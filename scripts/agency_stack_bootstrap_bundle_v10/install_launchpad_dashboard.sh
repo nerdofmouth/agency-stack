@@ -3,6 +3,20 @@
 
 echo "📜 Installing Launchpad Dashboard..."
 
+# Source the port manager
+source /home/revelationx/CascadeProjects/foss-server-stack/scripts/port_manager.sh
+
+# Default ports
+DEFAULT_DASHBOARD_PORT=1337
+DEFAULT_STATUS_PORT=3001
+
+# Register the ports and get assigned values
+DASHBOARD_PORT=$(register_port "launchpad_dashboard" "$DEFAULT_DASHBOARD_PORT" "flexible")
+STATUS_PORT=$(register_port "status_monitor" "$DEFAULT_STATUS_PORT" "flexible")
+
+echo "🔌 Launchpad Dashboard will use port: $DASHBOARD_PORT"
+echo "🔌 Status Monitor will use port: $STATUS_PORT"
+
 # Create directory for dashboard
 mkdir -p /opt/launchpad-dashboard
 mkdir -p /opt/launchpad-dashboard/src
@@ -28,6 +42,8 @@ services:
       - ./config:/app/config
       - ./data:/app/data
     restart: always
+    ports:
+      - "$DASHBOARD_PORT:3000"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.dashboard.rule=Host(\`dashboard.example.com\`)"
@@ -44,6 +60,8 @@ services:
     container_name: status_monitor
     volumes:
       - ./data/uptime-kuma:/app/data
+    ports:
+      - "$STATUS_PORT:3001"
     restart: always
     labels:
       - "traefik.enable=true"
@@ -196,7 +214,7 @@ app.get('/api/status', async (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(\`Launchpad Dashboard running on port \${PORT}\`);
+  console.log(`Launchpad Dashboard running on port ${PORT}`);
 });
 EOL
 
@@ -242,7 +260,7 @@ html(lang="en")
     
     footer.py-3.mt-4.border-top
       .container.text-center
-        p.text-muted #{env.FOOTER_TEXT || '© 2025 FOSS Server Stack'}
+        p.text-muted #{env.FOOTER_TEXT || ' 2025 FOSS Server Stack'}
     
     script(src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js")
     script(src="/js/main.js")
@@ -342,10 +360,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Update status indicators
         data.statuses.forEach(service => {
-          const statusElement = document.querySelector(\`[data-service="\${service.name}"]\`);
+          const statusElement = document.querySelector(`[data-service="${service.name}"]`);
           if (statusElement) {
-            statusElement.className = \`status-indicator \${service.status}\`;
-            statusElement.title = \`Status: \${service.status} (\${service.statusCode || 'N/A'})\`;
+            statusElement.className = `status-indicator ${service.status}`;
+            statusElement.title = `Status: ${service.status} (${service.statusCode || 'N/A'})`;
           }
         });
       }
@@ -479,7 +497,7 @@ AUTH_USER=admin
 AUTH_PASSWORD=change_me_now
 
 # Footer
-FOOTER_TEXT=© 2025 FOSS Server Stack - Powered by Open Source
+FOOTER_TEXT= 2025 FOSS Server Stack - Powered by Open Source
 
 # Keycloak Integration (optional)
 KEYCLOAK_URL=https://keycloak.example.com
@@ -508,7 +526,7 @@ ExecStart=/usr/bin/node server.js
 Restart=always
 User=root
 Environment=NODE_ENV=production
-Environment=PORT=3000
+Environment=PORT=$DASHBOARD_PORT
 
 [Install]
 WantedBy=multi-user.target
@@ -520,7 +538,7 @@ cat > /opt/launchpad-dashboard/setup.sh <<EOL
 # Setup script for Launchpad Dashboard
 
 # Check if running as root
-if [ "\$(id -u)" -ne 0 ]; then
+if [ "$(id -u)" -ne 0 ]; then
   echo "This script must be run as root" >&2
   exit 1
 fi
@@ -530,18 +548,18 @@ if [ ! -f "/opt/launchpad-dashboard/config/.env" ]; then
   cp /opt/launchpad-dashboard/config/.env.example /opt/launchpad-dashboard/config/.env
   
   # Generate a random password
-  RANDOM_PASSWORD=\$(tr -dc A-Za-z0-9 </dev/urandom | head -c 16)
+  RANDOM_PASSWORD=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 16)
   
   # Update the password in .env
-  sed -i "s/AUTH_PASSWORD=change_me_now/AUTH_PASSWORD=\$RANDOM_PASSWORD/" /opt/launchpad-dashboard/config/.env
+  sed -i "s/AUTH_PASSWORD=change_me_now/AUTH_PASSWORD=$RANDOM_PASSWORD/" /opt/launchpad-dashboard/config/.env
   
   # Generate hashed password for Traefik
-  HASHED_PASSWORD=\$(htpasswd -nb admin "\$RANDOM_PASSWORD" | sed -e s/\\$/\\$\\$/g)
+  HASHED_PASSWORD=$(htpasswd -nb admin "$RANDOM_PASSWORD" | sed -e s/\\$/\\$\\$/g)
   
   # Update the password in traefik-auth.toml
-  sed -i "s|admin:.*|\\"\$HASHED_PASSWORD\\"|" /opt/launchpad-dashboard/config/traefik-auth.toml
+  sed -i "s|admin:.*|\"$HASHED_PASSWORD\"|" /opt/launchpad-dashboard/config/traefik-auth.toml
   
-  echo "Generated random password: \$RANDOM_PASSWORD"
+  echo "Generated random password: $RANDOM_PASSWORD"
   echo "Remember to update your service URLs in the config files."
 fi
 
@@ -559,15 +577,15 @@ EOL
 # Make the setup script executable
 chmod +x /opt/launchpad-dashboard/setup.sh
 
-echo "✅ Launchpad Dashboard installed successfully!"
-echo "📋 Configuration:"
+echo " Launchpad Dashboard installed successfully!"
+echo " Configuration:"
 echo "  1. Run the setup script: /opt/launchpad-dashboard/setup.sh"
 echo "  2. Update service URLs in /opt/launchpad-dashboard/config/services.json"
 echo "  3. Customize dashboard settings in /opt/launchpad-dashboard/config/.env"
 echo "  4. Update Traefik configuration to include the auth middleware"
-echo "🚀 To start the dashboard manually:"
+echo " To start the dashboard manually:"
 echo "  cd /opt/launchpad-dashboard && docker-compose up -d"
-echo "🌐 Access your dashboard at: https://dashboard.example.com"
-echo "🔐 Default credentials (change these immediately):"
+echo " Access your dashboard at: https://dashboard.example.com"
+echo " Default credentials (change these immediately):"
 echo "  - Username: admin"
 echo "  - Password: Generated during setup (shown during setup.sh execution)"

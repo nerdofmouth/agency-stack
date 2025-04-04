@@ -1,4 +1,11 @@
 #!/bin/bash
+
+# Initialize port management
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+echo "🔌 Initializing port management system..."
+source "$SCRIPT_DIR/../../scripts/port_manager.sh"
+echo "✅ Port management system initialized."
+
 bash install_prerequisites.sh
 bash install_docker.sh
 bash install_docker_compose.sh
@@ -33,3 +40,6 @@ bash install_launchpad_dashboard.sh
 
 echo "✅ FOSS Server Stack installation completed!"
 echo "🚀 Access your services through the Launchpad Dashboard"
+echo ""
+echo "📊 Port allocation summary:"
+"$SCRIPT_DIR/../../scripts/port_manager.sh" list

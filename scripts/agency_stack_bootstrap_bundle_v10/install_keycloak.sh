@@ -3,6 +3,20 @@
 
 echo "🔐 Installing Keycloak (Identity and Access Management)..."
 
+# Source the port manager
+source /home/revelationx/CascadeProjects/foss-server-stack/scripts/port_manager.sh
+
+# Default port for Keycloak
+DEFAULT_KEYCLOAK_PORT=8080
+DEFAULT_POSTGRES_PORT=5432
+
+# Register the ports and get assigned values
+KEYCLOAK_PORT=$(register_port "keycloak" "$DEFAULT_KEYCLOAK_PORT" "flexible")
+POSTGRES_PORT=$(register_port "keycloak_postgres" "$DEFAULT_POSTGRES_PORT" "flexible")
+
+echo "🔌 Keycloak will use port: $KEYCLOAK_PORT"
+echo "🔌 Keycloak PostgreSQL will use port: $POSTGRES_PORT"
+
 # Create directory for Keycloak
 mkdir -p /opt/keycloak/data
 
@@ -21,6 +35,8 @@ services:
       POSTGRES_DB: keycloak
       POSTGRES_USER: keycloak
       POSTGRES_PASSWORD: keycloak_password
+    ports:
+      - "$POSTGRES_PORT:5432"
     networks:
       - keycloak_network
 
@@ -47,7 +63,9 @@ services:
       - "traefik.http.routers.keycloak.rule=Host(\`keycloak.example.com\`)"
       - "traefik.http.routers.keycloak.entrypoints=websecure"
       - "traefik.http.routers.keycloak.tls.certresolver=myresolver"
-      - "traefik.http.services.keycloak.loadbalancer.server.port=8080"
+      - "traefik.http.services.keycloak.loadbalancer.server.port=$KEYCLOAK_PORT"
+    ports:
+      - "$KEYCLOAK_PORT:8080"
     networks:
       - keycloak_network
       - traefik
@@ -124,6 +142,7 @@ echo "✅ Keycloak installed successfully!"
 echo "🔐 Default admin credentials:"
 echo "   - Username: admin"
 echo "   - Password: admin_password"
-echo "🌐 Access Keycloak at: https://keycloak.example.com"
+echo "🌐 Access Keycloak at: https://keycloak.example.com (Internal port: $KEYCLOAK_PORT)"
 echo "⚠️  IMPORTANT: Change the default credentials and update the hostname in the docker-compose.yml file!"
 echo "🧰 Run the setup-realm.sh script after updating the variables to create a basic realm and client."
+echo "📝 Port allocation information saved to $PORT_DB"

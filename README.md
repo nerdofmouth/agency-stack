@@ -67,7 +67,9 @@ Detailed documentation is available in the `docs/` directory:
 - [Pre-Installation Checklist](docs/PRE_INSTALLATION_CHECKLIST.md) - Preparation steps
 - [Client Setup Guide](docs/CLIENT_SETUP.md) - Setting up client instances
 - [Script Interactions](docs/SCRIPT_INTERACTIONS.md) - How scripts work together
+- [Port Reference](docs/PORTS.md) - Full list of exposed service ports and their usage.
 - [Future Plans (2025.04.03)](docs/FuturePlans.2025.04.03.md) - Future plans and updates
+
 
 ## Contributing
 
