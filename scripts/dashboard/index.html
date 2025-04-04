@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgencyStack Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <meta http-equiv="refresh" content="300"> <!-- Auto-refresh every 5 minutes -->
+</head>
+<body>
+    <header>
+        <div class="logo-container">
+            <h1>🧭 AgencyStack</h1>
+        </div>
+        <div class="tagline">
+            <p>"Run your agency. Reclaim your agency." - The Agency Project by NerdOfMouth</p>
+        </div>
+        <div class="meta-info">
+            <p>Server: <span id="server-name">Loading...</span> | Domain: <span id="domain-name">Loading...</span> | Last Updated: <span id="last-updated">Loading...</span></p>
+        </div>
+    </header>
+
+    <nav>
+        <button class="nav-btn active" data-category="all">All Services</button>
+        <button class="nav-btn" data-category="Core Infrastructure">Core Infrastructure</button>
+        <button class="nav-btn" data-category="Databases">Databases</button>
+        <button class="nav-btn" data-category="Identity & Auth">Identity & Auth</button>
+        <button class="nav-btn" data-category="CMS & Sites">CMS & Sites</button>
+        <button class="nav-btn" data-category="Business Applications">Business Applications</button>
+        <button class="nav-btn" data-category="Communication">Communication</button>
+        <button class="nav-btn" data-category="Monitoring">Monitoring</button>
+        <button class="nav-btn" data-category="Other">Other</button>
+    </nav>
+
+    <main>
+        <div class="dashboard-actions">
+            <button id="refresh-dashboard" class="action-btn primary">🔄 Refresh Dashboard</button>
+            <button id="integrate-components" class="action-btn">🔌 Integrate Components</button>
+            <button id="health-check" class="action-btn">🩺 Health Check</button>
+            <button id="view-logs" class="action-btn">📋 View Logs</button>
+        </div>
+
+        <div class="services-container">
+            <div class="loading" id="loading-indicator">
+                <div class="spinner"></div>
+                <p>Loading services...</p>
+            </div>
+            <div id="services-grid"></div>
+        </div>
+    </main>
+
+    <div class="status-legend">
+        <h3>⚙️ Status Legend</h3>
+        <div class="legend-items">
+            <div class="legend-item">
+                <span class="status-indicator running"></span>
+                <span class="status-label">Running</span>
+            </div>
+            <div class="legend-item">
+                <span class="status-indicator stopped"></span>
+                <span class="status-label">Stopped</span>
+            </div>
+            <div class="legend-item">
+                <span class="status-indicator not-installed"></span>
+                <span class="status-label">Not Installed</span>
+            </div>
+            <div class="legend-item">
+                <span class="status-indicator configurable"></span>
+                <span class="status-label">Configurable</span>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2025 NerdOfMouth - AgencyStack</p>
+        <div class="action-links">
+            <a href="https://stack.nerdofmouth.com" target="_blank">Documentation</a> |
+            <a href="https://github.com/nerdofmouth/agency-stack" target="_blank">GitHub</a>
+        </div>
+    </footer>
+
+    <template id="service-card-template">
+        <div class="service-card">
+            <div class="card-header">
+                <span class="status-indicator"></span>
+                <h3 class="service-name"></h3>
+            </div>
+            <div class="card-body">
+                <p class="service-category"></p>
+                <p class="service-domain">Domain: <a href="#" target="_blank"></a></p>
+                <p class="service-ports">Ports: <span></span></p>
+            </div>
+            <div class="card-footer">
+                <button class="open-btn">Open Service</button>
+                <button class="install-btn">Install</button>
+                <button class="start-btn">Start</button>
+                <button class="stop-btn">Stop</button>
+            </div>
+        </div>
+    </template>
+
+    <script src="script.js"></script>
+</body>
+</html>

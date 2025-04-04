@@ -19,7 +19,7 @@ MAGENTA := $(shell tput setaf 5)
 CYAN := $(shell tput setaf 6)
 RESET := $(shell tput sgr0)
 
-.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit integrate-components
+.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit integrate-components dashboard dashboard-refresh dashboard-enable
 
 # Default target
 help:
@@ -58,6 +58,9 @@ help:
 	@echo "  $(BOLD)make motd$(RESET)             Generate server message of the day"
 	@echo "  $(BOLD)make audit$(RESET)            Audit running components and system status"
 	@echo "  $(BOLD)make integrate-components$(RESET) Integrate AgencyStack components"
+	@echo "  $(BOLD)make dashboard$(RESET)        Open AgencyStack dashboard"
+	@echo "  $(BOLD)make dashboard-refresh$(RESET) Refresh AgencyStack dashboard"
+	@echo "  $(BOLD)make dashboard-enable$(RESET) Enable AgencyStack dashboard"
 	@echo ""
 	@echo "$(GREEN)Visit https://stack.nerdofmouth.com for documentation$(RESET)"
 
@@ -254,3 +257,18 @@ audit:
 integrate-components:
 	@echo "🔄 Integrating AgencyStack components..."
 	@sudo bash $(SCRIPTS_DIR)/integrate_components.sh
+
+# Open AgencyStack dashboard
+dashboard:
+	@echo "📊 Opening AgencyStack dashboard..."
+	@sudo bash $(SCRIPTS_DIR)/dashboard.sh
+
+# Refresh AgencyStack dashboard
+dashboard-refresh:
+	@echo "🔄 Refreshing AgencyStack dashboard..."
+	@sudo bash $(SCRIPTS_DIR)/dashboard_refresh.sh
+
+# Enable AgencyStack dashboard
+dashboard-enable:
+	@echo "🔓 Enabling AgencyStack dashboard..."
+	@sudo bash $(SCRIPTS_DIR)/dashboard_enable.sh

@@ -1,0 +1,26 @@
+version: '3'
+
+services:
+  dashboard:
+    image: nginx:alpine
+    container_name: agency_stack_dashboard
+    restart: unless-stopped
+    volumes:
+      - /opt/agency_stack/dashboard:/usr/share/nginx/html:ro
+    networks:
+      - agency_stack_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.agency-dashboard.rule=Host(`dashboard.${PRIMARY_DOMAIN:-example.com}`)"
+      - "traefik.http.routers.agency-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.agency-dashboard.tls=true"
+      - "traefik.http.routers.agency-dashboard.tls.certresolver=agency-stack-resolver"
+      - "traefik.http.services.agency-dashboard.loadbalancer.server.port=80"
+      - "traefik.docker.network=agency_stack_network"
+      - "agency_stack.component=dashboard"
+      - "agency_stack.category=Monitoring"
+      - "agency_stack.description=AgencyStack Dashboard"
+
+networks:
+  agency_stack_network:
+    external: true
