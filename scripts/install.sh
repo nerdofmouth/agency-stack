@@ -731,33 +731,59 @@ AGENCYSCRIPT
   echo -e "${GREEN}Created 'agency_stack' command for easier management${NC}"
 fi
 
+# Function to setup basic utilities
+setup_basic_utilities() {
+  echo -e "${BLUE}${BOLD} Setting up basic utilities...${NC}"
+  log "INFO" "Setting up basic utilities"
+  apt-get update
+  apt-get install -y htop git unzip curl wget
+  
+  # Set up log rotation for production readiness
+  echo -e "${BLUE}${BOLD} Setting up log rotation...${NC}"
+  if [ -f "$(dirname "$0")/setup_log_rotation.sh" ]; then
+    bash "$(dirname "$0")/setup_log_rotation.sh"
+    log "INFO" "Log rotation configured"
+  else
+    log "WARN" "Log rotation script not found"
+  fi
+  
+  echo -e "${GREEN}Basic utilities setup completed${NC}"
+}
+
 # Main menu
 main_menu() {
-  local choice
+  clear
+  echo -e "${MAGENTA}${BOLD} AgencyStack Installation Menu ${NC}"
+  echo -e " ============================="
+  source "$(dirname "$0")/agency_branding.sh" && random_tagline
+  echo
+  echo -e "${BLUE}${BOLD} Select components to install:${NC}"
   
-  while true; do
-    show_components
-    read -p "Enter your choice (0-80): " choice
-    
-    # Validate input is not empty and is a number
-    if [[ -z "$choice" || ! "$choice" =~ ^[0-9]+$ ]]; then
-      echo -e "${YELLOW} Invalid option${NC}"
-      continue
-    fi
-    
-    if [ "$choice" -eq 0 ]; then
-      log "INFO" "Exiting installer"
-      echo -e "${BLUE}${BOLD}Exiting installer. Thank you!${NC}"
-      echo -e "${GREEN}You can manage your installation with the 'agency_stack' command${NC}"
-      exit 0
-    else
-      install_component $choice
-      echo ""
-      read -p "Press enter to continue..."
-    fi
-    
+  # Setup basic utilities and log rotation for production readiness
+  setup_basic_utilities
+
+  # Display menu options
+  show_components
+  read -p "Enter your choice (0-80): " choice
+  
+  # Validate input is not empty and is a number
+  if [[ -z "$choice" || ! "$choice" =~ ^[0-9]+$ ]]; then
+    echo -e "${YELLOW} Invalid option${NC}"
+    return
+  fi
+  
+  if [ "$choice" -eq 0 ]; then
+    log "INFO" "Exiting installer"
+    echo -e "${BLUE}${BOLD}Exiting installer. Thank you!${NC}"
+    echo -e "${GREEN}You can manage your installation with the 'agency_stack' command${NC}"
+    exit 0
+  else
+    install_component $choice
     echo ""
-  done
+    read -p "Press enter to continue..."
+  fi
+  
+  echo ""
 }
 
 # Start the main menu

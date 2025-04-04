@@ -34,7 +34,14 @@ Before installing AgencyStack, make sure you have:
    - No firewall blocking HTTP/HTTPS traffic
    - Public static IP address (recommended)
 
-4. **Software Dependencies**:
+4. **Email Requirements**:
+   - Access to an SMTP server for sending system emails
+   - Can be your existing email provider (Gmail, Office 365, etc.)
+   - Or a transactional email service (SendGrid, Mailgun, Amazon SES)
+   - The email domain does NOT need to match your primary domain
+   - For testing, you can skip email setup or use a service like Mailtrap
+
+5. **Software Dependencies**:
    - The installer will automatically install these for you:
      - Docker and Docker Compose (for containerization)
      - Git, Make, Curl, Wget, JQ (for installation and configuration)
@@ -123,6 +130,52 @@ make client
 ```
 
 3. Consider setting up the [self-healing infrastructure](self-healing.html) for production deployments
+
+## Post-Installation Configuration
+
+After completing the basic installation, you may need to configure additional settings:
+
+### Email (SMTP) Configuration
+
+AgencyStack uses SMTP for sending notifications, password resets, and other system emails. During installation, you'll be prompted for SMTP details.
+
+#### Option 1: Using Built-in Mailu Email Server (Recommended)
+
+AgencyStack includes Mailu, a complete email server solution. To use it:
+
+1. During installation, select to install the Mailu component
+2. When prompted for SMTP details, use:
+   - SMTP Enabled: `true`
+   - SMTP Host: `mailu` (internal Docker network name)
+   - SMTP Port: `25` (internal network port)
+   - SMTP Username: `admin@yourdomain.com` (replace with your domain)
+   - SMTP Password: The admin password you set during Mailu installation
+   - SMTP From: `noreply@yourdomain.com` (or any address on your domain)
+
+This configuration uses the local Mailu instance, providing a fully integrated solution with:
+- Complete control over your email infrastructure
+- No dependency on external providers
+- Proper SPF, DKIM, and DMARC configuration
+- Built-in webmail interface for users
+
+#### Option 2: Using External Email Provider
+
+If you prefer using an external email provider:
+
+| Setting | Description | Example |
+|---------|-------------|---------|
+| SMTP Enabled | Enable/disable email functionality | `true` or `false` |
+| SMTP Host | Your email provider's SMTP server | `smtp.gmail.com` |
+| SMTP Port | The port for your SMTP server | `587` (TLS) or `465` (SSL) |
+| SMTP Username | Your email address or username | `notifications@yourdomain.com` |
+| SMTP Password | Password for your email account | `your-secure-password` |
+| SMTP From | The email address emails appear from | `noreply@yourdomain.com` |
+
+**Note for Gmail users**: You may need to create an "App Password" if you have 2-Factor Authentication enabled. Visit [Google Account Security](https://myaccount.google.com/security) → App Passwords.
+
+**Note for Office 365 users**: Make sure SMTP AUTH is enabled for your account and you've allowed "Less secure apps" if required.
+
+You can update these settings later by editing the `/opt/agency_stack/config.env` file and restarting the affected services.
 
 ## Troubleshooting
 

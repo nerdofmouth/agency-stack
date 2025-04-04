@@ -71,6 +71,28 @@ For detailed Builder.io integration instructions, see our [Builder.io Integratio
 | Component | Description | Default URL |
 |-----------|-------------|-------------|
 | **VoIP System** | Complete Voice over IP telephony service | https://voip.yourdomain.com |
+| **Mailu** | Complete email server with webmail, SMTP, and IMAP | https://mail.yourdomain.com |
+
+### Mailu Email Server
+
+AgencyStack includes Mailu, a complete, Docker-based mail server solution:
+
+**Features:**
+- SMTP server for sending and receiving emails
+- IMAP server for accessing emails
+- Webmail interface (Roundcube) for browser-based email access
+- Admin panel for managing domains, users, and aliases
+- Anti-spam filtering (with RSpamd)
+- Automatic DKIM, SPF, and DMARC setup
+- TLS encryption with Let's Encrypt integration
+
+**Default URLs:**
+- Admin panel: https://mailu.yourdomain.com/admin
+- Webmail: https://webmail.yourdomain.com
+- SMTP: smtp.yourdomain.com (port 587)
+- IMAP: imap.yourdomain.com (port 993)
+
+For detailed email client setup instructions, see our [Email Client Setup Guide](/pages/email-client-setup.html).
 
 ### VoIP Details
 
