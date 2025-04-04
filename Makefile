@@ -19,7 +19,7 @@ MAGENTA := $(shell tput setaf 5)
 CYAN := $(shell tput setaf 6)
 RESET := $(shell tput sgr0)
 
-.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring
+.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation
 
 # Default target
 help:
@@ -40,6 +40,12 @@ help:
 	@echo "  $(BOLD)make buddy-init$(RESET)       Initialize buddy system"
 	@echo "  $(BOLD)make buddy-monitor$(RESET)    Check health of buddy servers"
 	@echo "  $(BOLD)make drone-setup$(RESET)      Setup DroneCI integration"
+	@echo "  $(BOLD)make mailu-setup$(RESET)      Configure Mailu email server"
+	@echo "  $(BOLD)make mailu-test-email$(RESET) Send a test email via Mailu"
+	@echo "  $(BOLD)make logs$(RESET)             View installation and component logs"
+	@echo "  $(BOLD)make health-check$(RESET)     Verify all components are working properly"
+	@echo "  $(BOLD)make verify-dns$(RESET)       Check DNS configuration"
+	@echo "  $(BOLD)make setup-log-rotation$(RESET) Configure log rotation"
 	@echo ""
 	@echo "$(GREEN)Visit https://stack.nerdofmouth.com for documentation$(RESET)"
 
@@ -146,3 +152,33 @@ start-buddy-system:
 enable-monitoring: drone-setup start-buddy-system
 	@echo "🔍 Monitoring systems enabled"
 	@echo "Visit https://drone.$(shell hostname -f) to access your DroneCI instance"
+
+# Configure Mailu email server
+mailu-setup:
+	@echo "📨 Configuring Mailu email server..."
+	@sudo $(SCRIPTS_DIR)/mailu_setup.sh
+
+# Send a test email via Mailu
+mailu-test-email:
+	@echo "📨 Sending test email via Mailu..."
+	@sudo $(SCRIPTS_DIR)/mailu_test_email.sh
+
+# View installation and component logs
+logs:
+	@echo "📝 Viewing installation and component logs..."
+	@sudo $(SCRIPTS_DIR)/view_logs.sh
+
+# Verify all components are working properly
+health-check:
+	@echo "🏥 Verifying all components are working properly..."
+	@sudo $(SCRIPTS_DIR)/health_check.sh
+
+# Check DNS configuration
+verify-dns:
+	@echo "📈 Checking DNS configuration..."
+	@sudo $(SCRIPTS_DIR)/verify_dns.sh
+
+# Configure log rotation
+setup-log-rotation:
+	@echo "🔄 Configuring log rotation..."
+	@sudo $(SCRIPTS_DIR)/setup_log_rotation.sh
