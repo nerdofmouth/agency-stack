@@ -150,3 +150,73 @@ If an integration fails or you need to debug issues:
 2. **Keep components updated**: Ensure all components are up-to-date before running integrations
 3. **Check integration versions**: Re-run integrations after major version updates
 4. **Use specific integration types**: Use targeted integration commands rather than running all integrations at once
+
+## Port Management & Conflict Resolution
+
+AgencyStack provides robust tools for managing port assignments and resolving conflicts between services.
+
+### Port Registry
+
+All ports used by AgencyStack components are tracked in a central registry:
+
+- **Location**: `/opt/agency_stack/ports/ports.json`
+- **Format**: JSON mapping of ports to services
+- **Purpose**: Prevent conflicts, enable port remapping, document assignments
+
+### Port Detection Tools
+
+AgencyStack includes utilities to detect and resolve port conflicts:
+
+| Command | Description | Use Case |
+|---------|-------------|----------|
+| `make detect-ports` | Scan for conflicts without making changes | Before deployments or when troubleshooting |
+| `make remap-ports` | Automatically resolve conflicts by reassigning ports | When conflicts are detected |
+| `make scan-ports` | Only scan and update the port registry | After manual changes to the infrastructure |
+
+### How Port Conflict Detection Works
+
+1. **Registry Scanning**: Reads the current port registry from `ports.json`
+2. **Docker Container Analysis**: Examines all running containers for port mappings 
+3. **System Port Check**: Verifies if any ports are in use by the host system
+4. **Conflict Detection**: Identifies port collisions and duplications
+5. **Resolution**: Suggests or automatically applies port reassignments
+
+### Conflict Resolution Strategies
+
+When a conflict is detected, the system:
+
+1. Identifies an available port in the 8000-9000 range (customizable)
+2. Updates `ports.json` with the new assignment
+3. Modifies service configuration files (including `.env` files and Docker Compose config)
+4. Records the decision in `/opt/agency_stack/ports/decisions.log` for auditing
+
+### Best Practices for Port Management
+
+1. **Use Environment Variables**: Always reference ports as `${PORT_SERVICENAME}` in configuration files
+2. **Run Detection Regularly**: Especially before adding new components
+3. **Review the Decisions Log**: Check `/opt/agency_stack/ports/decisions.log` for port reassignment history
+4. **Restart Services**: After port remapping, restart affected services to apply changes
+
+### Common Port Assignments
+
+| Service | Default Port | Notes |
+|---------|--------------|-------|
+| Traefik | 80, 443 | Web traffic and HTTPS |
+| Portainer | 9000 | Container management |
+| WordPress | 8080 | Content management system |
+| ERPNext | 8000 | Business management platform |
+| Grafana | 3000 | Monitoring dashboards |
+| Loki | 3100 | Log aggregation |
+| Mailu | 25, 465, 587, 993, 995 | Email services |
+| Keycloak | 8443 | Identity management |
+
+### Handling Manual Port Changes
+
+If you need to change ports manually:
+
+1. Edit the relevant Docker Compose file or service configuration
+2. Update the environment variables in `.env` files
+3. Run `make scan-ports` to update the port registry
+4. Restart the affected services
+
+This systematic approach ensures that port conflicts are detected early and resolved automatically, reducing downtime and configuration errors across the AgencyStack ecosystem.
