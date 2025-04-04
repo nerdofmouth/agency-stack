@@ -238,14 +238,22 @@ if [ -f "/opt/agency_stack/config.env" ]; then
   source "/opt/agency_stack/config.env"
   
   if [ -n "$PRIMARY_DOMAIN" ]; then
-    print_info "Checking DNS for $PRIMARY_DOMAIN..."
-    if host "$PRIMARY_DOMAIN" &>/dev/null; then
-      print_success "DNS resolved for $PRIMARY_DOMAIN"
-      log "INFO" "DNS check passed for $PRIMARY_DOMAIN"
+    if [ "$PRIMARY_DOMAIN" = "example.com" ]; then
+      print_warning "PRIMARY_DOMAIN is set to example.com (placeholder)"
+      log "WARN" "PRIMARY_DOMAIN is set to example.com"
     else
-      print_warning "DNS failed for $PRIMARY_DOMAIN"
-      log "WARN" "DNS check failed for $PRIMARY_DOMAIN"
+      print_info "Checking DNS for $PRIMARY_DOMAIN..."
+      if host "$PRIMARY_DOMAIN" &>/dev/null; then
+        print_success "DNS resolved for $PRIMARY_DOMAIN"
+        log "INFO" "DNS check passed for $PRIMARY_DOMAIN"
+      else
+        print_warning "DNS failed for $PRIMARY_DOMAIN"
+        log "WARN" "DNS check failed for $PRIMARY_DOMAIN"
+      fi
     fi
+  else
+    print_warning "No PRIMARY_DOMAIN set in config (found: 'example.com' placeholder)"
+    log "WARN" "No PRIMARY_DOMAIN configured properly"
   fi
   
   # Check client domains if they exist
