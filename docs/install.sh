@@ -90,8 +90,8 @@ echo -e "${CYAN}This may take a few minutes. Please be patient.${NC}\n"
 
 # Clone the repository
 echo -e "${BLUE}Cloning AgencyStack repository...${NC}"
-if [ -d "/opt/agency-stack" ]; then
-    echo -e "${YELLOW}WARNING: Existing installation found at /opt/agency-stack${NC}"
+if [ -d "/opt/agency_stack" ]; then
+    echo -e "${YELLOW}WARNING: Existing installation found at /opt/agency_stack${NC}"
     echo -e "What would you like to do?"
     echo -e "  1. Backup and reinstall (recommended)"
     echo -e "  2. Remove and reinstall (data will be lost)"
@@ -102,14 +102,14 @@ if [ -d "/opt/agency-stack" ]; then
         1)
             echo -e "${BLUE}Backing up existing installation...${NC}"
             timestamp=$(date +%Y%m%d-%H%M%S)
-            backup_dir="/opt/agency-stack-backup-$timestamp"
-            cp -r /opt/agency-stack "$backup_dir"
+            backup_dir="/opt/agency_stack-backup-$timestamp"
+            cp -r /opt/agency_stack "$backup_dir"
             echo -e "${GREEN}Backup created at $backup_dir${NC}"
-            rm -rf /opt/agency-stack
+            rm -rf /opt/agency_stack
             ;;
         2)
             echo -e "${YELLOW}Removing existing installation...${NC}"
-            rm -rf /opt/agency-stack
+            rm -rf /opt/agency_stack
             ;;
         3)
             echo -e "${YELLOW}Installation aborted by user.${NC}"
@@ -123,8 +123,8 @@ if [ -d "/opt/agency-stack" ]; then
 fi
 
 # Clone the repository and run the installer
-git clone https://github.com/nerdofmouth/agency-stack.git /opt/agency-stack
-cd /opt/agency-stack
+git clone https://github.com/nerdofmouth/agency-stack.git /opt/agency_stack
+cd /opt/agency_stack
 
 # Make scripts executable
 chmod +x scripts/*.sh
