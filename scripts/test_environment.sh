@@ -1,6 +1,6 @@
 #!/bin/bash
-# test_environment.sh - Tests the Launchbox environment and services
-# Part of Launchbox by NerdofMouth.com
+# test_environment.sh - Tests the AgencyStack environment and services
+# https://stack.nerdofmouth.com
 
 # Colors and formatting
 RED='\033[0;31m'
@@ -43,14 +43,14 @@ fi
 cat << "EOF"
 🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪
 🧪                                                    🧪
-🧪    Launchbox Environment Test Suite               🧪
-🧪    https://nerdofmouth.com/launchbox              🧪
+🧪    AgencyStack Environment Test Suite               🧪
+🧪    https://stack.nerdofmouth.com                    🧪
 🧪                                                    🧪
 🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪🧪
 EOF
 echo ""
 
-log "INFO" "Starting Launchbox test suite"
+log "INFO" "Starting AgencyStack test suite"
 print_info "Test results will be logged to: $LOGFILE"
 
 # Display motto
@@ -273,7 +273,7 @@ fi
 
 # Test summary
 print_header "Test Summary"
-log "INFO" "Completed Launchbox test suite"
+log "INFO" "Completed AgencyStack test suite"
 print_info "All tests completed. Check the log for details: $LOGFILE"
 
 # Check if there were any errors
@@ -286,7 +286,7 @@ elif grep -q "WARN" "$LOGFILE"; then
   log "WARN" "Test suite completed with warnings"
   exit 0
 else
-  print_success "All tests passed successfully! Launchbox is ready."
+  print_success "All tests passed successfully! AgencyStack is ready."
   log "INFO" "Test suite completed successfully"
   exit 0
 fi

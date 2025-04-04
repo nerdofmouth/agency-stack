@@ -1,87 +1,106 @@
 # AgencyStack
 
-**Run your agency. Reclaim your agency.**
+<div align="center">
+  <img src="docs/images/AgencyStack-logo.png" alt="AgencyStack Logo" width="400">
+  <p><strong>Digital Sovereignty for Modern Agencies</strong></p>
+  <p><em>Run your agency. Reclaim your agency.</em></p>
+</div>
 
-A comprehensive solution for deploying a complete FOSS (Free and Open Source Software) server infrastructure using Docker containers. Built by [Nerd of Mouth](https://stack.nerdofmouth.com).
+A declaration of independence for digital agencies, creative professionals, and businesses who want to own their technology stack, control their data, and operate with true digital sovereignty. Built by [Nerd of Mouth](https://stack.nerdofmouth.com).
 
-## Overview
+## One-Line Installation
 
-AgencyStack contains scripts and documentation for automating the deployment of a collection of free and open source applications running in Docker containers. The stack is designed to provide agencies, businesses, and independent creators with a complete suite of tools for operations, collaboration, and customer engagement.
+```bash
+curl -sSL https://stack.nerdofmouth.com/install.sh | sudo bash
+```
 
-## Philosophy
+## Vision
 
-> "Tools for freedom, proof of power."
+In a world where agencies and businesses increasingly rely on closed SaaS platforms that limit control, extract ongoing fees, and hold your data hostage, AgencyStack offers a different path. We believe that:
 
-AgencyStack stands for sovereignty and freedom. It's built on the principles that:
-- Technology should empower, not constrain
-- Digital infrastructure should promote independence
-- The tools you use should align with your values
+- **Digital sovereignty** is fundamental to business resilience and independence
+- **Open source tools** can and should be as powerful and polished as proprietary alternatives
+- **Agencies deserve freedom** from vendor lock-in, unpredictable pricing, and unnecessary complexity
+- **Technology should serve your mission**, not complicate it or compromise it
 
 ## Features
 
+AgencyStack provides:
 - **One-click installation** of multiple FOSS applications
 - **Docker-based** for easy deployment and maintenance
 - **Secure by default** with SSL, fail2ban, and security hardening
-- **Modular design** allowing selective component installation
-- **Multi-tenant architecture** for serving multiple clients
+- **Multi-client architecture** for agency/client isolation
+- **Self-healing infrastructure** with buddy system monitoring
+- **DroneCI integration** for automated testing and deployment
 - **Comprehensive documentation** for setup and maintenance
+- **Beautiful branding** with custom taglines and ASCII art
+- **One-line installation** for quick deployment
 
-## Included Applications
+## Components
 
-| Category | Applications |
-|----------|--------------|
-| **Infrastructure** | Docker, Docker Compose, Traefik (SSL), Portainer |
-| **Business Operations** | ERPNext, KillBill, Cal.com, Documenso |
-| **Content Management** | WordPress, PeerTube, Seafile |
-| **Team Collaboration** | Focalboard, TaskWarrior/Calcure |
-| **Marketing & Analytics** | Listmonk, PostHog, WebPush |
-| **Automation** | n8n, OpenIntegrationHub |
-| **System & Security** | Netdata, Fail2ban, Security hardening |
+AgencyStack includes:
+
+### Core Infrastructure
+- **Traefik**: Edge router and reverse proxy
+- **Portainer**: Container management UI
+- **Docker & Docker Compose**: Container runtime
+- **DroneCI**: Continuous Integration server
+
+### Business Applications
+- **ERPNext**: Enterprise Resource Planning
+- **KillBill**: Subscription billing
+- **Cal.com**: Scheduling and appointments
+- **Documenso**: Document signing
+
+### Content Management
+- **WordPress**: Content management system
+- **PeerTube**: Video hosting platform
+- **Seafile**: File sync and share solution
+- **Builder.io**: Visual content management
+
+### Team Collaboration
+- **Focalboard**: Project management
+- **TaskWarrior/Calcure**: Task and calendar management
+
+### Marketing and Analytics
+- **Listmonk**: Newsletter and mailing list manager
+- **PostHog**: Product analytics
+- **WebPush**: Web push notifications
+
+### Integration
+- **n8n**: Workflow automation
+- **OpenIntegrationHub**: Integration framework
+
+### System Monitoring
+- **Netdata**: Performance monitoring
+- **Fail2ban**: Intrusion prevention
+- **Buddy System**: Self-healing infrastructure
 
 ## Getting Started
 
-For detailed installation instructions, see [SETUP.md](SETUP.md).
+Visit our documentation at [https://stack.nerdofmouth.com](https://stack.nerdofmouth.com) for comprehensive installation guides and configuration options.
 
 ### Quick Start
 
-1. **Clone the repository:**
 ```bash
-git clone https://github.com/nerdofmouth/agency-stack.git
-cd agency-stack
-```
+# One-line installer (recommended)
+curl -sSL https://stack.nerdofmouth.com/install.sh | sudo bash
 
-2. **View available commands:**
-```bash
-make help
-```
-
-3. **Install AgencyStack:**
-```bash
+# OR clone and install manually
+git clone https://github.com/nerdofmouth/agency-stack.git /opt/agency-stack
+cd /opt/agency-stack
 make install
-```
-
-4. **Create a client:**
-```bash
-./scripts/agency_stack_bootstrap_bundle_v10/bootstrap_client.sh client.yourdomain.com
 ```
 
 ## Documentation
 
-- [SETUP.md](SETUP.md) - Comprehensive installation guide
-- [BRANDING.md](BRANDING.md) - AgencyStack branding guidelines
-- [docs/](docs/) - Detailed documentation for each component
-
-## Architecture
-
-AgencyStack uses a multi-tenant architecture:
-
-1. **Core Infrastructure** - Installed once on the server
-2. **Client Environments** - Each client gets their own isolated environment
-3. **Shared Services** - Central dashboard for management
-
-## Contributing
-
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+- [Installation Guide](https://stack.nerdofmouth.com/pages/installation.html)
+- [Components Overview](https://stack.nerdofmouth.com/pages/components.html)
+- [Client Setup](https://stack.nerdofmouth.com/pages/client-setup.html)
+- [Maintenance and Backup](https://stack.nerdofmouth.com/pages/maintenance.html)
+- [Self-Healing Setup](https://stack.nerdofmouth.com/pages/self-healing.html)
+- [Public Demo Environment](https://stack.nerdofmouth.com/pages/demo-setup.html)
+- [Troubleshooting](https://stack.nerdofmouth.com/pages/troubleshooting.html)
 
 ## Support
 
@@ -89,8 +108,11 @@ For support, contact [support@nerdofmouth.com](mailto:support@nerdofmouth.com) o
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ---
 
-Built with 🧠 by [Nerd of Mouth](https://nerdofmouth.com) | Deploy Smart. Speak Nerd.
+<div align="center">
+  <img src="docs/images/NerdofMouth-logo.png" alt="Nerd of Mouth" height="30">
+  <p><strong>Built by Nerd of Mouth</strong> | Deploy Smart. Speak Nerd.</p>
+</div>

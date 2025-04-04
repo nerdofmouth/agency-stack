@@ -19,7 +19,7 @@ MAGENTA := $(shell tput setaf 5)
 CYAN := $(shell tput setaf 6)
 RESET := $(shell tput sgr0)
 
-.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth
+.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring
 
 # Default target
 help:
@@ -37,6 +37,9 @@ help:
 	@echo "  $(BOLD)make stack-info$(RESET)       Display AgencyStack information"
 	@echo "  $(BOLD)make talknerdy$(RESET)        Display a random nerdy quote"
 	@echo "  $(BOLD)make rootofmouth$(RESET)      Display system performance stats"
+	@echo "  $(BOLD)make buddy-init$(RESET)       Initialize buddy system"
+	@echo "  $(BOLD)make buddy-monitor$(RESET)    Check health of buddy servers"
+	@echo "  $(BOLD)make drone-setup$(RESET)      Setup DroneCI integration"
 	@echo ""
 	@echo "$(GREEN)Visit https://stack.nerdofmouth.com for documentation$(RESET)"
 
@@ -109,3 +112,37 @@ talknerdy:
 rootofmouth:
 	@echo "$(MAGENTA)$(BOLD)📊 System Performance Stats:$(RESET)"
 	@bash $(SCRIPTS_DIR)/system_performance.sh
+
+# Initialize buddy system
+buddy-init:
+	@echo "🤝 Initializing AgencyStack buddy system..."
+	@sudo $(SCRIPTS_DIR)/buddy_system.sh init
+	@sudo $(SCRIPTS_DIR)/buddy_system.sh generate-keys
+	@sudo $(SCRIPTS_DIR)/buddy_system.sh install-cron
+
+# Monitor buddy servers
+buddy-monitor:
+	@echo "👀 Monitoring buddy servers..."
+	@sudo $(SCRIPTS_DIR)/buddy_system.sh monitor
+
+# Setup DroneCI integration
+drone-setup:
+	@echo "🚀 Setting up DroneCI integration..."
+	@sudo $(SCRIPTS_DIR)/buddy_system.sh setup-drone
+	@echo "Visit https://drone.$(shell hostname -f) to access your DroneCI instance"
+
+# Generate buddy keys
+generate-buddy-keys:
+	@echo "🔑 Generating SSH keys for buddy system..."
+	@sudo $(SCRIPTS_DIR)/buddy_system.sh generate-keys
+
+# Start buddy system monitoring
+start-buddy-system:
+	@echo "🚀 Starting buddy system monitoring..."
+	@sudo $(SCRIPTS_DIR)/buddy_system.sh install-cron
+	@echo "Buddy system scheduled monitoring is now active"
+
+# Enable monitoring
+enable-monitoring: drone-setup start-buddy-system
+	@echo "🔍 Monitoring systems enabled"
+	@echo "Visit https://drone.$(shell hostname -f) to access your DroneCI instance"
