@@ -61,6 +61,16 @@ bash install_wordpress_module.sh
 bash install_listmonk.sh
 ```
 
+### Option 3: Using the Interactive Installer
+
+For a more user-friendly approach, use the interactive installer:
+
+```bash
+sudo bash scripts/install.sh
+```
+
+This will present a menu where you can choose which components to install.
+
 ## Post-Installation
 
 After installation:
@@ -68,6 +78,17 @@ After installation:
 1. Access Portainer at `https://your-server-ip:9443` to manage containers
 2. Configure each service according to their specific documentation
 3. Set up regular backups for your data
+
+## Setting Up Client Instances
+
+Once your server stack is installed, you can set up individual client instances, each with their own ERPNext, PeerTube, and other services:
+
+```bash
+cd scripts/agency_stack_bootstrap_bundle_v10
+bash bootstrap_client.sh client.domain.com
+```
+
+For detailed instructions on client setup, see the [Client Setup Guide](CLIENT_SETUP.md).
 
 ## Troubleshooting
 

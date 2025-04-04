@@ -63,6 +63,13 @@ This document describes each component in the FOSS server stack and explains its
 - **Usage**: Document storage, sharing, and collaboration
 - **Configuration**: Requires initial setup and user management
 
+### Builder.io
+- **Description**: Headless CMS and visual content editor
+- **Usage**: Enables content managers to visually build and edit web content without coding
+- **Configuration**: Requires an account and API key from Builder.io
+- **Integration**: Automated provisioning available via `builderio_provision.sh` script
+- **Client Setup**: Can be enabled per client by setting `BUILDER_ENABLE=true` in the client's `.env` file
+
 ## Team Collaboration
 
 ### Focalboard
