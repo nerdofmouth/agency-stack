@@ -19,7 +19,7 @@ MAGENTA := $(shell tput setaf 5)
 CYAN := $(shell tput setaf 6)
 RESET := $(shell tput sgr0)
 
-.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit integrate-components dashboard dashboard-refresh dashboard-enable
+.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit integrate-components dashboard dashboard-refresh dashboard-enable integrate-sso integrate-email integrate-monitoring integrate-data-bridge
 
 # Default target
 help:
@@ -61,6 +61,10 @@ help:
 	@echo "  $(BOLD)make dashboard$(RESET)        Open AgencyStack dashboard"
 	@echo "  $(BOLD)make dashboard-refresh$(RESET) Refresh AgencyStack dashboard"
 	@echo "  $(BOLD)make dashboard-enable$(RESET) Enable AgencyStack dashboard"
+	@echo "  $(BOLD)make integrate-sso$(RESET)    Integrate Single Sign-On for AgencyStack components"
+	@echo "  $(BOLD)make integrate-email$(RESET)  Integrate Email systems for AgencyStack components"
+	@echo "  $(BOLD)make integrate-monitoring$(RESET) Integrate Monitoring for AgencyStack components"
+	@echo "  $(BOLD)make integrate-data-bridge$(RESET) Integrate Data Exchange for AgencyStack components"
 	@echo ""
 	@echo "$(GREEN)Visit https://stack.nerdofmouth.com for documentation$(RESET)"
 
@@ -257,6 +261,26 @@ audit:
 integrate-components:
 	@echo "🔄 Integrating AgencyStack components..."
 	@sudo bash $(SCRIPTS_DIR)/integrate_components.sh
+
+# Integrate Single Sign-On for AgencyStack components
+integrate-sso:
+	@echo "🔑 Integrating Single Sign-On for AgencyStack components..."
+	@sudo bash $(SCRIPTS_DIR)/integrate_components.sh --type=sso
+
+# Integrate Email systems for AgencyStack components
+integrate-email:
+	@echo "📧 Integrating Email systems for AgencyStack components..."
+	@sudo bash $(SCRIPTS_DIR)/integrate_components.sh --type=email
+
+# Integrate Monitoring for AgencyStack components
+integrate-monitoring:
+	@echo "📊 Integrating Monitoring for AgencyStack components..."
+	@sudo bash $(SCRIPTS_DIR)/integrate_components.sh --type=monitoring
+
+# Integrate Data Exchange for AgencyStack components
+integrate-data-bridge:
+	@echo "🔄 Integrating Data Exchange for AgencyStack components..."
+	@sudo bash $(SCRIPTS_DIR)/integrate_components.sh --type=data-bridge
 
 # Open AgencyStack dashboard
 dashboard:
