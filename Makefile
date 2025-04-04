@@ -19,7 +19,7 @@ MAGENTA := $(shell tput setaf 5)
 CYAN := $(shell tput setaf 6)
 RESET := $(shell tput sgr0)
 
-.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit integrate-components dashboard dashboard-refresh dashboard-enable integrate-sso integrate-email integrate-monitoring integrate-data-bridge
+.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit integrate-components dashboard dashboard-refresh dashboard-enable integrate-sso integrate-email integrate-monitoring integrate-data-bridge detect-ports remap-ports scan-ports
 
 # Default target
 help:
@@ -65,6 +65,9 @@ help:
 	@echo "  $(BOLD)make integrate-email$(RESET)  Integrate Email systems for AgencyStack components"
 	@echo "  $(BOLD)make integrate-monitoring$(RESET) Integrate Monitoring for AgencyStack components"
 	@echo "  $(BOLD)make integrate-data-bridge$(RESET) Integrate Data Exchange for AgencyStack components"
+	@echo "  $(BOLD)make detect-ports$(RESET)      Detect port conflicts in AgencyStack"
+	@echo "  $(BOLD)make remap-ports$(RESET)       Automatically remap conflicting ports"
+	@echo "  $(BOLD)make scan-ports$(RESET)        Scan and update port registry without conflict resolution"
 	@echo ""
 	@echo "$(GREEN)Visit https://stack.nerdofmouth.com for documentation$(RESET)"
 
@@ -296,3 +299,18 @@ dashboard-refresh:
 dashboard-enable:
 	@echo "🔓 Enabling AgencyStack dashboard..."
 	@sudo bash $(SCRIPTS_DIR)/dashboard_enable.sh
+
+# Detect port conflicts
+detect-ports:
+	@echo "🔍 Detecting port conflicts in AgencyStack..."
+	@sudo bash $(SCRIPTS_DIR)/utils/port_conflict_detector.sh --dry-run
+
+# Remap conflicting ports
+remap-ports:
+	@echo "🔄 Remapping conflicting ports in AgencyStack..."
+	@sudo bash $(SCRIPTS_DIR)/utils/port_conflict_detector.sh --fix
+
+# Scan and update port registry
+scan-ports:
+	@echo "📋 Scanning and updating port registry..."
+	@sudo bash $(SCRIPTS_DIR)/utils/port_conflict_detector.sh --scan
