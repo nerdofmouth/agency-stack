@@ -1,0 +1,63 @@
+# Pre-Installation Checklist
+
+Use this checklist to ensure your environment is ready before deploying the FOSS server stack.
+
+## Server Requirements
+
+- [ ] Server with Linux OS (Ubuntu/Debian recommended)
+- [ ] Minimum 8GB RAM (16GB+ recommended for full stack)
+- [ ] At least 50GB free disk space (100GB+ recommended)
+- [ ] Public static IP address
+- [ ] Root or sudo access to the server
+
+## Network Requirements
+
+- [ ] Domain name configured with DNS records pointing to your server IP
+- [ ] Open ports:
+  - [ ] 80/443 (HTTP/HTTPS)
+  - [ ] 22 (SSH)
+  - [ ] 9443 (Portainer)
+  - [ ] Any additional ports needed by specific services
+- [ ] Firewall allows necessary traffic
+- [ ] ISP allows hosting services (not blocking ports 80/443)
+
+## Preparation Tasks
+
+- [ ] Perform full system update:
+  ```
+  apt update && apt upgrade -y
+  ```
+- [ ] Set system hostname:
+  ```
+  hostnamectl set-hostname your-server-name
+  ```
+- [ ] Configure timezone:
+  ```
+  timedatectl set-timezone your/timezone
+  ```
+- [ ] Create non-root user with sudo privileges (if not already done)
+- [ ] Configure SSH key-based authentication
+- [ ] Disable password-based SSH authentication (recommended)
+- [ ] Record your server's IP address and domain information
+
+## Service Planning
+
+- [ ] List which components you need to install
+- [ ] Prepare domain/subdomain names for each service
+- [ ] Plan backup strategy
+- [ ] Consider monitoring needs
+- [ ] Determine resource allocation for critical services
+
+## Data Preparation
+
+- [ ] Prepare any data that needs to be imported
+- [ ] Gather credentials for third-party services (SMTP, payment gateways, etc.)
+- [ ] Create backups of any existing data if migrating
+
+## Post-Installation Planning
+
+- [ ] Schedule maintenance windows
+- [ ] Plan user onboarding process
+- [ ] Prepare documentation for end users
+- [ ] Define backup verification procedures
+- [ ] Outline security audit process

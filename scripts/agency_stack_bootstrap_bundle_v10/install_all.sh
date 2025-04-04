@@ -1,0 +1,24 @@
+#!/bin/bash
+bash install_prerequisites.sh
+bash install_docker.sh
+bash install_docker_compose.sh
+bash install_traefik_ssl.sh
+bash install_portainer.sh
+bash install_erpnext.sh
+bash install_peertube.sh
+bash install_wordpress_module.sh
+bash install_focalboard.sh
+bash install_listmonk.sh
+bash install_calcom.sh
+bash install_n8n.sh
+bash install_openintegrationhub.sh
+bash install_taskwarrior_calcure.sh
+bash install_posthog.sh
+bash install_killbill.sh
+bash install_voip.sh
+bash install_seafile.sh
+bash install_documenso.sh
+bash install_webpush.sh
+bash install_netdata.sh
+bash install_fail2ban.sh
+bash install_security.sh
