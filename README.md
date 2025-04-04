@@ -65,6 +65,8 @@ Detailed documentation is available in the `docs/` directory:
 - [Configuration](docs/CONFIGURATION.md) - Configuration options and recommendations
 - [Maintenance](docs/MAINTENANCE.md) - Ongoing maintenance procedures
 - [Pre-Installation Checklist](docs/PRE_INSTALLATION_CHECKLIST.md) - Preparation steps
+- [Client Setup Guide](docs/CLIENT_SETUP.md) - Setting up client instances
+- [Script Interactions](docs/SCRIPT_INTERACTIONS.md) - How scripts work together
 - [Future Plans (2025.04.03)](docs/FuturePlans.2025.04.03.md) - Future plans and updates
 
 ## Contributing
