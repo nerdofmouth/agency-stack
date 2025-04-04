@@ -45,6 +45,8 @@ AgencyStack provides:
 - **Mailu**: Complete mail server solution
 - **Databases**: MySQL, PostgreSQL, MongoDB
 - **Keycloak**: Identity and access management
+- **WordPress**: Content management system
+- **ERPNext**: Business management platform (ERP/CRM)
 
 ### Operations Features
 - **Monitoring**: Grafana and Loki for logs + metrics

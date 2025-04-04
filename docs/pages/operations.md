@@ -15,6 +15,8 @@ The AgencyStack platform includes comprehensive operational features for monitor
 - [Configuration Management](#configuration-management)
 - [Automated Tasks](#automated-tasks)
 - [Keycloak Integration](#keycloak-integration)
+- [Content Management Systems](#content-management-systems)
+- [Business Applications](#business-applications)
 
 ## Monitoring Stack
 
@@ -293,3 +295,60 @@ If you encounter issues with Keycloak integration:
 3. Verify that DNS records are correctly set up for all domains
 
 4. Ensure that Keycloak is accessible at `https://keycloak.yourdomain.com`
+
+## Content Management Systems
+
+AgencyStack provides robust content management capabilities through WordPress.
+
+### WordPress
+
+WordPress is a full-featured CMS that can serve as the foundation for websites, blogs, and headless content delivery.
+
+#### Installation
+
+```bash
+make install
+# Select component 34 (WordPress)
+```
+
+#### Features
+
+- Complete content management system with admin dashboard
+- Integration with Traefik for automatic HTTPS
+- Optional Redis cache for improved performance
+- WP-CLI for command-line management
+- Headless WordPress support with REST API and GraphQL
+- Pre-installed plugins for security and performance
+
+#### Default URLs
+
+- WordPress Site: https://wordpress.yourdomain.com
+- WordPress Admin: https://wordpress.yourdomain.com/wp-admin/
+
+## Business Applications
+
+AgencyStack includes ERPNext for comprehensive business management.
+
+### ERPNext
+
+ERPNext is an open-source ERP system built on the Frappe framework, providing a complete suite of business applications.
+
+#### Installation
+
+```bash
+make install
+# Select component 35 (ERPNext)
+```
+
+#### Features
+
+- Full ERP system with accounting, inventory, HR, CRM, and more
+- Multi-tenancy support for running multiple sites
+- Frappe framework for rapid application development
+- Integrated with Traefik for automatic HTTPS
+- Scalable architecture with separate services for each component
+
+#### Default URLs
+
+- ERPNext Site: https://erp.yourdomain.com
+- Login with username: Administrator and the password provided during installation
