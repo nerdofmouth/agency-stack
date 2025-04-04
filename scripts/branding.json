@@ -1,0 +1,18 @@
+{
+  "product_name": "AgencyStack",
+  "creator": "Nerd of Mouth",
+  "slogan": "Deploy Smart. Speak Nerd.",
+  "homepage": "https://nerdofmouth.com/stack",
+  "support": "support@nerdofmouth.com", 
+  "version": "0.0.1.2025.04.04.0013",
+  "taglines": [
+    "Run your agency. Reclaim your agency.",
+    "Tools for freedom, proof of power.",
+    "The Agency Project: Metal + Meaning.",
+    "Don't just deploy. Declare independence.",
+    "Freedom starts with a shell prompt.",
+    "From Zero to Sovereign.",
+    "CLI-tested. Compliance-detested.",
+    "An agency stack with an agenda: yours."
+  ]
+}

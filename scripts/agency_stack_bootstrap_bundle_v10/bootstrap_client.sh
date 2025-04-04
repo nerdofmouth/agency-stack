@@ -1,6 +1,6 @@
 #!/bin/bash
-# Launchbox Client Bootstrap Script
-# https://nerdofmouth.com/launchbox
+# AgencyStack Client Bootstrap Script
+# https://nerdofmouth.com/stack
 
 # Exit immediately if a command exits with a non-zero status.
 set -e
@@ -16,7 +16,7 @@ BOLD='\033[1m'
 NC='\033[0m' # No Color
 
 # Logging setup
-LOGDIR="/var/log/launchbox"
+LOGDIR="/var/log/agency_stack"
 mkdir -p "$LOGDIR"
 LOGFILE="$LOGDIR/client-setup-$(date +%Y%m%d-%H%M%S).log"
 touch "$LOGFILE"
@@ -26,7 +26,7 @@ log() {
   local level="$1"
   local message="$2"
   local timestamp=$(date +"%Y-%m-%d %H:%M:%S")
-  echo -e "[$timestamp] [Launchbox] [$level] $message" | tee -a "$LOGFILE"
+  echo -e "[$timestamp] [AgencyStack] [$level] $message" | tee -a "$LOGFILE"
 }
 
 # Visual feedback
@@ -50,14 +50,16 @@ ENV_FILE="${CLIENT_DIR}/.env"
 COMPOSE_FILE="${CLIENT_DIR}/docker-compose.yml"
 
 # Display header
-print_header "🏢 Launchbox Client Setup: $CLIENT_DOMAIN"
+print_header "🏢 AgencyStack Client Setup: $CLIENT_DOMAIN"
 log "INFO" "Starting client setup for $CLIENT_DOMAIN"
 
-# Display random motto
+# Display random tagline
 SCRIPT_PATH="$(dirname "$(realpath "$0")")"
-MOTTO_PATH="$SCRIPT_PATH/../motto.sh"
-source "$MOTTO_PATH" && random_motto
-echo ""
+AGENCY_BRANDING="$SCRIPT_PATH/../agency_branding.sh"
+if [ -f "$AGENCY_BRANDING" ]; then
+  source "$AGENCY_BRANDING" && random_tagline
+  echo ""
+fi
 
 ### DIR SETUP ###
 print_info "Creating client directory structure"
@@ -208,8 +210,10 @@ print_success "Client ${CLIENT_DOMAIN} bootstrapped."
 log "INFO" "Client ${CLIENT_DOMAIN} bootstrapped."
 
 # Show motto after successful bootstrap
-source "$MOTTO_PATH" && random_motto
-echo ""
+if [ -f "$AGENCY_BRANDING" ]; then
+  source "$AGENCY_BRANDING" && random_tagline
+  echo ""
+fi
 
 print_info "Next step: cd ${CLIENT_DIR} && docker compose up -d"
 print_info ""

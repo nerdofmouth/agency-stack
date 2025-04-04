@@ -1,10 +1,21 @@
-# FOSS Server Stack
+# AgencyStack
 
-A comprehensive solution for deploying a complete FOSS (Free and Open Source Software) server infrastructure using Docker containers.
+**Run your agency. Reclaim your agency.**
+
+A comprehensive solution for deploying a complete FOSS (Free and Open Source Software) server infrastructure using Docker containers. Built by [Nerd of Mouth](https://nerdofmouth.com/stack).
 
 ## Overview
 
-This repository contains scripts and documentation for automating the deployment of a collection of free and open source applications running in Docker containers. The stack is designed to provide businesses, agencies, and organizations with a complete suite of tools for operations, collaboration, and customer engagement.
+AgencyStack contains scripts and documentation for automating the deployment of a collection of free and open source applications running in Docker containers. The stack is designed to provide agencies, businesses, and independent creators with a complete suite of tools for operations, collaboration, and customer engagement.
+
+## Philosophy
+
+> "Tools for freedom, proof of power."
+
+AgencyStack stands for sovereignty and freedom. It's built on the principles that:
+- Technology should empower, not constrain
+- Digital infrastructure should promote independence
+- The tools you use should align with your values
 
 ## Features
 
@@ -12,6 +23,7 @@ This repository contains scripts and documentation for automating the deployment
 - **Docker-based** for easy deployment and maintenance
 - **Secure by default** with SSL, fail2ban, and security hardening
 - **Modular design** allowing selective component installation
+- **Multi-tenant architecture** for serving multiple clients
 - **Comprehensive documentation** for setup and maintenance
 
 ## Included Applications
@@ -28,53 +40,57 @@ This repository contains scripts and documentation for automating the deployment
 
 ## Getting Started
 
-### Prerequisites
-
-- A server running Ubuntu/Debian with root access
-- Minimum 8GB RAM (16GB+ recommended)
-- At least 50GB disk space
-- Domain name(s) pointing to your server's IP
+For detailed installation instructions, see [SETUP.md](SETUP.md).
 
 ### Quick Start
 
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/yourusername/foss-server-stack.git
-   cd foss-server-stack
-   ```
+1. **Clone the repository:**
+```bash
+git clone https://github.com/nerdofmouth/agency-stack.git
+cd agency-stack
+```
 
-2. Validate your environment:
-   ```bash
-   sudo bash scripts/validate_environment.sh
-   ```
+2. **View available commands:**
+```bash
+make help
+```
 
-3. Start the installation:
-   ```bash
-   sudo bash scripts/install.sh
-   ```
+3. **Install AgencyStack:**
+```bash
+make install
+```
 
-4. Follow the on-screen prompts to install desired components
+4. **Create a client:**
+```bash
+./scripts/agency_stack_bootstrap_bundle_v10/bootstrap_client.sh client.yourdomain.com
+```
 
-### Documentation
+## Documentation
 
-Detailed documentation is available in the `docs/` directory:
+- [SETUP.md](SETUP.md) - Comprehensive installation guide
+- [BRANDING.md](BRANDING.md) - AgencyStack branding guidelines
+- [docs/](docs/) - Detailed documentation for each component
 
-- [Overview](docs/OVERVIEW.md) - Component descriptions and architecture
-- [Installation Guide](docs/INSTALLATION.md) - Detailed installation instructions
-- [Components](docs/COMPONENTS.md) - Information about each application
-- [Configuration](docs/CONFIGURATION.md) - Configuration options and recommendations
-- [Maintenance](docs/MAINTENANCE.md) - Ongoing maintenance procedures
-- [Pre-Installation Checklist](docs/PRE_INSTALLATION_CHECKLIST.md) - Preparation steps
-- [Client Setup Guide](docs/CLIENT_SETUP.md) - Setting up client instances
-- [Script Interactions](docs/SCRIPT_INTERACTIONS.md) - How scripts work together
-- [Port Reference](docs/PORTS.md) - Full list of exposed service ports and their usage.
-- [Future Plans (2025.04.03)](docs/FuturePlans.2025.04.03.md) - Future plans and updates
+## Architecture
 
+AgencyStack uses a multi-tenant architecture:
+
+1. **Core Infrastructure** - Installed once on the server
+2. **Client Environments** - Each client gets their own isolated environment
+3. **Shared Services** - Central dashboard for management
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## Support
+
+For support, contact [support@nerdofmouth.com](mailto:support@nerdofmouth.com) or visit [nerdofmouth.com/stack](https://nerdofmouth.com/stack).
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+Built with 🧠 by [Nerd of Mouth](https://nerdofmouth.com) | Deploy Smart. Speak Nerd.
