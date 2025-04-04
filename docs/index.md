@@ -4,7 +4,7 @@ title: AgencyStack Documentation
 ---
 
 <div style="text-align: center; margin-bottom: 30px;">
-  <img src="images/AgencyStack-logo.png" alt="AgencyStack Logo" style="max-width: 400px; width: 100%;">
+  <img src="/images/AgencyStack-logo.png" alt="AgencyStack Logo" style="max-width: 400px; width: 100%;">
 </div>
 
 # Digital Sovereignty for Modern Agencies
@@ -74,6 +74,6 @@ AgencyStack provides a complete server solution including:
 
 <div style="text-align: center; margin: 50px 0 20px 0; padding: 20px; background-color: #f8f9fa; border-radius: 5px;">
   <p>Built by <a href="https://nerdofmouth.com">
-    <img src="images/NerdofMouth-logo.png" alt="Nerd of Mouth" style="height: 30px; vertical-align: middle;">
+    <img src="/images/NerdofMouth-logo.png" alt="Nerd of Mouth" style="height: 30px; vertical-align: middle;">
   </a> | Deploy Smart. Speak Nerd.</p>
 </div>
