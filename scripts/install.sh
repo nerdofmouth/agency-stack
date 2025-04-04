@@ -437,6 +437,8 @@ show_components() {
   echo -e "  ${BOLD}28.${NC} Backup Strategy (automated backups)"
   echo -e "  ${BOLD}29.${NC} Markdown + Lexical (document editing)"
   echo -e "  ${BOLD}30.${NC} Launchpad Dashboard (central access)"
+  echo -e "  ${BOLD}32.${NC} Loki (logging)"
+  echo -e "  ${BOLD}33.${NC} Grafana (monitoring)"
   
   echo -e "${CYAN}Installation Options:${NC}"
   echo -e "  ${BOLD}40.${NC} Install Core Components Only"
@@ -500,6 +502,8 @@ install_component() {
     29) script="install_markdown_lexical.sh" ;;
     30) script="install_launchpad_dashboard.sh" ;;
     31) script="install_builderio.sh" ;;
+    32) script="install_loki.sh" ;;
+    33) script="install_grafana.sh" ;;
     40) 
       echo -e "${BLUE}${BOLD} Installing AgencyStack Core Components...${NC}"
       log "INFO" "Installing core components bundle"

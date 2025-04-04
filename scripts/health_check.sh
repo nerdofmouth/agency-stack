@@ -17,12 +17,194 @@ LOG_DIR="/var/log/agency_stack"
 LOG_FILE="${LOG_DIR}/health-check-$(date +%Y%m%d-%H%M%S).log"
 REPORT_FILE="/tmp/agency_stack_health_report.html"
 
+# Status tracking
+ERRORS=0
+ERROR_MESSAGES=""
+WARNINGS=0
+WARNING_MESSAGES=""
+
 # Create log directory if it doesn't exist
 mkdir -p "$LOG_DIR"
 
 # Logging function
 log() {
   echo -e "$1" | tee -a "$LOG_FILE"
+}
+
+# Alert functions
+add_error() {
+  local message="$1"
+  ERRORS=$((ERRORS + 1))
+  ERROR_MESSAGES="${ERROR_MESSAGES}⛔ ${message}\n"
+  log "${RED}❌ $message${NC}"
+}
+
+add_warning() {
+  local message="$1"
+  WARNINGS=$((WARNINGS + 1))
+  WARNING_MESSAGES="${WARNING_MESSAGES}⚠️ ${message}\n"
+  log "${YELLOW}⚠️ $message${NC}"
+}
+
+add_success() {
+  local message="$1"
+  log "${GREEN}✅ $message${NC}"
+}
+
+# Alerting functions
+send_email_alert() {
+  local subject="$1"
+  local message="$2"
+  
+  if [ -f "/opt/agency_stack/config.env" ]; then
+    source "/opt/agency_stack/config.env"
+    
+    if [[ "$SMTP_ENABLED" == "true" ]]; then
+      log "${BLUE}Sending email alert...${NC}"
+      
+      # Create email content
+      local email_file=$(mktemp)
+      cat > "$email_file" << EOL
+From: AgencyStack Monitoring <$SMTP_FROM>
+To: $ALERT_EMAIL_RECIPIENT
+Subject: $subject
+Content-Type: text/plain; charset=UTF-8
+
+$message
+
+Time: $(date)
+Server: $(hostname)
+---
+AgencyStack Monitoring System
+EOL
+      
+      # Send email using curl
+      if curl --url "smtp://${SMTP_HOST}:${SMTP_PORT}" \
+         --ssl-reqd \
+         --mail-from "${SMTP_FROM}" \
+         --mail-rcpt "${ALERT_EMAIL_RECIPIENT}" \
+         --upload-file "$email_file" \
+         --user "${SMTP_USERNAME}:${SMTP_PASSWORD}" \
+         --silent --show-error --fail; then
+        log "${GREEN}Email alert sent successfully${NC}"
+      else
+        log "${RED}Failed to send email alert${NC}"
+      fi
+      
+      # Clean up
+      rm -f "$email_file"
+    else
+      log "${YELLOW}Email alerts disabled (SMTP_ENABLED is not true)${NC}"
+    fi
+  else
+    log "${RED}Cannot send email alert: config.env not found${NC}"
+  fi
+}
+
+send_telegram_alert() {
+  local subject="$1"
+  local message="$2"
+  
+  if [ -f "/opt/agency_stack/config.env" ]; then
+    source "/opt/agency_stack/config.env"
+    
+    if [[ -n "$TELEGRAM_BOT_TOKEN" && -n "$TELEGRAM_CHAT_ID" ]]; then
+      log "${BLUE}Sending Telegram alert...${NC}"
+      
+      # Format message
+      local formatted_message="*${subject}*\n\n${message}\n\nTime: $(date)\nServer: $(hostname)"
+      
+      # Send to Telegram
+      if curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+         -d chat_id="${TELEGRAM_CHAT_ID}" \
+         -d text="${formatted_message}" \
+         -d parse_mode="Markdown" \
+         --silent --show-error --fail; then
+        log "${GREEN}Telegram alert sent successfully${NC}"
+      else
+        log "${RED}Failed to send Telegram alert${NC}"
+      fi
+    else
+      log "${YELLOW}Telegram alerts disabled (bot token or chat ID not configured)${NC}"
+    fi
+  else
+    log "${RED}Cannot send Telegram alert: config.env not found${NC}"
+  fi
+}
+
+send_webhook_alert() {
+  local subject="$1"
+  local message="$2"
+  
+  if [ -f "/opt/agency_stack/config.env" ]; then
+    source "/opt/agency_stack/config.env"
+    
+    if [[ -n "$WEBHOOK_URL" ]]; then
+      log "${BLUE}Sending webhook alert...${NC}"
+      
+      # Create JSON payload
+      local json_payload=$(cat << EOL
+{
+  "title": "${subject}",
+  "message": $(echo "${message}" | jq -Rs .),
+  "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "hostname": "$(hostname)",
+  "severity": "error",
+  "num_errors": $ERRORS,
+  "num_warnings": $WARNINGS
+}
+EOL
+)
+      
+      # Send to webhook
+      if curl -s -X POST "${WEBHOOK_URL}" \
+         -H "Content-Type: application/json" \
+         -d "${json_payload}" \
+         --silent --show-error --fail; then
+        log "${GREEN}Webhook alert sent successfully${NC}"
+      else
+        log "${RED}Failed to send webhook alert${NC}"
+      fi
+    else
+      log "${YELLOW}Webhook alerts disabled (URL not configured)${NC}"
+    fi
+  else
+    log "${RED}Cannot send webhook alert: config.env not found${NC}"
+  fi
+}
+
+# Master alert function that determines which channels to use
+send_alerts() {
+  local subject="[ALERT] AgencyStack Health Check Failure on $(hostname)"
+  local message="Health check detected issues:\n\n"
+  
+  if [ $ERRORS -gt 0 ]; then
+    message="${message}${ERROR_MESSAGES}\n"
+  fi
+  
+  if [ $WARNINGS -gt 0 ]; then
+    message="${message}${WARNING_MESSAGES}\n"
+  fi
+  
+  message="${message}\nFull report available at: ${LOG_FILE}\n"
+  
+  # Load config if exists
+  if [ -f "/opt/agency_stack/config.env" ]; then
+    source "/opt/agency_stack/config.env"
+  fi
+  
+  # Send alerts based on configuration
+  if [[ "$ALERT_EMAIL_ENABLED" == "true" ]]; then
+    send_email_alert "$subject" "$message"
+  fi
+  
+  if [[ "$ALERT_TELEGRAM_ENABLED" == "true" ]]; then
+    send_telegram_alert "$subject" "$message"
+  fi
+  
+  if [[ "$ALERT_WEBHOOK_ENABLED" == "true" ]]; then
+    send_webhook_alert "$subject" "$message"
+  fi
 }
 
 log "${MAGENTA}${BOLD}🩺 AgencyStack Health Check${NC}"
@@ -41,10 +223,10 @@ check_component() {
   log "${BLUE}Checking ${name}...${NC}"
   
   if eval "$check_command"; then
-    log "${GREEN}✅ $success_msg${NC}"
+    add_success "$success_msg"
     return 0
   else
-    log "${RED}❌ $failure_msg${NC}"
+    add_error "$failure_msg"
     return 1
   fi
 }
@@ -119,23 +301,109 @@ if [ -f /opt/agency_stack/config.env ]; then
         "Cannot access admin interface"
     fi
   fi
+  
+  # Check Keycloak if installed
+  check_keycloak() {
+    if ! grep -q "Keycloak" /opt/agency_stack/installed_components.txt 2>/dev/null; then
+      return
+    fi
+    
+    # Check if variables are defined in config.env
+    if [ -z "$KEYCLOAK_DOMAIN" ] || [ -z "$KEYCLOAK_ADMIN_PASSWORD" ]; then
+      log "${RED}❌ Keycloak configuration is incomplete${NC}"
+      return
+    fi
+    
+    log "${BLUE}Checking Keycloak service...${NC}"
+    
+    # Check if Keycloak is accessible
+    local status_code=$(curl -s -o /dev/null -w "%{http_code}" -L "https://${KEYCLOAK_DOMAIN}/auth/")
+    
+    if [ "$status_code" -eq 200 ] || [ "$status_code" -eq 302 ]; then
+      log "${GREEN}✅ Keycloak service is accessible${NC}"
+      
+      # Check if realm exists by trying to get token
+      local realm_status=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+        -H "Content-Type: application/x-www-form-urlencoded" \
+        -d "client_id=admin-cli" \
+        -d "username=admin" \
+        -d "password=${KEYCLOAK_ADMIN_PASSWORD}" \
+        -d "grant_type=password" \
+        "https://${KEYCLOAK_DOMAIN}/auth/realms/master/protocol/openid-connect/token")
+      
+      if [ "$realm_status" -eq 200 ]; then
+        log "${GREEN}✅ Keycloak realm is properly configured${NC}"
+      else
+        log "${RED}❌ Keycloak realm authentication failed (status: ${realm_status})${NC}"
+        ERRORS=$((ERRORS + 1))
+      fi
+      
+      # Check if AgencyStack realm exists
+      local agencystack_status=$(curl -s -o /dev/null -w "%{http_code}" \
+        "https://${KEYCLOAK_DOMAIN}/auth/realms/agencystack")
+      
+      if [ "$agencystack_status" -eq 200 ] || [ "$agencystack_status" -eq 302 ]; then
+        log "${GREEN}✅ Keycloak AgencyStack realm exists${NC}"
+      else
+        log "${YELLOW}⚠️ Keycloak AgencyStack realm not found (status: ${agencystack_status})${NC}"
+        log "${YELLOW}⚠️ Run 'make integrate-keycloak' to set up SSO integration${NC}"
+        WARNINGS=$((WARNINGS + 1))
+      fi
+    else
+      log "${RED}❌ Keycloak service is not accessible (status: ${status_code})${NC}"
+      ERRORS=$((ERRORS + 1))
+    fi
+  }
+  
+  check_keycloak
+  
+  # Check Traefik Auth if installed
+  check_traefik_auth() {
+    if [ ! -d "/opt/agency_stack/traefik-auth" ]; then
+      return
+    fi
+    
+    log "${BLUE}Checking Traefik Forward Auth service...${NC}"
+    
+    # Check if the container is running
+    if docker ps | grep -q "agency_stack_traefik_auth"; then
+      log "${GREEN}✅ Traefik Forward Auth container is running${NC}"
+      
+      # Check if auth domain is accessible
+      if [ -n "$PRIMARY_DOMAIN" ]; then
+        local status_code=$(curl -s -o /dev/null -w "%{http_code}" -L "https://auth.${PRIMARY_DOMAIN}/_ping")
+        
+        if [ "$status_code" -eq 200 ]; then
+          log "${GREEN}✅ Traefik Forward Auth endpoint is accessible${NC}"
+        else
+          log "${YELLOW}⚠️ Traefik Forward Auth endpoint is not accessible (status: ${status_code})${NC}"
+          WARNINGS=$((WARNINGS + 1))
+        fi
+      fi
+    else
+      log "${RED}❌ Traefik Forward Auth container is not running${NC}"
+      ERRORS=$((ERRORS + 1))
+    fi
+  }
+  
+  check_traefik_auth
 fi
 
 # Check disk space
 log "${CYAN}${BOLD}Checking system resources:${NC}"
 disk_used=$(df -h /opt | awk 'NR==2 {print $5}' | tr -d '%')
 if [ "$disk_used" -gt 90 ]; then
-  log "${RED}❌ Disk space critical: ${disk_used}% used${NC}"
+  add_error "Disk space critical: ${disk_used}% used"
 else
-  log "${GREEN}✅ Disk space OK: ${disk_used}% used${NC}"
+  add_success "Disk space OK: ${disk_used}% used"
 fi
 
 # Check memory
 mem_used=$(free | grep Mem | awk '{print int($3/$2 * 100.0)}')
 if [ "$mem_used" -gt 90 ]; then
-  log "${RED}❌ Memory usage critical: ${mem_used}% used${NC}"
+  add_error "Memory usage critical: ${mem_used}% used"
 else
-  log "${GREEN}✅ Memory usage OK: ${mem_used}% used${NC}"
+  add_success "Memory usage OK: ${mem_used}% used"
 fi
 
 # Check CPU load
@@ -143,9 +411,9 @@ load=$(cat /proc/loadavg | awk '{print $1}')
 cores=$(nproc)
 load_per_core=$(awk "BEGIN {print $load / $cores}")
 if (( $(echo "$load_per_core > 1.5" | bc -l) )); then
-  log "${RED}❌ CPU load high: $load (${load_per_core} per core)${NC}"
+  add_error "CPU load high: $load (${load_per_core} per core)"
 else
-  log "${GREEN}✅ CPU load OK: $load (${load_per_core} per core)${NC}"
+  add_success "CPU load OK: $load (${load_per_core} per core)"
 fi
 
 # Check security
@@ -154,9 +422,9 @@ log "${CYAN}${BOLD}Checking security:${NC}"
 # Check if firewall is enabled
 if command -v ufw &>/dev/null; then
   if ufw status | grep -q "Status: active"; then
-    log "${GREEN}✅ Firewall is active${NC}"
+    add_success "Firewall is active"
   else
-    log "${RED}❌ Firewall is inactive${NC}"
+    add_error "Firewall is inactive"
   fi
 fi
 
@@ -164,10 +432,15 @@ fi
 if command -v apt &>/dev/null; then
   security_updates=$(apt list --upgradable 2>/dev/null | grep -i security | wc -l)
   if [ "$security_updates" -gt 0 ]; then
-    log "${RED}❌ $security_updates security updates available${NC}"
+    add_error "$security_updates security updates available"
   else
-    log "${GREEN}✅ No security updates pending${NC}"
+    add_success "No security updates pending"
   fi
+fi
+
+# Send alerts if there are errors
+if [ $ERRORS -gt 0 ]; then
+  send_alerts
 fi
 
 # Generate HTML report

@@ -19,7 +19,7 @@ MAGENTA := $(shell tput setaf 5)
 CYAN := $(shell tput setaf 6)
 RESET := $(shell tput sgr0)
 
-.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation
+.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit
 
 # Default target
 help:
@@ -46,6 +46,17 @@ help:
 	@echo "  $(BOLD)make health-check$(RESET)     Verify all components are working properly"
 	@echo "  $(BOLD)make verify-dns$(RESET)       Check DNS configuration"
 	@echo "  $(BOLD)make setup-log-rotation$(RESET) Configure log rotation"
+	@echo "  $(BOLD)make monitoring-setup$(RESET) Install Loki & Grafana monitoring stack"
+	@echo "  $(BOLD)make config-snapshot$(RESET)  Create Git snapshot of current configuration"
+	@echo "  $(BOLD)make config-rollback$(RESET)  Restore configuration from a previous snapshot"
+	@echo "  $(BOLD)make config-diff$(RESET)      Show differences between configuration snapshots"
+	@echo "  $(BOLD)make verify-backup$(RESET)    Verify integrity of Restic backups"
+	@echo "  $(BOLD)make setup-cron$(RESET)       Configure automated monitoring tasks"
+	@echo "  $(BOLD)make test-alert$(RESET)       Test alert channels"
+	@echo "  $(BOLD)make integrate-keycloak$(RESET) Integrate Keycloak with AgencyStack components"
+	@echo "  $(BOLD)make test-operations$(RESET)  Test AgencyStack operational features"
+	@echo "  $(BOLD)make motd$(RESET)             Generate server message of the day"
+	@echo "  $(BOLD)make audit$(RESET)            Audit running components and system status"
 	@echo ""
 	@echo "$(GREEN)Visit https://stack.nerdofmouth.com for documentation$(RESET)"
 
@@ -182,3 +193,58 @@ verify-dns:
 setup-log-rotation:
 	@echo "🔄 Configuring log rotation..."
 	@sudo $(SCRIPTS_DIR)/setup_log_rotation.sh
+
+# Install Loki & Grafana monitoring stack
+monitoring-setup:
+	@echo "📊 Installing Loki & Grafana monitoring stack..."
+	@sudo $(SCRIPTS_DIR)/monitoring_setup.sh
+
+# Create Git snapshot of current configuration
+config-snapshot:
+	@echo "📸 Creating Git snapshot of current configuration..."
+	@sudo $(SCRIPTS_DIR)/config_snapshot.sh
+
+# Restore configuration from a previous snapshot
+config-rollback:
+	@echo "🔄 Restoring configuration from a previous snapshot..."
+	@sudo $(SCRIPTS_DIR)/config_rollback.sh
+
+# Show differences between configuration snapshots
+config-diff:
+	@echo "Running config diff..."
+	@sudo bash $(SCRIPTS_DIR)/config_diff.sh
+
+# Verify integrity of Restic backups
+verify-backup:
+	@echo "📈 Verifying integrity of Restic backups..."
+	@sudo $(SCRIPTS_DIR)/verify_backup.sh
+
+# Configure automated monitoring tasks
+setup-cron:
+	@echo "📅 Configuring automated monitoring tasks..."
+	@sudo $(SCRIPTS_DIR)/setup_cron.sh
+
+# Test alert channels
+test-alert:
+	@echo "Testing alert channels..."
+	@sudo bash $(SCRIPTS_DIR)/test_alert.sh
+
+# Integrate Keycloak with AgencyStack components
+integrate-keycloak:
+	@echo "🔐 Integrating Keycloak with AgencyStack components..."
+	@sudo bash $(SCRIPTS_DIR)/keycloak_integration.sh
+
+# Test AgencyStack operational features
+test-operations:
+	@echo "🧪 Testing AgencyStack operational features..."
+	@sudo bash $(SCRIPTS_DIR)/test_operations.sh
+
+# Generate server message of the day
+motd:
+	@echo "📝 Generating server message of the day..."
+	@sudo bash $(SCRIPTS_DIR)/motd_generator.sh
+
+# Audit AgencyStack components and system
+audit:
+	@echo "🔍 Auditing AgencyStack components..."
+	@sudo bash $(SCRIPTS_DIR)/audit.sh

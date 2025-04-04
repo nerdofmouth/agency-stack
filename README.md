@@ -36,6 +36,24 @@ AgencyStack provides:
 - **Beautiful branding** with custom taglines and ASCII art
 - **One-line installation** for quick deployment
 
+### Core Components
+- **Traefik**: Reverse proxy with automatic HTTPS
+- **Docker**: Container orchestration
+- **Portainer**: Container management UI
+- **MinIO**: S3-compatible object storage
+- **Netmaker**: VPN and network management
+- **Mailu**: Complete mail server solution
+- **Databases**: MySQL, PostgreSQL, MongoDB
+- **Keycloak**: Identity and access management
+
+### Operations Features
+- **Monitoring**: Grafana and Loki for logs + metrics
+- **Auto-alerting**: Email, Telegram, and webhook notifications
+- **Backup Tools**: Automated Restic verification
+- **Configuration Management**: Git-based version control
+- **Operations Dashboard**: System audit and health monitoring
+- **Single Sign-On**: Keycloak integration across components
+
 ## Components
 
 AgencyStack includes:
