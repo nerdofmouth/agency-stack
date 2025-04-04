@@ -1,6 +1,6 @@
 #!/bin/bash
-# Launchbox Full Installation Script
-# https://nerdofmouth.com/launchbox
+# AgencyStack Full Installation Script
+# https://stack.nerdofmouth.com
 
 # Colors for output
 RED='\033[0;31m'
@@ -14,7 +14,7 @@ NC='\033[0m' # No Color
 
 # Initialize port management
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-echo -e "${BLUE}${BOLD}🔌 Initializing Launchbox installation...${NC}"
+echo -e "${BLUE}${BOLD}🔌 Initializing AgencyStack installation...${NC}"
 
 # Display header
 echo -e "${MAGENTA}${BOLD}"
@@ -81,5 +81,5 @@ echo -e "${YELLOW}📊 Port allocation summary:${NC}"
 if [ -f "$MOTTO_PATH" ]; then
   echo ""
   source "$MOTTO_PATH" && random_motto
-  echo -e "\n${CYAN}Thank you for choosing Launchbox!${NC}"
+  echo -e "\n${CYAN}Thank you for choosing AgencyStack!${NC}"
 fi
