@@ -1,31 +1,31 @@
 #!/bin/bash
 
-# motto.sh – Tagline randomizer for Launchbox by NerdofMouth™
+# motto.sh – Tagline randomizer for AgencyStack by NerdofMouth™
 
-MOTTOS=(
-  "Launchbox: The Nerve Center of Your Revolution."
-  "Launchbox: So Powerful, We’re Already on a Watchlist."
-  "Launchbox: Eat Latency. Shit Metrics. Love Freedom."
-  "Brains, Metal, and Sovereignty. In One Click."
-  "Built for Pirates. Banned by Empires."
-  "Launch Smarter. Build Louder. Ship Ruthless."
-  "Not SaaS. Not IaaS. This is Guerrilla Infrastructure."
-  "Eat Brains. Ship Faster. Sleep Never."
-  "Launchbox: One Stack to Rule Your Work."
-  "Built to Serve Builders, Not Stakeholders."
-  "Launchbox: Stack Sovereignty in Every Byte."
-  "Launchbox: Move at the Speed of Truth."
-  "Launchbox: Built for the Infinite Game."
-  "Deploy with Teeth. Maintain with Malice."
-  "Launchbox: Infrastructure for Dangerous Ideas."
+mottos=(
+  "AgencyStack: The Nerve Center of Your Revolution."
+  "AgencyStack: So Powerful, We're Already on a Watchlist."
+  "AgencyStack: Eat Latency. Shit Metrics. Love Freedom."
+  "AgencyStack: Digital Sovereignty in a Box."
+  "AgencyStack: Bringing Promise to a Broken Stack."
+  "AgencyStack: For When SaaS Becomes a Four-Letter Word."
+  "AgencyStack: Handcrafted by the Unaligned."
+  "AgencyStack: One Stack to Rule Your Work."
+  "AgencyStack: Weapons-Grade Infrastructure."
+  "AgencyStack: Stack Sovereignty in Every Byte."
+  "AgencyStack: Move at the Speed of Truth."
+  "AgencyStack: Built for the Infinite Game."
+  "AgencyStack: Freedom for Full-Stack Thinkers."
+  "AgencyStack: Infrastructure for Dangerous Ideas."
+  "AgencyStack: Run your agency. Reclaim your agency."
 )
 
 
 
 function random_motto() {
-  SIZE=${#MOTTOS[@]}
+  SIZE=${#mottos[@]}
   INDEX=$((RANDOM % SIZE))
-  echo -e "\033[1;35m${MOTTOS[$INDEX]}\033[0m"
+  echo -e "\033[1;35m${mottos[$INDEX]}\033[0m"
 }
 
 # Run by default if this is called directly
