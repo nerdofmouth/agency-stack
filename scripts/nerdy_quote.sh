@@ -1,6 +1,6 @@
 #!/bin/bash
 # nerdy_quote.sh - Random nerdy quotes for AgencyStack by Nerd of Mouth
-# https://nerdofmouth.com/stack
+# https://stack.nerdofmouth.com
 
 # Colors for output
 BLUE='\033[0;34m'

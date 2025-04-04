@@ -1,6 +1,6 @@
 #!/bin/bash
 # AgencyStack Client Bootstrap Script
-# https://nerdofmouth.com/stack
+# https://stack.nerdofmouth.com
 
 # Exit immediately if a command exits with a non-zero status.
 set -e

@@ -2,7 +2,7 @@
 
 **Run your agency. Reclaim your agency.**
 
-A comprehensive solution for deploying a complete FOSS (Free and Open Source Software) server infrastructure using Docker containers. Built by [Nerd of Mouth](https://nerdofmouth.com/stack).
+A comprehensive solution for deploying a complete FOSS (Free and Open Source Software) server infrastructure using Docker containers. Built by [Nerd of Mouth](https://stack.nerdofmouth.com).
 
 ## Overview
 
@@ -85,7 +85,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Support
 
-For support, contact [support@nerdofmouth.com](mailto:support@nerdofmouth.com) or visit [nerdofmouth.com/stack](https://nerdofmouth.com/stack).
+For support, contact [support@nerdofmouth.com](mailto:support@nerdofmouth.com) or visit [stack.nerdofmouth.com](https://stack.nerdofmouth.com).
 
 ## License
 

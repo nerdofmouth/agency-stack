@@ -1,6 +1,6 @@
 #!/bin/bash
 # install-agencystack.sh - One-line installer for AgencyStack
-# https://nerdofmouth.com/stack
+# https://stack.nerdofmouth.com
 
 # Colors for output
 RED='\033[0;31m'
@@ -26,7 +26,7 @@ EOF
 echo -e "${NC}"
 echo -e "${BLUE}${BOLD}One-Line Installer${NC}"
 echo -e "${CYAN}By Nerd of Mouth - Deploy Smart. Speak Nerd.${NC}"
-echo -e "${GREEN}https://nerdofmouth.com/stack${NC}\n"
+echo -e "${GREEN}https://stack.nerdofmouth.com${NC}\n"
 
 # Display random tagline from a small set
 taglines=(
@@ -129,4 +129,4 @@ fi
 
 echo -e "\n${MAGENTA}${BOLD}AgencyStack setup complete!${NC}"
 echo -e "${CYAN}For more information and documentation, visit:${NC}"
-echo -e "${GREEN}https://nerdofmouth.com/stack${NC}\n"
+echo -e "${GREEN}https://stack.nerdofmouth.com${NC}\n"

@@ -1,6 +1,6 @@
 #!/bin/bash
 # agency_branding.sh - Branding utilities for AgencyStack by Nerd of Mouth
-# https://nerdofmouth.com/stack
+# https://stack.nerdofmouth.com
 
 # Colors for output
 RED='\033[0;31m'
@@ -31,7 +31,7 @@ get_branding_value() {
             "product_name") echo "AgencyStack" ;;
             "creator") echo "Nerd of Mouth" ;;
             "slogan") echo "Deploy Smart. Speak Nerd." ;;
-            "homepage") echo "https://nerdofmouth.com/stack" ;;
+            "homepage") echo "https://stack.nerdofmouth.com" ;;
             "support") echo "support@nerdofmouth.com" ;;
             "version") echo "0.0.1.2025.04.04" ;;
             *) echo "Unknown" ;;

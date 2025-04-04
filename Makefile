@@ -1,6 +1,6 @@
 # AgencyStack - Makefile
 # FOSS Server Stack for Agencies & Enterprises
-# https://nerdofmouth.com/stack
+# https://stack.nerdofmouth.com
 
 # Variables
 SHELL := /bin/bash
@@ -38,7 +38,7 @@ help:
 	@echo "  $(BOLD)make talknerdy$(RESET)        Display a random nerdy quote"
 	@echo "  $(BOLD)make rootofmouth$(RESET)      Display system performance stats"
 	@echo ""
-	@echo "$(GREEN)Visit https://nerdofmouth.com/stack for documentation$(RESET)"
+	@echo "$(GREEN)Visit https://stack.nerdofmouth.com for documentation$(RESET)"
 
 # Install AgencyStack
 install:
@@ -79,7 +79,7 @@ stack-info:
 	@echo "========================="
 	@echo "Version: $(YELLOW)$(VERSION)$(RESET)"
 	@echo "Stack Name: $(YELLOW)$(STACK_NAME)$(RESET)"
-	@echo "Website: $(GREEN)https://nerdofmouth.com/stack$(RESET)"
+	@echo "Website: $(GREEN)https://stack.nerdofmouth.com$(RESET)"
 	@echo ""
 	@bash $(SCRIPTS_DIR)/agency_branding.sh tagline
 	@echo ""

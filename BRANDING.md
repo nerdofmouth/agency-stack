@@ -11,7 +11,7 @@ This document outlines the branding system implemented within the AgencyStack ec
 - **Product Name**: AgencyStack
 - **Creator**: Nerd of Mouth
 - **Slogan**: Deploy Smart. Speak Nerd.
-- **Homepage**: https://nerdofmouth.com/stack
+- **Homepage**: https://stack.nerdofmouth.com
 - **Support**: support@nerdofmouth.com
 
 ### Taglines (Rotating)

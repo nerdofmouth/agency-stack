@@ -1,6 +1,6 @@
 #!/bin/bash
 # system_performance.sh - System performance stats for AgencyStack by Nerd of Mouth
-# https://nerdofmouth.com/stack
+# https://stack.nerdofmouth.com
 
 # Colors for output
 RED='\033[0;31m'

@@ -239,7 +239,7 @@ make stack-info
 
 ## Additional Resources
 
-- Documentation: https://nerdofmouth.com/stack/docs
+- Documentation: https://stack.nerdofmouth.com/docs
 - Support: support@nerdofmouth.com
 - GitHub: https://github.com/nerdofmouth/agency-stack
 
