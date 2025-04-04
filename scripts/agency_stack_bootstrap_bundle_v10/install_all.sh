@@ -22,3 +22,14 @@ bash install_webpush.sh
 bash install_netdata.sh
 bash install_fail2ban.sh
 bash install_security.sh
+
+# Newly added components
+bash install_keycloak.sh
+bash install_tailscale.sh
+bash install_signing_timestamps.sh
+bash install_backup_strategy.sh
+bash install_markdown_lexical.sh
+bash install_launchpad_dashboard.sh
+
+echo "✅ FOSS Server Stack installation completed!"
+echo "🚀 Access your services through the Launchpad Dashboard"

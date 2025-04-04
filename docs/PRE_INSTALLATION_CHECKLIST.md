@@ -17,7 +17,19 @@ Use this checklist to ensure your environment is ready before deploying the FOSS
   - [ ] 80/443 (HTTP/HTTPS)
   - [ ] 22 (SSH)
   - [ ] 9443 (Portainer)
-  - [ ] Any additional ports needed by specific services
+  - [ ] Any additional ports needed by specific services (e.g., 8080 for Portainer) 
+<!-- START:ports-table -->
+| Port | Protocol | Service | Component | Usage | Required |
+|------|----------|---------|-----------|-------|----------|
+| 22 | TCP | SSH | System | Server access | Yes |
+| 80 | TCP | HTTP | Traefik | Web traffic (redirects to HTTPS) | Yes |
+| 443 | TCP | HTTPS | Traefik | Secure web traffic | Yes |
+| 9443 | TCP | HTTPS | Portainer | Container management UI | Yes |
+| 3000 | TCP | HTTP | Focalboard/Dashboard/Hedgedoc/Gitea | Various web UIs | Internal only |
+| 3001 | TCP | HTTP | n8n/Status Monitor | Workflow & monitoring | Internal only |
+| 8080 | TCP | HTTP | Keycloak | Identity management | Internal only |
+| 41641 | UDP | WireGuard | Tailscale | Mesh VPN | External (if exit node) |
+<!-- END:ports-table -->
 - [ ] Firewall allows necessary traffic
 - [ ] ISP allows hosting services (not blocking ports 80/443)
 

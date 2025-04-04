@@ -127,3 +127,41 @@ This document describes each component in the FOSS server stack and explains its
 - **Description**: Voice over IP system
 - **Usage**: Internet-based telephony services
 - **Configuration**: Requires SIP account setup and network configuration
+
+## New Components
+
+### Keycloak
+- **Description**: Identity and access management system
+- **Usage**: Provides single sign-on (SSO), realms, user federation, and role-based access
+- **Configuration**: Requires admin login and realm/client setup
+- **Access**: Available at `https://keycloak.example.com` after installation
+
+### Tailscale
+- **Description**: Mesh VPN built on WireGuard
+- **Usage**: Secure internal network for admin access, multi-VM trust zones
+- **Configuration**: Link with Tailscale auth and enable tailscale up at boot
+- **Integration**: Can be used to securely access internal services
+
+### Signing & Timestamps (GPG + OpenTimestamps)
+- **Description**: Decentralized document signing & integrity verification
+- **Usage**: Ensures verifiability and timeproof of documents & log entries
+- **Configuration**: CLI tools, default GPG key per host, logs pipe to timestamped signed chain
+- **Security**: Provides cryptographic proof of document existence and integrity
+
+### Backup Strategy (Restic)
+- **Description**: Encrypted offsite incremental backup system
+- **Usage**: Data durability & disaster recovery
+- **Configuration**: Scheduled backup jobs with .env-based repo/credential configs
+- **Features**: Efficient deduplication, encryption, and compression
+
+### Markdown + Lexical
+- **Description**: Document editing + collaboration
+- **Usage**: Internal docs, UX flows, policies, product knowledge bases
+- **Configuration**: Git-based markdown editing, optionally integrated into frontend apps
+- **Components**: Includes HedgeDoc, Gitea, and Lexical-based editor
+
+### Launchpad Dashboard
+- **Description**: Obfuscated or internal homepage
+- **Usage**: Aggregates access to all apps/services, fallback monitoring landing
+- **Configuration**: Hosted on dashboard.$DOMAIN or internal port
+- **Features**: Service status monitoring, unified access, customizable theme
