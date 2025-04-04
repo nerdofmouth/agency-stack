@@ -22,16 +22,12 @@ mkdir -p "$LOG_DIR"
 
 # Non-interactive mode flag
 AUTO_MODE=false
-INTEGRATION_TYPE="all"
 
 # Check command-line arguments
 for arg in "$@"; do
   case $arg in
     --yes|--auto)
       AUTO_MODE=true
-      ;;
-    --type=*)
-      INTEGRATION_TYPE="${arg#*=}"
       ;;
     *)
       # Unknown argument
@@ -343,10 +339,10 @@ class ERPNextConnector {
         echo '</div>';
         
         echo '<script>
-            jQuery(document).ready(function(\$) {
+            jQuery(document).ready(function($) {
                 $("#sync-to-erpnext").click(function() {
                     $("#sync-status").html("<p>Syncing data to ERPNext...</p>");
-                    \$.post(ajaxurl, {
+                    $.post(ajaxurl, {
                         action: "sync_to_erpnext"
                     }, function(response) {
                         $("#sync-status").html("<p>" + response.data + "</p>");
@@ -398,31 +394,48 @@ EOL
 
 # Main function
 main() {
-  # Run the integration based on the integration type
-  if [[ "$INTEGRATION_TYPE" == "all" ]]; then
-    log "${BLUE}Running all integrations...${NC}"
-
-    integrate_email
-    integrate_sso
-    integrate_monitoring
-    create_data_bridge
-  elif [[ "$INTEGRATION_TYPE" == "sso" ]]; then
-    log "${BLUE}Running Single Sign-On integration...${NC}"
-    integrate_sso
-  elif [[ "$INTEGRATION_TYPE" == "email" ]]; then
-    log "${BLUE}Running Email integration...${NC}"
-    integrate_email
-  elif [[ "$INTEGRATION_TYPE" == "monitoring" ]]; then
-    log "${BLUE}Running Monitoring integration...${NC}"
-    integrate_monitoring
-  elif [[ "$INTEGRATION_TYPE" == "data-bridge" ]]; then
-    log "${BLUE}Running Data Exchange Bridge integration...${NC}"
-    create_data_bridge
+  # Display integration options
+  log "${BLUE}Available Integrations:${NC}"
+  log "1. Email Integration with Mailu"
+  log "2. Single Sign-On with Keycloak"
+  log "3. Monitoring Integration with Loki/Grafana"
+  log "4. Data Exchange Bridge"
+  log "5. Run All Integrations"
+  log ""
+  
+  # Ask for integration choice if not in auto mode
+  if [ "$AUTO_MODE" = false ]; then
+    read -p "Select integration to configure (1-5): " choice
   else
-    log "${RED}Unknown integration type: ${INTEGRATION_TYPE}${NC}"
-    log "Valid types: all, sso, email, monitoring, data-bridge"
-    exit 1
+    # Run all integrations in auto mode
+    choice=5
   fi
+  
+  case $choice in
+    1)
+      integrate_email
+      ;;
+    2)
+      integrate_sso
+      ;;
+    3)
+      integrate_monitoring
+      ;;
+    4)
+      create_data_bridge
+      ;;
+    5)
+      log "${BLUE}Running all integrations...${NC}"
+      integrate_email
+      integrate_sso
+      integrate_monitoring
+      create_data_bridge
+      ;;
+    *)
+      log "${RED}Invalid choice${NC}"
+      exit 1
+      ;;
+  esac
   
   log ""
   log "${GREEN}${BOLD}Integration complete!${NC}"
