@@ -30,6 +30,9 @@
         <button class="nav-btn" data-category="Communication">Communication</button>
         <button class="nav-btn" data-category="Monitoring">Monitoring</button>
         <button class="nav-btn" data-category="Other">Other</button>
+        <!-- New navigation tabs -->
+        <button class="nav-btn" data-view="integrations">Integrations</button>
+        <button class="nav-btn" data-view="ports">Port Management</button>
     </nav>
 
     <main>
@@ -38,14 +41,148 @@
             <button id="integrate-components" class="action-btn">🔌 Integrate Components</button>
             <button id="health-check" class="action-btn">🩺 Health Check</button>
             <button id="view-logs" class="action-btn">📋 View Logs</button>
+            <button id="detect-ports" class="action-btn">🔍 Detect Port Conflicts</button>
         </div>
 
-        <div class="services-container">
-            <div class="loading" id="loading-indicator">
-                <div class="spinner"></div>
-                <p>Loading services...</p>
+        <!-- Services View (default) -->
+        <div class="view-container" id="services-view">
+            <div class="services-container">
+                <div class="loading" id="loading-indicator">
+                    <div class="spinner"></div>
+                    <p>Loading services...</p>
+                </div>
+                <div id="services-grid"></div>
             </div>
-            <div id="services-grid"></div>
+        </div>
+
+        <!-- Integrations View -->
+        <div class="view-container hidden" id="integrations-view">
+            <h2>Integration Status</h2>
+            <div class="integration-actions">
+                <button id="run-all-integrations" class="integration-btn">🔄 Run All Integrations</button>
+                <button id="run-sso-integration" class="integration-btn">🔑 Run SSO Integration</button>
+                <button id="run-email-integration" class="integration-btn">📧 Run Email Integration</button>
+                <button id="run-monitoring-integration" class="integration-btn">📊 Run Monitoring Integration</button>
+                <button id="run-data-bridge-integration" class="integration-btn">🔄 Run Data Bridge Integration</button>
+            </div>
+            
+            <div class="integration-cards">
+                <!-- SSO Integration Card -->
+                <div class="integration-card" id="sso-integration">
+                    <div class="integration-header">
+                        <h3>Single Sign-On (SSO)</h3>
+                        <span class="integration-status" data-status="unknown">⚪ Unknown</span>
+                    </div>
+                    <div class="integration-body">
+                        <p class="integration-description">Keycloak SSO integration for unified authentication</p>
+                        <p class="last-updated">Last updated: <span>Never</span></p>
+                        <div class="integrated-components">
+                            <h4>Integrated Components:</h4>
+                            <ul class="component-list">
+                                <li class="loading-placeholder">Loading components...</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Email Integration Card -->
+                <div class="integration-card" id="email-integration">
+                    <div class="integration-header">
+                        <h3>Email Integration</h3>
+                        <span class="integration-status" data-status="unknown">⚪ Unknown</span>
+                    </div>
+                    <div class="integration-body">
+                        <p class="integration-description">Mailu email services for all components</p>
+                        <p class="last-updated">Last updated: <span>Never</span></p>
+                        <div class="integrated-components">
+                            <h4>Integrated Components:</h4>
+                            <ul class="component-list">
+                                <li class="loading-placeholder">Loading components...</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Monitoring Integration Card -->
+                <div class="integration-card" id="monitoring-integration">
+                    <div class="integration-header">
+                        <h3>Monitoring Integration</h3>
+                        <span class="integration-status" data-status="unknown">⚪ Unknown</span>
+                    </div>
+                    <div class="integration-body">
+                        <p class="integration-description">Loki and Grafana monitoring setup</p>
+                        <p class="last-updated">Last updated: <span>Never</span></p>
+                        <div class="integrated-components">
+                            <h4>Integrated Components:</h4>
+                            <ul class="component-list">
+                                <li class="loading-placeholder">Loading components...</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Data Bridge Integration Card -->
+                <div class="integration-card" id="data-bridge-integration">
+                    <div class="integration-header">
+                        <h3>Data Bridge Integration</h3>
+                        <span class="integration-status" data-status="unknown">⚪ Unknown</span>
+                    </div>
+                    <div class="integration-body">
+                        <p class="integration-description">Data exchange between WordPress and ERPNext</p>
+                        <p class="last-updated">Last updated: <span>Never</span></p>
+                        <div class="integrated-components">
+                            <h4>Integrated Components:</h4>
+                            <ul class="component-list">
+                                <li class="loading-placeholder">Loading components...</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Port Management View -->
+        <div class="view-container hidden" id="ports-view">
+            <h2>Port Management</h2>
+            <div class="port-actions">
+                <button id="detect-port-conflicts" class="port-btn">🔍 Detect Conflicts</button>
+                <button id="remap-ports" class="port-btn">🔄 Remap Ports</button>
+                <button id="scan-ports" class="port-btn">📋 Scan Ports</button>
+            </div>
+            
+            <div class="port-summary">
+                <h3>Port Status</h3>
+                <div class="port-status-info">
+                    <p>Last updated: <span id="ports-last-updated">Never</span></p>
+                    <p>Total ports in use: <span id="total-ports">0</span></p>
+                    <p>Conflicts detected: <span id="conflict-count">0</span></p>
+                </div>
+            </div>
+            
+            <div class="port-table-container">
+                <table class="port-table">
+                    <thead>
+                        <tr>
+                            <th>Port</th>
+                            <th>Service</th>
+                            <th>Description</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="port-table-body">
+                        <tr class="loading-placeholder">
+                            <td colspan="4">Loading port information...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div id="port-conflicts" class="hidden">
+                <h3>⚠️ Port Conflicts</h3>
+                <div class="conflicts-list" id="conflicts-container">
+                    <!-- Conflicts will be populated here -->
+                </div>
+            </div>
         </div>
     </main>
 
@@ -68,6 +205,19 @@
                 <span class="status-indicator configurable"></span>
                 <span class="status-label">Configurable</span>
             </div>
+            <!-- New integration status legend items -->
+            <div class="legend-item">
+                <span class="integration-indicator applied"></span>
+                <span class="status-label">Integrated</span>
+            </div>
+            <div class="legend-item">
+                <span class="integration-indicator missing"></span>
+                <span class="status-label">Not Integrated</span>
+            </div>
+            <div class="legend-item">
+                <span class="integration-indicator partial"></span>
+                <span class="status-label">Partially Integrated</span>
+            </div>
         </div>
     </div>
 
@@ -89,12 +239,33 @@
                 <p class="service-category"></p>
                 <p class="service-domain">Domain: <a href="#" target="_blank"></a></p>
                 <p class="service-ports">Ports: <span></span></p>
+                <div class="integration-badges"></div>
             </div>
             <div class="card-footer">
                 <button class="open-btn">Open Service</button>
                 <button class="install-btn">Install</button>
                 <button class="start-btn">Start</button>
                 <button class="stop-btn">Stop</button>
+                <button class="integrate-btn">Integrate</button>
+            </div>
+        </div>
+    </template>
+
+    <!-- Template for integration badge -->
+    <template id="integration-badge-template">
+        <span class="integration-badge">
+            <span class="badge-icon"></span>
+            <span class="badge-text"></span>
+        </span>
+    </template>
+
+    <!-- Template for port conflict item -->
+    <template id="port-conflict-template">
+        <div class="conflict-item">
+            <p class="conflict-description"></p>
+            <div class="conflict-resolution">
+                <p class="suggested-port">Suggested: <span></span></p>
+                <button class="resolve-btn">Apply Fix</button>
             </div>
         </div>
     </template>

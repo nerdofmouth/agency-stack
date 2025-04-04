@@ -19,7 +19,7 @@ MAGENTA := $(shell tput setaf 5)
 CYAN := $(shell tput setaf 6)
 RESET := $(shell tput sgr0)
 
-.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit integrate-components dashboard dashboard-refresh dashboard-enable integrate-sso integrate-email integrate-monitoring integrate-data-bridge detect-ports remap-ports scan-ports
+.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit integrate-components dashboard dashboard-refresh dashboard-enable dashboard-update dashboard-open integrate-sso integrate-email integrate-monitoring integrate-data-bridge detect-ports remap-ports scan-ports
 
 # Default target
 help:
@@ -61,6 +61,8 @@ help:
 	@echo "  $(BOLD)make dashboard$(RESET)        Open AgencyStack dashboard"
 	@echo "  $(BOLD)make dashboard-refresh$(RESET) Refresh AgencyStack dashboard"
 	@echo "  $(BOLD)make dashboard-enable$(RESET) Enable AgencyStack dashboard"
+	@echo "  $(BOLD)make dashboard-update$(RESET) Update AgencyStack dashboard data"
+	@echo "  $(BOLD)make dashboard-open$(RESET)   Open AgencyStack dashboard in browser"
 	@echo "  $(BOLD)make integrate-sso$(RESET)    Integrate Single Sign-On for AgencyStack components"
 	@echo "  $(BOLD)make integrate-email$(RESET)  Integrate Email systems for AgencyStack components"
 	@echo "  $(BOLD)make integrate-monitoring$(RESET) Integrate Monitoring for AgencyStack components"
@@ -299,6 +301,16 @@ dashboard-refresh:
 dashboard-enable:
 	@echo "🔓 Enabling AgencyStack dashboard..."
 	@sudo bash $(SCRIPTS_DIR)/dashboard_enable.sh
+
+# Update dashboard data
+dashboard-update:
+	@echo "🔄 Updating AgencyStack dashboard data..."
+	@sudo bash $(SCRIPTS_DIR)/dashboard/update_dashboard_data.sh
+
+# Open dashboard in browser
+dashboard-open:
+	@echo "🌐 Opening AgencyStack dashboard in browser..."
+	@xdg-open http://dashboard.$(shell grep PRIMARY_DOMAIN /opt/agency_stack/config.env 2>/dev/null | cut -d '=' -f2 || echo "localhost")
 
 # Detect port conflicts
 detect-ports:
