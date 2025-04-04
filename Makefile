@@ -19,7 +19,7 @@ MAGENTA := $(shell tput setaf 5)
 CYAN := $(shell tput setaf 6)
 RESET := $(shell tput sgr0)
 
-.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit
+.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit integrate-components
 
 # Default target
 help:
@@ -57,6 +57,7 @@ help:
 	@echo "  $(BOLD)make test-operations$(RESET)  Test AgencyStack operational features"
 	@echo "  $(BOLD)make motd$(RESET)             Generate server message of the day"
 	@echo "  $(BOLD)make audit$(RESET)            Audit running components and system status"
+	@echo "  $(BOLD)make integrate-components$(RESET) Integrate AgencyStack components"
 	@echo ""
 	@echo "$(GREEN)Visit https://stack.nerdofmouth.com for documentation$(RESET)"
 
@@ -248,3 +249,8 @@ motd:
 audit:
 	@echo "🔍 Auditing AgencyStack components..."
 	@sudo bash $(SCRIPTS_DIR)/audit.sh
+
+# Integrate AgencyStack components
+integrate-components:
+	@echo "🔄 Integrating AgencyStack components..."
+	@sudo bash $(SCRIPTS_DIR)/integrate_components.sh

@@ -439,6 +439,8 @@ show_components() {
   echo -e "  ${BOLD}30.${NC} Launchpad Dashboard (central access)"
   echo -e "  ${BOLD}32.${NC} Loki (logging)"
   echo -e "  ${BOLD}33.${NC} Grafana (monitoring)"
+  echo -e "  ${BOLD}34.${NC} WordPress (content management)"
+  echo -e "  ${BOLD}35.${NC} ERPNext (business management)"
   
   echo -e "${CYAN}Installation Options:${NC}"
   echo -e "  ${BOLD}40.${NC} Install Core Components Only"
@@ -504,6 +506,8 @@ install_component() {
     31) script="install_builderio.sh" ;;
     32) script="install_loki.sh" ;;
     33) script="install_grafana.sh" ;;
+    34) script="install_wordpress.sh" ;;
+    35) script="install_erpnext.sh" ;;
     40) 
       echo -e "${BLUE}${BOLD} Installing AgencyStack Core Components...${NC}"
       log "INFO" "Installing core components bundle"
