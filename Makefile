@@ -19,7 +19,7 @@ MAGENTA := $(shell tput setaf 5)
 CYAN := $(shell tput setaf 6)
 RESET := $(shell tput sgr0)
 
-.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit integrate-components dashboard dashboard-refresh dashboard-enable dashboard-update dashboard-open integrate-sso integrate-email integrate-monitoring integrate-data-bridge detect-ports remap-ports scan-ports
+.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit integrate-components dashboard dashboard-refresh dashboard-enable dashboard-update dashboard-open integrate-sso integrate-email integrate-monitoring integrate-data-bridge detect-ports remap-ports scan-ports setup-cronjobs view-alerts log-summary
 
 # Default target
 help:
@@ -70,6 +70,9 @@ help:
 	@echo "  $(BOLD)make detect-ports$(RESET)      Detect port conflicts in AgencyStack"
 	@echo "  $(BOLD)make remap-ports$(RESET)       Automatically remap conflicting ports"
 	@echo "  $(BOLD)make scan-ports$(RESET)        Scan and update port registry without conflict resolution"
+	@echo "  $(BOLD)make setup-cronjobs$(RESET)    Setup cron jobs for scheduled tasks"
+	@echo "  $(BOLD)make view-alerts$(RESET)       View recent alerts"
+	@echo "  $(BOLD)make log-summary$(RESET)       Display summary of logs"
 	@echo ""
 	@echo "$(GREEN)Visit https://stack.nerdofmouth.com for documentation$(RESET)"
 
@@ -326,3 +329,51 @@ remap-ports:
 scan-ports:
 	@echo "📋 Scanning and updating port registry..."
 	@sudo bash $(SCRIPTS_DIR)/utils/port_conflict_detector.sh --scan
+
+# Setup cron jobs
+setup-cronjobs:
+	@echo "⏱️ Setting up scheduled tasks for AgencyStack..."
+	@sudo bash $(SCRIPTS_DIR)/setup_cronjobs.sh
+
+# Send test alert
+test-alert:
+	@echo "🔔 Sending test alert..."
+	@sudo bash $(SCRIPTS_DIR)/notifications/notify_all.sh "Test Alert" "This is a test alert from AgencyStack on $(hostname) at $(date)"
+
+# View alerts
+view-alerts:
+	@echo "📢 Recent alerts from AgencyStack:"
+	@echo "--------------------------------"
+	@if [ -f /var/log/agency_stack/alerts.log ]; then \
+		tail -n 20 /var/log/agency_stack/alerts.log; \
+	else \
+		echo "No alerts log found"; \
+	fi
+
+# Display summary of logs
+log-summary:
+	@echo "📋 AgencyStack Log Summary"
+	@echo "=================================="
+	@echo ""
+	@echo "$(BOLD)Health Check Logs:$(RESET)"
+	@if [ -f /var/log/agency_stack/health.log ]; then \
+		tail -n 10 /var/log/agency_stack/health.log; \
+	else \
+		echo "No health logs found"; \
+	fi
+	@echo ""
+	@echo "$(BOLD)Backup Logs:$(RESET)"
+	@if [ -f /var/log/agency_stack/backup.log ]; then \
+		tail -n 10 /var/log/agency_stack/backup.log; \
+	else \
+		echo "No backup logs found"; \
+	fi
+	@echo ""
+	@echo "$(BOLD)Alert Logs:$(RESET)"
+	@if [ -f /var/log/agency_stack/alerts.log ]; then \
+		tail -n 10 /var/log/agency_stack/alerts.log; \
+	else \
+		echo "No alert logs found"; \
+	fi
+	@echo ""
+	@echo "For more details, run \`make logs\` or view the dashboard"

@@ -35,6 +35,16 @@ const conflictCountElement = document.getElementById('conflict-count');
 const portConflictsContainer = document.getElementById('port-conflicts');
 const conflictsContainer = document.getElementById('conflicts-container');
 
+// Alerts & Logs UI elements
+const refreshAlertsButton = document.getElementById('refresh-alerts');
+const testAlertButton = document.getElementById('test-alert');
+const logFilterSelect = document.getElementById('log-filter');
+const autoRefreshCheckbox = document.getElementById('auto-refresh');
+const totalAlertsElement = document.getElementById('total-alerts');
+const recentIssuesElement = document.getElementById('recent-issues');
+const lastAlertTimeElement = document.getElementById('last-alert-time');
+const alertsTableBody = document.getElementById('alerts-table-body');
+
 // Global variables
 let dashboardData = {
     services: [],
@@ -54,6 +64,10 @@ let dashboardData = {
 };
 let currentCategory = 'all';
 let currentView = 'services-view';
+
+// Global variables for alerts
+let alertsData = [];
+let alertsAutoRefreshInterval = null;
 
 // Load dashboard data
 async function loadDashboardData() {
@@ -664,6 +678,141 @@ function resolvePortConflict(port) {
     });
 }
 
+// Alerts & Logs functionality
+function loadAlerts() {
+    fetch('/api/alerts/logs')
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Failed to load alerts and logs');
+        }
+        return response.json();
+    })
+    .then(data => {
+        alertsData = data.logs || [];
+        updateAlertsView();
+    })
+    .catch(error => {
+        console.error('Error loading alerts and logs:', error);
+        alertsTableBody.innerHTML = `<tr><td colspan="5" class="error-message">Failed to load alerts: ${error.message}</td></tr>`;
+    });
+}
+
+function updateAlertsView() {
+    const filter = logFilterSelect.value;
+    let filteredLogs = alertsData;
+    
+    // Apply filter
+    if (filter !== 'all') {
+        filteredLogs = alertsData.filter(log => log.type === filter);
+    }
+    
+    // Update summary information
+    const totalAlerts = alertsData.filter(log => log.type === 'alert').length;
+    const recentIssues = alertsData.filter(log => 
+        (log.status === 'error' || log.status === 'warning') && 
+        new Date(log.timestamp) > new Date(Date.now() - 24*60*60*1000)
+    ).length;
+    
+    totalAlertsElement.textContent = totalAlerts;
+    recentIssuesElement.textContent = recentIssues;
+    
+    // Find the most recent alert
+    const alerts = alertsData.filter(log => log.type === 'alert');
+    if (alerts.length > 0) {
+        alerts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        lastAlertTimeElement.textContent = formatDate(alerts[0].timestamp);
+    } else {
+        lastAlertTimeElement.textContent = 'Never';
+    }
+    
+    // Update table
+    alertsTableBody.innerHTML = '';
+    
+    if (filteredLogs.length === 0) {
+        alertsTableBody.innerHTML = '<tr><td colspan="5" class="loading-placeholder">No logs found</td></tr>';
+        return;
+    }
+    
+    // Sort logs by timestamp (newest first)
+    filteredLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    // Display logs in table
+    filteredLogs.forEach(log => {
+        const row = document.createElement('tr');
+        
+        // Time column
+        const timeCell = document.createElement('td');
+        timeCell.textContent = formatDate(log.timestamp);
+        row.appendChild(timeCell);
+        
+        // Type column
+        const typeCell = document.createElement('td');
+        const typeSpan = document.createElement('span');
+        typeSpan.classList.add('log-type');
+        typeSpan.classList.add(log.type);
+        typeSpan.textContent = log.type.toUpperCase();
+        typeCell.appendChild(typeSpan);
+        row.appendChild(typeCell);
+        
+        // Component column
+        const componentCell = document.createElement('td');
+        componentCell.textContent = log.component || '-';
+        row.appendChild(componentCell);
+        
+        // Message column
+        const messageCell = document.createElement('td');
+        messageCell.textContent = log.message;
+        row.appendChild(messageCell);
+        
+        // Status column
+        const statusCell = document.createElement('td');
+        const statusSpan = document.createElement('span');
+        statusSpan.classList.add('log-status');
+        statusSpan.classList.add(log.status || 'info');
+        statusSpan.textContent = (log.status || 'info').toUpperCase();
+        statusCell.appendChild(statusSpan);
+        row.appendChild(statusCell);
+        
+        alertsTableBody.appendChild(row);
+    });
+}
+
+function sendTestAlert() {
+    fetch('/api/alerts/test', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Failed to send test alert');
+        }
+        return response.json();
+    })
+    .then(data => {
+        alert('Test alert sent successfully. Check the Alerts & Logs tab in a few seconds.');
+        // Refresh alerts after a delay
+        setTimeout(loadAlerts, 3000);
+    })
+    .catch(error => {
+        console.error('Error sending test alert:', error);
+        alert('Failed to send test alert: ' + error.message);
+    });
+}
+
+function setupAlertsAutoRefresh() {
+    // Clear any existing interval
+    if (alertsAutoRefreshInterval) {
+        clearInterval(alertsAutoRefreshInterval);
+    }
+    
+    // Set up new interval if enabled
+    if (autoRefreshCheckbox.checked) {
+        alertsAutoRefreshInterval = setInterval(loadAlerts, 30000); // Refresh every 30 seconds
+    }
+}
+
 // View switching
 function switchView(viewId) {
     // Hide all views
@@ -733,4 +882,10 @@ document.addEventListener('DOMContentLoaded', () => {
     detectPortConflictsButton.addEventListener('click', detectPortConflicts);
     remapPortsButton.addEventListener('click', remapPorts);
     scanPortsButton.addEventListener('click', scanPorts);
+    
+    // Set up alerts & logs button listeners
+    refreshAlertsButton.addEventListener('click', loadAlerts);
+    testAlertButton.addEventListener('click', sendTestAlert);
+    autoRefreshCheckbox.addEventListener('change', setupAlertsAutoRefresh);
+    logFilterSelect.addEventListener('change', updateAlertsView);
 });

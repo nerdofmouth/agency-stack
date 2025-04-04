@@ -33,6 +33,7 @@
         <!-- New navigation tabs -->
         <button class="nav-btn" data-view="integrations">Integrations</button>
         <button class="nav-btn" data-view="ports">Port Management</button>
+        <button class="nav-btn" data-view="alerts">Alerts & Logs</button>
     </nav>
 
     <main>
@@ -181,6 +182,64 @@
                 <h3>⚠️ Port Conflicts</h3>
                 <div class="conflicts-list" id="conflicts-container">
                     <!-- Conflicts will be populated here -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Alerts & Logs View -->
+        <div class="view-container hidden" id="alerts-view">
+            <h2>Alerts & System Logs</h2>
+            <div class="alerts-actions">
+                <button id="refresh-alerts" class="alert-btn">🔄 Refresh Alerts</button>
+                <button id="test-alert" class="alert-btn">🔔 Send Test Alert</button>
+                <div class="filter-container">
+                    <label for="log-filter">Filter:</label>
+                    <select id="log-filter">
+                        <option value="all">All Logs</option>
+                        <option value="alert">Alerts Only</option>
+                        <option value="health">Health Logs</option>
+                        <option value="backup">Backup Logs</option>
+                        <option value="integration">Integration Logs</option>
+                    </select>
+                    <label for="auto-refresh">
+                        <input type="checkbox" id="auto-refresh" checked> Auto-refresh (30s)
+                    </label>
+                </div>
+            </div>
+            
+            <div class="alerts-container">
+                <div class="alerts-summary">
+                    <div class="summary-item">
+                        <h3>Total Alerts</h3>
+                        <span id="total-alerts" class="count">0</span>
+                    </div>
+                    <div class="summary-item">
+                        <h3>Recent Issues</h3>
+                        <span id="recent-issues" class="count">0</span>
+                    </div>
+                    <div class="summary-item">
+                        <h3>Last Alert</h3>
+                        <span id="last-alert-time">Never</span>
+                    </div>
+                </div>
+                
+                <div class="alerts-table-container">
+                    <table class="alerts-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Type</th>
+                                <th>Component</th>
+                                <th>Message</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="alerts-table-body">
+                            <tr class="loading-placeholder">
+                                <td colspan="5">Loading alerts and logs...</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
