@@ -27,11 +27,17 @@ The demo environment consists of:
 
 ![Demo Architecture](../images/demo-architecture.png)
 
+## System Requirements
+
+For the best performance in a demo environment:
+
+- Debian 11+ or Ubuntu 20.04 LTS
+- 4GB RAM or more
+- 40GB SSD storage
+- Dedicated public IP address
+
 ## Prerequisites
 
-- A VPS or dedicated server with at least 4GB RAM
-- Ubuntu 20.04 LTS or newer
-- Public IP address
 - Domain name pointed to the server (e.g., demo.stack.nerdofmouth.com)
 
 ## Basic Setup
@@ -48,8 +54,8 @@ apt update && apt upgrade -y
 apt install -y git make curl wget jq
 
 # Clone repository
-git clone https://github.com/nerdofmouth/agency-stack.git /opt/agency-stack
-cd /opt/agency-stack
+git clone https://github.com/nerdofmouth/agency-stack.git /opt/agency_stack
+cd /opt/agency_stack
 
 # Make scripts executable
 chmod +x scripts/*.sh
@@ -60,7 +66,7 @@ chmod +x scripts/*.sh
 Create a demo configuration file:
 
 ```bash
-cat > /opt/agency-stack/.demo-config << EOF
+cat > /opt/agency_stack/.demo-config << EOF
 DEMO_DOMAIN=demo.stack.nerdofmouth.com
 DEMO_REBUILD_INTERVAL=daily  # Options: hourly, daily, weekly
 DEMO_COMPONENTS=40  # Install all components
@@ -75,7 +81,7 @@ EOF
 Run the installer with demo parameters:
 
 ```bash
-cd /opt/agency-stack
+cd /opt/agency_stack
 make install DEMO_MODE=true
 ```
 
@@ -90,7 +96,7 @@ cat > /opt/demo-scripts/rebuild-demo.sh << EOF
 # https://stack.nerdofmouth.com
 
 # Load demo configuration
-source /opt/agency-stack/.demo-config
+source /opt/agency_stack/.demo-config
 
 # Log setup
 LOG_FILE="/var/log/agency-stack-demo/rebuild-\$(date +%Y%m%d-%H%M%S).log"
@@ -101,22 +107,22 @@ echo "===== DEMO REBUILD STARTED: \$(date) ====="
 
 # Backup current configuration
 echo "Creating backup before rebuild..."
-cd /opt/agency-stack
+cd /opt/agency_stack
 make backup || true
 
 # Clean current installation
 echo "Cleaning current installation..."
-cd /opt/agency-stack
+cd /opt/agency_stack
 make clean || true
 
 # Fresh installation
 echo "Performing fresh installation..."
-cd /opt/agency-stack
+cd /opt/agency_stack
 make install DEMO_MODE=true
 
 # Create demo client
 echo "Setting up demo client..."
-cd /opt/agency-stack
+cd /opt/agency_stack
 ./scripts/agency_stack_bootstrap_bundle_v10/bootstrap_client.sh \$DEMO_DOMAIN
 
 # Create demo user accounts
@@ -268,7 +274,7 @@ For high-availability demo environments, integrate with the buddy system:
 
 ```bash
 # On the main demo server
-cd /opt/agency-stack
+cd /opt/agency_stack
 make buddy-init
 
 # Configure the buddies.json file
@@ -298,9 +304,9 @@ make start-buddy-system
 
 If your demo environment encounters issues:
 
-1. Check the logs in `/var/log/agency-stack-demo/`
+1. Check the logs in `/var/log/agency_stack-demo/`
 2. Verify container status with `docker ps -a`
-3. Run a manual rebuild: `/opt/demo-scripts/rebuild-demo.sh`
-4. Check system resources: `make rootofmouth`
+3. Run a manual rebuild: `/opt/agency_stack/scripts/rebuild-demo.sh`
+4. Check system resources: `sudo make rootofmouth`
 
 For persistent issues, consult the main [Troubleshooting Guide](troubleshooting.html) or contact [support@nerdofmouth.com](mailto:support@nerdofmouth.com).

@@ -54,9 +54,15 @@ echo -e "${BLUE}Performing system checks...${NC}"
 # Check OS
 if [ -f /etc/os-release ]; then
     . /etc/os-release
-    if [ "$ID" != "ubuntu" ] && [ "$ID" != "debian" ]; then
-        echo -e "${YELLOW}Warning: This script is optimized for Ubuntu/Debian systems. Your system is $PRETTY_NAME.${NC}"
+    if [ "$ID" != "debian" ] && [ "$ID" != "ubuntu" ]; then
+        echo -e "${YELLOW}Warning: This script is optimized for Debian/Ubuntu systems. Your system is $PRETTY_NAME.${NC}"
         echo -e "Proceeding anyway, but you may encounter issues."
+    else
+        if [ "$ID" = "debian" ]; then
+            echo -e "${GREEN}✓ Detected Debian ($PRETTY_NAME) - Recommended OS${NC}"
+        else
+            echo -e "${GREEN}✓ Detected Ubuntu ($PRETTY_NAME) - Supported OS${NC}"
+        fi
     fi
 else
     echo -e "${YELLOW}Warning: Could not determine your OS distribution.${NC}"

@@ -31,13 +31,13 @@ The buddy system uses a combination of DroneCI and custom scripts to:
 1. **Enable DroneCI monitoring:**
 
 ```bash
-cd /opt/agency-stack
+cd /opt/agency_stack
 make enable-monitoring
 ```
 
 2. **Configure buddy relationships:**
 
-Edit the `/opt/agency-stack/config/buddies.json` file:
+Edit the `/opt/agency_stack/config/buddies.json` file:
 
 ```json
 {
@@ -46,7 +46,7 @@ Edit the `/opt/agency-stack/config/buddies.json` file:
     {
       "name": "server2.example.com",
       "ip": "192.168.1.2",
-      "ssh_key": "/opt/agency-stack/config/buddy_keys/server2.key",
+      "ssh_key": "/opt/agency_stack/config/buddy_keys/server2.key",
       "check_interval_minutes": 5,
       "recovery_actions": ["restart", "rebuild", "notify"]
     }
@@ -59,7 +59,7 @@ Edit the `/opt/agency-stack/config/buddies.json` file:
 3. **Generate and exchange SSH keys:**
 
 ```bash
-cd /opt/agency-stack
+cd /opt/agency_stack
 make generate-buddy-keys
 # Then manually exchange keys between servers
 ```
@@ -98,7 +98,7 @@ For more advanced configuration options, including custom monitoring checks and 
 
 If you encounter issues with the buddy system:
 
-1. Check the buddy system logs: `/var/log/agency-stack/buddy-system.log`
+1. Check the buddy system logs: `/var/log/agency_stack/buddy-system.log`
 2. Verify DroneCI is running: `docker ps | grep drone`
 3. Check connectivity between servers
 4. Review the DroneCI pipeline logs

@@ -34,6 +34,8 @@ AgencyStack consists of a carefully curated selection of open-source application
 | **Seafile** | File sync and share solution | https://files.yourdomain.com |
 | **Builder.io** | Visual content management | https://builder.yourdomain.com |
 
+For detailed Builder.io integration instructions, see our [Builder.io Integration Guide](/pages/builderio-integration.html).
+
 ## Team Collaboration
 
 | Component | Description | Default URL |
@@ -63,6 +65,41 @@ AgencyStack consists of a carefully curated selection of open-source application
 | **Netdata** | Real-time performance monitoring | https://monitor.yourdomain.com |
 | **Fail2ban** | Intrusion prevention framework | N/A |
 | **Buddy System** | Self-healing infrastructure service | N/A |
+
+## Communication
+
+| Component | Description | Default URL |
+|-----------|-------------|-------------|
+| **VoIP System** | Complete Voice over IP telephony service | https://voip.yourdomain.com |
+
+### VoIP Details
+
+The AgencyStack VoIP component provides a comprehensive communication solution:
+
+**Server Components:**
+- **FreePBX/Asterisk**: Open-source PBX system for call routing and management
+- **WebRTC Gateway**: For browser-based calling without plugins
+- **SIP Trunking**: Connect to external phone networks
+- **Voicemail to Email**: Automatic email delivery of voice messages
+
+**Client Applications:**
+- **Desktop**: Supports softphones like Zoiper, MicroSIP, and Bria (Windows, macOS, Linux)
+- **Mobile**: 
+  - **Android**: Zoiper, Linphone, Grandstream Wave (available on Google Play)
+  - **iOS**: Zoiper, Linphone, Acrobits Softphone (available on App Store)
+- **Web Interface**: Browser-based calling interface with no installation required
+- **Hardware Support**: Compatible with standard SIP desk phones from Yealink, Polycom, etc.
+
+For detailed client setup instructions, see our [VOIP Client Setup Guide](/pages/voip-client-setup.html) that you can share with end-users.
+
+**Features:**
+- Call recording and monitoring
+- IVR (Interactive Voice Response) menus
+- Conference rooms
+- Call queues and ring groups
+- Detailed call reporting
+
+All client applications are FOSS (Free and Open Source Software) or have FOSS alternatives available.
 
 ## Component Selection
 

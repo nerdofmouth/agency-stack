@@ -31,15 +31,19 @@ This guide will help you diagnose and resolve common issues with your AgencyStac
 
 3. **Try manual installation:**
    ```bash
-   git clone https://github.com/nerdofmouth/agency-stack.git /opt/agency-stack
-   cd /opt/agency-stack
-   chmod +x scripts/*.sh
-   make install
+   git clone https://github.com/nerdofmouth/agency-stack.git /opt/agency_stack
+   cd /opt/agency_stack
+   sudo chmod +x scripts/*.sh
+   sudo make install
    ```
 
 4. **Check logs:**
    ```bash
-   cat /var/log/agency_stack/install-*.log
+   # View installation logs
+   sudo cat /var/log/agency_stack/install-*.log
+   
+   # View test environment logs
+   sudo cat /var/log/agency_stack/test-*.log
    ```
 
 ### Docker Installation Issues
@@ -91,7 +95,7 @@ This guide will help you diagnose and resolve common issues with your AgencyStac
 3. **Manual certificate renewal:**
    ```bash
    cd /opt/agency_stack
-   ./scripts/renew_certificates.sh --force
+   sudo ./scripts/renew_certificates.sh --force
    ```
 
 ### Network Connectivity Issues
@@ -175,12 +179,12 @@ This guide will help you diagnose and resolve common issues with your AgencyStac
 2. **Try manual backup:**
    ```bash
    cd /opt/agency_stack
-   ./scripts/backup.sh --verbose
+   sudo ./scripts/backup.sh --verbose
    ```
 
 3. **Check backup logs:**
    ```bash
-   cat /var/log/agency_stack/backup-*.log
+   sudo cat /var/log/agency_stack/backup-*.log
    ```
 
 ### Restore Failures
@@ -197,7 +201,7 @@ This guide will help you diagnose and resolve common issues with your AgencyStac
 2. **Try alternative restore method:**
    ```bash
    cd /opt/agency_stack
-   ./scripts/restore.sh --alternative /path/to/backup.tar.gz
+   sudo ./scripts/restore.sh --alternative /path/to/backup.tar.gz
    ```
 
 ## Buddy System Issues
@@ -221,12 +225,12 @@ This guide will help you diagnose and resolve common issues with your AgencyStac
 3. **Restart buddy monitoring:**
    ```bash
    cd /opt/agency_stack
-   make buddy-monitor
+   sudo make buddy-monitor
    ```
 
 4. **Check logs:**
    ```bash
-   cat /var/log/agency_stack/buddy-system.log
+   sudo cat /var/log/agency_stack/buddy-system.log
    ```
 
 ### DroneCI Integration Issues
@@ -263,7 +267,7 @@ This guide will help you diagnose and resolve common issues with your AgencyStac
 1. **Check system resources:**
    ```bash
    cd /opt/agency_stack
-   make rootofmouth
+   sudo make rootofmouth
    ```
 
 2. **Identify resource-intensive containers:**
@@ -293,8 +297,8 @@ This guide will help you diagnose and resolve common issues with your AgencyStac
 3. **Clean old backups and logs:**
    ```bash
    cd /opt/agency_stack
-   ./scripts/cleanup_old_backups.sh
-   ./scripts/cleanup_logs.sh
+   sudo ./scripts/cleanup_old_backups.sh
+   sudo ./scripts/cleanup_logs.sh
    ```
 
 4. **Prune Docker resources:**
@@ -309,7 +313,7 @@ If you've tried these troubleshooting steps and still have issues:
 1. **Run diagnostic report:**
    ```bash
    cd /opt/agency_stack
-   ./scripts/generate_diagnostic_report.sh
+   sudo ./scripts/generate_diagnostic_report.sh
    ```
 
 2. **Contact support:**
