@@ -701,6 +701,12 @@ main_menu() {
     show_components
     read -p "Enter your choice (0-80): " choice
     
+    # Validate input is not empty and is a number
+    if [[ -z "$choice" || ! "$choice" =~ ^[0-9]+$ ]]; then
+      echo -e "${YELLOW} Invalid option${NC}"
+      continue
+    fi
+    
     if [ "$choice" -eq 0 ]; then
       log "INFO" "Exiting installer"
       echo -e "${BLUE}${BOLD}Exiting installer. Thank you!${NC}"
