@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgencyStack - Digital Sovereignty for Modern Agencies</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            padding-top: 20px;
+        }
+        .header-logo {
+            max-width: 400px;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .tagline {
+            font-style: italic;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .btn-primary {
+            background-color: #4CAF50;
+            border-color: #4CAF50;
+            padding: 10px 20px;
+            font-weight: bold;
+        }
+        .btn-secondary {
+            background-color: #333;
+            border-color: #333;
+            padding: 10px 20px;
+            font-weight: bold;
+        }
+        .btn-primary:hover {
+            background-color: #3d8b40;
+            border-color: #3d8b40;
+        }
+        .btn-secondary:hover {
+            background-color: #222;
+            border-color: #222;
+        }
+        .section {
+            margin-bottom: 40px;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            margin-top: 50px;
+            text-align: center;
+        }
+        .footer img {
+            height: 30px;
+            vertical-align: middle;
+        }
+        code {
+            background-color: #f5f5f5;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .github-icon {
+            height: 20px;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="text-center mb-5">
+            <img src="images/AgencyStack-logo.png" alt="AgencyStack Logo" class="header-logo">
+            <h1>Digital Sovereignty for Modern Agencies</h1>
+            <p class="tagline">"Run your agency. Reclaim your agency."</p>
+        </div>
+
+        <div class="section">
+            <p class="lead">
+                AgencyStack is more than just a collection of open-source software—it's a declaration of independence for digital agencies, creative professionals, and businesses who want to own their technology stack, control their data, and operate with true digital sovereignty.
+            </p>
+        </div>
+
+        <div class="section">
+            <h2>Our Vision</h2>
+            <p>
+                In a world where agencies and businesses increasingly rely on closed SaaS platforms that limit control, extract ongoing fees, and hold your data hostage, AgencyStack offers a different path. We believe that:
+            </p>
+            <ul>
+                <li><strong>Digital sovereignty</strong> is fundamental to business resilience and independence</li>
+                <li><strong>Open source tools</strong> can and should be as powerful and polished as proprietary alternatives</li>
+                <li><strong>Agencies deserve freedom</strong> from vendor lock-in, unpredictable pricing, and unnecessary complexity</li>
+                <li><strong>Technology should serve your mission</strong>, not complicate it or compromise it</li>
+            </ul>
+            <p>
+                AgencyStack empowers you to deploy a complete, integrated stack of best-in-class open source tools with a single command. Take back control, eliminate monthly SaaS fees, and build client solutions on a foundation you actually own.
+            </p>
+        </div>
+
+        <div class="text-center my-5">
+            <a href="#quick-installation" class="btn btn-primary btn-lg mr-3">⚡ Get Started</a>
+            <a href="https://github.com/nerdofmouth/agency-stack" class="btn btn-secondary btn-lg">
+                <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" alt="GitHub" class="github-icon">
+                GitHub
+            </a>
+        </div>
+
+        <div class="section" id="quick-installation">
+            <h2>Quick Installation</h2>
+            <p>Install AgencyStack on your server with our one-line installer:</p>
+            <pre><code>curl -sSL https://stack.nerdofmouth.com/install.sh | sudo bash</code></pre>
+        </div>
+
+        <div class="section">
+            <h2>What's Included</h2>
+            <p>AgencyStack provides a complete server solution including:</p>
+            <ul>
+                <li><strong>Core Infrastructure</strong>: Docker, Docker Compose, Traefik (reverse proxy), Portainer</li>
+                <li><strong>Business Applications</strong>: ERPNext, KillBill, Cal.com, Documenso</li>
+                <li><strong>Content Management</strong>: WordPress, PeerTube, Seafile, Builder.io</li>
+                <li><strong>Team Collaboration</strong>: Focalboard, TaskWarrior/Calcure</li>
+                <li><strong>Marketing and Analytics</strong>: Listmonk, PostHog, WebPush</li>
+                <li><strong>Integration</strong>: n8n, OpenIntegrationHub</li>
+                <li><strong>System Monitoring</strong>: Netdata, Fail2ban, DroneCI</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>Documentation Sections</h2>
+            <ul>
+                <li><a href="pages/installation.html">Detailed Installation Guide</a></li>
+                <li><a href="pages/components.html">Components Overview</a></li>
+                <li><a href="pages/client-setup.html">Client Setup</a></li>
+                <li><a href="pages/maintenance.html">Maintenance and Backup</a></li>
+                <li><a href="pages/self-healing.html">Self-Healing Setup</a></li>
+                <li><a href="pages/demo-setup.html">Public Demo Environment</a></li>
+                <li><a href="pages/droneci-guide.html">DroneCI Integration</a></li>
+                <li><a href="pages/troubleshooting.html">Troubleshooting Guide</a></li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>Requirements</h2>
+            <ul>
+                <li>Ubuntu 20.04 LTS or newer</li>
+                <li>At least 4GB RAM (8GB+ recommended)</li>
+                <li>20GB+ free disk space</li>
+                <li>Root access</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>Support and Community</h2>
+            <ul>
+                <li><a href="https://github.com/nerdofmouth/agency-stack/issues">GitHub Issues</a></li>
+                <li><a href="mailto:support@nerdofmouth.com">Email Support</a></li>
+            </ul>
+        </div>
+
+        <div class="footer">
+            <p>
+                Built by 
+                <a href="https://nerdofmouth.com">
+                    <img src="images/NerdofMouth-logo.png" alt="Nerd of Mouth">
+                </a> 
+                | Deploy Smart. Speak Nerd.
+            </p>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>
