@@ -1,12 +1,46 @@
 #!/bin/bash
+# Launchbox Client Bootstrap Script
+# https://nerdofmouth.com/launchbox
 
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
+BOLD='\033[1m'
+NC='\033[0m' # No Color
+
+# Logging setup
+LOGDIR="/var/log/launchbox"
+mkdir -p "$LOGDIR"
+LOGFILE="$LOGDIR/client-setup-$(date +%Y%m%d-%H%M%S).log"
+touch "$LOGFILE"
+
+# Logging function
+log() {
+  local level="$1"
+  local message="$2"
+  local timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+  echo -e "[$timestamp] [Launchbox] [$level] $message" | tee -a "$LOGFILE"
+}
+
+# Visual feedback
+print_header() { echo -e "\n${MAGENTA}${BOLD}$1${NC}\n"; }
+print_success() { echo -e "${GREEN}✅ $1${NC}"; }
+print_info() { echo -e "${BLUE}ℹ️ $1${NC}"; }
+print_warning() { echo -e "${YELLOW}⚠️ $1${NC}"; }
+print_error() { echo -e "${RED}❌ $1${NC}"; }
+
 ### VARS ###
 CLIENT_DOMAIN="$1"
 if [ -z "$CLIENT_DOMAIN" ]; then
-  echo "❌ Usage: $0 client.domain.com"
+  print_error "Usage: $0 client.domain.com"
+  log "ERROR" "No domain provided for client setup"
   exit 1
 fi
 
@@ -15,12 +49,23 @@ CLIENT_DIR="clients/${CLIENT_DOMAIN}"
 ENV_FILE="${CLIENT_DIR}/.env"
 COMPOSE_FILE="${CLIENT_DIR}/docker-compose.yml"
 
+# Display header
+print_header "🏢 Launchbox Client Setup: $CLIENT_DOMAIN"
+log "INFO" "Starting client setup for $CLIENT_DOMAIN"
+
+# Display random motto
+SCRIPT_PATH="$(dirname "$(realpath "$0")")"
+MOTTO_PATH="$SCRIPT_PATH/../motto.sh"
+source "$MOTTO_PATH" && random_motto
+echo ""
+
 ### DIR SETUP ###
-echo "🚀 Bootstrapping client: $CLIENT_DOMAIN"
+print_info "Creating client directory structure"
 mkdir -p "$CLIENT_DIR"
+log "INFO" "Created directory $CLIENT_DIR"
 
 ### GENERATE .env ###
-echo "📦 Generating .env for $CLIENT_DOMAIN"
+print_info "Generating .env for $CLIENT_DOMAIN"
 cat > "$ENV_FILE" <<EOF
 SITE_NAME=$CLIENT_DOMAIN
 MYSQL_ROOT_PASSWORD=$(openssl rand -base64 12)
@@ -32,7 +77,7 @@ BUILDER_IO_API_KEY=
 EOF
 
 ### GENERATE docker-compose.yml ###
-echo "⚙️  Generating docker-compose.yml for $CLIENT_DOMAIN"
+print_info "Generating docker-compose.yml for $CLIENT_DOMAIN"
 cat > "$COMPOSE_FILE" <<EOF
 version: "3.7"
 services:
@@ -90,11 +135,14 @@ networks:
 EOF
 
 ### CREATE DIRECTORIES FOR VOLUMES ###
+print_info "Creating directories for volumes"
 mkdir -p "${CLIENT_DIR}/erpnext_data"
 mkdir -p "${CLIENT_DIR}/peertube_data"
 mkdir -p "${CLIENT_DIR}/static"
+log "INFO" "Created directories for volumes"
 
 # Create basic offline fallback page
+print_info "Creating basic offline fallback page"
 cat > "${CLIENT_DIR}/static/offline.html" <<EOF
 <!DOCTYPE html>
 <html lang="en">
@@ -118,15 +166,16 @@ cat > "${CLIENT_DIR}/static/offline.html" <<EOF
 </body>
 </html>
 EOF
+log "INFO" "Created basic offline fallback page"
 
 ### PROVISION Builder.io space (optional) ###
-echo "🔧 Checking for Builder.io integration..."
+print_info "Checking for Builder.io integration..."
 
 # Source the .env file to get the BUILDER_ENABLE variable
 source "$ENV_FILE"
 
 if [ "$BUILDER_ENABLE" = "true" ]; then
-  echo "🔧 Provisioning Builder.io space for ${CLIENT_NAME}..."
+  print_info "Provisioning Builder.io space for ${CLIENT_NAME}..."
   
   # Get the absolute path to the builderio_provision.sh script
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -137,9 +186,10 @@ if [ "$BUILDER_ENABLE" = "true" ]; then
   if [ -f "$BUILDERIO_SCRIPT" ]; then
     # Check if BUILDER_API_KEY is set in the environment
     if [ -z "$BUILDER_API_KEY" ]; then
-      echo "❌ BUILDER_API_KEY environment variable is not set."
-      echo "❌ Please set it with: export BUILDER_API_KEY=\"your_api_key\""
-      echo "❌ Builder.io integration will be skipped."
+      print_error "BUILDER_API_KEY environment variable is not set."
+      log "ERROR" "BUILDER_API_KEY environment variable is not set."
+      print_info "Please set it with: export BUILDER_API_KEY=\"your_api_key\""
+      print_info "Builder.io integration will be skipped."
     else
       bash "$BUILDERIO_SCRIPT" "$CLIENT_NAME" "$CLIENT_DOMAIN"
       
@@ -147,18 +197,25 @@ if [ "$BUILDER_ENABLE" = "true" ]; then
       # (This step is now handled by the builderio_provision.sh script)
     fi
   else
-    echo "❌ Builder.io provisioning script not found at: $BUILDERIO_SCRIPT"
-    echo "❌ Please ensure the script exists or update this script with the correct path."
+    print_error "Builder.io provisioning script not found at: $BUILDERIO_SCRIPT"
+    log "ERROR" "Builder.io provisioning script not found at: $BUILDERIO_SCRIPT"
+    print_info "Please ensure the script exists or update this script with the correct path."
   fi
 fi
 
 ### DONE ###
-echo "✅ Client ${CLIENT_DOMAIN} bootstrapped."
-echo "🔧 Next step: cd ${CLIENT_DIR} && docker compose up -d"
+print_success "Client ${CLIENT_DOMAIN} bootstrapped."
+log "INFO" "Client ${CLIENT_DOMAIN} bootstrapped."
+
+# Show motto after successful bootstrap
+source "$MOTTO_PATH" && random_motto
 echo ""
-echo "📝 Available services after startup:"
-echo "  • ERPNext:  https://${CLIENT_DOMAIN}"
-echo "  • PeerTube: https://media.${CLIENT_DOMAIN}"
+
+print_info "Next step: cd ${CLIENT_DIR} && docker compose up -d"
+print_info ""
+print_info "Available services after startup:"
+print_info "  • ERPNext:  https://${CLIENT_DOMAIN}"
+print_info "  • PeerTube: https://media.${CLIENT_DOMAIN}"
 if [ "$BUILDER_ENABLE" = "true" ]; then
-  echo "  • Builder.io integration is enabled - check your Builder.io dashboard"
+  print_info "  • Builder.io integration is enabled - check your Builder.io dashboard"
 fi

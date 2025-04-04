@@ -1,5 +1,27 @@
 #!/bin/bash
 # install_launchpad_dashboard.sh - Central dashboard for accessing all services
+# Part of Launchbox by NerdofMouth.com
+
+# Colors and formatting
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
+BOLD='\033[1m'
+NC='\033[0m' # No Color
+
+# Header
+echo -e "${BLUE}${BOLD}🚀 Installing Launchbox Control Panel...${NC}\n"
+
+# Display motto
+SCRIPT_DIR="$(dirname "$(realpath "$0")")"
+MOTTO_PATH="$SCRIPT_DIR/../../scripts/motto.sh"
+if [ -f "$MOTTO_PATH" ]; then
+  source "$MOTTO_PATH" && random_motto
+  echo ""
+fi
 
 echo "📜 Installing Launchpad Dashboard..."
 

@@ -1,7 +1,27 @@
 #!/bin/bash
 # install_keycloak.sh - Identity and access management system installation
+# Part of Launchbox by NerdofMouth.com
 
-echo "🔐 Installing Keycloak (Identity and Access Management)..."
+# Colors and formatting
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
+BOLD='\033[1m'
+NC='\033[0m' # No Color
+
+# Header
+echo -e "${BLUE}${BOLD}🔐 Installing Keycloak Identity Server...${NC}\n"
+
+# Display motto
+SCRIPT_DIR="$(dirname "$(realpath "$0")")"
+MOTTO_PATH="$SCRIPT_DIR/../../scripts/motto.sh"
+if [ -f "$MOTTO_PATH" ]; then
+  source "$MOTTO_PATH" && random_motto
+  echo ""
+fi
 
 # Source the port manager
 source /home/revelationx/CascadeProjects/foss-server-stack/scripts/port_manager.sh
