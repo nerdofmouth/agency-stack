@@ -20,7 +20,7 @@ print_warning() { echo -e "${YELLOW}⚠️ $1${NC}"; }
 print_error() { echo -e "${RED}❌ $1${NC}"; }
 
 # Log file setup
-LOGDIR="/var/log/launchbox"
+LOGDIR="/var/log/agency_stack"
 LOGFILE="$LOGDIR/test-$(date +%Y%m%d-%H%M%S).log"
 mkdir -p "$LOGDIR"
 touch "$LOGFILE"
@@ -30,7 +30,7 @@ log() {
   local level="$1"
   local message="$2"
   local timestamp=$(date +"%Y-%m-%d %H:%M:%S")
-  echo -e "[$timestamp] [Launchbox] [$level] $message" | tee -a "$LOGFILE"
+  echo -e "[$timestamp] [AgencyStack] [$level] $message" | tee -a "$LOGFILE"
 }
 
 # Check if script is run as root
@@ -234,8 +234,8 @@ fi
 print_header "DNS Configuration Check"
 
 # Check if config.env exists
-if [ -f "/opt/launchbox/config.env" ]; then
-  source "/opt/launchbox/config.env"
+if [ -f "/opt/agency_stack/config.env" ]; then
+  source "/opt/agency_stack/config.env"
   
   if [ -n "$PRIMARY_DOMAIN" ]; then
     print_info "Checking DNS for $PRIMARY_DOMAIN..."
@@ -249,8 +249,8 @@ if [ -f "/opt/launchbox/config.env" ]; then
   fi
   
   # Check client domains if they exist
-  if [ -d "/opt/launchbox/clients" ]; then
-    for client_dir in /opt/launchbox/clients/*; do
+  if [ -d "/opt/agency_stack/clients" ]; then
+    for client_dir in /opt/agency_stack/clients/*; do
       if [ -d "$client_dir" ] && [ -f "$client_dir/.env" ]; then
         CLIENT_DOMAIN=$(grep CLIENT_DOMAIN "$client_dir/.env" | cut -d'=' -f2)
         if [ -n "$CLIENT_DOMAIN" ]; then
@@ -267,7 +267,7 @@ if [ -f "/opt/launchbox/config.env" ]; then
     done
   fi
 else
-  print_warning "No configuration file found at /opt/launchbox/config.env"
+  print_warning "No configuration file found at /opt/agency_stack/config.env"
   log "WARN" "Configuration file check failed"
 fi
 

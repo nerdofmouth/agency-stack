@@ -1,5 +1,5 @@
 #!/bin/bash
-# welcome.sh - Displays the Launchbox welcome message
+# welcome.sh - Displays the AgencyStack welcome message
 # Add this to /etc/profile.d/ to display on login
 
 # Colors
@@ -23,8 +23,8 @@ cat << "EOF"
 EOF
 
 echo -e "${BLUE}${BOLD}Open Source Freedom Stack for Agencies & Enterprises${NC}"
-echo -e "${CYAN}Version: $(cat /opt/launchbox/version 2>/dev/null || echo "1.0.0")${NC}"
-echo -e "${GREEN}${BOLD}https://nerdofmouth.com/launchbox${NC}\n"
+echo -e "${CYAN}Version: $(cat /opt/agency_stack/version 2>/dev/null || echo "1.0.0")${NC}"
+echo -e "${GREEN}${BOLD}https://stack.nerdofmouth.com${NC}\n"
 
 # Display random motto
 SCRIPT_PATH="$(dirname "$(realpath "$0")")"
@@ -33,34 +33,37 @@ if [ -f "$SCRIPT_PATH/motto.sh" ]; then
     echo ""
 fi
 
-# Check Launchbox status if it's installed
-if [ -d "/opt/launchbox" ]; then
-    # Count running containers
-    RUNNING_CONTAINERS=$(docker ps -q 2>/dev/null | wc -l)
-    TOTAL_CONTAINERS=$(docker ps -a -q 2>/dev/null | wc -l)
+# Check AgencyStack status if it's installed
+if [ -d "/opt/agency_stack" ]; then
+    echo -e "${BLUE}${BOLD}System Status:${NC}"
     
-    echo -e "${YELLOW}System Status:${NC}"
-    echo -e " • ${CYAN}Running containers:${NC} $RUNNING_CONTAINERS of $TOTAL_CONTAINERS"
-    
-    # Check if Launchpad Dashboard is running
-    if docker ps 2>/dev/null | grep -q "launchpad_dashboard"; then
-        echo -e " • ${CYAN}Launchbox Dashboard:${NC} ${GREEN}Online${NC}"
-        # Get dashboard URL
-        DASHBOARD_URL=$(grep "dashboard" /opt/launchbox/config.env 2>/dev/null | cut -d'=' -f2)
-        [ -n "$DASHBOARD_URL" ] && echo -e " • ${CYAN}Control Panel:${NC} ${GREEN}https://$DASHBOARD_URL${NC}"
+    # Check if Traefik is running
+    if docker ps 2>/dev/null | grep -q "traefik"; then
+        echo -e " • ${CYAN}Traefik Proxy:${NC} ${GREEN}Online${NC}"
     else
-        echo -e " • ${CYAN}Launchbox Dashboard:${NC} ${RED}Offline${NC}"
+        echo -e " • ${CYAN}Traefik Proxy:${NC} ${RED}Offline${NC}"
+    fi
+    
+    # Check if Dashboard is running
+    if docker ps 2>/dev/null | grep -q "dashboard"; then
+        echo -e " • ${CYAN}AgencyStack Dashboard:${NC} ${GREEN}Online${NC}"
+        
+        DASHBOARD_URL=$(grep "dashboard" /opt/agency_stack/config.env 2>/dev/null | cut -d'=' -f2)
+        echo -e "   ${GREEN}${DASHBOARD_URL:-https://dashboard.yourdomain.com}${NC}"
+    else
+        echo -e " • ${CYAN}AgencyStack Dashboard:${NC} ${RED}Offline${NC}"
     fi
     
     # Show client count
-    CLIENT_COUNT=$(find /opt/launchbox/clients -maxdepth 1 -type d | wc -l)
-    [ "$CLIENT_COUNT" -gt 1 ] && echo -e " • ${CYAN}Active clients:${NC} $(($CLIENT_COUNT - 1))"
+    CLIENT_COUNT=$(find /opt/agency_stack/clients -maxdepth 1 -type d | wc -l)
+    CLIENT_COUNT=$((CLIENT_COUNT-1)) # Subtract the parent directory
+    echo -e " • ${CYAN}Active Clients:${NC} ${YELLOW}${CLIENT_COUNT:-0}${NC}"
     
-    echo -e "\n${MAGENTA}${BOLD}Commands:${NC}"
-    echo -e " • ${YELLOW}launchbox status${NC} - Check system status"
-    echo -e " • ${YELLOW}launchbox install${NC} - Run installer"
-    echo -e " • ${YELLOW}launchbox client${NC} - Create new client"
-    echo -e " • ${YELLOW}launchbox help${NC} - Show help"
+    echo -e "\n${BLUE}${BOLD}Command Reference:${NC}"
+    echo -e " • ${YELLOW}agency_stack status${NC} - Check system status"
+    echo -e " • ${YELLOW}agency_stack install${NC} - Run installer"
+    echo -e " • ${YELLOW}agency_stack client${NC} - Create new client"
+    echo -e " • ${YELLOW}agency_stack help${NC} - Show help"
 fi
 
-echo -e "\nWelcome to ${BOLD}Launchbox${NC} powered by NerdofMouth.com"
+echo -e "\nWelcome to ${BOLD}AgencyStack${NC} powered by NerdofMouth.com"
