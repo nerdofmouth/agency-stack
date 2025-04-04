@@ -351,6 +351,40 @@ else
   print_success "Loaded existing configuration for domain: $PRIMARY_DOMAIN"
 fi
 
+# Function to check DNS configuration
+function check_dns_configuration() {
+  print_header "DNS Configuration Check"
+  
+  # Get server's public IP
+  SERVER_IP=$(curl -s https://api.ipify.org)
+  
+  if [ -z "$PRIMARY_DOMAIN" ] || [ "$PRIMARY_DOMAIN" = "example.com" ]; then
+    print_warning "You haven't configured a custom domain yet."
+    echo -e "You will be prompted to enter your domain during installation."
+    echo -e "Make sure your domain's DNS records point to this server: ${GREEN}${SERVER_IP}${NC}\n"
+    return 0
+  fi
+  
+  # Check if domain resolves
+  DOMAIN_IP=$(dig +short "$PRIMARY_DOMAIN" 2>/dev/null)
+  
+  if [ -z "$DOMAIN_IP" ]; then
+    print_warning "Domain $PRIMARY_DOMAIN does not resolve to any IP address."
+    echo -e "Please configure your DNS records to point to this server: ${GREEN}${SERVER_IP}${NC}\n"
+    log "WARN" "Domain $PRIMARY_DOMAIN does not resolve"
+  elif [ "$DOMAIN_IP" != "$SERVER_IP" ]; then
+    print_warning "Domain $PRIMARY_DOMAIN resolves to $DOMAIN_IP, not to this server ($SERVER_IP)."
+    echo -e "Your DNS configuration may not be correct, which will cause issues with SSL certificates and service access.\n"
+    log "WARN" "Domain $PRIMARY_DOMAIN resolves to wrong IP: $DOMAIN_IP (server: $SERVER_IP)"
+  else
+    print_success "DNS configuration for $PRIMARY_DOMAIN looks good! (Resolves to $DOMAIN_IP)"
+    log "INFO" "DNS check passed for $PRIMARY_DOMAIN"
+  fi
+}
+
+# Check DNS configuration
+check_dns_configuration
+
 # Check system dependencies
 check_dependencies
 
@@ -363,6 +397,7 @@ show_components() {
   echo -e "  ${BOLD}3.${NC}  Docker Compose"
   echo -e "  ${BOLD}4.${NC}  Traefik SSL (reverse proxy)"
   echo -e "  ${BOLD}5.${NC}  Portainer (container management)"
+  echo -e "  ${BOLD}24.${NC} DroneCI (continuous integration)"
   
   echo -e "${CYAN}Business Applications:${NC}"
   echo -e "  ${BOLD}6.${NC}  ERPNext (ERP system)"
@@ -374,6 +409,7 @@ show_components() {
   echo -e "  ${BOLD}7.${NC}  PeerTube (video platform)"
   echo -e "  ${BOLD}8.${NC}  WordPress Module"
   echo -e "  ${BOLD}18.${NC} Seafile (file sharing)"
+  echo -e "  ${BOLD}31.${NC} Builder.io (visual CMS)"
   
   echo -e "${CYAN}Team Collaboration:${NC}"
   echo -e "  ${BOLD}9.${NC}  Focalboard (project management)"
@@ -456,17 +492,19 @@ install_component() {
     21) script="install_netdata.sh" ;;
     22) script="install_fail2ban.sh" ;;
     23) script="install_security.sh" ;;
+    24) script="install_droneci.sh" ;;
     25) script="install_keycloak.sh" ;;
     26) script="install_tailscale.sh" ;;
     27) script="install_signing_timestamps.sh" ;;
     28) script="install_backup_strategy.sh" ;;
     29) script="install_markdown_lexical.sh" ;;
     30) script="install_launchpad_dashboard.sh" ;;
+    31) script="install_builderio.sh" ;;
     40) 
       echo -e "${BLUE}${BOLD} Installing AgencyStack Core Components...${NC}"
       log "INFO" "Installing core components bundle"
       install_component 1 && install_component 2 && install_component 3 && 
-      install_component 4 && install_component 5 && install_component 30
+      install_component 4 && install_component 5 && install_component 24 && install_component 30
       return $?
       ;;
     50) 
