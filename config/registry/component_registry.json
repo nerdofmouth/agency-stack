@@ -474,6 +474,53 @@
         },
         "description": "Log aggregation"
       }
+    },
+    "devops": {
+      "gitea": {
+        "name": "Gitea",
+        "category": "DevOps",
+        "version": "1.20.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Self-hosted Git service",
+        "ports": {
+          "web": 3000,
+          "ssh": 2222
+        }
+      },
+      "droneci": {
+        "name": "Drone CI",
+        "category": "DevOps",
+        "version": "2.16.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Continuous Integration and Delivery platform",
+        "ports": {
+          "web": 3001,
+          "rpc": 3002,
+          "runner": 3003
+        }
+      }
     }
   }
 }

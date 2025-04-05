@@ -36,6 +36,16 @@ This document provides a comprehensive list of all port assignments used by Agen
 | **Documenso** | Web UI | 3001 | HTTP | Document signing |
 | **Chatwoot** | Web UI | 3002 | HTTP | Customer service platform |
 
+## DevOps
+
+| Component | Service | Port | Protocol | Notes |
+|-----------|---------|------|----------|-------|
+| **Gitea** | Web UI | 3000 | HTTP | Git service |
+| **Gitea** | SSH | 2222 | TCP | Git SSH access |
+| **DroneCI** | Web UI | 3001 | HTTP | CI/CD web interface |
+| **DroneCI** | RPC | 3002 | HTTP | Server-Runner communication |
+| **DroneCI** | Runner | 3003 | HTTP | Runner API & metrics |
+
 ## Content Management
 
 | Component | Service | Port | Protocol | Notes |
