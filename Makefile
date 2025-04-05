@@ -93,6 +93,8 @@ help:
 	@echo "  $(BOLD)make install-posthog$(RESET)           Install PostHog"
 	@echo "  $(BOLD)make install-voip$(RESET)              Install VoIP system (FusionPBX + FreeSWITCH)"
 	@echo "  $(BOLD)make install-mailu$(RESET)             Install Mailu email server"
+	@echo "  $(BOLD)make install-grafana$(RESET)           Install Grafana monitoring"
+	@echo "  $(BOLD)make install-keycloak$(RESET)         Install Keycloak identity provider"
 	@echo "  $(BOLD)make install-infrastructure$(RESET)    Install core infrastructure"
 	@echo "  $(BOLD)make install-security-infrastructure$(RESET) Install security infrastructure"
 	@echo "  $(BOLD)make install-multi-tenancy$(RESET)     Set up multi-tenancy infrastructure"
@@ -496,6 +498,16 @@ install-voip: validate
 install-mailu: validate
 	@echo "Installing Mailu email server..."
 	@sudo $(SCRIPTS_DIR)/components/install_mailu.sh --domain mail.$(DOMAIN) --email-domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+# Grafana
+install-grafana: validate
+	@echo "Installing Grafana monitoring..."
+	@sudo $(SCRIPTS_DIR)/components/install_grafana.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+# Keycloak
+install-keycloak: validate
+	@echo "Installing Keycloak identity provider..."
+	@sudo $(SCRIPTS_DIR)/components/install_keycloak.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
 # Core Infrastructure
 install-infrastructure:
