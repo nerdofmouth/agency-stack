@@ -1,13 +1,12 @@
 #!/bin/bash
-# install_posthog.sh - Install and configure PostHog for AgencyStack
+# install_posthog.sh - Install and configure PostHog analytics for AgencyStack
 # https://stack.nerdofmouth.com
 #
-# This script sets up PostHog analytics platform with:
+# This script sets up PostHog with:
 # - PostgreSQL database
-# - ClickHouse for events
-# - Redis for caching
-# - Zookeeper for coordination
-# - Kafka for messaging
+# - Redis caching
+# - ClickHouse analytics database
+# - Auto-configured for multi-tenancy
 #
 # Author: AgencyStack Team
 # Version: 1.0.0
@@ -30,21 +29,27 @@ CONFIG_DIR="/opt/agency_stack"
 POSTHOG_DIR="${CONFIG_DIR}/posthog"
 LOG_DIR="/var/log/agency_stack"
 COMPONENTS_LOG_DIR="${LOG_DIR}/components"
+INTEGRATIONS_LOG_DIR="${LOG_DIR}/integrations"
 INSTALL_LOG="${COMPONENTS_LOG_DIR}/posthog.log"
+INTEGRATION_LOG="${INTEGRATIONS_LOG_DIR}/posthog.log"
+MAIN_INTEGRATION_LOG="${INTEGRATIONS_LOG_DIR}/integration.log"
 VERBOSE=false
+FORCE=false
+WITH_DEPS=false
 DOMAIN=""
 CLIENT_ID=""
 ADMIN_EMAIL=""
 POSTHOG_VERSION="latest"
-SECRET_KEY=$(openssl rand -base64 32)
-POSTGRES_PASSWORD=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-16)
-ADMIN_PASSWORD=$(openssl rand -base64 12 | tr -d "=+/")
+DB_ROOT_PASSWORD=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-16)
+POSTHOG_DB_PASSWORD=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-16)
+POSTHOG_ADMIN_PASSWORD=$(openssl rand -base64 12 | tr -d "=+/")
+POSTHOG_SECRET=$(openssl rand -base64 32)
 
 # Show help message
 show_help() {
   echo -e "${MAGENTA}${BOLD}AgencyStack PostHog Setup${NC}"
-  echo -e "==========================="
-  echo -e "This script installs and configures PostHog analytics platform."
+  echo -e "=============================="
+  echo -e "This script installs and configures PostHog analytics platform with PostgreSQL and ClickHouse."
   echo -e ""
   echo -e "${CYAN}Usage:${NC}"
   echo -e "  $0 [options]"
@@ -53,12 +58,14 @@ show_help() {
   echo -e "  ${BOLD}--domain${NC} <domain>         Primary domain for PostHog (required)"
   echo -e "  ${BOLD}--client-id${NC} <client_id>   Client ID for multi-tenant setup (optional)"
   echo -e "  ${BOLD}--admin-email${NC} <email>     Admin email address (required)"
-  echo -e "  ${BOLD}--posthog-version${NC} <ver>   PostHog version (default: latest)"
+  echo -e "  ${BOLD}--posthog-version${NC} <version> PostHog version (default: latest)"
+  echo -e "  ${BOLD}--force${NC}                   Force reinstallation even if PostHog is already installed"
+  echo -e "  ${BOLD}--with-deps${NC}               Automatically install dependencies if missing"
   echo -e "  ${BOLD}--verbose${NC}                 Show detailed output during installation"
   echo -e "  ${BOLD}--help${NC}                    Show this help message and exit"
   echo -e ""
   echo -e "${CYAN}Example:${NC}"
-  echo -e "  $0 --domain analytics.example.com --admin-email admin@example.com"
+  echo -e "  $0 --domain analytics.example.com --admin-email admin@example.com --client-id acme"
   echo -e ""
   echo -e "${CYAN}Notes:${NC}"
   echo -e "  - The script requires root privileges for installation"
@@ -88,6 +95,14 @@ while [[ $# -gt 0 ]]; do
     --posthog-version)
       POSTHOG_VERSION="$2"
       shift
+      shift
+      ;;
+    --force)
+      FORCE=true
+      shift
+      ;;
+    --with-deps)
+      WITH_DEPS=true
       shift
       ;;
     --verbose)
@@ -120,7 +135,7 @@ fi
 
 # Welcome message
 echo -e "${MAGENTA}${BOLD}AgencyStack PostHog Setup${NC}"
-echo -e "==========================="
+echo -e "=============================="
 
 # Check if running as root
 if [ "$EUID" -ne 0 ]; then
@@ -131,7 +146,10 @@ fi
 # Create log directories if they don't exist
 mkdir -p "$LOG_DIR"
 mkdir -p "$COMPONENTS_LOG_DIR"
+mkdir -p "$INTEGRATIONS_LOG_DIR"
 touch "$INSTALL_LOG"
+touch "$INTEGRATION_LOG"
+touch "$MAIN_INTEGRATION_LOG"
 
 # Log function
 log() {
@@ -143,46 +161,149 @@ log() {
   fi
 }
 
-log "INFO: Starting PostHog installation for $DOMAIN" "${BLUE}Starting PostHog installation for $DOMAIN...${NC}"
+# Integration log function
+integration_log() {
+  echo "$(date +"%Y-%m-%d %H:%M:%S") - PostHog - $1" >> "$INTEGRATION_LOG"
+  echo "$(date +"%Y-%m-%d %H:%M:%S") - PostHog - $1" >> "$MAIN_INTEGRATION_LOG"
+  if [ "$VERBOSE" = true ]; then
+    echo -e "${BLUE}[Integration] ${NC}$1"
+  fi
+}
+
+log "INFO: Starting PostHog installation validation for $DOMAIN" "${BLUE}Starting PostHog installation validation for $DOMAIN...${NC}"
+
+# Set up site-specific variables
+SITE_NAME=${DOMAIN//./_}
+if [ -n "$CLIENT_ID" ]; then
+  POSTHOG_CONTAINER="${CLIENT_ID}_posthog"
+  POSTGRES_CONTAINER="${CLIENT_ID}_posthog_postgres"
+  REDIS_CONTAINER="${CLIENT_ID}_posthog_redis"
+  CLICKHOUSE_CONTAINER="${CLIENT_ID}_posthog_clickhouse"
+  NETWORK_NAME="${CLIENT_ID}_network"
+else
+  POSTHOG_CONTAINER="posthog_${SITE_NAME}"
+  POSTGRES_CONTAINER="posthog_postgres_${SITE_NAME}"
+  REDIS_CONTAINER="posthog_redis_${SITE_NAME}"
+  CLICKHOUSE_CONTAINER="posthog_clickhouse_${SITE_NAME}"
+  NETWORK_NAME="agency-network"
+fi
+
+# Check if PostHog is already installed
+if docker ps -a --format '{{.Names}}' | grep -q "$POSTHOG_CONTAINER"; then
+  if [ "$FORCE" = true ]; then
+    log "WARNING: PostHog container '$POSTHOG_CONTAINER' already exists, will reinstall because --force was specified" "${YELLOW}⚠️ PostHog container '$POSTHOG_CONTAINER' already exists, will reinstall because --force was specified${NC}"
+    # Stop and remove existing containers
+    log "INFO: Stopping and removing existing PostHog containers" "${CYAN}Stopping and removing existing PostHog containers...${NC}"
+    cd "${POSTHOG_DIR}/${DOMAIN}" && docker-compose down 2>/dev/null || true
+  else
+    log "INFO: PostHog container '$POSTHOG_CONTAINER' already exists" "${GREEN}✅ PostHog installation for $DOMAIN already exists${NC}"
+    log "INFO: To reinstall, use --force flag" "${CYAN}To reinstall, use --force flag${NC}"
+    
+    # Check if the containers are running
+    if docker ps --format '{{.Names}}' | grep -q "$POSTHOG_CONTAINER"; then
+      log "INFO: PostHog container is running" "${GREEN}✅ PostHog is running${NC}"
+      echo -e "${GREEN}PostHog is already installed and running for $DOMAIN${NC}"
+      echo -e "${CYAN}Admin URL: https://${DOMAIN}${NC}"
+      echo -e "${CYAN}To make changes, use --force to reinstall${NC}"
+      exit 0
+    else
+      log "WARNING: PostHog container exists but is not running" "${YELLOW}⚠️ PostHog container exists but is not running${NC}"
+      echo -e "${YELLOW}PostHog is installed but not running for $DOMAIN${NC}"
+      echo -e "${CYAN}Starting PostHog containers...${NC}"
+      cd "${POSTHOG_DIR}/${DOMAIN}" && docker-compose up -d
+      echo -e "${GREEN}PostHog has been started for $DOMAIN${NC}"
+      echo -e "${CYAN}Admin URL: https://${DOMAIN}${NC}"
+      exit 0
+    fi
+  fi
+fi
 
 # Check if Docker is installed
 if ! command -v docker &> /dev/null; then
   log "ERROR: Docker is not installed" "${RED}Docker is not installed. Please install Docker first.${NC}"
+  if [ "$WITH_DEPS" = true ]; then
+    log "INFO: Installing Docker with --with-deps flag" "${CYAN}Installing Docker with --with-deps flag...${NC}"
+    if [ -f "${ROOT_DIR}/scripts/core/install_infrastructure.sh" ]; then
+      bash "${ROOT_DIR}/scripts/core/install_infrastructure.sh" || {
+        log "ERROR: Failed to install Docker" "${RED}Failed to install Docker. Please install it manually.${NC}"
+        exit 1
+      }
+    else
+      log "ERROR: Cannot find install_infrastructure.sh script" "${RED}Cannot find install_infrastructure.sh script. Please install Docker manually.${NC}"
+      exit 1
+    fi
+  else
+    log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
+    exit 1
+  fi
+fi
+
+# Check if Docker is running
+if ! docker info &> /dev/null; then
+  log "ERROR: Docker is not running" "${RED}Docker is not running. Please start Docker first.${NC}"
   exit 1
 fi
 
 # Check if Docker Compose is installed
 if ! command -v docker-compose &> /dev/null; then
   log "ERROR: Docker Compose is not installed" "${RED}Docker Compose is not installed. Please install Docker Compose first.${NC}"
-  exit 1
-fi
-
-# Set up site-specific variables
-SITE_NAME=${DOMAIN//./_}
-if [ -n "$CLIENT_ID" ]; then
-  POSTHOG_PROJECT_NAME="${CLIENT_ID}_posthog"
-  NETWORK_NAME="${CLIENT_ID}_network"
-  
-  # Check if client-specific network exists, create if it doesn't
-  if ! docker network inspect "$NETWORK_NAME" &> /dev/null; then
-    log "INFO: Creating Docker network $NETWORK_NAME" "${CYAN}Creating Docker network $NETWORK_NAME...${NC}"
-    docker network create "$NETWORK_NAME" >> "$INSTALL_LOG" 2>&1
-    if [ $? -ne 0 ]; then
-      log "ERROR: Failed to create Docker network $NETWORK_NAME" "${RED}Failed to create Docker network $NETWORK_NAME. See log for details.${NC}"
+  if [ "$WITH_DEPS" = true ]; then
+    log "INFO: Installing Docker Compose with --with-deps flag" "${CYAN}Installing Docker Compose with --with-deps flag...${NC}"
+    if [ -f "${ROOT_DIR}/scripts/core/install_infrastructure.sh" ]; then
+      bash "${ROOT_DIR}/scripts/core/install_infrastructure.sh" || {
+        log "ERROR: Failed to install Docker Compose" "${RED}Failed to install Docker Compose. Please install it manually.${NC}"
+        exit 1
+      }
+    else
+      log "ERROR: Cannot find install_infrastructure.sh script" "${RED}Cannot find install_infrastructure.sh script. Please install Docker Compose manually.${NC}"
       exit 1
     fi
+  else
+    log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
+    exit 1
+  fi
+fi
+
+# Check if network exists, create if it doesn't
+if ! docker network inspect "$NETWORK_NAME" &> /dev/null; then
+  log "INFO: Creating Docker network $NETWORK_NAME" "${CYAN}Creating Docker network $NETWORK_NAME...${NC}"
+  docker network create "$NETWORK_NAME" >> "$INSTALL_LOG" 2>&1
+  if [ $? -ne 0 ]; then
+    log "ERROR: Failed to create Docker network $NETWORK_NAME" "${RED}Failed to create Docker network $NETWORK_NAME. See log for details.${NC}"
+    exit 1
   fi
 else
-  POSTHOG_PROJECT_NAME="posthog_${SITE_NAME}"
-  NETWORK_NAME="agency-network"
+  log "INFO: Docker network $NETWORK_NAME already exists" "${GREEN}✅ Docker network $NETWORK_NAME already exists${NC}"
 fi
+
+# Check for Traefik
+if ! docker ps --format '{{.Names}}' | grep -q "traefik"; then
+  log "WARNING: Traefik container not found" "${YELLOW}⚠️ Traefik container not found. PostHog may not be accessible without a reverse proxy.${NC}"
+  if [ "$WITH_DEPS" = true ]; then
+    log "INFO: Installing security infrastructure with --with-deps flag" "${CYAN}Installing security infrastructure with --with-deps flag...${NC}"
+    if [ -f "${ROOT_DIR}/scripts/core/install_security_infrastructure.sh" ]; then
+      bash "${ROOT_DIR}/scripts/core/install_security_infrastructure.sh" --domain "$DOMAIN" --email "$ADMIN_EMAIL" || {
+        log "ERROR: Failed to install security infrastructure" "${RED}Failed to install security infrastructure. Please install it manually.${NC}"
+      }
+    else
+      log "ERROR: Cannot find install_security_infrastructure.sh script" "${RED}Cannot find install_security_infrastructure.sh script. Please install security infrastructure manually.${NC}"
+    fi
+  else
+    log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
+  fi
+else
+  log "INFO: Traefik container found" "${GREEN}✅ Traefik container found${NC}"
+fi
+
+log "INFO: Starting PostHog installation for $DOMAIN" "${BLUE}Starting PostHog installation for $DOMAIN...${NC}"
 
 # Create PostHog directories
 log "INFO: Creating PostHog directories" "${CYAN}Creating PostHog directories...${NC}"
 mkdir -p "${POSTHOG_DIR}/${DOMAIN}"
 mkdir -p "${POSTHOG_DIR}/${DOMAIN}/data/postgres"
 mkdir -p "${POSTHOG_DIR}/${DOMAIN}/data/clickhouse"
-mkdir -p "${POSTHOG_DIR}/${DOMAIN}/data/zookeeper"
+mkdir -p "${POSTHOG_DIR}/${DOMAIN}/data/redis"
+mkdir -p "${POSTHOG_DIR}/${DOMAIN}/data/geoip"
 mkdir -p "${POSTHOG_DIR}/${DOMAIN}/logs"
 
 # Download PostHog docker-compose.yml
@@ -201,7 +322,7 @@ cat > "${POSTHOG_DIR}/${DOMAIN}/.env" <<EOF
 # Generated by AgencyStack installer on $(date +"%Y-%m-%d")
 
 # General
-POSTHOG_SECRET=${SECRET_KEY}
+POSTHOG_SECRET=${POSTHOG_SECRET}
 SITE_URL=https://${DOMAIN}
 DISABLE_SECURE_SSL_REDIRECT=false
 IS_BEHIND_PROXY=true
@@ -209,7 +330,7 @@ IS_BEHIND_PROXY=true
 # Database
 PGHOST=postgres
 PGUSER=posthog
-PGPASSWORD=${POSTGRES_PASSWORD}
+PGPASSWORD=${POSTHOG_DB_PASSWORD}
 PGDATABASE=posthog
 PGPORT=5432
 
@@ -225,12 +346,11 @@ CLICKHOUSE_SECURE=false
 CLICKHOUSE_VERIFY=false
 
 # Other services
-KAFKA_URL=kafka://kafka:9092
 REDIS_URL=redis://redis:6379
 
 # Initial user
 ADMIN_EMAIL=${ADMIN_EMAIL}
-ADMIN_PASSWORD=${ADMIN_PASSWORD}
+ADMIN_PASSWORD=${POSTHOG_ADMIN_PASSWORD}
 EOF
 
 # Customize docker-compose.yml file with our settings
@@ -247,8 +367,8 @@ sed -i "/web:/,/depends_on:/ s/web:/web:\n    labels:\n      - \"traefik.enable=
 log "INFO: Customizing volume paths" "${CYAN}Customizing volume paths...${NC}"
 sed -i "s|pgdata|${POSTHOG_DIR}/${DOMAIN}/data/postgres|g" "${POSTHOG_DIR}/${DOMAIN}/docker-compose.yml"
 sed -i "s|clickhouse-data|${POSTHOG_DIR}/${DOMAIN}/data/clickhouse|g" "${POSTHOG_DIR}/${DOMAIN}/docker-compose.yml"
-sed -i "s|zookeeper-datalog|${POSTHOG_DIR}/${DOMAIN}/data/zookeeper/datalog|g" "${POSTHOG_DIR}/${DOMAIN}/docker-compose.yml"
-sed -i "s|zookeeper-data|${POSTHOG_DIR}/${DOMAIN}/data/zookeeper/data|g" "${POSTHOG_DIR}/${DOMAIN}/docker-compose.yml"
+sed -i "s|redis-data|${POSTHOG_DIR}/${DOMAIN}/data/redis|g" "${POSTHOG_DIR}/${DOMAIN}/docker-compose.yml"
+sed -i "s|geoip-data|${POSTHOG_DIR}/${DOMAIN}/data/geoip|g" "${POSTHOG_DIR}/${DOMAIN}/docker-compose.yml"
 
 # Add network configuration
 log "INFO: Adding network configuration" "${CYAN}Adding network configuration...${NC}"
@@ -295,14 +415,14 @@ cat > "${CONFIG_DIR}/secrets/posthog/${DOMAIN}.env" <<EOF
 
 POSTHOG_URL=https://${DOMAIN}/
 POSTHOG_ADMIN_USER="staff_user@${DOMAIN}"
-POSTHOG_ADMIN_PASSWORD=${ADMIN_PASSWORD}
+POSTHOG_ADMIN_PASSWORD=${POSTHOG_ADMIN_PASSWORD}
 POSTHOG_ADMIN_EMAIL=${ADMIN_EMAIL}
 
-POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-SECRET_KEY=${SECRET_KEY}
+POSTGRES_PASSWORD=${POSTHOG_DB_PASSWORD}
+SECRET_KEY=${POSTHOG_SECRET}
 
 # Docker project
-POSTHOG_PROJECT_NAME=${POSTHOG_PROJECT_NAME}
+POSTHOG_PROJECT_NAME=${POSTHOG_CONTAINER}
 EOF
 
 chmod 600 "${CONFIG_DIR}/secrets/posthog/${DOMAIN}.env"
@@ -349,7 +469,7 @@ fi
 log "INFO: PostHog installation completed successfully" "${GREEN}${BOLD}✅ PostHog installed successfully!${NC}"
 echo -e "${CYAN}PostHog URL: https://${DOMAIN}/${NC}"
 echo -e "${YELLOW}Admin Email: ${ADMIN_EMAIL}${NC}"
-echo -e "${YELLOW}Admin Password: ${ADMIN_PASSWORD}${NC}"
+echo -e "${YELLOW}Admin Password: ${POSTHOG_ADMIN_PASSWORD}${NC}"
 echo -e "${YELLOW}IMPORTANT: Please save these credentials safely and change the password!${NC}"
 echo -e ""
 echo -e "${CYAN}Credentials saved to: ${CONFIG_DIR}/secrets/posthog/${DOMAIN}.env${NC}"
