@@ -319,6 +319,26 @@
         "description": "Security automation"
       }
     },
+    "security_storage": {
+      "cryptosync": {
+        "name": "Cryptosync",
+        "component_id": "cryptosync",
+        "category": "Security & Storage",
+        "version": "v1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso_ready": false,
+          "monitoring": false,
+          "backup_ready": true,
+          "traefik": false,
+          "ports_defined": false,
+          "multi_tenant": true
+        },
+        "description": "Encrypted local vaults + remote cloud sync via gocryptfs and rclone"
+      }
+    },
     "communication": {
       "mailu": {
         "name": "Mailu",

@@ -1,0 +1,19 @@
+{
+  "components": {
+    "security_storage": {
+      "cryptosync": {
+        "name": "Cryptosync",
+        "description": "Encrypted local vaults + remote cloud sync",
+        "version": "1.0.0",
+        "icon": "lock",
+        "status": {
+          "mounted": false,
+          "last_sync": null,
+          "remote_destination": "",
+          "health": "unknown"
+        },
+        "client_data": {}
+      }
+    }
+  }
+}
