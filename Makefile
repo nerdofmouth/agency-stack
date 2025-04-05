@@ -19,7 +19,7 @@ MAGENTA := $(shell tput setaf 5)
 CYAN := $(shell tput setaf 6)
 RESET := $(shell tput sgr0)
 
-.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit integrate-components dashboard dashboard-refresh dashboard-enable dashboard-update dashboard-open integrate-sso integrate-email integrate-monitoring integrate-data-bridge detect-ports remap-ports scan-ports setup-cronjobs view-alerts log-summary create-client setup-roles security-audit security-fix rotate-secrets setup-log-segmentation verify-certs verify-auth multi-tenancy-status install-wordpress install-erpnext install-posthog install-voip install-mailu install-grafana install-loki install-prometheus install-keycloak install-infrastructure install-security-infrastructure install-multi-tenancy validate validate-report audit audit-report cleanup
+.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit integrate-components dashboard dashboard-refresh dashboard-enable dashboard-update dashboard-open integrate-sso integrate-email integrate-monitoring integrate-data-bridge detect-ports remap-ports scan-ports setup-cronjobs view-alerts log-summary create-client setup-roles security-audit security-fix rotate-secrets setup-log-segmentation verify-certs verify-auth multi-tenancy-status install-wordpress install-erpnext install-posthog install-voip install-mailu install-grafana install-loki install-prometheus install-keycloak install-infrastructure install-security-infrastructure install-multi-tenancy validate validate-report peertube peertube-sso peertube-with-deps peertube-reinstall peertube-status peertube-logs peertube-stop peertube-start peertube-restart
 
 # Default target
 help:
@@ -100,6 +100,15 @@ help:
 	@echo "  $(BOLD)make install-infrastructure$(RESET)    Install core infrastructure"
 	@echo "  $(BOLD)make install-security-infrastructure$(RESET) Install security infrastructure"
 	@echo "  $(BOLD)make install-multi-tenancy$(RESET)     Set up multi-tenancy infrastructure"
+	@echo "  $(BOLD)make peertube$(RESET)                 Install PeerTube - Self-hosted Video Platform"
+	@echo "  $(BOLD)make peertube-sso$(RESET)             Install PeerTube with SSO integration"
+	@echo "  $(BOLD)make peertube-with-deps$(RESET)       Install PeerTube with all dependencies"
+	@echo "  $(BOLD)make peertube-reinstall$(RESET)       Reinstall PeerTube"
+	@echo "  $(BOLD)make peertube-status$(RESET)          Check PeerTube status"
+	@echo "  $(BOLD)make peertube-logs$(RESET)            View PeerTube logs"
+	@echo "  $(BOLD)make peertube-stop$(RESET)            Stop PeerTube"
+	@echo "  $(BOLD)make peertube-start$(RESET)           Start PeerTube"
+	@echo "  $(BOLD)make peertube-restart$(RESET)         Restart PeerTube"
 
 # Install AgencyStack
 install: validate
@@ -522,6 +531,28 @@ cleanup:
 		echo "$(YELLOW)Cleanup aborted.$(RESET)"; \
 	fi
 
+# Component Registry Management Targets
+# ------------------------------------------------------------------------------
+
+component-registry:
+	@echo "$(MAGENTA)$(BOLD)📋 Updating Component Registry...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/utils/update_component_registry.sh
+
+component-status:
+	@echo "$(MAGENTA)$(BOLD)📊 Checking Component Integration Status...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/utils/update_component_registry.sh --summary
+
+component-check:
+	@echo "$(MAGENTA)$(BOLD)🔍 Checking Component Registry for Inconsistencies...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/utils/update_component_registry.sh --check
+
+component-update:
+	@echo "$(MAGENTA)$(BOLD)✏️ Updating Component Status...$(RESET)"
+	@read -p "$(YELLOW)Enter component name:$(RESET) " COMPONENT; \
+	read -p "$(YELLOW)Enter flag to update (installed/hardened/makefile/sso/etc):$(RESET) " FLAG; \
+	read -p "$(YELLOW)Enter new value (true/false):$(RESET) " VALUE; \
+	sudo $(SCRIPTS_DIR)/utils/update_component_registry.sh --update-component $$COMPONENT --update-flag $$FLAG --update-value $$VALUE
+
 # System Validation
 validate:
 	@echo "🔍 Validating system readiness for AgencyStack..."
@@ -547,8 +578,38 @@ install-posthog: validate
 
 # VoIP (FusionPBX + FreeSWITCH)
 install-voip: validate
-	@echo "Installing VoIP system (FusionPBX + FreeSWITCH)..."
+	@echo "$(MAGENTA)$(BOLD)☎️ Installing VoIP system (FusionPBX + FreeSWITCH)...$(RESET)"
 	@sudo $(SCRIPTS_DIR)/components/install_voip.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+voip: install-voip
+
+voip-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking VoIP System Status...$(RESET)"
+	@cd /opt/agency_stack/voip/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose ps
+	@echo "$(CYAN)Logs can be viewed with: make voip-logs$(RESET)"
+
+voip-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing VoIP Logs...$(RESET)"
+	@cd /opt/agency_stack/voip/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose logs -f
+
+voip-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting VoIP Services...$(RESET)"
+	@cd /opt/agency_stack/voip/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose restart
+
+voip-stop:
+	@echo "$(MAGENTA)$(BOLD)🛑 Stopping VoIP Services...$(RESET)"
+	@cd /opt/agency_stack/voip/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose stop
+
+voip-start:
+	@echo "$(MAGENTA)$(BOLD)▶️ Starting VoIP Services...$(RESET)"
+	@cd /opt/agency_stack/voip/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose start
+
+voip-config:
+	@echo "$(MAGENTA)$(BOLD)⚙️ Configuring VoIP System...$(RESET)"
+	@read -p "$(YELLOW)Enter domain for VoIP (e.g., voip.yourdomain.com):$(RESET) " DOMAIN; \
+	read -p "$(YELLOW)Enter admin email:$(RESET) " ADMIN_EMAIL; \
+	read -p "$(YELLOW)Enter client ID (optional):$(RESET) " CLIENT_ID; \
+	sudo $(SCRIPTS_DIR)/components/install_voip.sh --domain $$DOMAIN --admin-email $$ADMIN_EMAIL $(if [ -n "$$CLIENT_ID" ]; then echo "--client-id $$CLIENT_ID"; fi) --configure-only
 
 # Mailu Email Server
 install-mailu: validate
@@ -567,8 +628,46 @@ install-loki: validate
 
 # Prometheus
 install-prometheus: validate
-	@echo "Installing Prometheus monitoring..."
+	@echo "$(MAGENTA)$(BOLD)📊 Installing Prometheus Monitoring...$(RESET)"
 	@sudo $(SCRIPTS_DIR)/components/install_prometheus.sh --domain metrics.$(DOMAIN) $(if $(GRAFANA_DOMAIN),--grafana-domain $(GRAFANA_DOMAIN),--grafana-domain grafana.$(DOMAIN)) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+prometheus: install-prometheus
+
+prometheus-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Prometheus Status...$(RESET)"
+	@cd /opt/agency_stack/prometheus/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose ps
+	@echo "$(CYAN)Logs can be viewed with: make prometheus-logs$(RESET)"
+
+prometheus-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing Prometheus Logs...$(RESET)"
+	@cd /opt/agency_stack/prometheus/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose logs -f
+
+prometheus-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Prometheus Services...$(RESET)"
+	@cd /opt/agency_stack/prometheus/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose restart
+
+prometheus-stop:
+	@echo "$(MAGENTA)$(BOLD)🛑 Stopping Prometheus Services...$(RESET)"
+	@cd /opt/agency_stack/prometheus/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose stop
+
+prometheus-start:
+	@echo "$(MAGENTA)$(BOLD)▶️ Starting Prometheus Services...$(RESET)"
+	@cd /opt/agency_stack/prometheus/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose start
+
+prometheus-reload:
+	@echo "$(MAGENTA)$(BOLD)🔄 Reloading Prometheus Configuration...$(RESET)"
+	@curl -X POST http://localhost:9090/-/reload || echo "$(RED)Failed to reload Prometheus. Is it running?$(RESET)"
+
+prometheus-alerts:
+	@echo "$(MAGENTA)$(BOLD)🔔 Viewing Prometheus Alerts...$(RESET)"
+	@curl -s http://localhost:9090/api/v1/alerts | jq . || echo "$(RED)Failed to fetch alerts. Is Prometheus running?$(RESET)"
+
+prometheus-config:
+	@echo "$(MAGENTA)$(BOLD)⚙️ Configuring Prometheus...$(RESET)"
+	@read -p "$(YELLOW)Enter domain for Prometheus (e.g., metrics.yourdomain.com):$(RESET) " DOMAIN; \
+	read -p "$(YELLOW)Enter Grafana domain (e.g., grafana.yourdomain.com):$(RESET) " GRAFANA_DOMAIN; \
+	read -p "$(YELLOW)Enter client ID (optional):$(RESET) " CLIENT_ID; \
+	sudo $(SCRIPTS_DIR)/components/install_prometheus.sh --domain $$DOMAIN --grafana-domain $$GRAFANA_DOMAIN $(if [ -n "$$CLIENT_ID" ]; then echo "--client-id $$CLIENT_ID"; fi) --configure-only
 
 # Keycloak
 install-keycloak: validate
@@ -589,3 +688,48 @@ install-security-infrastructure:
 install-multi-tenancy:
 	@echo "Setting up multi-tenancy infrastructure..."
 	@sudo $(SCRIPTS_DIR)/multi-tenancy/install_multi_tenancy.sh $(if $(VERBOSE),--verbose,)
+
+# Content & Media Suite Components
+# ------------------------------------------------------------------------------
+
+peertube:
+	@echo "$(MAGENTA)$(BOLD)🎞️ Installing PeerTube - Self-hosted Video Platform...$(RESET)"
+	@read -p "$(YELLOW)Enter domain for PeerTube (e.g., peertube.yourdomain.com):$(RESET) " DOMAIN; \
+	sudo $(SCRIPTS_DIR)/components/install_peertube.sh --domain $$DOMAIN
+
+peertube-sso:
+	@echo "$(MAGENTA)$(BOLD)🔐 Installing PeerTube with SSO integration...$(RESET)"
+	@read -p "$(YELLOW)Enter domain for PeerTube (e.g., peertube.yourdomain.com):$(RESET) " DOMAIN; \
+	read -p "$(YELLOW)Enter SSO client ID for PeerTube:$(RESET) " CLIENT_ID; \
+	sudo $(SCRIPTS_DIR)/components/install_peertube.sh --domain $$DOMAIN --client-id $$CLIENT_ID
+
+peertube-with-deps:
+	@echo "$(MAGENTA)$(BOLD)🎞️ Installing PeerTube with all dependencies...$(RESET)"
+	@read -p "$(YELLOW)Enter domain for PeerTube (e.g., peertube.yourdomain.com):$(RESET) " DOMAIN; \
+	sudo $(SCRIPTS_DIR)/components/install_peertube.sh --domain $$DOMAIN --with-deps
+
+peertube-reinstall:
+	@echo "$(MAGENTA)$(BOLD)🔄 Reinstalling PeerTube...$(RESET)"
+	@read -p "$(YELLOW)Enter domain for PeerTube (e.g., peertube.yourdomain.com):$(RESET) " DOMAIN; \
+	sudo $(SCRIPTS_DIR)/components/install_peertube.sh --domain $$DOMAIN --force
+
+peertube-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking PeerTube status...$(RESET)"
+	@cd $(DOCKER_DIR)/peertube && docker-compose ps
+	@echo "$(CYAN)Logs can be viewed with: make peertube-logs$(RESET)"
+
+peertube-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing PeerTube logs...$(RESET)"
+	@cd $(DOCKER_DIR)/peertube && docker-compose logs -f
+
+peertube-stop:
+	@echo "$(MAGENTA)$(BOLD)🛑 Stopping PeerTube...$(RESET)"
+	@cd $(DOCKER_DIR)/peertube && docker-compose stop
+
+peertube-start:
+	@echo "$(MAGENTA)$(BOLD)▶️ Starting PeerTube...$(RESET)"
+	@cd $(DOCKER_DIR)/peertube && docker-compose start
+
+peertube-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting PeerTube...$(RESET)"
+	@cd $(DOCKER_DIR)/peertube && docker-compose restart

@@ -1,0 +1,428 @@
+{
+  "schema_version": "1.0.0",
+  "last_updated": "2025-04-05T03:11:30-05:00",
+  "components": {
+    "infrastructure": {
+      "traefik": {
+        "name": "Traefik",
+        "category": "Core Infrastructure",
+        "version": "2.9.8",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Edge router and reverse proxy"
+      },
+      "portainer": {
+        "name": "Portainer",
+        "category": "Core Infrastructure",
+        "version": "2.17.1",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": false
+        },
+        "description": "Container management UI"
+      },
+      "droneci": {
+        "name": "DroneCI",
+        "category": "Core Infrastructure",
+        "version": "2.16.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": false
+        },
+        "description": "Continuous Integration/Deployment server"
+      }
+    },
+    "business": {
+      "erpnext": {
+        "name": "ERPNext",
+        "category": "Business Applications",
+        "version": "14.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Enterprise Resource Planning system"
+      },
+      "killbill": {
+        "name": "KillBill",
+        "category": "Business Applications",
+        "version": "0.24.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Open-source subscription billing"
+      },
+      "calcom": {
+        "name": "Cal.com",
+        "category": "Business Applications",
+        "version": "2.9.4",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Scheduling and appointment application"
+      },
+      "documenso": {
+        "name": "Documenso",
+        "category": "Business Applications",
+        "version": "1.3.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Document signing platform"
+      }
+    },
+    "content": {
+      "wordpress": {
+        "name": "WordPress",
+        "category": "Content Management",
+        "version": "6.4.2",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Content management system"
+      },
+      "ghost": {
+        "name": "Ghost",
+        "category": "Content Management",
+        "version": "5.59.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Modern publishing platform"
+      },
+      "focalboard": {
+        "name": "Focalboard",
+        "category": "Content Management",
+        "version": "7.8.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Project management board"
+      },
+      "peertube": {
+        "name": "PeerTube",
+        "category": "Content Management",
+        "version": "5.1.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Self-hosted video streaming platform"
+      },
+      "seafile": {
+        "name": "Seafile",
+        "category": "Content Management",
+        "version": "10.0.1",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "File sync and share solution"
+      },
+      "builderio": {
+        "name": "Builder.io",
+        "category": "Content Management",
+        "version": "2.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": false,
+          "makefile": true,
+          "sso": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": false
+        },
+        "description": "Visual content management"
+      }
+    },
+    "security": {
+      "keycloak": {
+        "name": "Keycloak",
+        "category": "Security & Identity",
+        "version": "22.0.1",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Single sign-on and identity management"
+      },
+      "vault": {
+        "name": "Vault",
+        "category": "Security & Identity",
+        "version": "1.14.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Secret management"
+      },
+      "crowdsec": {
+        "name": "CrowdSec",
+        "category": "Security & Identity",
+        "version": "1.5.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": false
+        },
+        "description": "Security automation"
+      }
+    },
+    "communication": {
+      "mailu": {
+        "name": "Mailu",
+        "category": "Email & Communication",
+        "version": "2.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Self-hosted email solution"
+      },
+      "mattermost": {
+        "name": "Mattermost",
+        "category": "Email & Communication",
+        "version": "7.10.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Team messaging platform"
+      },
+      "voip": {
+        "name": "VoIP",
+        "category": "Email & Communication",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "VoIP solution (FusionPBX + FreeSWITCH)",
+        "ports": {
+          "sip_udp": 5060,
+          "sip_tcp": 5060,
+          "sip_tls": 5061,
+          "rtp_range": "16384-32768",
+          "fusionpbx_web": 8082,
+          "fusionpbx_admin": 8445
+        }
+      }
+    },
+    "monitoring": {
+      "prometheus": {
+        "name": "Prometheus",
+        "category": "Monitoring & Observability",
+        "version": "2.44.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Metrics collection and alerting",
+        "ports": {
+          "prometheus": 9090,
+          "alertmanager": 9093,
+          "node_exporter": 9100,
+          "pushgateway": 9091
+        }
+      },
+      "grafana": {
+        "name": "Grafana",
+        "category": "Monitoring & Observability",
+        "version": "10.1.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Visualization and analytics"
+      },
+      "loki": {
+        "name": "Loki",
+        "category": "Monitoring & Observability",
+        "version": "2.9.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Log aggregation"
+      }
+    }
+  }
+}

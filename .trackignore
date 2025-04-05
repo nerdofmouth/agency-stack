@@ -14,3 +14,6 @@ scripts/experimental/*.sh
 
 # Scripts that are intentionally kept but not directly called
 scripts/migration/legacy/*.sh
+
+# PeerTube component scripts that are called dynamically
+scripts/components/peertube/*.sh
