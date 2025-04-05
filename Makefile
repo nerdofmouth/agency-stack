@@ -19,7 +19,7 @@ MAGENTA := $(shell tput setaf 5)
 CYAN := $(shell tput setaf 6)
 RESET := $(shell tput sgr0)
 
-.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit integrate-components dashboard dashboard-refresh dashboard-enable dashboard-update dashboard-open integrate-sso integrate-email integrate-monitoring integrate-data-bridge detect-ports remap-ports scan-ports setup-cronjobs view-alerts log-summary create-client setup-roles security-audit security-fix rotate-secrets setup-log-segmentation verify-certs verify-auth multi-tenancy-status
+.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit integrate-components dashboard dashboard-refresh dashboard-enable dashboard-update dashboard-open integrate-sso integrate-email integrate-monitoring integrate-data-bridge detect-ports remap-ports scan-ports setup-cronjobs view-alerts log-summary create-client setup-roles security-audit security-fix rotate-secrets setup-log-segmentation verify-certs verify-auth multi-tenancy-status install-wordpress install-erpnext install-posthog install-voip install-mailu install-infrastructure install-security-infrastructure install-multi-tenancy
 
 # Default target
 help:
@@ -86,6 +86,16 @@ help:
 	@echo "  $(BOLD)make rotate-secrets$(RESET)   Rotate all secrets"
 	@echo "  $(BOLD)make verify-certs$(RESET)     Verify TLS certificates"
 	@echo "  $(BOLD)make verify-auth$(RESET)      Verify authentication configuration"
+	@echo ""
+	@echo "$(BOLD)Component Installation Commands:$(RESET)"
+	@echo "  $(BOLD)make install-wordpress$(RESET)          Install WordPress"
+	@echo "  $(BOLD)make install-erpnext$(RESET)           Install ERPNext"
+	@echo "  $(BOLD)make install-posthog$(RESET)           Install PostHog"
+	@echo "  $(BOLD)make install-voip$(RESET)              Install VoIP system (FusionPBX + FreeSWITCH)"
+	@echo "  $(BOLD)make install-mailu$(RESET)             Install Mailu email server"
+	@echo "  $(BOLD)make install-infrastructure$(RESET)    Install core infrastructure"
+	@echo "  $(BOLD)make install-security-infrastructure$(RESET) Install security infrastructure"
+	@echo "  $(BOLD)make install-multi-tenancy$(RESET)     Set up multi-tenancy infrastructure"
 
 # Install AgencyStack
 install:
@@ -453,3 +463,43 @@ verify-auth:
 multi-tenancy-status:
 	@echo "🏢 Checking multi-tenancy status..."
 	@sudo -E bash $(SCRIPTS_DIR)/security/check_multi_tenancy.sh
+
+# WordPress
+install-wordpress:
+	@echo "Installing WordPress..."
+	@sudo $(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),)
+
+# ERPNext
+install-erpnext:
+	@echo "Installing ERPNext..."
+	@sudo $(SCRIPTS_DIR)/components/install_erpnext.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),)
+
+# PostHog
+install-posthog:
+	@echo "Installing PostHog..."
+	@sudo $(SCRIPTS_DIR)/components/install_posthog.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),)
+
+# VoIP (FusionPBX + FreeSWITCH)
+install-voip:
+	@echo "Installing VoIP system (FusionPBX + FreeSWITCH)..."
+	@sudo $(SCRIPTS_DIR)/components/install_voip.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),)
+
+# Mailu Email Server
+install-mailu:
+	@echo "Installing Mailu email server..."
+	@sudo $(SCRIPTS_DIR)/components/install_mailu.sh --domain mail.$(DOMAIN) --email-domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),)
+
+# Core Infrastructure
+install-infrastructure:
+	@echo "Installing core infrastructure..."
+	@sudo $(SCRIPTS_DIR)/core/install_infrastructure.sh $(if $(VERBOSE),--verbose,)
+
+# Security Infrastructure
+install-security-infrastructure:
+	@echo "Installing security infrastructure..."
+	@sudo $(SCRIPTS_DIR)/core/install_security_infrastructure.sh --domain $(DOMAIN) --email $(ADMIN_EMAIL) $(if $(VERBOSE),--verbose,)
+
+# Multi-tenancy Infrastructure
+install-multi-tenancy:
+	@echo "Setting up multi-tenancy infrastructure..."
+	@sudo $(SCRIPTS_DIR)/multi-tenancy/install_multi_tenancy.sh $(if $(VERBOSE),--verbose,)
