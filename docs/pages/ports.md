@@ -59,6 +59,13 @@ This document provides a comprehensive list of all port assignments used by Agen
 | **Seafile** | Web UI | 8012 | HTTP | File sharing |
 | **Builder.io** | Web UI | 8013 | HTTP | Visual CMS |
 
+## Collaboration
+
+| Component | Service | Port | Protocol | Notes |
+|-----------|---------|------|----------|-------|
+| **Mastodon** | Streaming | 4000 | HTTP | Streaming API |
+| **Etebase** | Web API | 8732 | HTTP | Encrypted CalDAV/CardDAV server |
+
 ## Security & Identity
 
 | Component | Service | Port | Protocol | Notes |
