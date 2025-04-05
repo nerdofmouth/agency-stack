@@ -30,10 +30,11 @@
         <button class="nav-btn" data-category="Communication">Communication</button>
         <button class="nav-btn" data-category="Monitoring">Monitoring</button>
         <button class="nav-btn" data-category="Other">Other</button>
-        <!-- New navigation tabs -->
+        <!-- Navigation tabs -->
         <button class="nav-btn" data-view="integrations">Integrations</button>
         <button class="nav-btn" data-view="ports">Port Management</button>
         <button class="nav-btn" data-view="alerts">Alerts & Logs</button>
+        <button class="nav-btn" data-view="security">Security</button>
     </nav>
 
     <main>
@@ -43,6 +44,7 @@
             <button id="health-check" class="action-btn">🩺 Health Check</button>
             <button id="view-logs" class="action-btn">📋 View Logs</button>
             <button id="detect-ports" class="action-btn">🔍 Detect Port Conflicts</button>
+            <button id="security-audit" class="action-btn">🔐 Security Audit</button>
         </div>
 
         <!-- Services View (default) -->
@@ -243,92 +245,250 @@
                 </div>
             </div>
         </div>
-    </main>
 
-    <div class="status-legend">
-        <h3>⚙️ Status Legend</h3>
-        <div class="legend-items">
-            <div class="legend-item">
-                <span class="status-indicator running"></span>
-                <span class="status-label">Running</span>
+        <!-- Security View -->
+        <div class="view-container hidden" id="security-view">
+            <h2>Security Status</h2>
+            <div class="security-actions">
+                <button id="run-security-audit" class="security-btn primary">🔐 Run Security Audit</button>
+                <button id="verify-certs" class="security-btn">🔒 Verify Certificates</button>
+                <button id="verify-auth" class="security-btn">👤 Verify Authentication</button>
+                <button id="rotate-secrets" class="security-btn">🔄 Rotate Secrets</button>
+                <button id="refresh-security" class="security-btn">🔄 Refresh Security Status</button>
             </div>
-            <div class="legend-item">
-                <span class="status-indicator stopped"></span>
-                <span class="status-label">Stopped</span>
-            </div>
-            <div class="legend-item">
-                <span class="status-indicator not-installed"></span>
-                <span class="status-label">Not Installed</span>
-            </div>
-            <div class="legend-item">
-                <span class="status-indicator configurable"></span>
-                <span class="status-label">Configurable</span>
-            </div>
-            <!-- New integration status legend items -->
-            <div class="legend-item">
-                <span class="integration-indicator applied"></span>
-                <span class="status-label">Integrated</span>
-            </div>
-            <div class="legend-item">
-                <span class="integration-indicator missing"></span>
-                <span class="status-label">Not Integrated</span>
-            </div>
-            <div class="legend-item">
-                <span class="integration-indicator partial"></span>
-                <span class="status-label">Partially Integrated</span>
+
+            <div class="security-overview">
+                <div class="security-stats">
+                    <div class="stat-card">
+                        <h3>🔒 TLS Certificates</h3>
+                        <p class="stat-value"><span id="valid-certs">--</span>/<span id="total-certs">--</span></p>
+                        <p class="stat-label">Valid Certificates</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>🔐 SSO Status</h3>
+                        <p class="stat-value"><span id="sso-protected">--</span>/<span id="total-services">--</span></p>
+                        <p class="stat-label">SSO-Protected Services</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>🔍 Open Ports</h3>
+                        <p class="stat-value"><span id="exposed-ports">--</span></p>
+                        <p class="stat-label">Exposed to Internet</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>⚠️ Security Issues</h3>
+                        <p class="stat-value"><span id="security-issues">--</span></p>
+                        <p class="stat-label">Requiring Attention</p>
+                    </div>
+                </div>
+
+                <div class="security-section">
+                    <h3>Certificate Status</h3>
+                    <div class="cert-info">
+                        <p>Last checked: <span id="certs-last-checked">--</span></p>
+                    </div>
+                    <table class="security-table">
+                        <thead>
+                            <tr>
+                                <th>Domain</th>
+                                <th>Status</th>
+                                <th>Expiration</th>
+                                <th>Issuer</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cert-table-body">
+                            <!-- Certificates will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="security-section">
+                    <h3>Authentication Status</h3>
+                    <div class="auth-info">
+                        <p>Services using Keycloak SSO: <span id="services-with-sso">--</span></p>
+                    </div>
+                    <table class="security-table">
+                        <thead>
+                            <tr>
+                                <th>Service</th>
+                                <th>SSO Status</th>
+                                <th>Middleware</th>
+                                <th>Auth Method</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="auth-table-body">
+                            <!-- Authentication status will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="security-section">
+                    <h3>Recent Failed Logins</h3>
+                    <table class="security-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>IP Address</th>
+                                <th>Service</th>
+                                <th>Username</th>
+                                <th>Client ID</th>
+                            </tr>
+                        </thead>
+                        <tbody id="failed-logins-body">
+                            <!-- Failed logins will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="security-section">
+                    <h3>Multi-Tenancy Status</h3>
+                    <div class="tenancy-info">
+                        <p>Total clients: <span id="total-clients">--</span></p>
+                    </div>
+                    <table class="security-table">
+                        <thead>
+                            <tr>
+                                <th>Client ID</th>
+                                <th>Network Isolation</th>
+                                <th>Backup Separation</th>
+                                <th>Log Segmentation</th>
+                                <th>Client Realm</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tenancy-table-body">
+                            <!-- Multi-tenancy status will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="security-section">
+                    <h3>Last Security Audit</h3>
+                    <div class="audit-summary" id="audit-summary">
+                        <!-- Security audit summary will be populated here -->
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
 
-    <footer>
-        <p>&copy; 2025 NerdOfMouth - AgencyStack</p>
-        <div class="action-links">
-            <a href="https://stack.nerdofmouth.com" target="_blank">Documentation</a> |
-            <a href="https://github.com/nerdofmouth/agency-stack" target="_blank">GitHub</a>
-        </div>
-    </footer>
-
-    <template id="service-card-template">
-        <div class="service-card">
-            <div class="card-header">
-                <span class="status-indicator"></span>
-                <h3 class="service-name"></h3>
-            </div>
-            <div class="card-body">
-                <p class="service-category"></p>
-                <p class="service-domain">Domain: <a href="#" target="_blank"></a></p>
-                <p class="service-ports">Ports: <span></span></p>
-                <div class="integration-badges"></div>
-            </div>
-            <div class="card-footer">
-                <button class="open-btn">Open Service</button>
-                <button class="install-btn">Install</button>
-                <button class="start-btn">Start</button>
-                <button class="stop-btn">Stop</button>
-                <button class="integrate-btn">Integrate</button>
-            </div>
-        </div>
-    </template>
-
-    <!-- Template for integration badge -->
-    <template id="integration-badge-template">
-        <span class="integration-badge">
-            <span class="badge-icon"></span>
-            <span class="badge-text"></span>
-        </span>
-    </template>
-
-    <!-- Template for port conflict item -->
-    <template id="port-conflict-template">
-        <div class="conflict-item">
-            <p class="conflict-description"></p>
-            <div class="conflict-resolution">
-                <p class="suggested-port">Suggested: <span></span></p>
-                <button class="resolve-btn">Apply Fix</button>
+        <div class="status-legend">
+            <h3>⚙️ Status Legend</h3>
+            <div class="legend-items">
+                <div class="legend-item">
+                    <span class="status-indicator running"></span>
+                    <span class="status-label">Running</span>
+                </div>
+                <div class="legend-item">
+                    <span class="status-indicator stopped"></span>
+                    <span class="status-label">Stopped</span>
+                </div>
+                <div class="legend-item">
+                    <span class="status-indicator not-installed"></span>
+                    <span class="status-label">Not Installed</span>
+                </div>
+                <div class="legend-item">
+                    <span class="status-indicator configurable"></span>
+                    <span class="status-label">Configurable</span>
+                </div>
+                <!-- New integration status legend items -->
+                <div class="legend-item">
+                    <span class="integration-indicator applied"></span>
+                    <span class="status-label">Integrated</span>
+                </div>
+                <div class="legend-item">
+                    <span class="integration-indicator missing"></span>
+                    <span class="status-label">Not Integrated</span>
+                </div>
+                <div class="legend-item">
+                    <span class="integration-indicator partial"></span>
+                    <span class="status-label">Partially Integrated</span>
+                </div>
             </div>
         </div>
-    </template>
 
-    <script src="script.js"></script>
-</body>
+        <footer>
+            <p>&copy; 2025 NerdOfMouth - AgencyStack</p>
+            <div class="action-links">
+                <a href="https://stack.nerdofmouth.com" target="_blank">Documentation</a> |
+                <a href="https://github.com/nerdofmouth/agency-stack" target="_blank">GitHub</a>
+            </div>
+        </footer>
+
+        <template id="service-card-template">
+            <div class="service-card">
+                <div class="card-header">
+                    <span class="status-indicator"></span>
+                    <h3 class="service-name"></h3>
+                </div>
+                <div class="card-body">
+                    <p class="service-category"></p>
+                    <p class="service-domain">Domain: <a href="#" target="_blank"></a></p>
+                    <p class="service-ports">Ports: <span></span></p>
+                    <div class="integration-badges"></div>
+                </div>
+                <div class="card-footer">
+                    <button class="open-btn">Open Service</button>
+                    <button class="install-btn">Install</button>
+                    <button class="start-btn">Start</button>
+                    <button class="stop-btn">Stop</button>
+                    <button class="integrate-btn">Integrate</button>
+                </div>
+            </div>
+        </template>
+
+        <!-- Template for integration badge -->
+        <template id="integration-badge-template">
+            <span class="integration-badge">
+                <span class="badge-icon"></span>
+                <span class="badge-text"></span>
+            </span>
+        </template>
+
+        <!-- Template for port conflict item -->
+        <template id="port-conflict-template">
+            <div class="conflict-item">
+                <p class="conflict-description"></p>
+                <div class="conflict-resolution">
+                    <p class="suggested-port">Suggested: <span></span></p>
+                    <button class="resolve-btn">Apply Fix</button>
+                </div>
+            </div>
+        </template>
+
+        <template id="cert-row-template">
+            <tr>
+                <td class="domain"></td>
+                <td class="status"></td>
+                <td class="expiration"></td>
+                <td class="issuer"></td>
+                <td class="actions">
+                    <button class="table-action-btn renew-cert">Renew</button>
+                </td>
+            </tr>
+        </template>
+
+        <template id="auth-row-template">
+            <tr>
+                <td class="service-name"></td>
+                <td class="sso-status"></td>
+                <td class="middleware"></td>
+                <td class="auth-method"></td>
+                <td class="actions">
+                    <button class="table-action-btn enable-sso">Enable SSO</button>
+                </td>
+            </tr>
+        </template>
+
+        <template id="tenancy-row-template">
+            <tr>
+                <td class="client-id"></td>
+                <td class="network-isolation"></td>
+                <td class="backup-separation"></td>
+                <td class="log-segmentation"></td>
+                <td class="client-realm"></td>
+            </tr>
+        </template>
+
+        <script src="script.js"></script>
+    </body>
 </html>

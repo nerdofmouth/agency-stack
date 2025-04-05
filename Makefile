@@ -19,7 +19,7 @@ MAGENTA := $(shell tput setaf 5)
 CYAN := $(shell tput setaf 6)
 RESET := $(shell tput sgr0)
 
-.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit integrate-components dashboard dashboard-refresh dashboard-enable dashboard-update dashboard-open integrate-sso integrate-email integrate-monitoring integrate-data-bridge detect-ports remap-ports scan-ports setup-cronjobs view-alerts log-summary
+.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit integrate-components dashboard dashboard-refresh dashboard-enable dashboard-update dashboard-open integrate-sso integrate-email integrate-monitoring integrate-data-bridge detect-ports remap-ports scan-ports setup-cronjobs view-alerts log-summary create-client setup-roles security-audit security-fix rotate-secrets setup-log-segmentation verify-certs verify-auth multi-tenancy-status
 
 # Default target
 help:
@@ -74,7 +74,18 @@ help:
 	@echo "  $(BOLD)make view-alerts$(RESET)       View recent alerts"
 	@echo "  $(BOLD)make log-summary$(RESET)       Display summary of logs"
 	@echo ""
-	@echo "$(GREEN)Visit https://stack.nerdofmouth.com for documentation$(RESET)"
+	@echo "$(BOLD)Multi-Tenancy Commands:$(RESET)"
+	@echo "  $(BOLD)make create-client CLIENT_ID=name CLIENT_NAME=\"Full Name\" CLIENT_DOMAIN=domain.com$(RESET)  Create a new client"
+	@echo "  $(BOLD)make setup-roles CLIENT_ID=name$(RESET)  Set up Keycloak roles for a client"
+	@echo "  $(BOLD)make multi-tenancy-status$(RESET)  Check status of all clients"
+	@echo "  $(BOLD)make setup-log-segmentation CLIENT_ID=name$(RESET)  Set up client log segmentation"
+	@echo ""
+	@echo "$(BOLD)Security Commands:$(RESET)"
+	@echo "  $(BOLD)make security-audit$(RESET)   Run security audit on stack"
+	@echo "  $(BOLD)make security-fix$(RESET)     Automatically fix security issues"
+	@echo "  $(BOLD)make rotate-secrets$(RESET)   Rotate all secrets"
+	@echo "  $(BOLD)make verify-certs$(RESET)     Verify TLS certificates"
+	@echo "  $(BOLD)make verify-auth$(RESET)      Verify authentication configuration"
 
 # Install AgencyStack
 install:
@@ -377,3 +388,68 @@ log-summary:
 	fi
 	@echo ""
 	@echo "For more details, run \`make logs\` or view the dashboard"
+
+# Security and multi-tenancy commands
+create-client:
+	@echo "🏢 Creating new client..."
+	@if [ -z "$(CLIENT_ID)" ] || [ -z "$(CLIENT_NAME)" ] || [ -z "$(CLIENT_DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameters.$(RESET)"; \
+		echo "Usage: make create-client CLIENT_ID=name CLIENT_NAME=\"Full Name\" CLIENT_DOMAIN=domain.com"; \
+		exit 1; \
+	fi
+	@sudo bash $(SCRIPTS_DIR)/create-client.sh "$(CLIENT_ID)" "$(CLIENT_NAME)" "$(CLIENT_DOMAIN)"
+
+setup-roles:
+	@echo "🔑 Setting up Keycloak roles for client..."
+	@if [ -z "$(CLIENT_ID)" ]; then \
+		echo "$(RED)Error: Missing required parameter CLIENT_ID.$(RESET)"; \
+		echo "Usage: make setup-roles CLIENT_ID=name"; \
+		exit 1; \
+	fi
+	@sudo bash $(SCRIPTS_DIR)/keycloak/setup_roles.sh "$(CLIENT_ID)"
+
+security-audit:
+	@echo "🔐 Running security audit..."
+	@if [ -n "$(CLIENT_ID)" ]; then \
+		sudo bash $(SCRIPTS_DIR)/security/audit_stack.sh --client-id "$(CLIENT_ID)"; \
+	else \
+		sudo bash $(SCRIPTS_DIR)/security/audit_stack.sh; \
+	fi
+
+security-fix:
+	@echo "🔧 Fixing security issues..."
+	@if [ -n "$(CLIENT_ID)" ]; then \
+		sudo bash $(SCRIPTS_DIR)/security/audit_stack.sh --fix --client-id "$(CLIENT_ID)"; \
+	else \
+		sudo bash $(SCRIPTS_DIR)/security/audit_stack.sh --fix; \
+	fi
+
+rotate-secrets:
+	@echo "🔄 Rotating secrets..."
+	@if [ -n "$(CLIENT_ID)" ] && [ -n "$(SERVICE)" ]; then \
+		sudo bash $(SCRIPTS_DIR)/security/generate_secrets.sh --rotate --client-id "$(CLIENT_ID)" --service "$(SERVICE)"; \
+	elif [ -n "$(CLIENT_ID)" ]; then \
+		sudo bash $(SCRIPTS_DIR)/security/generate_secrets.sh --rotate --client-id "$(CLIENT_ID)"; \
+	else \
+		sudo bash $(SCRIPTS_DIR)/security/generate_secrets.sh --rotate; \
+	fi
+
+setup-log-segmentation:
+	@echo "📋 Setting up log segmentation..."
+	@if [ -n "$(CLIENT_ID)" ]; then \
+		sudo bash $(SCRIPTS_DIR)/security/setup_log_segmentation.sh --client-id "$(CLIENT_ID)"; \
+	else \
+		sudo bash $(SCRIPTS_DIR)/security/setup_log_segmentation.sh; \
+	fi
+
+verify-certs:
+	@echo "🔒 Verifying TLS certificates..."
+	@sudo -E bash $(SCRIPTS_DIR)/security/verify_certificates.sh
+
+verify-auth:
+	@echo "👤 Verifying authentication configuration..."
+	@sudo -E bash $(SCRIPTS_DIR)/security/verify_authentication.sh
+
+multi-tenancy-status:
+	@echo "🏢 Checking multi-tenancy status..."
+	@sudo -E bash $(SCRIPTS_DIR)/security/check_multi_tenancy.sh
