@@ -86,6 +86,14 @@ help:
 	@echo "  $(BOLD)make rotate-secrets$(RESET)   Rotate all secrets"
 	@echo "  $(BOLD)make verify-certs$(RESET)     Verify TLS certificates"
 	@echo "  $(BOLD)make verify-auth$(RESET)      Verify authentication configuration"
+	@echo "  $(BOLD)make cryptosync$(RESET)       Install Cryptosync - Encrypted Storage & Remote Sync"
+	@echo "  $(BOLD)make cryptosync-mount$(RESET) Mount Cryptosync vault"
+	@echo "  $(BOLD)make cryptosync-unmount$(RESET) Unmount Cryptosync vault"
+	@echo "  $(BOLD)make cryptosync-sync$(RESET)  Sync Cryptosync data to remote"
+	@echo "  $(BOLD)make cryptosync-config$(RESET) Open Cryptosync configuration"
+	@echo "  $(BOLD)make cryptosync-rclone-config$(RESET) Configure Rclone remotes"
+	@echo "  $(BOLD)make cryptosync-status$(RESET) Check Cryptosync status"
+	@echo "  $(BOLD)make cryptosync-logs$(RESET)  View Cryptosync logs"
 	@echo ""
 	@echo "$(BOLD)Component Installation Commands:$(RESET)"
 	@echo "  $(BOLD)make install-wordpress$(RESET)          Install WordPress"
@@ -476,6 +484,62 @@ verify-auth:
 multi-tenancy-status:
 	@echo "🏢 Checking multi-tenancy status..."
 	@sudo -E bash $(SCRIPTS_DIR)/security/check_multi_tenancy.sh
+
+cryptosync:
+	@echo "$(MAGENTA)$(BOLD)🔒 Installing Cryptosync...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_cryptosync.sh $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) \
+		$(if $(MOUNT_DIR),--mount-dir $(MOUNT_DIR),) \
+		$(if $(REMOTE_NAME),--remote-name $(REMOTE_NAME),) \
+		$(if $(CONFIG_NAME),--config-name $(CONFIG_NAME),) \
+		$(if $(REMOTE_TYPE),--remote-type $(REMOTE_TYPE),) \
+		$(if $(REMOTE_PATH),--remote-path $(REMOTE_PATH),) \
+		$(if $(REMOTE_OPTIONS),--remote-options $(REMOTE_OPTIONS),) \
+		$(if $(FORCE),--force,) \
+		$(if $(WITH_DEPS),--with-deps,) \
+		$(if $(USE_CRYFS),--use-cryfs,) \
+		$(if $(INITIAL_SYNC),--initial-sync,) \
+		$(if $(AUTO_MOUNT),--auto-mount,)
+
+cryptosync-mount:
+	@echo "$(MAGENTA)$(BOLD)🔒 Mounting Cryptosync vault...$(RESET)"
+	@cryptosync-mount-$(CLIENT_ID)-$(CONFIG_NAME)
+
+cryptosync-unmount:
+	@echo "$(MAGENTA)$(BOLD)🔒 Unmounting Cryptosync vault...$(RESET)"
+	@cryptosync-unmount-$(CLIENT_ID)-$(CONFIG_NAME)
+
+cryptosync-sync:
+	@echo "$(MAGENTA)$(BOLD)🔄 Syncing Cryptosync data to remote...$(RESET)"
+	@cryptosync-sync-$(CLIENT_ID)-$(CONFIG_NAME) $(REMOTE_PATH)
+
+cryptosync-config:
+	@echo "$(MAGENTA)$(BOLD)⚙️ Opening Cryptosync configuration...$(RESET)"
+	@$(EDITOR) $(CONFIG_DIR)/clients/$(CLIENT_ID)/cryptosync/config/cryptosync.$(CONFIG_NAME).conf
+
+cryptosync-rclone-config:
+	@echo "$(MAGENTA)$(BOLD)⚙️ Configuring Rclone remotes...$(RESET)"
+	@rclone config --config $(CONFIG_DIR)/clients/$(CLIENT_ID)/rclone/rclone.conf
+
+cryptosync-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Cryptosync Status:$(RESET)"
+	@echo "$(CYAN)Encrypted directory:$(RESET) $(CONFIG_DIR)/clients/$(CLIENT_ID)/vault/encrypted"
+	@echo "$(CYAN)Mount point:$(RESET) $(if $(MOUNT_DIR),$(MOUNT_DIR),$(CONFIG_DIR)/clients/$(CLIENT_ID)/vault/decrypted)"
+	@echo "$(CYAN)Mounted:$(RESET) $$(mountpoint -q $(if $(MOUNT_DIR),$(MOUNT_DIR),$(CONFIG_DIR)/clients/$(CLIENT_ID)/vault/decrypted) && echo "Yes" || echo "No")"
+	@echo "$(CYAN)Configuration:$(RESET) $(CONFIG_DIR)/clients/$(CLIENT_ID)/cryptosync/config/cryptosync.$(CONFIG_NAME).conf"
+	@echo "$(CYAN)Rclone config:$(RESET) $(CONFIG_DIR)/clients/$(CLIENT_ID)/rclone/rclone.conf"
+	@echo "$(CYAN)Remote:$(RESET) $(REMOTE_NAME)"
+	@$(SCRIPTS_DIR)/monitoring/check_cryptosync.sh $(CLIENT_ID) $(CONFIG_NAME)
+
+cryptosync-logs:
+	@echo "$(MAGENTA)$(BOLD)📋 Viewing Cryptosync logs...$(RESET)"
+	@tail -n 50 $(LOG_DIR)/components/cryptosync.log
+	@echo ""
+	@echo "$(YELLOW)For more logs: $(RESET)less $(LOG_DIR)/components/cryptosync.log"
+	@if [ -f "$(CONFIG_DIR)/clients/$(CLIENT_ID)/cryptosync/logs/sync.log" ]; then \
+		echo ""; \
+		echo "$(MAGENTA)$(BOLD)📋 Last sync operations:$(RESET)"; \
+		tail -n 20 $(CONFIG_DIR)/clients/$(CLIENT_ID)/cryptosync/logs/sync.log; \
+	fi
 
 # Repository Audit and Cleanup Targets
 # ------------------------------------------------------------------------------

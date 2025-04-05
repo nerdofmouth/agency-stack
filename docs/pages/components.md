@@ -111,6 +111,13 @@ AgencyStack includes Grafana for advanced monitoring and visualization:
 
 For detailed Grafana setup and integration information, see our [Monitoring Guide](/pages/monitoring.html).
 
+## Security & Storage
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| **[Vaultwarden](components/vaultwarden.md)** | Self-hosted password manager | ✅ |
+| **[Cryptosync](components/cryptosync.md)** | Encrypted local vaults + remote cloud sync | ✅ |
+
 ## Communication
 
 | Component | Description | Default URL |
