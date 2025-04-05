@@ -821,3 +821,41 @@ peertube-start:
 peertube-restart:
 	@echo "$(MAGENTA)$(BOLD)🔄 Restarting PeerTube...$(RESET)"
 	@cd $(DOCKER_DIR)/peertube && docker-compose restart
+
+# DevOps Components
+# ------------------------------------------------------------------------------
+
+# Drone CI - Continuous Integration and Delivery Platform
+droneci:
+	@echo "Installing Drone CI..."
+	@sudo $(SCRIPTS_DIR)/components/install_droneci.sh --domain $(DRONECI_DOMAIN) $(INSTALL_FLAGS)
+
+droneci-status:
+	@docker ps -a | grep drone || echo "Drone CI is not running"
+
+droneci-logs:
+	@docker logs -f drone-server-$(CLIENT_ID) 2>&1 | tee $(LOG_DIR)/components/droneci.log
+
+droneci-runner-logs:
+	@docker logs -f drone-runner-$(CLIENT_ID) 2>&1 | tee $(LOG_DIR)/components/droneci-runner.log
+
+droneci-stop:
+	@docker-compose -f $(DOCKER_DIR)/droneci/docker-compose.yml down
+
+droneci-start:
+	@docker-compose -f $(DOCKER_DIR)/droneci/docker-compose.yml up -d
+
+droneci-restart:
+	@docker-compose -f $(DOCKER_DIR)/droneci/docker-compose.yml restart
+
+droneci-backup:
+	@echo "Backing up Drone CI data..."
+	@mkdir -p $(BACKUP_DIR)/droneci
+	@$(CONFIG_DIR)/clients/$(CLIENT_ID)/droneci_data/scripts/backup.sh $(BACKUP_DIR)/droneci
+	@echo "Backup completed: $(BACKUP_DIR)/droneci/"
+
+droneci-config:
+	@echo "Opening Drone CI configuration..."
+	@$(EDITOR) $(DOCKER_DIR)/droneci/.env
+
+# Database Components
