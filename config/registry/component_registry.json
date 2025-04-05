@@ -130,6 +130,27 @@
           "multi_tenant": true
         },
         "description": "Document signing platform"
+      },
+      "chatwoot": {
+        "name": "Chatwoot",
+        "category": "Business Applications",
+        "version": "v3.5.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Customer messaging platform that helps businesses talk to customers",
+        "ports": {
+          "web": 3002
+        }
       }
     },
     "content": {
