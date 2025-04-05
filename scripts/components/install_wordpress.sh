@@ -30,8 +30,13 @@ CONFIG_DIR="/opt/agency_stack"
 WP_DIR="${CONFIG_DIR}/wordpress"
 LOG_DIR="/var/log/agency_stack"
 COMPONENTS_LOG_DIR="${LOG_DIR}/components"
+INTEGRATIONS_LOG_DIR="${LOG_DIR}/integrations"
 INSTALL_LOG="${COMPONENTS_LOG_DIR}/wordpress.log"
+INTEGRATION_LOG="${INTEGRATIONS_LOG_DIR}/wordpress.log"
+MAIN_INTEGRATION_LOG="${INTEGRATIONS_LOG_DIR}/integration.log"
 VERBOSE=false
+FORCE=false
+WITH_DEPS=false
 DOMAIN=""
 CLIENT_ID=""
 ADMIN_EMAIL=""
@@ -57,6 +62,8 @@ show_help() {
   echo -e "  ${BOLD}--admin-email${NC} <email>     Admin email address (required)"
   echo -e "  ${BOLD}--wp-version${NC} <version>    WordPress version (default: latest)"
   echo -e "  ${BOLD}--php-version${NC} <version>   PHP version (default: 8.1)"
+  echo -e "  ${BOLD}--force${NC}                   Force reinstallation even if WordPress is already installed"
+  echo -e "  ${BOLD}--with-deps${NC}               Automatically install dependencies if missing"
   echo -e "  ${BOLD}--verbose${NC}                 Show detailed output during installation"
   echo -e "  ${BOLD}--help${NC}                    Show this help message and exit"
   echo -e ""
@@ -96,6 +103,14 @@ while [[ $# -gt 0 ]]; do
     --php-version)
       PHP_VERSION="$2"
       shift
+      shift
+      ;;
+    --force)
+      FORCE=true
+      shift
+      ;;
+    --with-deps)
+      WITH_DEPS=true
       shift
       ;;
     --verbose)
@@ -139,7 +154,10 @@ fi
 # Create log directories if they don't exist
 mkdir -p "$LOG_DIR"
 mkdir -p "$COMPONENTS_LOG_DIR"
+mkdir -p "$INTEGRATIONS_LOG_DIR"
 touch "$INSTALL_LOG"
+touch "$INTEGRATION_LOG"
+touch "$MAIN_INTEGRATION_LOG"
 
 # Log function
 log() {
@@ -151,19 +169,16 @@ log() {
   fi
 }
 
-log "INFO: Starting WordPress installation for $DOMAIN" "${BLUE}Starting WordPress installation for $DOMAIN...${NC}"
+# Integration log function
+integration_log() {
+  echo "$(date +"%Y-%m-%d %H:%M:%S") - WordPress - $1" >> "$INTEGRATION_LOG"
+  echo "$(date +"%Y-%m-%d %H:%M:%S") - WordPress - $1" >> "$MAIN_INTEGRATION_LOG"
+  if [ "$VERBOSE" = true ]; then
+    echo -e "${BLUE}[Integration] ${NC}$1"
+  fi
+}
 
-# Check if Docker is installed
-if ! command -v docker &> /dev/null; then
-  log "ERROR: Docker is not installed" "${RED}Docker is not installed. Please install Docker first.${NC}"
-  exit 1
-fi
-
-# Check if Docker Compose is installed
-if ! command -v docker-compose &> /dev/null; then
-  log "ERROR: Docker Compose is not installed" "${RED}Docker Compose is not installed. Please install Docker Compose first.${NC}"
-  exit 1
-fi
+log "INFO: Starting WordPress installation validation for $DOMAIN" "${BLUE}Starting WordPress installation validation for $DOMAIN...${NC}"
 
 # Set up site-specific variables
 SITE_NAME=${DOMAIN//./_}
@@ -172,22 +187,121 @@ if [ -n "$CLIENT_ID" ]; then
   MARIADB_CONTAINER="${CLIENT_ID}_mariadb"
   REDIS_CONTAINER="${CLIENT_ID}_redis"
   NETWORK_NAME="${CLIENT_ID}_network"
-  
-  # Check if client-specific network exists, create if it doesn't
-  if ! docker network inspect "$NETWORK_NAME" &> /dev/null; then
-    log "INFO: Creating Docker network $NETWORK_NAME" "${CYAN}Creating Docker network $NETWORK_NAME...${NC}"
-    docker network create "$NETWORK_NAME" >> "$INSTALL_LOG" 2>&1
-    if [ $? -ne 0 ]; then
-      log "ERROR: Failed to create Docker network $NETWORK_NAME" "${RED}Failed to create Docker network $NETWORK_NAME. See log for details.${NC}"
-      exit 1
-    fi
-  fi
 else
   WP_CONTAINER="wordpress_${SITE_NAME}"
   MARIADB_CONTAINER="mariadb_${SITE_NAME}"
   REDIS_CONTAINER="redis_${SITE_NAME}"
   NETWORK_NAME="agency-network"
 fi
+
+# Check if WordPress is already installed
+if docker ps -a --format '{{.Names}}' | grep -q "$WP_CONTAINER"; then
+  if [ "$FORCE" = true ]; then
+    log "WARNING: WordPress container '$WP_CONTAINER' already exists, will reinstall because --force was specified" "${YELLOW}⚠️ WordPress container '$WP_CONTAINER' already exists, will reinstall because --force was specified${NC}"
+    # Stop and remove existing containers
+    log "INFO: Stopping and removing existing WordPress containers" "${CYAN}Stopping and removing existing WordPress containers...${NC}"
+    cd "${WP_DIR}/${DOMAIN}" && docker-compose down 2>/dev/null || true
+  else
+    log "INFO: WordPress container '$WP_CONTAINER' already exists" "${GREEN}✅ WordPress installation for $DOMAIN already exists${NC}"
+    log "INFO: To reinstall, use --force flag" "${CYAN}To reinstall, use --force flag${NC}"
+    
+    # Check if the containers are running
+    if docker ps --format '{{.Names}}' | grep -q "$WP_CONTAINER"; then
+      log "INFO: WordPress container is running" "${GREEN}✅ WordPress is running${NC}"
+      echo -e "${GREEN}WordPress is already installed and running for $DOMAIN${NC}"
+      echo -e "${CYAN}Admin URL: https://${DOMAIN}/wp-admin/${NC}"
+      echo -e "${CYAN}To make changes, use --force to reinstall${NC}"
+      exit 0
+    else
+      log "WARNING: WordPress container exists but is not running" "${YELLOW}⚠️ WordPress container exists but is not running${NC}"
+      echo -e "${YELLOW}WordPress is installed but not running for $DOMAIN${NC}"
+      echo -e "${CYAN}Starting WordPress containers...${NC}"
+      cd "${WP_DIR}/${DOMAIN}" && docker-compose up -d
+      echo -e "${GREEN}WordPress has been started for $DOMAIN${NC}"
+      echo -e "${CYAN}Admin URL: https://${DOMAIN}/wp-admin/${NC}"
+      exit 0
+    fi
+  fi
+fi
+
+# Check if Docker is installed
+if ! command -v docker &> /dev/null; then
+  log "ERROR: Docker is not installed" "${RED}Docker is not installed. Please install Docker first.${NC}"
+  if [ "$WITH_DEPS" = true ]; then
+    log "INFO: Installing Docker with --with-deps flag" "${CYAN}Installing Docker with --with-deps flag...${NC}"
+    if [ -f "${ROOT_DIR}/scripts/core/install_infrastructure.sh" ]; then
+      bash "${ROOT_DIR}/scripts/core/install_infrastructure.sh" || {
+        log "ERROR: Failed to install Docker" "${RED}Failed to install Docker. Please install it manually.${NC}"
+        exit 1
+      }
+    else
+      log "ERROR: Cannot find install_infrastructure.sh script" "${RED}Cannot find install_infrastructure.sh script. Please install Docker manually.${NC}"
+      exit 1
+    fi
+  else
+    log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
+    exit 1
+  fi
+fi
+
+# Check if Docker is running
+if ! docker info &> /dev/null; then
+  log "ERROR: Docker is not running" "${RED}Docker is not running. Please start Docker first.${NC}"
+  exit 1
+fi
+
+# Check if Docker Compose is installed
+if ! command -v docker-compose &> /dev/null; then
+  log "ERROR: Docker Compose is not installed" "${RED}Docker Compose is not installed. Please install Docker Compose first.${NC}"
+  if [ "$WITH_DEPS" = true ]; then
+    log "INFO: Installing Docker Compose with --with-deps flag" "${CYAN}Installing Docker Compose with --with-deps flag...${NC}"
+    if [ -f "${ROOT_DIR}/scripts/core/install_infrastructure.sh" ]; then
+      bash "${ROOT_DIR}/scripts/core/install_infrastructure.sh" || {
+        log "ERROR: Failed to install Docker Compose" "${RED}Failed to install Docker Compose. Please install it manually.${NC}"
+        exit 1
+      }
+    else
+      log "ERROR: Cannot find install_infrastructure.sh script" "${RED}Cannot find install_infrastructure.sh script. Please install Docker Compose manually.${NC}"
+      exit 1
+    fi
+  else
+    log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
+    exit 1
+  fi
+fi
+
+# Check if network exists, create if it doesn't
+if ! docker network inspect "$NETWORK_NAME" &> /dev/null; then
+  log "INFO: Creating Docker network $NETWORK_NAME" "${CYAN}Creating Docker network $NETWORK_NAME...${NC}"
+  docker network create "$NETWORK_NAME" >> "$INSTALL_LOG" 2>&1
+  if [ $? -ne 0 ]; then
+    log "ERROR: Failed to create Docker network $NETWORK_NAME" "${RED}Failed to create Docker network $NETWORK_NAME. See log for details.${NC}"
+    exit 1
+  fi
+else
+  log "INFO: Docker network $NETWORK_NAME already exists" "${GREEN}✅ Docker network $NETWORK_NAME already exists${NC}"
+fi
+
+# Check for Traefik
+if ! docker ps --format '{{.Names}}' | grep -q "traefik"; then
+  log "WARNING: Traefik container not found" "${YELLOW}⚠️ Traefik container not found. WordPress may not be accessible without a reverse proxy.${NC}"
+  if [ "$WITH_DEPS" = true ]; then
+    log "INFO: Installing security infrastructure with --with-deps flag" "${CYAN}Installing security infrastructure with --with-deps flag...${NC}"
+    if [ -f "${ROOT_DIR}/scripts/core/install_security_infrastructure.sh" ]; then
+      bash "${ROOT_DIR}/scripts/core/install_security_infrastructure.sh" --domain "$DOMAIN" --email "$ADMIN_EMAIL" || {
+        log "ERROR: Failed to install security infrastructure" "${RED}Failed to install security infrastructure. Please install it manually.${NC}"
+      }
+    else
+      log "ERROR: Cannot find install_security_infrastructure.sh script" "${RED}Cannot find install_security_infrastructure.sh script. Please install security infrastructure manually.${NC}"
+    fi
+  else
+    log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
+  fi
+else
+  log "INFO: Traefik container found" "${GREEN}✅ Traefik container found${NC}"
+fi
+
+log "INFO: Starting WordPress installation for $DOMAIN" "${BLUE}Starting WordPress installation for $DOMAIN...${NC}"
 
 # Create WordPress directories
 log "INFO: Creating WordPress directories" "${CYAN}Creating WordPress directories...${NC}"
