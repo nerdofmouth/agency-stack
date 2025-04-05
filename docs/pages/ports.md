@@ -34,6 +34,7 @@ This document provides a comprehensive list of all port assignments used by Agen
 | **KillBill** | API | 8003 | HTTP | Payment API |
 | **Cal.com** | Web UI | 3000 | HTTP | Scheduling |
 | **Documenso** | Web UI | 3001 | HTTP | Document signing |
+| **Chatwoot** | Web UI | 3002 | HTTP | Customer service platform |
 
 ## Content Management
 

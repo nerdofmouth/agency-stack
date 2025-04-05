@@ -724,9 +724,62 @@ install-multi-tenancy:
 	@echo "Setting up multi-tenancy infrastructure..."
 	@sudo $(SCRIPTS_DIR)/multi-tenancy/install_multi_tenancy.sh $(if $(VERBOSE),--verbose,)
 
-# Content & Media Suite Components
-# ------------------------------------------------------------------------------
+# Business Applications
+business: erp cal killbill documenso chatwoot
+	@echo "Business Applications installed"
 
+# ERPNext - Enterprise Resource Planning
+erp:
+	@echo "Installing ERPNext..."
+	@sudo $(SCRIPTS_DIR)/components/install_erpnext.sh --domain $(ERP_DOMAIN) $(INSTALL_FLAGS)
+
+# Cal.com - Scheduling
+cal:
+	@echo "Installing Cal.com..."
+	@sudo $(SCRIPTS_DIR)/components/install_cal.sh --domain $(CAL_DOMAIN) $(INSTALL_FLAGS)
+
+# Documenso - Document signing
+documenso:
+	@echo "Installing Documenso..."
+	@sudo $(SCRIPTS_DIR)/components/install_documenso.sh --domain $(DOCUMENSO_DOMAIN) $(INSTALL_FLAGS)
+
+# KillBill - Billing
+killbill:
+	@echo "Installing KillBill..."
+	@sudo $(SCRIPTS_DIR)/components/install_killbill.sh --domain $(KILLBILL_DOMAIN) $(INSTALL_FLAGS)
+
+# Chatwoot - Customer Service Platform
+chatwoot:
+	@echo "Installing Chatwoot..."
+	@sudo $(SCRIPTS_DIR)/components/install_chatwoot.sh --domain $(CHATWOOT_DOMAIN) $(INSTALL_FLAGS)
+
+chatwoot-status:
+	@docker ps -a | grep chatwoot || echo "Chatwoot is not running"
+
+chatwoot-logs:
+	@docker logs -f chatwoot-app-$(CLIENT_ID) 2>&1 | tee $(LOG_DIR)/components/chatwoot.log
+
+chatwoot-stop:
+	@docker-compose -f $(DOCKER_DIR)/chatwoot/docker-compose.yml down
+
+chatwoot-start:
+	@docker-compose -f $(DOCKER_DIR)/chatwoot/docker-compose.yml up -d
+
+chatwoot-restart:
+	@docker-compose -f $(DOCKER_DIR)/chatwoot/docker-compose.yml restart
+
+chatwoot-backup:
+	@echo "Backing up Chatwoot data..."
+	@mkdir -p $(BACKUP_DIR)/chatwoot
+	@docker exec chatwoot-postgres-$(CLIENT_ID) pg_dump -U chatwoot chatwoot > $(BACKUP_DIR)/chatwoot/chatwoot_db_$(shell date +%Y%m%d).sql
+	@tar -czf $(BACKUP_DIR)/chatwoot/chatwoot_storage_$(shell date +%Y%m%d).tar.gz -C $(CONFIG_DIR)/clients/$(CLIENT_ID)/chatwoot_data/storage .
+	@echo "Backup completed: $(BACKUP_DIR)/chatwoot/"
+
+chatwoot-config:
+	@echo "Opening Chatwoot environment configuration..."
+	@$(EDITOR) $(DOCKER_DIR)/chatwoot/.env
+
+# Content & Media
 peertube:
 	@echo "$(MAGENTA)$(BOLD)🎞️ Installing PeerTube - Self-hosted Video Platform...$(RESET)"
 	@read -p "$(YELLOW)Enter domain for PeerTube (e.g., peertube.yourdomain.com):$(RESET) " DOMAIN; \
