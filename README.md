@@ -1,7 +1,7 @@
 # AgencyStack
 
 <div align="center">
-  <img src="docs/images/AgencyStack-logo.png" alt="AgencyStack Logo" width="400">
+  <img src="images/AgencyStack-logo.png" alt="AgencyStack Logo" width="400">
   <p><strong>Digital Sovereignty for Modern Agencies</strong></p>
   <p><em>Run your agency. Reclaim your agency.</em></p>
 </div>

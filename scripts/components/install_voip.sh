@@ -1,12 +1,12 @@
 #!/bin/bash
-# install_voip.sh - Install and configure VoIP infrastructure for AgencyStack
+# install_voip.sh - Install and configure VoIP for AgencyStack
 # https://stack.nerdofmouth.com
 #
-# This script sets up a complete VoIP system with:
-# - FusionPBX administrative interface
-# - FreeSWITCH VoIP server
+# This script sets up a complete VoIP solution with:
+# - FusionPBX for admin interface
+# - FreeSWITCH for call processing
 # - PostgreSQL database
-# - Properly configured SIP and RTP ports
+# - Auto-configured for multi-tenancy
 #
 # Author: AgencyStack Team
 # Version: 1.0.0
@@ -29,48 +29,49 @@ CONFIG_DIR="/opt/agency_stack"
 VOIP_DIR="${CONFIG_DIR}/voip"
 LOG_DIR="/var/log/agency_stack"
 COMPONENTS_LOG_DIR="${LOG_DIR}/components"
+INTEGRATIONS_LOG_DIR="${LOG_DIR}/integrations"
 INSTALL_LOG="${COMPONENTS_LOG_DIR}/voip.log"
+INTEGRATION_LOG="${INTEGRATIONS_LOG_DIR}/voip.log"
+MAIN_INTEGRATION_LOG="${INTEGRATIONS_LOG_DIR}/integration.log"
 VERBOSE=false
+FORCE=false
+WITH_DEPS=false
 DOMAIN=""
 CLIENT_ID=""
 ADMIN_EMAIL=""
-FREESWITCH_VERSION="1.10"
 FUSIONPBX_VERSION="latest"
-POSTGRES_PASSWORD=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-16)
+FREESWITCH_VERSION="latest"
+DB_ROOT_PASSWORD=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-16)
+VOIP_DB_PASSWORD=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-16)
 ADMIN_PASSWORD=$(openssl rand -base64 12 | tr -d "=+/")
-SIP_PORT=5060
-SIP_TLS_PORT=5061
-RTP_START_PORT=16384
-RTP_END_PORT=32768
 
 # Show help message
 show_help() {
   echo -e "${MAGENTA}${BOLD}AgencyStack VoIP Setup${NC}"
-  echo -e "========================="
-  echo -e "This script installs and configures a complete VoIP system with FusionPBX and FreeSWITCH."
+  echo -e "=============================="
+  echo -e "This script installs and configures a VoIP system with FusionPBX and FreeSWITCH."
   echo -e ""
   echo -e "${CYAN}Usage:${NC}"
   echo -e "  $0 [options]"
   echo -e ""
   echo -e "${CYAN}Options:${NC}"
-  echo -e "  ${BOLD}--domain${NC} <domain>            Primary domain for VoIP server (required)"
-  echo -e "  ${BOLD}--client-id${NC} <client_id>      Client ID for multi-tenant setup (optional)"
-  echo -e "  ${BOLD}--admin-email${NC} <email>        Admin email address (required)"
-  echo -e "  ${BOLD}--sip-port${NC} <port>            SIP UDP port (default: 5060)"
-  echo -e "  ${BOLD}--sip-tls-port${NC} <port>        SIP TLS port (default: 5061)"
-  echo -e "  ${BOLD}--rtp-start-port${NC} <port>      RTP starting port (default: 16384)"
-  echo -e "  ${BOLD}--rtp-end-port${NC} <port>        RTP ending port (default: 32768)"
-  echo -e "  ${BOLD}--freeswitch-version${NC} <ver>   FreeSWITCH version (default: 1.10)"
-  echo -e "  ${BOLD}--verbose${NC}                    Show detailed output during installation"
-  echo -e "  ${BOLD}--help${NC}                       Show this help message and exit"
+  echo -e "  ${BOLD}--domain${NC} <domain>         Primary domain for VoIP (required)"
+  echo -e "  ${BOLD}--client-id${NC} <client_id>   Client ID for multi-tenant setup (optional)"
+  echo -e "  ${BOLD}--admin-email${NC} <email>     Admin email address (required)"
+  echo -e "  ${BOLD}--fusion-version${NC} <version> FusionPBX version (default: latest)"
+  echo -e "  ${BOLD}--fs-version${NC} <version>    FreeSWITCH version (default: latest)"
+  echo -e "  ${BOLD}--force${NC}                   Force reinstallation even if VoIP is already installed"
+  echo -e "  ${BOLD}--with-deps${NC}               Automatically install dependencies if missing"
+  echo -e "  ${BOLD}--verbose${NC}                 Show detailed output during installation"
+  echo -e "  ${BOLD}--help${NC}                    Show this help message and exit"
   echo -e ""
   echo -e "${CYAN}Example:${NC}"
-  echo -e "  $0 --domain voip.example.com --admin-email admin@example.com"
+  echo -e "  $0 --domain pbx.example.com --admin-email admin@example.com --client-id acme"
   echo -e ""
   echo -e "${CYAN}Notes:${NC}"
   echo -e "  - The script requires root privileges for installation"
-  echo -e "  - Make sure the specified SIP and RTP ports are allowed in your firewall"
   echo -e "  - Log file is saved to: ${INSTALL_LOG}"
+  echo -e "  - VoIP requires ports 5060-5061 (SIP) and 16384-32768 (RTP)"
   exit 0
 }
 
@@ -93,29 +94,22 @@ while [[ $# -gt 0 ]]; do
       shift
       shift
       ;;
-    --sip-port)
-      SIP_PORT="$2"
+    --fusion-version)
+      FUSIONPBX_VERSION="$2"
       shift
       shift
       ;;
-    --sip-tls-port)
-      SIP_TLS_PORT="$2"
-      shift
-      shift
-      ;;
-    --rtp-start-port)
-      RTP_START_PORT="$2"
-      shift
-      shift
-      ;;
-    --rtp-end-port)
-      RTP_END_PORT="$2"
-      shift
-      shift
-      ;;
-    --freeswitch-version)
+    --fs-version)
       FREESWITCH_VERSION="$2"
       shift
+      shift
+      ;;
+    --force)
+      FORCE=true
+      shift
+      ;;
+    --with-deps)
+      WITH_DEPS=true
       shift
       ;;
     --verbose)
@@ -148,7 +142,7 @@ fi
 
 # Welcome message
 echo -e "${MAGENTA}${BOLD}AgencyStack VoIP Setup${NC}"
-echo -e "========================="
+echo -e "=============================="
 
 # Check if running as root
 if [ "$EUID" -ne 0 ]; then
@@ -159,7 +153,10 @@ fi
 # Create log directories if they don't exist
 mkdir -p "$LOG_DIR"
 mkdir -p "$COMPONENTS_LOG_DIR"
+mkdir -p "$INTEGRATIONS_LOG_DIR"
 touch "$INSTALL_LOG"
+touch "$INTEGRATION_LOG"
+touch "$MAIN_INTEGRATION_LOG"
 
 # Log function
 log() {
@@ -171,39 +168,147 @@ log() {
   fi
 }
 
-log "INFO: Starting VoIP installation for $DOMAIN" "${BLUE}Starting VoIP installation for $DOMAIN...${NC}"
+# Integration log function
+integration_log() {
+  echo "$(date +"%Y-%m-%d %H:%M:%S") - VoIP - $1" >> "$INTEGRATION_LOG"
+  echo "$(date +"%Y-%m-%d %H:%M:%S") - VoIP - $1" >> "$MAIN_INTEGRATION_LOG"
+  if [ "$VERBOSE" = true ]; then
+    echo -e "${BLUE}[Integration] ${NC}$1"
+  fi
+}
+
+log "INFO: Starting VoIP installation validation for $DOMAIN" "${BLUE}Starting VoIP installation validation for $DOMAIN...${NC}"
+
+# Set up site-specific variables
+SITE_NAME=${DOMAIN//./_}
+if [ -n "$CLIENT_ID" ]; then
+  FUSIONPBX_CONTAINER="${CLIENT_ID}_fusionpbx"
+  FREESWITCH_CONTAINER="${CLIENT_ID}_freeswitch"
+  POSTGRES_CONTAINER="${CLIENT_ID}_voip_postgres"
+  NETWORK_NAME="${CLIENT_ID}_network"
+else
+  FUSIONPBX_CONTAINER="fusionpbx_${SITE_NAME}"
+  FREESWITCH_CONTAINER="freeswitch_${SITE_NAME}"
+  POSTGRES_CONTAINER="voip_postgres_${SITE_NAME}"
+  NETWORK_NAME="agency-network"
+fi
+
+# Check if VoIP is already installed
+if docker ps -a --format '{{.Names}}' | grep -q "$FUSIONPBX_CONTAINER"; then
+  if [ "$FORCE" = true ]; then
+    log "WARNING: VoIP container '$FUSIONPBX_CONTAINER' already exists, will reinstall because --force was specified" "${YELLOW}⚠️ VoIP container '$FUSIONPBX_CONTAINER' already exists, will reinstall because --force was specified${NC}"
+    # Stop and remove existing containers
+    log "INFO: Stopping and removing existing VoIP containers" "${CYAN}Stopping and removing existing VoIP containers...${NC}"
+    cd "${VOIP_DIR}/${DOMAIN}" && docker-compose down 2>/dev/null || true
+  else
+    log "INFO: VoIP container '$FUSIONPBX_CONTAINER' already exists" "${GREEN}✅ VoIP installation for $DOMAIN already exists${NC}"
+    log "INFO: To reinstall, use --force flag" "${CYAN}To reinstall, use --force flag${NC}"
+    
+    # Check if the containers are running
+    if docker ps --format '{{.Names}}' | grep -q "$FUSIONPBX_CONTAINER"; then
+      log "INFO: VoIP container is running" "${GREEN}✅ VoIP is running${NC}"
+      echo -e "${GREEN}VoIP is already installed and running for $DOMAIN${NC}"
+      echo -e "${CYAN}Admin URL: https://${DOMAIN}${NC}"
+      echo -e "${CYAN}To make changes, use --force to reinstall${NC}"
+      exit 0
+    else
+      log "WARNING: VoIP container exists but is not running" "${YELLOW}⚠️ VoIP container exists but is not running${NC}"
+      echo -e "${YELLOW}VoIP is installed but not running for $DOMAIN${NC}"
+      echo -e "${CYAN}Starting VoIP containers...${NC}"
+      cd "${VOIP_DIR}/${DOMAIN}" && docker-compose up -d
+      echo -e "${GREEN}VoIP has been started for $DOMAIN${NC}"
+      echo -e "${CYAN}Admin URL: https://${DOMAIN}${NC}"
+      exit 0
+    fi
+  fi
+fi
 
 # Check if Docker is installed
 if ! command -v docker &> /dev/null; then
   log "ERROR: Docker is not installed" "${RED}Docker is not installed. Please install Docker first.${NC}"
+  if [ "$WITH_DEPS" = true ]; then
+    log "INFO: Installing Docker with --with-deps flag" "${CYAN}Installing Docker with --with-deps flag...${NC}"
+    if [ -f "${ROOT_DIR}/scripts/core/install_infrastructure.sh" ]; then
+      bash "${ROOT_DIR}/scripts/core/install_infrastructure.sh" || {
+        log "ERROR: Failed to install Docker" "${RED}Failed to install Docker. Please install it manually.${NC}"
+        exit 1
+      }
+    else
+      log "ERROR: Cannot find install_infrastructure.sh script" "${RED}Cannot find install_infrastructure.sh script. Please install Docker manually.${NC}"
+      exit 1
+    fi
+  else
+    log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
+    exit 1
+  fi
+fi
+
+# Check if Docker is running
+if ! docker info &> /dev/null; then
+  log "ERROR: Docker is not running" "${RED}Docker is not running. Please start Docker first.${NC}"
   exit 1
 fi
 
 # Check if Docker Compose is installed
 if ! command -v docker-compose &> /dev/null; then
   log "ERROR: Docker Compose is not installed" "${RED}Docker Compose is not installed. Please install Docker Compose first.${NC}"
-  exit 1
-fi
-
-# Set up site-specific variables
-SITE_NAME=${DOMAIN//./_}
-if [ -n "$CLIENT_ID" ]; then
-  VOIP_PROJECT_NAME="${CLIENT_ID}_voip"
-  NETWORK_NAME="${CLIENT_ID}_network"
-  
-  # Check if client-specific network exists, create if it doesn't
-  if ! docker network inspect "$NETWORK_NAME" &> /dev/null; then
-    log "INFO: Creating Docker network $NETWORK_NAME" "${CYAN}Creating Docker network $NETWORK_NAME...${NC}"
-    docker network create "$NETWORK_NAME" >> "$INSTALL_LOG" 2>&1
-    if [ $? -ne 0 ]; then
-      log "ERROR: Failed to create Docker network $NETWORK_NAME" "${RED}Failed to create Docker network $NETWORK_NAME. See log for details.${NC}"
+  if [ "$WITH_DEPS" = true ]; then
+    log "INFO: Installing Docker Compose with --with-deps flag" "${CYAN}Installing Docker Compose with --with-deps flag...${NC}"
+    if [ -f "${ROOT_DIR}/scripts/core/install_infrastructure.sh" ]; then
+      bash "${ROOT_DIR}/scripts/core/install_infrastructure.sh" || {
+        log "ERROR: Failed to install Docker Compose" "${RED}Failed to install Docker Compose. Please install it manually.${NC}"
+        exit 1
+      }
+    else
+      log "ERROR: Cannot find install_infrastructure.sh script" "${RED}Cannot find install_infrastructure.sh script. Please install Docker Compose manually.${NC}"
       exit 1
     fi
+  else
+    log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
+    exit 1
+  fi
+fi
+
+# Check if network exists, create if it doesn't
+if ! docker network inspect "$NETWORK_NAME" &> /dev/null; then
+  log "INFO: Creating Docker network $NETWORK_NAME" "${CYAN}Creating Docker network $NETWORK_NAME...${NC}"
+  docker network create "$NETWORK_NAME" >> "$INSTALL_LOG" 2>&1
+  if [ $? -ne 0 ]; then
+    log "ERROR: Failed to create Docker network $NETWORK_NAME" "${RED}Failed to create Docker network $NETWORK_NAME. See log for details.${NC}"
+    exit 1
   fi
 else
-  VOIP_PROJECT_NAME="voip_${SITE_NAME}"
-  NETWORK_NAME="agency-network"
+  log "INFO: Docker network $NETWORK_NAME already exists" "${GREEN}✅ Docker network $NETWORK_NAME already exists${NC}"
 fi
+
+# Check for Traefik
+if ! docker ps --format '{{.Names}}' | grep -q "traefik"; then
+  log "WARNING: Traefik container not found" "${YELLOW}⚠️ Traefik container not found. VoIP web administration may not be accessible without a reverse proxy.${NC}"
+  if [ "$WITH_DEPS" = true ]; then
+    log "INFO: Installing security infrastructure with --with-deps flag" "${CYAN}Installing security infrastructure with --with-deps flag...${NC}"
+    if [ -f "${ROOT_DIR}/scripts/core/install_security_infrastructure.sh" ]; then
+      bash "${ROOT_DIR}/scripts/core/install_security_infrastructure.sh" --domain "$DOMAIN" --email "$ADMIN_EMAIL" || {
+        log "ERROR: Failed to install security infrastructure" "${RED}Failed to install security infrastructure. Please install it manually.${NC}"
+      }
+    else
+      log "ERROR: Cannot find install_security_infrastructure.sh script" "${RED}Cannot find install_security_infrastructure.sh script. Please install security infrastructure manually.${NC}"
+    fi
+  else
+    log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
+  fi
+else
+  log "INFO: Traefik container found" "${GREEN}✅ Traefik container found${NC}"
+fi
+
+# Check if ports are available
+log "INFO: Checking for port availability" "${CYAN}Checking for port availability...${NC}"
+for port in 5060 5061 5080 16384; do
+  if netstat -tuln | grep -q ":$port "; then
+    log "WARNING: Port $port is already in use" "${YELLOW}⚠️ Port $port is already in use. This may cause conflicts with the VoIP system.${NC}"
+  fi
+done
+
+log "INFO: Starting VoIP installation for $DOMAIN" "${BLUE}Starting VoIP installation for $DOMAIN...${NC}"
 
 # Create VoIP directories
 log "INFO: Creating VoIP directories" "${CYAN}Creating VoIP directories...${NC}"
@@ -212,7 +317,6 @@ mkdir -p "${VOIP_DIR}/${DOMAIN}/freeswitch"
 mkdir -p "${VOIP_DIR}/${DOMAIN}/fusionpbx"
 mkdir -p "${VOIP_DIR}/${DOMAIN}/postgres"
 mkdir -p "${VOIP_DIR}/${DOMAIN}/logs"
-mkdir -p "${VOIP_DIR}/${DOMAIN}/certs"
 
 # Create docker-compose.yml file for VoIP stack
 log "INFO: Creating VoIP Docker Compose file" "${CYAN}Creating VoIP Docker Compose file...${NC}"
@@ -222,10 +326,10 @@ version: '3.7'
 services:
   postgres:
     image: postgres:13-alpine
-    container_name: ${VOIP_PROJECT_NAME}_postgres
+    container_name: ${POSTGRES_CONTAINER}
     restart: unless-stopped
     environment:
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${DB_ROOT_PASSWORD}
       POSTGRES_USER: fusionpbx
       POSTGRES_DB: fusionpbx
     volumes:
@@ -241,21 +345,21 @@ services:
 
   freeswitch:
     image: signalwire/freeswitch:${FREESWITCH_VERSION}
-    container_name: ${VOIP_PROJECT_NAME}_freeswitch
+    container_name: ${FREESWITCH_CONTAINER}
     restart: unless-stopped
     ports:
-      - "${SIP_PORT}:${SIP_PORT}/udp"
-      - "${SIP_TLS_PORT}:${SIP_TLS_PORT}/tcp"
-      - "${RTP_START_PORT}-${RTP_END_PORT}:${RTP_START_PORT}-${RTP_END_PORT}/udp"
+      - "5060:5060/udp"
+      - "5061:5061/tcp"
+      - "5080:5080/tcp"
+      - "16384-32768:16384-32768/udp"
     volumes:
       - ${VOIP_DIR}/${DOMAIN}/freeswitch:/etc/freeswitch
       - ${VOIP_DIR}/${DOMAIN}/logs:/var/log/freeswitch
-      - ${VOIP_DIR}/${DOMAIN}/certs:/etc/freeswitch/tls
     environment:
       - POSTGRES_HOST=postgres
       - POSTGRES_DB=fusionpbx
       - POSTGRES_USER=fusionpbx
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_PASSWORD=${VOIP_DB_PASSWORD}
       - DOMAIN_NAME=${DOMAIN}
     networks:
       - ${NETWORK_NAME}
@@ -273,17 +377,16 @@ services:
 
   fusionpbx:
     image: sareu/fusionpbx:${FUSIONPBX_VERSION}
-    container_name: ${VOIP_PROJECT_NAME}_fusionpbx
+    container_name: ${FUSIONPBX_CONTAINER}
     restart: unless-stopped
     volumes:
       - ${VOIP_DIR}/${DOMAIN}/fusionpbx:/var/www/fusionpbx
       - ${VOIP_DIR}/${DOMAIN}/freeswitch:/etc/freeswitch:ro
-      - ${VOIP_DIR}/${DOMAIN}/certs:/etc/nginx/ssl
     environment:
       - POSTGRES_HOST=postgres
       - POSTGRES_DB=fusionpbx
       - POSTGRES_USER=fusionpbx
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_PASSWORD=${VOIP_DB_PASSWORD}
       - ADMIN_EMAIL=${ADMIN_EMAIL}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - DOMAIN_NAME=${DOMAIN}
@@ -354,7 +457,7 @@ cat > "${VOIP_DIR}/${DOMAIN}/fusionpbx/resources/config/config.php" <<EOF
 \$db_port = '5432';
 \$db_name = 'fusionpbx';
 \$db_username = 'fusionpbx';
-\$db_password = '${POSTGRES_PASSWORD}';
+\$db_password = '${VOIP_DB_PASSWORD}';
 
 // Show errors
 \$show_debug = false;
@@ -388,11 +491,11 @@ cat > "${VOIP_DIR}/${DOMAIN}/setup_firewall.sh" <<EOF
 # This script configures the firewall to allow VoIP traffic
 
 # Allow SIP ports
-ufw allow ${SIP_PORT}/udp
-ufw allow ${SIP_TLS_PORT}/tcp
+ufw allow 5060/udp
+ufw allow 5061/tcp
 
 # Allow RTP ports
-ufw allow ${RTP_START_PORT}:${RTP_END_PORT}/udp
+ufw allow 16384:32768/udp
 
 # Reload firewall
 ufw reload
@@ -413,9 +516,9 @@ if [ -f "${ROOT_DIR}/docs/pages/ports.md" ]; then
 
 | Service     | Port            | Protocol | Purpose                        |
 |-------------|-----------------|----------|--------------------------------|
-| SIP         | ${SIP_PORT}     | UDP      | Session Initiation Protocol    |
-| SIP-TLS     | ${SIP_TLS_PORT} | TCP      | Secure SIP over TLS            |
-| RTP         | ${RTP_START_PORT}-${RTP_END_PORT} | UDP | Real-time Transport Protocol |
+| SIP         | 5060            | UDP      | Session Initiation Protocol    |
+| SIP-TLS     | 5061            | TCP      | Secure SIP over TLS            |
+| RTP         | 16384-32768     | UDP      | Real-time Transport Protocol |
 
 These ports must be open in your firewall for proper VoIP functionality.
 EOF
@@ -430,9 +533,9 @@ This document outlines the ports used by various services in the AgencyStack.
 
 | Service     | Port            | Protocol | Purpose                        |
 |-------------|-----------------|----------|--------------------------------|
-| SIP         | ${SIP_PORT}     | UDP      | Session Initiation Protocol    |
-| SIP-TLS     | ${SIP_TLS_PORT} | TCP      | Secure SIP over TLS            |
-| RTP         | ${RTP_START_PORT}-${RTP_END_PORT} | UDP | Real-time Transport Protocol |
+| SIP         | 5060            | UDP      | Session Initiation Protocol    |
+| SIP-TLS     | 5061            | TCP      | Secure SIP over TLS            |
+| RTP         | 16384-32768     | UDP      | Real-time Transport Protocol |
 
 These ports must be open in your firewall for proper VoIP functionality.
 EOF
@@ -458,7 +561,7 @@ if command -v ufw &> /dev/null; then
   log "INFO: Firewall configured for VoIP" "${GREEN}Firewall configured for VoIP${NC}"
 else
   log "WARNING: UFW not installed, firewall not configured" "${YELLOW}UFW not installed, please configure your firewall manually${NC}"
-  log "WARNING: VoIP requires SIP ports ($SIP_PORT/udp, $SIP_TLS_PORT/tcp) and RTP ports ($RTP_START_PORT-$RTP_END_PORT/udp)" "${YELLOW}VoIP requires SIP ports ($SIP_PORT/udp, $SIP_TLS_PORT/tcp) and RTP ports ($RTP_START_PORT-$RTP_END_PORT/udp)${NC}"
+  log "WARNING: VoIP requires SIP ports (5060/udp, 5061/tcp) and RTP ports (16384-32768/udp)" "${YELLOW}VoIP requires SIP ports (5060/udp, 5061/tcp) and RTP ports (16384-32768/udp)${NC}"
 fi
 
 # Store credentials in a secure location
@@ -476,16 +579,16 @@ FUSIONPBX_ADMIN_USER=admin
 FUSIONPBX_ADMIN_PASSWORD=${ADMIN_PASSWORD}
 FUSIONPBX_ADMIN_EMAIL=${ADMIN_EMAIL}
 
-POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+POSTGRES_PASSWORD=${VOIP_DB_PASSWORD}
 
 # SIP Server Details
 SIP_SERVER=${DOMAIN}
-SIP_PORT=${SIP_PORT}
-SIP_TLS_PORT=${SIP_TLS_PORT}
-RTP_PORTS=${RTP_START_PORT}-${RTP_END_PORT}
+SIP_PORT=5060
+SIP_TLS_PORT=5061
+RTP_PORTS=16384-32768
 
 # Docker project
-VOIP_PROJECT_NAME=${VOIP_PROJECT_NAME}
+VOIP_PROJECT_NAME=${FUSIONPBX_CONTAINER}
 EOF
 
 chmod 600 "${CONFIG_DIR}/secrets/voip/${DOMAIN}.env"
@@ -505,10 +608,10 @@ if [ -d "${CONFIG_DIR}/components" ]; then
   "client_id": "${CLIENT_ID}",
   "status": "active",
   "ports": {
-    "sip": ${SIP_PORT},
-    "sip_tls": ${SIP_TLS_PORT},
-    "rtp_start": ${RTP_START_PORT},
-    "rtp_end": ${RTP_END_PORT}
+    "sip": 5060,
+    "sip_tls": 5061,
+    "rtp_start": 16384,
+    "rtp_end": 32768
   }
 }
 EOF
@@ -543,9 +646,9 @@ echo -e "${YELLOW}Admin Password: ${ADMIN_PASSWORD}${NC}"
 echo -e "${YELLOW}IMPORTANT: Please save these credentials safely and change the password!${NC}"
 echo -e ""
 echo -e "${CYAN}SIP Server: ${DOMAIN}${NC}"
-echo -e "${CYAN}SIP Port (UDP): ${SIP_PORT}${NC}"
-echo -e "${CYAN}SIP-TLS Port: ${SIP_TLS_PORT}${NC}"
-echo -e "${CYAN}RTP Ports: ${RTP_START_PORT}-${RTP_END_PORT}${NC}"
+echo -e "${CYAN}SIP Port (UDP): 5060${NC}"
+echo -e "${CYAN}SIP-TLS Port: 5061${NC}"
+echo -e "${CYAN}RTP Ports: 16384-32768${NC}"
 echo -e ""
 echo -e "${CYAN}Credentials saved to: ${CONFIG_DIR}/secrets/voip/${DOMAIN}.env${NC}"
 echo -e ""

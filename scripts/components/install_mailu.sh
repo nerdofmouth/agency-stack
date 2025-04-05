@@ -2,12 +2,12 @@
 # install_mailu.sh - Install and configure Mailu email server for AgencyStack
 # https://stack.nerdofmouth.com
 #
-# This script sets up Mailu, a full-featured mail server with:
-# - SMTP and IMAP services
-# - Webmail interface (Roundcube)
-# - Admin panel
-# - Anti-spam and anti-virus filtering
-# - DKIM, SPF, and DMARC support
+# This script sets up a Mailu email server with:
+# - SMTP/IMAP/POP3 services
+# - Web administration interface
+# - Webmail (Roundcube)
+# - Anti-spam and anti-virus protection
+# - Auto-configured for multi-tenancy
 #
 # Author: AgencyStack Team
 # Version: 1.0.0
@@ -29,42 +29,49 @@ ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 CONFIG_DIR="/opt/agency_stack"
 MAILU_DIR="${CONFIG_DIR}/mailu"
 LOG_DIR="/var/log/agency_stack"
-INSTALL_LOG="${LOG_DIR}/mailu_install.log"
+COMPONENTS_LOG_DIR="${LOG_DIR}/components"
+INTEGRATIONS_LOG_DIR="${LOG_DIR}/integrations"
+INSTALL_LOG="${COMPONENTS_LOG_DIR}/mailu.log"
+INTEGRATION_LOG="${INTEGRATIONS_LOG_DIR}/mailu.log"
+MAIN_INTEGRATION_LOG="${INTEGRATIONS_LOG_DIR}/integration.log"
 VERBOSE=false
+FORCE=false
+WITH_DEPS=false
 DOMAIN=""
 EMAIL_DOMAIN=""
+CLIENT_ID=""
 ADMIN_EMAIL=""
-SECRET_KEY=$(openssl rand -base64 16 | tr -d "=+/" | cut -c1-16)
-INITIAL_ADMIN_PASSWORD=$(openssl rand -base64 12 | tr -d "=+/")
+ADMIN_PASSWORD=$(openssl rand -base64 12 | tr -d "=+/")
+SECRET_KEY=$(openssl rand -base64 32)
+MAILU_VERSION="1.9"
 
 # Show help message
 show_help() {
   echo -e "${MAGENTA}${BOLD}AgencyStack Mailu Email Server Setup${NC}"
-  echo -e "========================================"
-  echo -e "This script installs and configures Mailu email server with:"
-  echo -e "  - SMTP and IMAP services"
-  echo -e "  - Webmail interface (Roundcube)"
-  echo -e "  - Admin panel"
-  echo -e "  - Anti-spam and anti-virus filtering"
-  echo -e "  - DKIM, SPF, and DMARC support"
+  echo -e "======================================"
+  echo -e "This script installs and configures a Mailu email server with webmail and administration interface."
   echo -e ""
   echo -e "${CYAN}Usage:${NC}"
   echo -e "  $0 [options]"
   echo -e ""
   echo -e "${CYAN}Options:${NC}"
-  echo -e "  ${BOLD}--domain${NC} <domain>        Main domain for Mailu admin panel (required)"
-  echo -e "  ${BOLD}--email-domain${NC} <domain>  Domain for email addresses (required)" 
-  echo -e "  ${BOLD}--admin-email${NC} <email>    Admin email address (required)"
-  echo -e "  ${BOLD}--verbose${NC}                Show detailed output during installation"
-  echo -e "  ${BOLD}--help${NC}                   Show this help message and exit"
+  echo -e "  ${BOLD}--domain${NC} <domain>         Primary domain for Mailu server (required)"
+  echo -e "  ${BOLD}--email-domain${NC} <domain>   Domain for email addresses (defaults to --domain)"
+  echo -e "  ${BOLD}--client-id${NC} <client_id>   Client ID for multi-tenant setup (optional)"
+  echo -e "  ${BOLD}--admin-email${NC} <email>     Admin email address (required)"
+  echo -e "  ${BOLD}--mailu-version${NC} <version> Mailu version (default: 1.9)"
+  echo -e "  ${BOLD}--force${NC}                   Force reinstallation even if Mailu is already installed"
+  echo -e "  ${BOLD}--with-deps${NC}               Automatically install dependencies if missing"
+  echo -e "  ${BOLD}--verbose${NC}                 Show detailed output during installation"
+  echo -e "  ${BOLD}--help${NC}                    Show this help message and exit"
   echo -e ""
   echo -e "${CYAN}Example:${NC}"
-  echo -e "  $0 --domain mail.example.com --email-domain example.com --admin-email admin@example.com"
+  echo -e "  $0 --domain mail.example.com --email-domain example.com --admin-email admin@example.com --client-id acme"
   echo -e ""
   echo -e "${CYAN}Notes:${NC}"
   echo -e "  - The script requires root privileges for installation"
-  echo -e "  - Make sure proper DNS records are configured before running this script"
   echo -e "  - Log file is saved to: ${INSTALL_LOG}"
+  echo -e "  - Make sure DNS records for mail server are properly configured"
   exit 0
 }
 
@@ -82,9 +89,27 @@ while [[ $# -gt 0 ]]; do
       shift
       shift
       ;;
+    --client-id)
+      CLIENT_ID="$2"
+      shift
+      shift
+      ;;
     --admin-email)
       ADMIN_EMAIL="$2"
       shift
+      shift
+      ;;
+    --mailu-version)
+      MAILU_VERSION="$2"
+      shift
+      shift
+      ;;
+    --force)
+      FORCE=true
+      shift
+      ;;
+    --with-deps)
+      WITH_DEPS=true
       shift
       ;;
     --verbose)
@@ -109,21 +134,20 @@ if [ -z "$DOMAIN" ]; then
   exit 1
 fi
 
-if [ -z "$EMAIL_DOMAIN" ]; then
-  echo -e "${RED}Error: --email-domain is required${NC}"
-  echo -e "Use --help for usage information"
-  exit 1
-fi
-
 if [ -z "$ADMIN_EMAIL" ]; then
   echo -e "${RED}Error: --admin-email is required${NC}"
   echo -e "Use --help for usage information"
   exit 1
 fi
 
+# Set email domain if not provided
+if [ -z "$EMAIL_DOMAIN" ]; then
+  EMAIL_DOMAIN="$DOMAIN"
+fi
+
 # Welcome message
 echo -e "${MAGENTA}${BOLD}AgencyStack Mailu Email Server Setup${NC}"
-echo -e "========================================"
+echo -e "======================================"
 
 # Check if running as root
 if [ "$EUID" -ne 0 ]; then
@@ -131,9 +155,13 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-# Create log directory if it doesn't exist
+# Create log directories if they don't exist
 mkdir -p "$LOG_DIR"
+mkdir -p "$COMPONENTS_LOG_DIR"
+mkdir -p "$INTEGRATIONS_LOG_DIR"
 touch "$INSTALL_LOG"
+touch "$INTEGRATION_LOG"
+touch "$MAIN_INTEGRATION_LOG"
 
 # Log function
 log() {
@@ -145,157 +173,158 @@ log() {
   fi
 }
 
-log "INFO: Starting Mailu installation" "${BLUE}Starting Mailu installation...${NC}"
+# Integration log function
+integration_log() {
+  echo "$(date +"%Y-%m-%d %H:%M:%S") - Mailu - $1" >> "$INTEGRATION_LOG"
+  echo "$(date +"%Y-%m-%d %H:%M:%S") - Mailu - $1" >> "$MAIN_INTEGRATION_LOG"
+  if [ "$VERBOSE" = true ]; then
+    echo -e "${BLUE}[Integration] ${NC}$1"
+  fi
+}
+
+log "INFO: Starting Mailu installation validation for $DOMAIN" "${BLUE}Starting Mailu installation validation for $DOMAIN...${NC}"
+
+# Set up site-specific variables
+SITE_NAME=${DOMAIN//./_}
+if [ -n "$CLIENT_ID" ]; then
+  MAILU_CONTAINER="${CLIENT_ID}_mailu"
+  NETWORK_NAME="${CLIENT_ID}_network"
+else
+  MAILU_CONTAINER="mailu_${SITE_NAME}"
+  NETWORK_NAME="agency-network"
+fi
+
+# Check if Mailu is already installed
+if docker ps -a --format '{{.Names}}' | grep -q "${MAILU_CONTAINER}_admin"; then
+  if [ "$FORCE" = true ]; then
+    log "WARNING: Mailu containers already exist, will reinstall because --force was specified" "${YELLOW}⚠️ Mailu containers already exist, will reinstall because --force was specified${NC}"
+    # Stop and remove existing containers
+    log "INFO: Stopping and removing existing Mailu containers" "${CYAN}Stopping and removing existing Mailu containers...${NC}"
+    cd "${MAILU_DIR}/${DOMAIN}" && docker-compose down 2>/dev/null || true
+  else
+    log "INFO: Mailu containers already exist" "${GREEN}✅ Mailu installation for $DOMAIN already exists${NC}"
+    log "INFO: To reinstall, use --force flag" "${CYAN}To reinstall, use --force flag${NC}"
+    
+    # Check if the containers are running
+    if docker ps --format '{{.Names}}' | grep -q "${MAILU_CONTAINER}_admin"; then
+      log "INFO: Mailu containers are running" "${GREEN}✅ Mailu is running${NC}"
+      echo -e "${GREEN}Mailu is already installed and running for $DOMAIN${NC}"
+      echo -e "${CYAN}Admin URL: https://${DOMAIN}/admin/${NC}"
+      echo -e "${CYAN}Webmail URL: https://${DOMAIN}/webmail/${NC}"
+      echo -e "${CYAN}To make changes, use --force to reinstall${NC}"
+      exit 0
+    else
+      log "WARNING: Mailu containers exist but are not running" "${YELLOW}⚠️ Mailu containers exist but are not running${NC}"
+      echo -e "${YELLOW}Mailu is installed but not running for $DOMAIN${NC}"
+      echo -e "${CYAN}Starting Mailu containers...${NC}"
+      cd "${MAILU_DIR}/${DOMAIN}" && docker-compose up -d
+      echo -e "${GREEN}Mailu has been started for $DOMAIN${NC}"
+      echo -e "${CYAN}Admin URL: https://${DOMAIN}/admin/${NC}"
+      echo -e "${CYAN}Webmail URL: https://${DOMAIN}/webmail/${NC}"
+      exit 0
+    fi
+  fi
+fi
 
 # Check if Docker is installed
 if ! command -v docker &> /dev/null; then
   log "ERROR: Docker is not installed" "${RED}Docker is not installed. Please install Docker first.${NC}"
+  if [ "$WITH_DEPS" = true ]; then
+    log "INFO: Installing Docker with --with-deps flag" "${CYAN}Installing Docker with --with-deps flag...${NC}"
+    if [ -f "${ROOT_DIR}/scripts/core/install_infrastructure.sh" ]; then
+      bash "${ROOT_DIR}/scripts/core/install_infrastructure.sh" || {
+        log "ERROR: Failed to install Docker" "${RED}Failed to install Docker. Please install it manually.${NC}"
+        exit 1
+      }
+    else
+      log "ERROR: Cannot find install_infrastructure.sh script" "${RED}Cannot find install_infrastructure.sh script. Please install Docker manually.${NC}"
+      exit 1
+    fi
+  else
+    log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
+    exit 1
+  fi
+fi
+
+# Check if Docker is running
+if ! docker info &> /dev/null; then
+  log "ERROR: Docker is not running" "${RED}Docker is not running. Please start Docker first.${NC}"
   exit 1
 fi
 
 # Check if Docker Compose is installed
 if ! command -v docker-compose &> /dev/null; then
   log "ERROR: Docker Compose is not installed" "${RED}Docker Compose is not installed. Please install Docker Compose first.${NC}"
-  exit 1
+  if [ "$WITH_DEPS" = true ]; then
+    log "INFO: Installing Docker Compose with --with-deps flag" "${CYAN}Installing Docker Compose with --with-deps flag...${NC}"
+    if [ -f "${ROOT_DIR}/scripts/core/install_infrastructure.sh" ]; then
+      bash "${ROOT_DIR}/scripts/core/install_infrastructure.sh" || {
+        log "ERROR: Failed to install Docker Compose" "${RED}Failed to install Docker Compose. Please install it manually.${NC}"
+        exit 1
+      }
+    else
+      log "ERROR: Cannot find install_infrastructure.sh script" "${RED}Cannot find install_infrastructure.sh script. Please install Docker Compose manually.${NC}"
+      exit 1
+    fi
+  else
+    log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
+    exit 1
+  fi
 fi
 
-# Create Mailu directory
-log "INFO: Creating Mailu directory" "${CYAN}Creating Mailu directory...${NC}"
-mkdir -p "${MAILU_DIR}"
-mkdir -p "${MAILU_DIR}/data"
-mkdir -p "${MAILU_DIR}/data/mail"
-mkdir -p "${MAILU_DIR}/data/webmail"
-mkdir -p "${MAILU_DIR}/data/filter"
-mkdir -p "${MAILU_DIR}/overrides"
+# Check if network exists, create if it doesn't
+if ! docker network inspect "$NETWORK_NAME" &> /dev/null; then
+  log "INFO: Creating Docker network $NETWORK_NAME" "${CYAN}Creating Docker network $NETWORK_NAME...${NC}"
+  docker network create "$NETWORK_NAME" >> "$INSTALL_LOG" 2>&1
+  if [ $? -ne 0 ]; then
+    log "ERROR: Failed to create Docker network $NETWORK_NAME" "${RED}Failed to create Docker network $NETWORK_NAME. See log for details.${NC}"
+    exit 1
+  fi
+else
+  log "INFO: Docker network $NETWORK_NAME already exists" "${GREEN}✅ Docker network $NETWORK_NAME already exists${NC}"
+fi
 
-# Create Docker Compose file for Mailu
-log "INFO: Creating Mailu Docker Compose file" "${CYAN}Creating Mailu Docker Compose file...${NC}"
-cat > "${MAILU_DIR}/docker-compose.yml" <<EOF
-version: '3.7'
+# Check for Traefik
+if ! docker ps --format '{{.Names}}' | grep -q "traefik"; then
+  log "WARNING: Traefik container not found" "${YELLOW}⚠️ Traefik container not found. Mailu may not be accessible without a reverse proxy.${NC}"
+  if [ "$WITH_DEPS" = true ]; then
+    log "INFO: Installing security infrastructure with --with-deps flag" "${CYAN}Installing security infrastructure with --with-deps flag...${NC}"
+    if [ -f "${ROOT_DIR}/scripts/core/install_security_infrastructure.sh" ]; then
+      bash "${ROOT_DIR}/scripts/core/install_security_infrastructure.sh" --domain "$DOMAIN" --email "$ADMIN_EMAIL" || {
+        log "ERROR: Failed to install security infrastructure" "${RED}Failed to install security infrastructure. Please install it manually.${NC}"
+      }
+    else
+      log "ERROR: Cannot find install_security_infrastructure.sh script" "${RED}Cannot find install_security_infrastructure.sh script. Please install security infrastructure manually.${NC}"
+    fi
+  else
+    log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
+  fi
+else
+  log "INFO: Traefik container found" "${GREEN}✅ Traefik container found${NC}"
+fi
 
-services:
-  front:
-    image: ${DOCKER_ORG:-mailu}/nginx:${MAILU_VERSION:-1.9}
-    restart: always
-    env_file: mailu.env
-    logging:
-      driver: json-file
-    ports:
-      - "25:25"    # SMTP
-      - "465:465"  # SMTPS
-      - "587:587"  # Submission
-      - "993:993"  # IMAPS
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./data/certs:/certs
-      - ./overrides/nginx:/overrides
-    networks:
-      - agency-network
-    depends_on:
-      - webmail
-      - admin
-      - imap
-      - antispam
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.mailu.rule=Host(\`${DOMAIN}\`)"
-      - "traefik.http.routers.mailu.entrypoints=websecure"
-      - "traefik.http.routers.mailu.tls.certresolver=myresolver"
-      - "traefik.http.routers.mailu.middlewares=secure-headers@file"
-      - "traefik.http.services.mailu.loadbalancer.server.port=80"
+# Check if ports are available
+log "INFO: Checking for port availability" "${CYAN}Checking for port availability...${NC}"
+for port in 25 465 587 143 993 110 995; do
+  if netstat -tuln | grep -q ":$port "; then
+    log "WARNING: Port $port is already in use" "${YELLOW}⚠️ Port $port is already in use. This may cause conflicts with Mailu.${NC}"
+  fi
+done
 
-  admin:
-    image: ${DOCKER_ORG:-mailu}/admin:${MAILU_VERSION:-1.9}
-    restart: always
-    env_file: mailu.env
-    volumes:
-      - ./data:/data
-      - ./data/mail:/mail
-    depends_on:
-      - redis
-    networks:
-      - agency-network
+log "INFO: Starting Mailu installation for $DOMAIN" "${BLUE}Starting Mailu installation for $DOMAIN...${NC}"
 
-  imap:
-    image: ${DOCKER_ORG:-mailu}/dovecot:${MAILU_VERSION:-1.9}
-    restart: always
-    env_file: mailu.env
-    volumes:
-      - ./data/mail:/mail
-      - ./data/certs:/certs
-      - ./overrides/dovecot:/overrides
-    networks:
-      - agency-network
-
-  smtp:
-    image: ${DOCKER_ORG:-mailu}/postfix:${MAILU_VERSION:-1.9}
-    restart: always
-    env_file: mailu.env
-    volumes:
-      - ./data/mail:/mail
-      - ./data/certs:/certs
-      - ./overrides/postfix:/overrides
-    networks:
-      - agency-network
-
-  antispam:
-    image: ${DOCKER_ORG:-mailu}/rspamd:${MAILU_VERSION:-1.9}
-    restart: always
-    env_file: mailu.env
-    volumes:
-      - ./data/filter:/var/lib/rspamd
-      - ./data/mail:/mail
-      - ./overrides/rspamd:/overrides
-    networks:
-      - agency-network
-    depends_on:
-      - antivirus
-
-  antivirus:
-    image: ${DOCKER_ORG:-mailu}/clamav:${MAILU_VERSION:-1.9}
-    restart: always
-    env_file: mailu.env
-    volumes:
-      - ./data/filter:/data
-    networks:
-      - agency-network
-
-  webmail:
-    image: ${DOCKER_ORG:-mailu}/roundcube:${MAILU_VERSION:-1.9}
-    restart: always
-    env_file: mailu.env
-    volumes:
-      - ./data/webmail:/data
-    networks:
-      - agency-network
-    depends_on:
-      - imap
-
-  webdav:
-    image: ${DOCKER_ORG:-mailu}/radicale:${MAILU_VERSION:-1.9}
-    restart: always
-    env_file: mailu.env
-    volumes:
-      - ./data/dav:/data
-    networks:
-      - agency-network
-
-  redis:
-    image: redis:alpine
-    restart: always
-    volumes:
-      - ./data/redis:/data
-    networks:
-      - agency-network
-
-networks:
-  agency-network:
-    external: true
-EOF
+# Create Mailu directories
+log "INFO: Creating Mailu directories" "${CYAN}Creating Mailu directories...${NC}"
+mkdir -p "${MAILU_DIR}/${DOMAIN}"
+mkdir -p "${MAILU_DIR}/${DOMAIN}/data"
+mkdir -p "${MAILU_DIR}/${DOMAIN}/mail"
+mkdir -p "${MAILU_DIR}/${DOMAIN}/certs"
+mkdir -p "${MAILU_DIR}/${DOMAIN}/overrides"
+mkdir -p "${MAILU_DIR}/${DOMAIN}/logs"
 
 # Create Mailu environment file
 log "INFO: Creating Mailu environment file" "${CYAN}Creating Mailu environment file...${NC}"
-cat > "${MAILU_DIR}/mailu.env" <<EOF
+cat > "${MAILU_DIR}/${DOMAIN}/mailu.env" <<EOF
 # Mailu main configuration file
 #
 # This file is autogenerated by the AgencyStack installer
@@ -339,19 +368,144 @@ POD_ADDRESS_RANGE=none
 # Admin user
 INITIAL_ADMIN_ACCOUNT=admin
 INITIAL_ADMIN_DOMAIN=${EMAIL_DOMAIN}
-INITIAL_ADMIN_PASSWORD=${INITIAL_ADMIN_PASSWORD}
+INITIAL_ADMIN_PASSWORD=${ADMIN_PASSWORD}
 INITIAL_ADMIN_MODE=update
+EOF
+
+# Create Docker Compose file for Mailu
+log "INFO: Creating Mailu Docker Compose file" "${CYAN}Creating Mailu Docker Compose file...${NC}"
+cat > "${MAILU_DIR}/${DOMAIN}/docker-compose.yml" <<EOF
+version: '3.7'
+
+services:
+  front:
+    image: ${DOCKER_ORG:-mailu}/nginx:${MAILU_VERSION:-1.9}
+    restart: always
+    env_file: mailu.env
+    logging:
+      driver: json-file
+    ports:
+      - "25:25"    # SMTP
+      - "465:465"  # SMTPS
+      - "587:587"  # Submission
+      - "993:993"  # IMAPS
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./data/certs:/certs
+      - ./overrides/nginx:/overrides
+    networks:
+      - ${NETWORK_NAME}
+    depends_on:
+      - webmail
+      - admin
+      - imap
+      - antispam
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mailu.rule=Host(\`${DOMAIN}\`)"
+      - "traefik.http.routers.mailu.entrypoints=websecure"
+      - "traefik.http.routers.mailu.tls.certresolver=myresolver"
+      - "traefik.http.routers.mailu.middlewares=secure-headers@file"
+      - "traefik.http.services.mailu.loadbalancer.server.port=80"
+
+  admin:
+    image: ${DOCKER_ORG:-mailu}/admin:${MAILU_VERSION:-1.9}
+    restart: always
+    env_file: mailu.env
+    volumes:
+      - ./data:/data
+      - ./data/mail:/mail
+    depends_on:
+      - redis
+    networks:
+      - ${NETWORK_NAME}
+
+  imap:
+    image: ${DOCKER_ORG:-mailu}/dovecot:${MAILU_VERSION:-1.9}
+    restart: always
+    env_file: mailu.env
+    volumes:
+      - ./data/mail:/mail
+      - ./data/certs:/certs
+      - ./overrides/dovecot:/overrides
+    networks:
+      - ${NETWORK_NAME}
+
+  smtp:
+    image: ${DOCKER_ORG:-mailu}/postfix:${MAILU_VERSION:-1.9}
+    restart: always
+    env_file: mailu.env
+    volumes:
+      - ./data/mail:/mail
+      - ./data/certs:/certs
+      - ./overrides/postfix:/overrides
+    networks:
+      - ${NETWORK_NAME}
+
+  antispam:
+    image: ${DOCKER_ORG:-mailu}/rspamd:${MAILU_VERSION:-1.9}
+    restart: always
+    env_file: mailu.env
+    volumes:
+      - ./data/filter:/var/lib/rspamd
+      - ./data/mail:/mail
+      - ./overrides/rspamd:/overrides
+    networks:
+      - ${NETWORK_NAME}
+    depends_on:
+      - antivirus
+
+  antivirus:
+    image: ${DOCKER_ORG:-mailu}/clamav:${MAILU_VERSION:-1.9}
+    restart: always
+    env_file: mailu.env
+    volumes:
+      - ./data/filter:/data
+    networks:
+      - ${NETWORK_NAME}
+
+  webmail:
+    image: ${DOCKER_ORG:-mailu}/roundcube:${MAILU_VERSION:-1.9}
+    restart: always
+    env_file: mailu.env
+    volumes:
+      - ./data/webmail:/data
+    networks:
+      - ${NETWORK_NAME}
+    depends_on:
+      - imap
+
+  webdav:
+    image: ${DOCKER_ORG:-mailu}/radicale:${MAILU_VERSION:-1.9}
+    restart: always
+    env_file: mailu.env
+    volumes:
+      - ./data/dav:/data
+    networks:
+      - ${NETWORK_NAME}
+
+  redis:
+    image: redis:alpine
+    restart: always
+    volumes:
+      - ./data/redis:/data
+    networks:
+      - ${NETWORK_NAME}
+
+networks:
+  ${NETWORK_NAME}:
+    external: true
 EOF
 
 # Set permissions
 log "INFO: Setting permissions" "${CYAN}Setting permissions...${NC}"
-chmod 600 "${MAILU_DIR}/mailu.env"
-chown -R root:docker "${MAILU_DIR}/data"
-chmod -R 770 "${MAILU_DIR}/data"
+chmod 600 "${MAILU_DIR}/${DOMAIN}/mailu.env"
+chown -R root:docker "${MAILU_DIR}/${DOMAIN}/data"
+chmod -R 770 "${MAILU_DIR}/${DOMAIN}/data"
 
 # Start Mailu
 log "INFO: Starting Mailu" "${CYAN}Starting Mailu...${NC}"
-cd "${MAILU_DIR}" && docker-compose up -d
+cd "${MAILU_DIR}/${DOMAIN}" && docker-compose up -d
 
 if [ $? -ne 0 ]; then
   log "ERROR: Failed to start Mailu" "${RED}Failed to start Mailu. See log for details.${NC}"
@@ -360,7 +514,7 @@ fi
 
 # DNS Records Information
 log "INFO: Generating DNS records information" "${CYAN}Generating DNS records information...${NC}"
-cat > "${MAILU_DIR}/dns_records.txt" <<EOF
+cat > "${MAILU_DIR}/${DOMAIN}/dns_records.txt" <<EOF
 # DNS Records for Mailu (${EMAIL_DOMAIN})
 # Please add these records to your DNS zone
 
@@ -386,14 +540,14 @@ EOF
 
 # Final message
 log "INFO: Mailu installation completed successfully" "${GREEN}${BOLD}✅ Mailu email server installation completed successfully!${NC}"
-echo -e "${CYAN}Mailu admin panel: https://${DOMAIN}/admin${NC}"
-echo -e "${CYAN}Webmail: https://${DOMAIN}/webmail${NC}"
+echo -e "${CYAN}Mailu admin panel: https://${DOMAIN}/admin/${NC}"
+echo -e "${CYAN}Webmail: https://${DOMAIN}/webmail/${NC}"
 echo -e "${YELLOW}Admin login: admin@${EMAIL_DOMAIN}${NC}"
-echo -e "${YELLOW}Initial password: ${INITIAL_ADMIN_PASSWORD}${NC}"
+echo -e "${YELLOW}Initial password: ${ADMIN_PASSWORD}${NC}"
 echo -e "${YELLOW}IMPORTANT: Please change this password immediately!${NC}"
 echo -e ""
 echo -e "${CYAN}Required DNS records have been saved to:${NC}"
-echo -e "${CYAN}${MAILU_DIR}/dns_records.txt${NC}"
+echo -e "${CYAN}${MAILU_DIR}/${DOMAIN}/dns_records.txt${NC}"
 echo -e ""
 echo -e "${YELLOW}⚠️ You must set up these DNS records for the mail server to function properly!${NC}"
 echo -e "${YELLOW}⚠️ DKIM keys will be generated after the first startup and should be added to your DNS records.${NC}"
