@@ -1140,3 +1140,26 @@ ai-dashboard-restart:
 ai-dashboard-test:
 	@echo "Opening AI Dashboard in browser..."
 	@xdg-open https://ai.$(DOMAIN) || open https://ai.$(DOMAIN) || echo "Could not open browser, please visit https://ai.$(DOMAIN) manually"
+
+## Agent Orchestrator Targets
+agent-orchestrator:
+	@echo "Installing Agent Orchestrator..."
+	@./scripts/components/install_agent_orchestrator.sh --client-id=$(CLIENT_ID) --domain=$(DOMAIN) $(AGENT_ORCHESTRATOR_FLAGS)
+
+agent-orchestrator-status:
+	@echo "Checking Agent Orchestrator status..."
+	@docker ps -f "name=agent-orchestrator-$(CLIENT_ID)" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+agent-orchestrator-logs:
+	@echo "Viewing Agent Orchestrator logs..."
+	@docker logs agent-orchestrator-$(CLIENT_ID) -f --tail=100
+
+agent-orchestrator-restart:
+	@echo "Restarting Agent Orchestrator..."
+	@docker restart agent-orchestrator-$(CLIENT_ID)
+
+agent-orchestrator-test:
+	@echo "Testing Agent Orchestrator API..."
+	@curl -s http://localhost:5210/health || echo "Could not connect to Agent Orchestrator. Is it running?"
+	@echo ""
+	@echo "To open in browser, visit: https://agent.$(DOMAIN)"
