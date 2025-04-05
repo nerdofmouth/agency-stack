@@ -339,6 +339,29 @@
         "description": "Encrypted local vaults + remote cloud sync via gocryptfs and rclone"
       }
     },
+    "collaboration": {
+      "etebase": {
+        "component_id": "etebase",
+        "name": "Etebase",
+        "category": "Collaboration",
+        "version": "v0.7.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso_ready": false,
+          "monitoring": true,
+          "backup_ready": true,
+          "traefik": true,
+          "ports_defined": true,
+          "multi_tenant": true
+        },
+        "description": "Encrypted self-hosted CalDAV and CardDAV server for private calendar, contact, and task sync.",
+        "ports": {
+          "http": 8732
+        }
+      }
+    },
     "communication": {
       "mailu": {
         "name": "Mailu",

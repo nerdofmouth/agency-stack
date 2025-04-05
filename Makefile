@@ -922,4 +922,55 @@ droneci-config:
 	@echo "Opening Drone CI configuration..."
 	@$(EDITOR) $(DOCKER_DIR)/droneci/.env
 
+# Collaboration Components
+# ------------------------------------------------------------------------------
+
+# Etebase - Encrypted CalDAV/CardDAV Server
+etebase:
+	@echo "$(MAGENTA)$(BOLD)🗓️ Installing Etebase...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_etebase.sh $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) \
+		$(if $(DOMAIN),--domain $(DOMAIN),) \
+		$(if $(PORT),--port $(PORT),) \
+		$(if $(ADMIN_USER),--admin-user $(ADMIN_USER),) \
+		$(if $(ADMIN_EMAIL),--admin-email $(ADMIN_EMAIL),) \
+		$(if $(ADMIN_PASSWORD),--admin-password $(ADMIN_PASSWORD),) \
+		$(if $(FORCE),--force,) \
+		$(if $(WITH_DEPS),--with-deps,) \
+		$(if $(NO_SSL),--no-ssl,) \
+		$(if $(DISABLE_MONITORING),--disable-monitoring,)
+
+etebase-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Etebase status...$(RESET)"
+	@if [ -f "$(CONFIG_DIR)/monitoring/scripts/check_etebase-$(CLIENT_ID).sh" ]; then \
+		$(CONFIG_DIR)/monitoring/scripts/check_etebase-$(CLIENT_ID).sh $(CLIENT_ID); \
+	else \
+		echo "$(RED)Monitoring script not found. Checking container status...$(RESET)"; \
+		docker ps -a | grep etebase-$(CLIENT_ID) || echo "$(RED)Etebase container not found$(RESET)"; \
+	fi
+
+etebase-logs:
+	@echo "$(MAGENTA)$(BOLD)📋 Viewing Etebase logs...$(RESET)"
+	@docker logs -f etebase-$(CLIENT_ID) 2>&1 | tee $(LOG_DIR)/components/etebase.log
+
+etebase-stop:
+	@echo "$(MAGENTA)$(BOLD)🛑 Stopping Etebase...$(RESET)"
+	@cd $(DOCKER_DIR)/etebase && docker-compose down
+
+etebase-start:
+	@echo "$(MAGENTA)$(BOLD)🚀 Starting Etebase...$(RESET)"
+	@cd $(DOCKER_DIR)/etebase && docker-compose up -d
+
+etebase-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Etebase...$(RESET)"
+	@cd $(DOCKER_DIR)/etebase && docker-compose restart
+
+etebase-backup:
+	@echo "$(MAGENTA)$(BOLD)💾 Backing up Etebase data...$(RESET)"
+	@$(CONFIG_DIR)/clients/$(CLIENT_ID)/etebase/scripts/backup.sh "$(CLIENT_ID)" "$(CONFIG_DIR)/backups/etebase"
+	@echo "$(GREEN)Backup completed to: $(CONFIG_DIR)/backups/etebase$(RESET)"
+
+etebase-config:
+	@echo "$(MAGENTA)$(BOLD)⚙️ Opening Etebase configuration...$(RESET)"
+	@$(EDITOR) $(CONFIG_DIR)/clients/$(CLIENT_ID)/etebase/config/credentials.env
+
 # Database Components
