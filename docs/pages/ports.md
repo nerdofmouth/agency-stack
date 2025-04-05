@@ -72,6 +72,7 @@ This document provides a comprehensive list of all port assignments used by Agen
 | **VoIP** | RTP | 16384-32768 | UDP | Voice/video media |
 | **VoIP** | Web UI | 8082 | HTTP | FusionPBX UI |
 | **VoIP** | Admin UI | 8445 | HTTPS | FusionPBX Admin |
+| **Listmonk** | Web UI | 9000 | HTTP | Newsletter & list management |
 
 ## Monitoring & Observability
 

@@ -616,6 +616,41 @@ install-mailu: validate
 	@echo "Installing Mailu email server..."
 	@sudo $(SCRIPTS_DIR)/components/install_mailu.sh --domain mail.$(DOMAIN) --email-domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
+# Listmonk - Newsletter & Mailing Lists
+listmonk:
+	@echo "Installing Listmonk..."
+	@sudo $(SCRIPTS_DIR)/components/install_listmonk.sh --domain $(LISTMONK_DOMAIN) $(INSTALL_FLAGS)
+
+listmonk-status:
+	@docker ps -a | grep listmonk || echo "Listmonk is not running"
+
+listmonk-logs:
+	@docker logs -f listmonk-$(CLIENT_ID) 2>&1 | tee $(LOG_DIR)/components/listmonk.log
+
+listmonk-stop:
+	@docker-compose -f $(DOCKER_DIR)/listmonk/docker-compose.yml down
+
+listmonk-start:
+	@docker-compose -f $(DOCKER_DIR)/listmonk/docker-compose.yml up -d
+
+listmonk-restart:
+	@docker-compose -f $(DOCKER_DIR)/listmonk/docker-compose.yml restart
+
+listmonk-backup:
+	@echo "Backing up Listmonk data..."
+	@mkdir -p $(BACKUP_DIR)/listmonk
+	@docker exec listmonk-postgres-$(CLIENT_ID) pg_dump -U listmonk listmonk > $(BACKUP_DIR)/listmonk/listmonk_db_$(shell date +%Y%m%d).sql
+	@tar -czf $(BACKUP_DIR)/listmonk/listmonk_uploads_$(shell date +%Y%m%d).tar.gz -C $(CONFIG_DIR)/clients/$(CLIENT_ID)/listmonk_data/uploads .
+	@echo "Backup completed: $(BACKUP_DIR)/listmonk/"
+
+listmonk-restore:
+	@echo "Restoring Listmonk from backup is a manual process."
+	@echo "Please refer to the documentation for detailed instructions."
+
+listmonk-config:
+	@echo "Opening Listmonk configuration..."
+	@$(EDITOR) $(CONFIG_DIR)/clients/$(CLIENT_ID)/listmonk_data/config/config.toml
+
 # Grafana
 install-grafana: validate
 	@echo "Installing Grafana monitoring..."

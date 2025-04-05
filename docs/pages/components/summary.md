@@ -40,6 +40,7 @@ Each component is evaluated against the following integration criteria:
 
 | Component | Version | Installed | Hardened | Makefile | SSO | Dashboard | Logs | Docs | Auditable | Traefik TLS | Multi-tenant |
 |-----------|---------|:---------:|:--------:|:--------:|:---:|:---------:|:----:|:----:|:---------:|:-----------:|:------------:|
+| **Listmonk** | v2.5.1 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Mailu** | 2.0.0 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Mattermost** | 7.10.0 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **VoIP** | 1.0.0 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -88,10 +89,10 @@ Each component is evaluated against the following integration criteria:
 
 ### Overall Status
 
-- **Total Components**: 22
-- **Fully Integrated Components**: 15 (68%)
-- **Partially Integrated Components**: 7 (31%)
-- **Components Needing Attention**: 2 (9%)
+- **Total Components**: 23
+- **Fully Integrated Components**: 15 (65%)
+- **Partially Integrated Components**: 8 (34%)
+- **Components Needing Attention**: 2 (8%)
 
 ### Integration Areas Needing Attention
 

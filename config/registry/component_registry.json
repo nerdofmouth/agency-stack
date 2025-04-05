@@ -315,7 +315,13 @@
           "traefik_tls": true,
           "multi_tenant": true
         },
-        "description": "Self-hosted email solution"
+        "description": "Self-hosted email solution",
+        "ports": {
+          "smtp": 25,
+          "imap": 143,
+          "imaps": 993,
+          "web": 8020
+        }
       },
       "mattermost": {
         "name": "Mattermost",
@@ -333,7 +339,31 @@
           "traefik_tls": true,
           "multi_tenant": true
         },
-        "description": "Team messaging platform"
+        "description": "Team messaging platform",
+        "ports": {
+          "web": 8065
+        }
+      },
+      "listmonk": {
+        "name": "Listmonk",
+        "category": "Email & Communication",
+        "version": "v2.5.1",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Self-hosted newsletter and mailing list manager",
+        "ports": {
+          "web": 9000
+        }
       },
       "voip": {
         "name": "VoIP",
