@@ -29,8 +29,10 @@ AgencyStack consists of a carefully curated selection of open-source application
 
 | Component | Description | Default URL |
 |-----------|-------------|-------------|
-| **WordPress** | Content management system | https://cms.yourdomain.com |
-| **PeerTube** | Video hosting platform | https://video.yourdomain.com |
+| **WordPress** | Content management system | https://blog.yourdomain.com |
+| **Ghost** | Modern publishing platform | https://news.yourdomain.com |
+| **Focalboard** | Project management board | https://board.yourdomain.com |
+| **PeerTube** | Self-hosted video streaming platform | https://peertube.yourdomain.com |
 | **Seafile** | File sync and share solution | https://files.yourdomain.com |
 | **Builder.io** | Visual content management | https://builder.yourdomain.com |
 
