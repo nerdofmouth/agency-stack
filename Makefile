@@ -974,3 +974,83 @@ etebase-config:
 	@$(EDITOR) $(CONFIG_DIR)/clients/$(CLIENT_ID)/etebase/config/credentials.env
 
 # Database Components
+
+# AI Foundation
+.PHONY: ollama ollama-status ollama-logs ollama-stop ollama-start ollama-restart ollama-pull ollama-list ollama-test
+
+ollama:
+	@echo "Installing Ollama..."
+	@mkdir -p /var/log/agency_stack/components/
+	@bash scripts/components/install_ollama.sh $(ARGS)
+
+ollama-status:
+	@echo "Checking Ollama status..."
+	@if [ -f "/opt/agency_stack/monitoring/scripts/check_ollama-$(CLIENT_ID).sh" ]; then \
+		/opt/agency_stack/monitoring/scripts/check_ollama-$(CLIENT_ID).sh $(CLIENT_ID); \
+	else \
+		echo "Ollama monitoring script not found. Please install Ollama first."; \
+		exit 1; \
+	fi
+
+ollama-logs:
+	@echo "Displaying Ollama logs..."
+	@if [ -d "/opt/agency_stack/docker/ollama" ]; then \
+		cd /opt/agency_stack/docker/ollama && docker-compose logs --tail=100 -f; \
+	else \
+		echo "Ollama installation not found. Please install Ollama first."; \
+		exit 1; \
+	fi
+
+ollama-stop:
+	@echo "Stopping Ollama..."
+	@if [ -d "/opt/agency_stack/docker/ollama" ]; then \
+		cd /opt/agency_stack/docker/ollama && docker-compose stop; \
+	else \
+		echo "Ollama installation not found. Please install Ollama first."; \
+		exit 1; \
+	fi
+
+ollama-start:
+	@echo "Starting Ollama..."
+	@if [ -d "/opt/agency_stack/docker/ollama" ]; then \
+		cd /opt/agency_stack/docker/ollama && docker-compose start; \
+	else \
+		echo "Ollama installation not found. Please install Ollama first."; \
+		exit 1; \
+	fi
+
+ollama-restart:
+	@echo "Restarting Ollama..."
+	@if [ -d "/opt/agency_stack/docker/ollama" ]; then \
+		cd /opt/agency_stack/docker/ollama && docker-compose restart; \
+	else \
+		echo "Ollama installation not found. Please install Ollama first."; \
+		exit 1; \
+	fi
+
+ollama-pull:
+	@echo "Pulling Ollama models..."
+	@if command -v ollama-pull-models-$(CLIENT_ID) > /dev/null 2>&1; then \
+		ollama-pull-models-$(CLIENT_ID); \
+	else \
+		echo "Ollama helper scripts not found. Please install Ollama first."; \
+		exit 1; \
+	fi
+
+ollama-list:
+	@echo "Listing Ollama models..."
+	@if command -v ollama-list-models-$(CLIENT_ID) > /dev/null 2>&1; then \
+		ollama-list-models-$(CLIENT_ID); \
+	else \
+		echo "Ollama helper scripts not found. Please install Ollama first."; \
+		exit 1; \
+	fi
+
+ollama-test:
+	@echo "Testing Ollama API..."
+	@if command -v ollama-test-api-$(CLIENT_ID) > /dev/null 2>&1; then \
+		ollama-test-api-$(CLIENT_ID) $(MODEL) "$(PROMPT)"; \
+	else \
+		echo "Ollama helper scripts not found. Please install Ollama first."; \
+		exit 1; \
+	fi

@@ -564,6 +564,32 @@
           "runner": 3003
         }
       }
+    },
+    "ai": {
+      "ollama": {
+        "name": "Ollama",
+        "component_id": "ollama",
+        "category": "AI",
+        "version": "0.1.27",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso_ready": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik": false,
+          "multi_tenant": true,
+          "monitoring": true
+        },
+        "description": "Local LLM inference server with multi-model support",
+        "ports": {
+          "api": 11434,
+          "metrics": 11435
+        }
+      }
     }
   }
 }
