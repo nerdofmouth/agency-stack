@@ -1054,3 +1054,68 @@ ollama-test:
 		echo "Ollama helper scripts not found. Please install Ollama first."; \
 		exit 1; \
 	fi
+
+# LangChain
+.PHONY: langchain langchain-status langchain-logs langchain-stop langchain-start langchain-restart langchain-test
+
+langchain:
+	@echo "Installing LangChain..."
+	@mkdir -p /var/log/agency_stack/components/
+	@bash scripts/components/install_langchain.sh $(ARGS)
+
+langchain-status:
+	@echo "Checking LangChain status..."
+	@if [ -f "/opt/agency_stack/monitoring/scripts/check_langchain-$(CLIENT_ID).sh" ]; then \
+		/opt/agency_stack/monitoring/scripts/check_langchain-$(CLIENT_ID).sh $(CLIENT_ID); \
+	else \
+		echo "LangChain monitoring script not found. Please install LangChain first."; \
+		exit 1; \
+	fi
+
+langchain-logs:
+	@echo "Displaying LangChain logs..."
+	@if [ -d "/opt/agency_stack/docker/langchain" ]; then \
+		cd /opt/agency_stack/docker/langchain && docker-compose logs --tail=100 -f; \
+	else \
+		echo "LangChain installation not found. Please install LangChain first."; \
+		exit 1; \
+	fi
+
+langchain-stop:
+	@echo "Stopping LangChain..."
+	@if [ -d "/opt/agency_stack/docker/langchain" ]; then \
+		cd /opt/agency_stack/docker/langchain && docker-compose stop; \
+	else \
+		echo "LangChain installation not found. Please install LangChain first."; \
+		exit 1; \
+	fi
+
+langchain-start:
+	@echo "Starting LangChain..."
+	@if [ -d "/opt/agency_stack/docker/langchain" ]; then \
+		cd /opt/agency_stack/docker/langchain && docker-compose start; \
+	else \
+		echo "LangChain installation not found. Please install LangChain first."; \
+		exit 1; \
+	fi
+
+langchain-restart:
+	@echo "Restarting LangChain..."
+	@if [ -d "/opt/agency_stack/docker/langchain" ]; then \
+		cd /opt/agency_stack/docker/langchain && docker-compose restart; \
+	else \
+		echo "LangChain installation not found. Please install LangChain first."; \
+		exit 1; \
+	fi
+
+langchain-test:
+	@echo "Testing LangChain API..."
+	@if [ -d "/opt/agency_stack/docker/langchain" ]; then \
+		PORT=$$(grep PORT /opt/agency_stack/docker/langchain/.env | cut -d= -f2); \
+		curl -X POST "http://localhost:$${PORT}/prompt" \
+			-H "Content-Type: application/json" \
+			-d '{"template":"Tell me about {topic} in one sentence.","inputs":{"topic":"LangChain"}}'; \
+	else \
+		echo "LangChain installation not found. Please install LangChain first."; \
+		exit 1; \
+	fi
