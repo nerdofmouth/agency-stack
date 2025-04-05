@@ -379,7 +379,7 @@ setup-cronjobs:
 
 # Send test alert
 test-alert:
-	@echo "🔔 Sending test alert..."
+	@echo "Testing alert channels..."
 	@sudo bash $(SCRIPTS_DIR)/notifications/notify_all.sh "Test Alert" "This is a test alert from AgencyStack on $(hostname) at $(date)"
 
 # View alerts
@@ -1119,3 +1119,24 @@ langchain-test:
 		echo "LangChain installation not found. Please install LangChain first."; \
 		exit 1; \
 	fi
+
+## AI Dashboard Targets
+ai-dashboard:
+	@echo "Installing AI Dashboard..."
+	@./scripts/components/install_ai_dashboard.sh --client-id=$(CLIENT_ID) --domain=$(DOMAIN) $(AI_DASHBOARD_FLAGS)
+
+ai-dashboard-status:
+	@echo "Checking AI Dashboard status..."
+	@docker ps -f "name=ai-dashboard-$(CLIENT_ID)" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+ai-dashboard-logs:
+	@echo "Viewing AI Dashboard logs..."
+	@docker logs ai-dashboard-$(CLIENT_ID) -f --tail=100
+
+ai-dashboard-restart:
+	@echo "Restarting AI Dashboard..."
+	@docker restart ai-dashboard-$(CLIENT_ID)
+
+ai-dashboard-test:
+	@echo "Opening AI Dashboard in browser..."
+	@xdg-open https://ai.$(DOMAIN) || open https://ai.$(DOMAIN) || echo "Could not open browser, please visit https://ai.$(DOMAIN) manually"
