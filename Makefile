@@ -473,23 +473,51 @@ multi-tenancy-status:
 
 audit:
 	@echo "$(MAGENTA)$(BOLD)📊 Running AgencyStack Repository Audit...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/utils/audit_and_cleanup.sh
+	@sudo $(CURDIR)/scripts/utils/audit_and_cleanup.sh
+
+quick-audit:
+	@echo "$(MAGENTA)$(BOLD)🔍 Running Quick AgencyStack Repository Audit...$(RESET)"
+	@sudo $(CURDIR)/scripts/utils/audit_and_cleanup.sh --quick
+
+reliable-audit:
+	@echo "$(MAGENTA)$(BOLD)🔍 Running Reliable AgencyStack Repository Audit...$(RESET)"
+	@sudo $(CURDIR)/scripts/utils/quick_audit.sh
+	@echo "$(GREEN)To view detailed report, check: /var/log/agency_stack/audit/quick_audit_$$(date +%Y%m%d).txt$(RESET)"
+
+script-usage:
+	@echo "$(MAGENTA)$(BOLD)📜 Analyzing Script Usage Patterns...$(RESET)"
+	@sudo $(CURDIR)/scripts/utils/reliable_track_usage.sh
+	@echo "$(GREEN)To view detailed report, check: /var/log/agency_stack/audit/usage_summary.txt$(RESET)"
+
+script-usage-verbose:
+	@echo "$(MAGENTA)$(BOLD)📜 Analyzing Script Usage Patterns (Verbose Mode)...$(RESET)"
+	@sudo $(CURDIR)/scripts/utils/track_usage.sh --verbose
+	@echo "$(GREEN)To view detailed report, check: /var/log/agency_stack/audit/usage_summary.txt$(RESET)"
+
+audit-docs:
+	@echo "$(MAGENTA)$(BOLD)📚 Running Documentation Audit...$(RESET)"
+	@sudo $(CURDIR)/scripts/utils/quick_audit.sh --include-docs
 
 audit-report:
 	@echo "$(MAGENTA)$(BOLD)📋 Displaying AgencyStack Audit Report...$(RESET)"
 	@if [ -f /var/log/agency_stack/audit/summary_$$(date +%Y%m%d).txt ]; then \
 		cat /var/log/agency_stack/audit/summary_$$(date +%Y%m%d).txt; \
+	elif [ -f /var/log/agency_stack/audit/usage_summary.txt ]; then \
+		cat /var/log/agency_stack/audit/usage_summary.txt; \
+	elif [ -f /var/log/agency_stack/audit/quick_audit_$$(date +%Y%m%d).txt ]; then \
+		cat /var/log/agency_stack/audit/quick_audit_$$(date +%Y%m%d).txt; \
 	elif [ -f /var/log/agency_stack/audit/audit_report.log ]; then \
 		cat /var/log/agency_stack/audit/audit_report.log; \
 	else \
 		echo "$(RED)No audit report found. Run 'make audit' first.$(RESET)"; \
+		echo "$(YELLOW)Try running the script usage analysis with 'make script-usage'$(RESET)"; \
 	fi
 
 cleanup:
 	@echo "$(MAGENTA)$(BOLD)🧹 Running AgencyStack Repository Cleanup...$(RESET)"
 	@read -p "$(YELLOW)This will clean up unused scripts and resources. Are you sure? (y/N):$(RESET) " confirm; \
 	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
-		sudo $(SCRIPTS_DIR)/utils/audit_and_cleanup.sh --clean; \
+		sudo $(CURDIR)/scripts/utils/audit_and_cleanup.sh --clean; \
 	else \
 		echo "$(YELLOW)Cleanup aborted.$(RESET)"; \
 	fi

@@ -47,6 +47,7 @@ CLEANUP_ITEMS=()
 EMAIL_REPORT=false
 EMAIL_TO=""
 AUDIT_DIRS=()
+QUICK_ANALYSIS=false
 
 # Usage Information
 show_help() {
@@ -72,6 +73,7 @@ show_help() {
   echo -e "  ${BOLD}--quiet${NC}                      Minimal output, useful for cron jobs"
   echo -e "  ${BOLD}--email-report${NC} <address>     Email address to send report to"
   echo -e "  ${BOLD}--verbose${NC}                    Show detailed output"
+  echo -e "  ${BOLD}--quick${NC}                      Perform quick analysis (skip documentation analysis)"
   echo -e "  ${BOLD}--help${NC}                       Show this help message and exit"
   echo -e ""
   echo -e "${CYAN}Examples:${NC}"
@@ -144,6 +146,14 @@ run_script_tracking() {
     track_args+=(--include-dir "$dir")
   done
   
+  # Limit scope for faster analysis in first run
+  track_args+=(--max-depth 3)
+  
+  # Skip documentation analysis for faster processing
+  if [ "$QUICK_ANALYSIS" = true ]; then
+    track_args+=(--skip-docs)
+  fi
+  
   # Add verbose flag if needed
   if [ "$VERBOSE" = true ]; then
     track_args+=(--verbose)
@@ -151,7 +161,23 @@ run_script_tracking() {
   
   # Run the track_usage.sh script
   log "INFO" "Executing: $track_script ${track_args[*]}" "${CLEANUP_LOG}"
-  "$track_script" "${track_args[@]}" | tee -a "${CLEANUP_LOG}"
+  echo -e "${CYAN}Running script usage analysis. This may take a few moments...${NC}"
+  
+  if [ -f "/var/log/agency_stack/audit/unused_scripts.log" ]; then
+    # Backup previous logs
+    mv "/var/log/agency_stack/audit/unused_scripts.log" "/var/log/agency_stack/audit/unused_scripts.log.bak"
+  fi
+  
+  # Execute track_usage.sh with timeout to prevent hanging
+  timeout 300 "$track_script" "${track_args[@]}" 2>&1 | tee -a "${CLEANUP_LOG}"
+  
+  # Check if the script completed successfully
+  if [ ${PIPESTATUS[0]} -eq 124 ]; then
+    log "WARNING" "Script usage tracking timed out after 5 minutes. Results may be incomplete." "${CLEANUP_LOG}"
+    echo -e "${YELLOW}Script usage tracking timed out after 5 minutes. Results may be incomplete.${NC}"
+  else
+    log "SUCCESS" "Script usage tracking completed." "${CLEANUP_LOG}"
+  fi
   
   # Check if unused scripts were found
   if [ -f "${AUDIT_LOG_DIR}/unused_scripts.log" ]; then
@@ -161,11 +187,22 @@ run_script_tracking() {
     # Add unused scripts to cleanup items if older than threshold
     if [ "$unused_count" -gt 0 ]; then
       log "INFO" "Checking age of unused scripts..." "${CLEANUP_LOG}"
+      echo -e "${CYAN}Analyzing $unused_count potentially unused scripts...${NC}"
       
       # Extract script paths from unused_scripts.log
       grep "Script not referenced:" "${AUDIT_LOG_DIR}/unused_scripts.log" | sed 's/\[WARNING\] Script not referenced: //' > "${TEMP_DIR}/unused_scripts_paths.txt"
       
+      local script_current=0
+      local script_total=$(wc -l < "${TEMP_DIR}/unused_scripts_paths.txt")
+      
       while read -r script_path; do
+        ((script_current++))
+        
+        # Show progress
+        if [ $((script_current % 5)) -eq 0 ] || [ "$script_current" -eq "$script_total" ]; then
+          echo -ne "Analyzing script age: $script_current of $script_total ($(( script_current * 100 / script_total ))%)\r"
+        fi
+        
         local full_path="${ROOT_DIR}/${script_path}"
         
         # Skip if file doesn't exist
@@ -181,31 +218,50 @@ run_script_tracking() {
           CLEANUP_ITEMS+=("$full_path")
         fi
       done < "${TEMP_DIR}/unused_scripts_paths.txt"
+      
+      echo "" # Clear progress line
     fi
   else
     log "WARNING" "No unused scripts log found at ${AUDIT_LOG_DIR}/unused_scripts.log" "${CLEANUP_LOG}"
   fi
-  
-  log "SUCCESS" "Script usage tracking completed" "${CLEANUP_LOG}"
 }
 
 # Scan for old log files
 scan_old_logs() {
   log "INFO" "Scanning for old log files..." "${CLEANUP_LOG}"
+  echo -e "${CYAN}Scanning for old log files...${NC}"
   
   # Get current date in seconds since epoch
   local now=$(date +%s)
+  local log_count=0
+  
+  # Ensure log directory exists
+  if [ ! -d "${LOG_DIR}" ]; then
+    log "WARNING" "Log directory not found: ${LOG_DIR}" "${CLEANUP_LOG}"
+    return
+  fi
   
   # Find log files older than MAX_LOGS_DAYS
   find "${LOG_DIR}" -type f -name "*.log" | while read -r log_file; do
     local file_mtime=$(stat -c %Y "$log_file")
     local file_age_days=$(( (now - file_mtime) / 86400 ))
     
+    ((log_count++))
+    
+    # Show progress for every 10 logs
+    if [ $((log_count % 10)) -eq 0 ]; then
+      echo -ne "Scanned $log_count log files...\r"
+    fi
+    
     if [ "$file_age_days" -gt "$MAX_LOGS_DAYS" ]; then
       log "INFO" "Old log file: $log_file (age: $file_age_days days)" "${CLEANUP_LOG}"
       CLEANUP_ITEMS+=("$log_file")
     fi
   done
+  
+  echo "" # Clear progress line
+  log "INFO" "Scanned $log_count log files" "${CLEANUP_LOG}"
+  echo -e "${CYAN}Scanned $log_count log files${NC}"
 }
 
 # Scan for unused ports
@@ -277,10 +333,23 @@ perform_cleanup() {
   
   if [ ${#CLEANUP_ITEMS[@]} -eq 0 ]; then
     log "SUCCESS" "No items to clean up" "${CLEANUP_LOG}"
+    echo -e "${GREEN}No items to clean up${NC}"
     return 0
   fi
   
   log "INFO" "Preparing to clean up ${#CLEANUP_ITEMS[@]} items..." "${CLEANUP_LOG}"
+  echo -e "${CYAN}Preparing to clean up ${#CLEANUP_ITEMS[@]} items...${NC}"
+  
+  # Print list of items to be cleaned up
+  echo -e "${YELLOW}The following items will be cleaned up:${NC}"
+  for ((i=0; i<${#CLEANUP_ITEMS[@]} && i<10; i++)); do
+    echo -e "  ${YELLOW}- ${CLEANUP_ITEMS[$i]}${NC}"
+  done
+  
+  # Show count if more than 10 items
+  if [ ${#CLEANUP_ITEMS[@]} -gt 10 ]; then
+    echo -e "  ${YELLOW}... and $((${#CLEANUP_ITEMS[@]} - 10)) more items${NC}"
+  fi
   
   # If not in dry-run mode, confirm before proceeding
   if [ "$DRY_RUN" = false ] && [ "$FORCE" = false ] && [ "$SKIP_CONFIRM" = false ]; then
@@ -291,12 +360,27 @@ perform_cleanup() {
     
     if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
       log "INFO" "Cleanup aborted by user" "${CLEANUP_LOG}"
+      echo -e "${YELLOW}Cleanup aborted.${NC}"
       return 0
     fi
   fi
   
-  # Process each cleanup item
+  # Create backup directory
+  local backup_dir="${AUDIT_LOG_DIR}/backups/$(date +%Y%m%d)"
+  mkdir -p "$backup_dir"
+  
+  # Process each cleanup item with progress indicator
+  local item_current=0
+  local item_total=${#CLEANUP_ITEMS[@]}
+  
   for item in "${CLEANUP_ITEMS[@]}"; do
+    ((item_current++))
+    
+    # Show progress
+    if [ $((item_current % 5)) -eq 0 ] || [ "$item_current" -eq "$item_total" ]; then
+      echo -ne "Processing: $item_current of $item_total ($(( item_current * 100 / item_total ))%)\r"
+    fi
+    
     # Skip excluded components
     local basename=$(basename "$item")
     local skip=false
@@ -315,11 +399,13 @@ perform_cleanup() {
     
     # Create backup if not in dry-run mode
     if [ "$DRY_RUN" = false ]; then
-      local backup_dir="${AUDIT_LOG_DIR}/backups/$(date +%Y%m%d)"
-      mkdir -p "$backup_dir"
-      
       log "ACTION" "Creating backup of $item" "${CLEANUP_LOG}"
-      cp -a "$item" "${backup_dir}/"
+      
+      # Ensure backup directory structure exists
+      mkdir -p "$backup_dir/$(dirname "$item" | sed "s|$ROOT_DIR||")"
+      
+      # Create backup with full path structure
+      cp -a "$item" "$backup_dir/$(dirname "$item" | sed "s|$ROOT_DIR||")/"
       
       # Perform the cleanup
       log "ACTION" "Removing: $item" "${CLEANUP_LOG}"
@@ -329,126 +415,210 @@ perform_cleanup() {
     fi
   done
   
+  echo "" # Clear progress line
+  
   if [ "$DRY_RUN" = true ]; then
     log "SUCCESS" "Dry run completed. Use --clean to perform actual cleanup" "${CLEANUP_LOG}"
+    echo -e "${GREEN}Dry run completed. No files were modified.${NC}"
+    echo -e "${GREEN}Use --clean to perform actual cleanup.${NC}"
   else
     log "SUCCESS" "Cleanup completed. Removed ${#CLEANUP_ITEMS[@]} items" "${CLEANUP_LOG}"
+    echo -e "${GREEN}Cleanup completed. Removed ${#CLEANUP_ITEMS[@]} items.${NC}"
+    echo -e "${GREEN}Backups saved to: $backup_dir${NC}"
   fi
 }
 
-# Generate summary report
+# Generate comprehensive audit report
 generate_report() {
   if [ "$SKIP_REPORT" = true ]; then
-    log "INFO" "Skipping report generation" "${CLEANUP_LOG}"
+    log "INFO" "Skipping report generation phase" "${CLEANUP_LOG}"
     return 0
   fi
   
-  log "INFO" "Generating summary report..." "${CLEANUP_LOG}"
+  log "INFO" "Generating audit report..." "${CLEANUP_LOG}"
+  echo -e "${CYAN}Generating comprehensive audit report...${NC}"
   
   local report_file="${AUDIT_LOG_DIR}/summary_$(date +%Y%m%d).txt"
-  : > "$report_file"
+  local current_date=$(date "+%Y-%m-%d %H:%M:%S")
   
-  # Report header
-  cat << EOF > "$report_file"
-=============================================
-AgencyStack Repository Audit Summary Report
-=============================================
-Generated: $(date)
-Mode: $([ "$DRY_RUN" = true ] && echo "DRY-RUN" || echo "ACTUAL CLEANUP")
+  # Create report header
+  cat > "$report_file" << EOF
+=========================================================================
+                  AGENCYSTACK REPOSITORY AUDIT REPORT
+                          Generated: $current_date
+=========================================================================
 
-SUMMARY
--------
 EOF
-  
-  # Add script usage statistics
-  if [ -f "${TEMP_DIR}/script_count.txt" ] && [ -f "${TEMP_DIR}/unused_count.txt" ]; then
-    local script_count=$(cat "${TEMP_DIR}/script_count.txt")
-    local unused_count=$(cat "${TEMP_DIR}/unused_count.txt")
-    local used_percent=$((100 - (unused_count * 100 / script_count)))
-    
-    cat << EOF >> "$report_file"
-Scripts:
-  - Total scripts: $script_count
-  - Used scripts: $((script_count - unused_count)) ($used_percent%)
-  - Unused scripts: $unused_count ($((100 - used_percent))%)
-EOF
-  fi
-  
-  # Add cleanup statistics
-  cat << EOF >> "$report_file"
 
-Cleanup:
-  - Total items flagged: ${#CLEANUP_ITEMS[@]}
-  - Items cleaned: $([ "$DRY_RUN" = true ] && echo "0 (dry run)" || echo "${#CLEANUP_ITEMS[@]}")
-EOF
-  
-  # Add detailed lists
-  cat << EOF >> "$report_file"
+  # System information
+  cat >> "$report_file" << EOF
+SYSTEM INFORMATION:
+------------------
+Hostname: $(hostname)
+OS: $(grep PRETTY_NAME /etc/os-release | cut -d'"' -f2)
+Kernel: $(uname -r)
+Repository Root: ${ROOT_DIR}
 
-DETAILED FINDINGS
-----------------
 EOF
-  
-  # Add unused scripts
+
+  # Audit summary
+  cat >> "$report_file" << EOF
+AUDIT SUMMARY:
+-------------
+Mode: $([ "$DRY_RUN" = true ] && echo "Dry Run (no files modified)" || echo "Cleanup Mode (files may have been modified)")
+Git-aware: $([ "$GIT_AWARE" = true ] && echo "Yes" || echo "No")
+Quick analysis: $([ "$QUICK_ANALYSIS" = true ] && echo "Yes" || echo "No")
+
+EOF
+
+  # Unused scripts summary
   if [ -f "${AUDIT_LOG_DIR}/unused_scripts.log" ]; then
-    cat << EOF >> "$report_file"
-Unused Scripts:
-$(grep "Script not referenced" "${AUDIT_LOG_DIR}/unused_scripts.log" | sed 's/\[WARNING\] //')
+    local unused_count=$(grep -c "Script not referenced" "${AUDIT_LOG_DIR}/unused_scripts.log" || echo "0")
+    local cleanup_count=${#CLEANUP_ITEMS[@]}
+    
+    cat >> "$report_file" << EOF
+UNUSED SCRIPTS SUMMARY:
+----------------------
+Total scripts scanned: $(grep "Scanning script: " "${CLEANUP_LOG}" | wc -l || echo "Unknown")
+Unused scripts detected: $unused_count
+Scripts eligible for cleanup: $cleanup_count
+
+EOF
+
+    # List top 10 unused scripts
+    if [ "$unused_count" -gt 0 ]; then
+      echo "TOP UNUSED SCRIPTS (by age):" >> "$report_file"
+      echo "--------------------------" >> "$report_file"
+      
+      # Extract script paths from unused_scripts.log and get their age
+      grep "Script not referenced:" "${AUDIT_LOG_DIR}/unused_scripts.log" | 
+      sed 's/\[WARNING\] Script not referenced: //' | 
+      while read -r script_path; do
+        local full_path="${ROOT_DIR}/${script_path}"
+        
+        if [ -f "$full_path" ]; then
+          local file_age_days=$((($(date +%s) - $(stat -c %Y "$full_path")) / 86400))
+          echo "$script_path|$file_age_days"
+        fi
+      done | 
+      sort -t'|' -k2,2nr | 
+      head -10 | 
+      while IFS="|" read -r path age; do
+        local git_info=""
+        if [ "$GIT_AWARE" = true ] && [ -d "${ROOT_DIR}/.git" ]; then
+          git_info=$(cd "${ROOT_DIR}" && git log -1 --format="Last commit: %cr by %an" -- "$path" 2>/dev/null || echo "Not in git")
+        fi
+        echo "- $path (Age: $age days) - $git_info" >> "$report_file"
+      done
+      
+      echo "" >> "$report_file"
+    fi
+  else
+    cat >> "$report_file" << EOF
+UNUSED SCRIPTS SUMMARY:
+----------------------
+No unused scripts log found. Script usage tracking may not have completed successfully.
 
 EOF
   fi
-  
-  # Add documentation inconsistencies
-  if [ -f "${AUDIT_LOG_DIR}/inconsistent_docs.log" ]; then
-    cat << EOF >> "$report_file"
-Documentation Inconsistencies:
-$(grep -v "^#" "${AUDIT_LOG_DIR}/inconsistent_docs.log" | sed 's/\[WARNING\] //')
+
+  # Documentation consistency
+  if [ -f "${AUDIT_LOG_DIR}/doc_inconsistencies.log" ]; then
+    local inconsistency_count=$(grep -c "\[WARNING\]" "${AUDIT_LOG_DIR}/doc_inconsistencies.log" || echo "0")
+    
+    cat >> "$report_file" << EOF
+DOCUMENTATION CONSISTENCY:
+-------------------------
+Documentation inconsistencies detected: $inconsistency_count
+
+EOF
+
+    if [ "$inconsistency_count" -gt 0 ]; then
+      echo "TOP DOCUMENTATION INCONSISTENCIES:" >> "$report_file"
+      echo "--------------------------------" >> "$report_file"
+      grep "\[WARNING\]" "${AUDIT_LOG_DIR}/doc_inconsistencies.log" | head -10 | 
+      sed 's/\[WARNING\] /- /' >> "$report_file"
+      
+      if [ "$inconsistency_count" -gt 10 ]; then
+        echo "... and $(($inconsistency_count - 10)) more inconsistencies" >> "$report_file"
+      fi
+      
+      echo "" >> "$report_file"
+    fi
+  else
+    cat >> "$report_file" << EOF
+DOCUMENTATION CONSISTENCY:
+-------------------------
+No documentation consistency log found. Documentation analysis may have been skipped.
 
 EOF
   fi
-  
-  # Add cleanup items
-  cat << EOF >> "$report_file"
-Items $([ "$DRY_RUN" = true ] && echo "flagged for cleanup" || echo "cleaned up"):
+
+  # Log files summary
+  cat >> "$report_file" << EOF
+LOG FILES SUMMARY:
+----------------
+Old log files detected: $(grep -c "Old log file:" "${CLEANUP_LOG}" || echo "0")
+Max log age threshold: ${MAX_LOGS_DAYS} days
+
 EOF
+
+  # Cleanup summary
+  cat >> "$report_file" << EOF
+CLEANUP SUMMARY:
+--------------
+Total items flagged for cleanup: ${#CLEANUP_ITEMS[@]}
+$([ "$DRY_RUN" = true ] && echo "No items were actually removed (dry run mode)" || echo "Items removed: ${#CLEANUP_ITEMS[@]}")
+$([ "$DRY_RUN" = false ] && echo "Backup location: ${AUDIT_LOG_DIR}/backups/$(date +%Y%m%d)" || echo "")
+
+EOF
+
+  # Recommendations
+  cat >> "$report_file" << EOF
+RECOMMENDATIONS:
+--------------
+1. Review the unused scripts list for any false positives
+2. Run a full audit periodically (at least quarterly)
+3. Document any scripts that should be excluded from cleanup
+4. For production systems, always run with --dry-run first
+
+EOF
+
+  # Footer
+  cat >> "$report_file" << EOF
+=========================================================================
+             Report generated by AgencyStack Audit System
+                https://stack.nerdofmouth.com
+=========================================================================
+EOF
+
+  # Create a symlink to the latest report
+  ln -sf "$report_file" "${AUDIT_LOG_DIR}/audit_report.log"
   
-  for item in "${CLEANUP_ITEMS[@]}"; do
-    echo "  - $item" >> "$report_file"
-  done
+  log "SUCCESS" "Audit report generated: $report_file" "${CLEANUP_LOG}"
+  echo -e "${GREEN}Audit report generated: $report_file${NC}"
   
-  log "SUCCESS" "Summary report generated: $report_file" "${CLEANUP_LOG}"
+  # Display report summary if not in quiet mode
+  if [ "$QUIET" = false ]; then
+    echo -e "${CYAN}${BOLD}Audit Report Summary:${NC}"
+    echo -e "${CYAN}------------------------------------------${NC}"
+    grep -A 3 "UNUSED SCRIPTS SUMMARY:" "$report_file"
+    grep -A 2 "DOCUMENTATION CONSISTENCY:" "$report_file"
+    grep -A 2 "CLEANUP SUMMARY:" "$report_file"
+    echo -e "${CYAN}------------------------------------------${NC}"
+    echo -e "${GREEN}To view the full report, run: make audit-report${NC}"
+  fi
   
   # Email report if requested
   if [ "$EMAIL_REPORT" = true ] && [ -n "$EMAIL_TO" ]; then
-    if command -v mail &> /dev/null; then
-      log "INFO" "Emailing report to $EMAIL_TO" "${CLEANUP_LOG}"
-      mail -s "AgencyStack Repository Audit Report - $(date +%Y-%m-%d)" "$EMAIL_TO" < "$report_file"
+    log "INFO" "Emailing audit report to $EMAIL_TO" "${CLEANUP_LOG}"
+    
+    if command -v mail >/dev/null 2>&1; then
+      mail -s "AgencyStack Audit Report: $(date +%Y-%m-%d)" "$EMAIL_TO" < "$report_file"
+      log "SUCCESS" "Audit report emailed to $EMAIL_TO" "${CLEANUP_LOG}"
     else
-      log "WARNING" "mail command not found, cannot send email report" "${CLEANUP_LOG}"
+      log "ERROR" "mail command not found. Email report not sent." "${CLEANUP_LOG}"
     fi
-  fi
-  
-  # Display report summary to console
-  if [ "$QUIET" = false ]; then
-    echo -e "\n${BOLD}${MAGENTA}AgencyStack Repository Audit Summary${NC}"
-    echo -e "${BOLD}=====================================${NC}"
-    
-    if [ -f "${TEMP_DIR}/script_count.txt" ] && [ -f "${TEMP_DIR}/unused_count.txt" ]; then
-      local script_count=$(cat "${TEMP_DIR}/script_count.txt")
-      local unused_count=$(cat "${TEMP_DIR}/unused_count.txt")
-      local used_percent=$((100 - (unused_count * 100 / script_count)))
-      
-      echo -e "${BOLD}Scripts:${NC}"
-      echo -e "  Total: $script_count"
-      echo -e "  Used: $((script_count - unused_count)) ($used_percent%)"
-      echo -e "  Unused: $unused_count ($((100 - used_percent))%)"
-    fi
-    
-    echo -e "\n${BOLD}Cleanup:${NC}"
-    echo -e "  Items flagged: ${#CLEANUP_ITEMS[@]}"
-    echo -e "  Cleanup mode: $([ "$DRY_RUN" = true ] && echo "${YELLOW}DRY-RUN${NC}" || echo "${GREEN}ACTUAL CLEANUP${NC}")"
-    
-    echo -e "\n${BOLD}Report:${NC} $report_file"
   fi
 }
 
@@ -514,6 +684,10 @@ process_args() {
         GIT_AWARE=false
         shift
         ;;
+      --quick)
+        QUICK_ANALYSIS=true
+        shift
+        ;;
       --quiet)
         QUIET=true
         shift
@@ -564,5 +738,5 @@ main() {
 # Process command line arguments
 process_args "$@"
 
-# Run main function
+# Run the main function
 main

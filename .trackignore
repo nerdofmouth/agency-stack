@@ -1,0 +1,16 @@
+# AgencyStack .trackignore file
+# Format: one script path per line (relative to repository root)
+# Supports glob patterns (e.g., scripts/deprecated/*.sh)
+
+# Core templates that shouldn't be flagged
+scripts/utils/template*.sh
+scripts/utils/example*.sh
+
+# Special scripts that are called dynamically but might not be detected
+scripts/components/_template.sh
+
+# Scripts under active development
+scripts/experimental/*.sh
+
+# Scripts that are intentionally kept but not directly called
+scripts/migration/legacy/*.sh
