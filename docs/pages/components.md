@@ -63,8 +63,51 @@ For detailed Builder.io integration instructions, see our [Builder.io Integratio
 | Component | Description | Default URL |
 |-----------|-------------|-------------|
 | **Netdata** | Real-time performance monitoring | https://monitor.yourdomain.com |
+| **Grafana** | Metrics visualization and monitoring platform | https://grafana.yourdomain.com |
 | **Fail2ban** | Intrusion prevention framework | N/A |
 | **Buddy System** | Self-healing infrastructure service | N/A |
+
+## Security & Identity Management
+
+| Component | Description | Default URL |
+|-----------|-------------|-------------|
+| **Keycloak** | Open-source identity and access management | https://auth.yourdomain.com |
+
+### Keycloak Identity Provider
+
+AgencyStack includes Keycloak, a comprehensive identity and access management solution:
+
+**Features:**
+- Single Sign-On (SSO) for all applications
+- Identity Brokering and Social Login
+- User Federation (LDAP, Active Directory)
+- Two-Factor Authentication
+- Fine-grained authorization
+- Standard protocols support (OpenID Connect, SAML, OAuth 2.0)
+- User self-service
+
+**Default URLs:**
+- Admin Console: https://auth.yourdomain.com/auth/admin
+- Account Console: https://auth.yourdomain.com/auth/realms/agency/account
+
+For detailed integration instructions with other AgencyStack components, see our [Identity Integration Guide](/pages/identity-integration.html).
+
+### Grafana Dashboard
+
+AgencyStack includes Grafana for advanced monitoring and visualization:
+
+**Features:**
+- Customizable dashboards
+- Multiple data source integration
+- Alerting and notification engine
+- User-friendly query builder
+- Role-based access control
+- API for automation and integration
+
+**Default URLs:**
+- Dashboard: https://grafana.yourdomain.com
+
+For detailed Grafana setup and integration information, see our [Monitoring Guide](/pages/monitoring.html).
 
 ## Communication
 
