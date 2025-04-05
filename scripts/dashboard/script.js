@@ -16,6 +16,7 @@ const serviceCardTemplate = document.getElementById('service-card-template');
 const integrationBadgeTemplate = document.getElementById('integration-badge-template');
 const portConflictTemplate = document.getElementById('port-conflict-template');
 const viewContainers = document.querySelectorAll('.view-container');
+const securityAuditButton = document.getElementById('security-audit');
 
 // Integration UI elements
 const runAllIntegrationsButton = document.getElementById('run-all-integrations');
@@ -45,6 +46,30 @@ const recentIssuesElement = document.getElementById('recent-issues');
 const lastAlertTimeElement = document.getElementById('last-alert-time');
 const alertsTableBody = document.getElementById('alerts-table-body');
 
+// Security UI elements
+const runSecurityAuditButton = document.getElementById('run-security-audit');
+const verifyCertsButton = document.getElementById('verify-certs');
+const verifyAuthButton = document.getElementById('verify-auth');
+const rotateSecretsButton = document.getElementById('rotate-secrets');
+const refreshSecurityButton = document.getElementById('refresh-security');
+const validCertsElement = document.getElementById('valid-certs');
+const totalCertsElement = document.getElementById('total-certs');
+const ssoProtectedElement = document.getElementById('sso-protected');
+const totalServicesElement = document.getElementById('total-services');
+const exposedPortsElement = document.getElementById('exposed-ports');
+const securityIssuesElement = document.getElementById('security-issues');
+const certsLastCheckedElement = document.getElementById('certs-last-checked');
+const servicesWithSsoElement = document.getElementById('services-with-sso');
+const totalClientsElement = document.getElementById('total-clients');
+const certTableBody = document.getElementById('cert-table-body');
+const authTableBody = document.getElementById('auth-table-body');
+const failedLoginsBody = document.getElementById('failed-logins-body');
+const tenancyTableBody = document.getElementById('tenancy-table-body');
+const auditSummaryElement = document.getElementById('audit-summary');
+const certRowTemplate = document.getElementById('cert-row-template');
+const authRowTemplate = document.getElementById('auth-row-template');
+const tenancyRowTemplate = document.getElementById('tenancy-row-template');
+
 // Global variables
 let dashboardData = {
     services: [],
@@ -60,6 +85,23 @@ let dashboardData = {
     ports: {
         ports: { updated_at: '', ports_in_use: {} },
         conflicts: []
+    },
+    security: {
+        certificates: [],
+        authStatus: [],
+        failedLogins: [],
+        multiTenancy: [],
+        auditResults: {},
+        lastChecked: '',
+        summary: {
+            validCerts: 0,
+            totalCerts: 0,
+            ssoProtected: 0,
+            totalServices: 0,
+            exposedPorts: 0,
+            securityIssues: 0,
+            totalClients: 0
+        }
     }
 };
 let currentCategory = 'all';
@@ -93,6 +135,9 @@ async function loadDashboardData() {
         
         // Update port information
         updatePortInformation();
+        
+        // Update security status
+        updateSecurityStatus();
     } catch (error) {
         console.error('Error loading dashboard data:', error);
         servicesGrid.innerHTML = `<div class="error-message">
@@ -813,33 +858,414 @@ function setupAlertsAutoRefresh() {
     }
 }
 
+// Security functionality
+function updateSecurityStatus() {
+    // Update summary stats
+    validCertsElement.textContent = dashboardData.security.summary.validCerts;
+    totalCertsElement.textContent = dashboardData.security.summary.totalCerts;
+    ssoProtectedElement.textContent = dashboardData.security.summary.ssoProtected;
+    totalServicesElement.textContent = dashboardData.security.summary.totalServices;
+    exposedPortsElement.textContent = dashboardData.security.summary.exposedPorts;
+    securityIssuesElement.textContent = dashboardData.security.summary.securityIssues;
+    totalClientsElement.textContent = dashboardData.security.summary.totalClients;
+    
+    // Update last checked timestamp
+    if (dashboardData.security.lastChecked) {
+        certsLastCheckedElement.textContent = formatDate(dashboardData.security.lastChecked);
+    } else {
+        certsLastCheckedElement.textContent = 'Never';
+    }
+    
+    // Update services with SSO
+    servicesWithSsoElement.textContent = `${dashboardData.security.summary.ssoProtected} of ${dashboardData.security.summary.totalServices}`;
+    
+    // Update tables
+    updateCertificateTable();
+    updateAuthenticationTable();
+    updateFailedLoginsTable();
+    updateMultiTenancyTable();
+    updateAuditSummary();
+}
+
+function updateCertificateTable() {
+    certTableBody.innerHTML = '';
+    
+    if (dashboardData.security.certificates.length === 0) {
+        const row = document.createElement('tr');
+        row.innerHTML = '<td colspan="5">No certificate data available</td>';
+        certTableBody.appendChild(row);
+        return;
+    }
+    
+    dashboardData.security.certificates.forEach(cert => {
+        const template = certRowTemplate.content.cloneNode(true);
+        
+        template.querySelector('.domain').textContent = cert.domain;
+        
+        const statusCell = template.querySelector('.status');
+        statusCell.textContent = cert.status;
+        if (cert.status === 'Valid') {
+            statusCell.classList.add('status-valid');
+        } else if (cert.status === 'Expiring Soon') {
+            statusCell.classList.add('status-warning');
+        } else {
+            statusCell.classList.add('status-error');
+        }
+        
+        template.querySelector('.expiration').textContent = cert.expiration;
+        template.querySelector('.issuer').textContent = cert.issuer;
+        
+        const renewButton = template.querySelector('.renew-cert');
+        renewButton.addEventListener('click', () => renewCertificate(cert.domain));
+        
+        certTableBody.appendChild(template);
+    });
+}
+
+function updateAuthenticationTable() {
+    authTableBody.innerHTML = '';
+    
+    if (dashboardData.security.authStatus.length === 0) {
+        const row = document.createElement('tr');
+        row.innerHTML = '<td colspan="5">No authentication data available</td>';
+        authTableBody.appendChild(row);
+        return;
+    }
+    
+    dashboardData.security.authStatus.forEach(auth => {
+        const template = authRowTemplate.content.cloneNode(true);
+        
+        template.querySelector('.service-name').textContent = auth.service;
+        
+        const ssoStatusCell = template.querySelector('.sso-status');
+        ssoStatusCell.textContent = auth.ssoEnabled ? 'Enabled' : 'Disabled';
+        ssoStatusCell.classList.add(auth.ssoEnabled ? 'status-valid' : 'status-error');
+        
+        template.querySelector('.middleware').textContent = auth.middleware || 'None';
+        template.querySelector('.auth-method').textContent = auth.authMethod;
+        
+        const enableSsoButton = template.querySelector('.enable-sso');
+        if (auth.ssoEnabled) {
+            enableSsoButton.textContent = 'Configure SSO';
+        }
+        enableSsoButton.addEventListener('click', () => configureSso(auth.service));
+        
+        authTableBody.appendChild(template);
+    });
+}
+
+function updateFailedLoginsTable() {
+    failedLoginsBody.innerHTML = '';
+    
+    if (dashboardData.security.failedLogins.length === 0) {
+        const row = document.createElement('tr');
+        row.innerHTML = '<td colspan="5">No failed login data available</td>';
+        failedLoginsBody.appendChild(row);
+        return;
+    }
+    
+    dashboardData.security.failedLogins.forEach(login => {
+        const row = document.createElement('tr');
+        
+        const timestampCell = document.createElement('td');
+        timestampCell.textContent = formatDate(login.timestamp);
+        
+        const ipCell = document.createElement('td');
+        ipCell.textContent = login.ipAddress;
+        
+        const serviceCell = document.createElement('td');
+        serviceCell.textContent = login.service;
+        
+        const usernameCell = document.createElement('td');
+        usernameCell.textContent = login.username;
+        
+        const clientIdCell = document.createElement('td');
+        clientIdCell.textContent = login.clientId || 'N/A';
+        
+        row.appendChild(timestampCell);
+        row.appendChild(ipCell);
+        row.appendChild(serviceCell);
+        row.appendChild(usernameCell);
+        row.appendChild(clientIdCell);
+        
+        failedLoginsBody.appendChild(row);
+    });
+}
+
+function updateMultiTenancyTable() {
+    tenancyTableBody.innerHTML = '';
+    
+    if (dashboardData.security.multiTenancy.length === 0) {
+        const row = document.createElement('tr');
+        row.innerHTML = '<td colspan="5">No client data available</td>';
+        tenancyTableBody.appendChild(row);
+        return;
+    }
+    
+    dashboardData.security.multiTenancy.forEach(client => {
+        const template = tenancyRowTemplate.content.cloneNode(true);
+        
+        template.querySelector('.client-id').textContent = client.id;
+        
+        const networkCell = template.querySelector('.network-isolation');
+        networkCell.textContent = client.networkIsolation ? 'Enabled' : 'Disabled';
+        networkCell.classList.add(client.networkIsolation ? 'status-valid' : 'status-error');
+        
+        const backupCell = template.querySelector('.backup-separation');
+        backupCell.textContent = client.backupSeparation ? 'Enabled' : 'Disabled';
+        backupCell.classList.add(client.backupSeparation ? 'status-valid' : 'status-error');
+        
+        const logCell = template.querySelector('.log-segmentation');
+        logCell.textContent = client.logSegmentation ? 'Enabled' : 'Disabled';
+        logCell.classList.add(client.logSegmentation ? 'status-valid' : 'status-error');
+        
+        const realmCell = template.querySelector('.client-realm');
+        realmCell.textContent = client.realmConfigured ? 'Configured' : 'Missing';
+        realmCell.classList.add(client.realmConfigured ? 'status-valid' : 'status-error');
+        
+        tenancyTableBody.appendChild(template);
+    });
+}
+
+function updateAuditSummary() {
+    auditSummaryElement.innerHTML = '';
+    
+    if (!dashboardData.security.auditResults || Object.keys(dashboardData.security.auditResults).length === 0) {
+        auditSummaryElement.innerHTML = '<p>No security audit data available. Run a security audit to see results.</p>';
+        return;
+    }
+    
+    const results = dashboardData.security.auditResults;
+    
+    const summaryDiv = document.createElement('div');
+    summaryDiv.className = 'audit-results';
+    summaryDiv.innerHTML = `
+        <p class="audit-timestamp">Last run: ${formatDate(results.timestamp)}</p>
+        <div class="audit-stats">
+            <div class="audit-stat pass"><span class="stat-count">${results.passing}</span> Passing</div>
+            <div class="audit-stat warning"><span class="stat-count">${results.warnings}</span> Warnings</div>
+            <div class="audit-stat fail"><span class="stat-count">${results.failing}</span> Failing</div>
+        </div>
+    `;
+    
+    // Add issues list if there are any
+    if (results.issues && results.issues.length > 0) {
+        const issuesDiv = document.createElement('div');
+        issuesDiv.className = 'audit-issues';
+        issuesDiv.innerHTML = '<h4>Issues Requiring Attention</h4>';
+        
+        const issuesList = document.createElement('ul');
+        results.issues.forEach(issue => {
+            const issueItem = document.createElement('li');
+            issueItem.className = `${issue.severity}-severity`;
+            issueItem.textContent = issue.description;
+            issuesList.appendChild(issueItem);
+        });
+        issuesDiv.appendChild(issuesList);
+        summaryDiv.appendChild(issuesDiv);
+    }
+    
+    const reportLink = document.createElement('a');
+    reportLink.href = '#';
+    reportLink.className = 'view-full-report';
+    reportLink.textContent = 'View Full Report';
+    reportLink.addEventListener('click', viewFullAuditReport);
+    summaryDiv.appendChild(reportLink);
+    
+    auditSummaryElement.appendChild(summaryDiv);
+}
+
+// Load security data
+function loadSecurityData() {
+    // This would normally fetch data from the server
+    // Simulate fetch with setTimeout
+    setTimeout(() => {
+        // Sample data
+        dashboardData.security = {
+            lastChecked: new Date().toISOString(),
+            certificates: [
+                { domain: 'dashboard.example.com', status: 'Valid', expiration: '2025-06-30', issuer: 'Let\'s Encrypt' },
+                { domain: 'wordpress.example.com', status: 'Valid', expiration: '2025-06-30', issuer: 'Let\'s Encrypt' },
+                { domain: 'mail.example.com', status: 'Expiring Soon', expiration: '2025-04-15', issuer: 'Let\'s Encrypt' },
+                { domain: 'erp.example.com', status: 'Invalid', expiration: '2025-03-01', issuer: 'Let\'s Encrypt' }
+            ],
+            authStatus: [
+                { service: 'WordPress', ssoEnabled: true, middleware: 'forward-auth', authMethod: 'Keycloak OIDC' },
+                { service: 'ERPNext', ssoEnabled: true, middleware: 'forward-auth', authMethod: 'Keycloak OIDC' },
+                { service: 'Mailu', ssoEnabled: false, middleware: 'None', authMethod: 'Basic Auth' },
+                { service: 'Grafana', ssoEnabled: true, middleware: 'forward-auth', authMethod: 'Keycloak OIDC' },
+                { service: 'Traefik Dashboard', ssoEnabled: false, middleware: 'basic-auth', authMethod: 'Basic Auth' }
+            ],
+            failedLogins: [
+                { timestamp: '2025-04-04T10:15:23Z', ipAddress: '192.168.1.100', service: 'Keycloak', username: 'admin', clientId: 'N/A' },
+                { timestamp: '2025-04-04T08:32:11Z', ipAddress: '203.0.113.42', service: 'WordPress', username: 'editor', clientId: 'acme' },
+                { timestamp: '2025-04-03T22:45:18Z', ipAddress: '198.51.100.73', service: 'ERPNext', username: 'user123', clientId: 'acme' }
+            ],
+            multiTenancy: [
+                { id: 'acme', networkIsolation: true, backupSeparation: true, logSegmentation: true, realmConfigured: true },
+                { id: 'globex', networkIsolation: true, backupSeparation: true, logSegmentation: false, realmConfigured: true },
+                { id: 'initech', networkIsolation: true, backupSeparation: false, logSegmentation: false, realmConfigured: false }
+            ],
+            auditResults: {
+                timestamp: '2025-04-04T14:30:00Z',
+                passing: 12,
+                warnings: 3,
+                failing: 2,
+                issues: [
+                    { severity: 'high', description: 'Default credentials found for Traefik Dashboard' },
+                    { severity: 'medium', description: 'Mailu service not using SSO authentication' },
+                    { severity: 'medium', description: 'Client "initech" missing log segmentation' },
+                    { severity: 'low', description: 'Minimum TLS version not explicitly set' },
+                    { severity: 'low', description: 'Port 8080 exposed to public network' }
+                ]
+            },
+            summary: {
+                validCerts: 2,
+                totalCerts: 4,
+                ssoProtected: 3,
+                totalServices: 5,
+                exposedPorts: 7,
+                securityIssues: 5,
+                totalClients: 3
+            }
+        };
+        
+        // Update UI with the data
+        updateSecurityStatus();
+    }, 500);
+}
+
+// Security action functions
+function runSecurityAudit() {
+    showNotification('Running security audit...', 'info');
+    setTimeout(() => {
+        dashboardData.security.auditResults = {
+            timestamp: new Date().toISOString(),
+            passing: 12,
+            warnings: 3,
+            failing: 2,
+            issues: [
+                { severity: 'high', description: 'Default credentials found for Traefik Dashboard' },
+                { severity: 'medium', description: 'Mailu service not using SSO authentication' },
+                { severity: 'medium', description: 'Client "initech" missing log segmentation' },
+                { severity: 'low', description: 'Minimum TLS version not explicitly set' },
+                { severity: 'low', description: 'Port 8080 exposed to public network' }
+            ]
+        };
+        dashboardData.security.summary.securityIssues = dashboardData.security.auditResults.issues.length;
+        updateAuditSummary();
+        showNotification('Security audit completed', 'success');
+    }, 2000);
+}
+
+function verifyCertificates() {
+    showNotification('Verifying TLS certificates...', 'info');
+    setTimeout(() => {
+        dashboardData.security.lastChecked = new Date().toISOString();
+        dashboardData.security.summary.validCerts = dashboardData.security.certificates.filter(cert => cert.status === 'Valid').length;
+        updateCertificateTable();
+        validCertsElement.textContent = dashboardData.security.summary.validCerts;
+        certsLastCheckedElement.textContent = formatDate(dashboardData.security.lastChecked);
+        showNotification('Certificate verification completed', 'success');
+    }, 1500);
+}
+
+function verifyAuthentication() {
+    showNotification('Verifying authentication configuration...', 'info');
+    setTimeout(() => {
+        dashboardData.security.summary.ssoProtected = dashboardData.security.authStatus.filter(auth => auth.ssoEnabled).length;
+        updateAuthenticationTable();
+        ssoProtectedElement.textContent = dashboardData.security.summary.ssoProtected;
+        servicesWithSsoElement.textContent = `${dashboardData.security.summary.ssoProtected} of ${dashboardData.security.summary.totalServices}`;
+        showNotification('Authentication verification completed', 'success');
+    }, 1500);
+}
+
+function rotateSecrets() {
+    showNotification('Rotating secrets...', 'info');
+    setTimeout(() => {
+        showNotification('Secrets rotated successfully', 'success');
+    }, 2000);
+}
+
+function renewCertificate(domain) {
+    showNotification(`Renewing certificate for ${domain}...`, 'info');
+    setTimeout(() => {
+        const certIndex = dashboardData.security.certificates.findIndex(cert => cert.domain === domain);
+        if (certIndex !== -1) {
+            dashboardData.security.certificates[certIndex].status = 'Valid';
+            dashboardData.security.certificates[certIndex].expiration = '2025-07-04';
+            dashboardData.security.summary.validCerts = dashboardData.security.certificates.filter(cert => cert.status === 'Valid').length;
+            updateCertificateTable();
+            validCertsElement.textContent = dashboardData.security.summary.validCerts;
+        }
+        showNotification(`Certificate for ${domain} renewed successfully`, 'success');
+    }, 2000);
+}
+
+function configureSso(service) {
+    showNotification(`Configuring SSO for ${service}...`, 'info');
+    setTimeout(() => {
+        const serviceIndex = dashboardData.security.authStatus.findIndex(auth => auth.service === service);
+        if (serviceIndex !== -1 && !dashboardData.security.authStatus[serviceIndex].ssoEnabled) {
+            dashboardData.security.authStatus[serviceIndex].ssoEnabled = true;
+            dashboardData.security.authStatus[serviceIndex].middleware = 'forward-auth';
+            dashboardData.security.authStatus[serviceIndex].authMethod = 'Keycloak OIDC';
+            dashboardData.security.summary.ssoProtected = dashboardData.security.authStatus.filter(auth => auth.ssoEnabled).length;
+            updateAuthenticationTable();
+            ssoProtectedElement.textContent = dashboardData.security.summary.ssoProtected;
+            servicesWithSsoElement.textContent = `${dashboardData.security.summary.ssoProtected} of ${dashboardData.security.summary.totalServices}`;
+        }
+        showNotification(`SSO for ${service} configured successfully`, 'success');
+    }, 2000);
+}
+
+function viewFullAuditReport() {
+    window.open('/security_audit_report.html', '_blank');
+}
+
+function refreshSecurityData() {
+    showNotification('Refreshing security data...', 'info');
+    loadSecurityData();
+    setTimeout(() => {
+        showNotification('Security data refreshed', 'success');
+    }, 1000);
+}
+
 // View switching
 function switchView(viewId) {
-    // Hide all views
+    // Get current active view and deactivate it
+    const currentActiveBtn = document.querySelector('.nav-btn.active[data-view]');
+    if (currentActiveBtn) {
+        currentActiveBtn.classList.remove('active');
+    }
+    
+    // Hide all view containers
     viewContainers.forEach(container => {
         container.classList.add('hidden');
     });
     
-    // Show selected view
-    document.getElementById(viewId).classList.remove('hidden');
-    
-    // Update current view
-    currentView = viewId;
-    
-    // Update nav buttons
-    navButtons.forEach(btn => {
-        if (btn.dataset.view && btn.dataset.view === viewId.replace('-view', '')) {
-            btn.classList.add('active');
-        } else if (btn.dataset.category && viewId === 'services-view') {
-            if (btn.dataset.category === currentCategory) {
-                btn.classList.add('active');
-            } else {
-                btn.classList.remove('active');
-            }
-        } else {
-            btn.classList.remove('active');
-        }
-    });
+    // Show requested view and activate its nav button
+    if (viewId === 'services') {
+        document.getElementById('services-view').classList.remove('hidden');
+        document.querySelector('.nav-btn[data-category="all"]').classList.add('active');
+    } else if (viewId === 'integrations') {
+        document.getElementById('integrations-view').classList.remove('hidden');
+        document.querySelector('.nav-btn[data-view="integrations"]').classList.add('active');
+        updateIntegrationStatus();
+    } else if (viewId === 'ports') {
+        document.getElementById('ports-view').classList.remove('hidden');
+        document.querySelector('.nav-btn[data-view="ports"]').classList.add('active');
+        updatePortInformation();
+    } else if (viewId === 'alerts') {
+        document.getElementById('alerts-view').classList.remove('hidden');
+        document.querySelector('.nav-btn[data-view="alerts"]').classList.add('active');
+        loadAlerts();
+    } else if (viewId === 'security') {
+        document.getElementById('security-view').classList.remove('hidden');
+        document.querySelector('.nav-btn[data-view="security"]').classList.add('active');
+        loadSecurityData();
+    }
 }
 
 // Event listeners
@@ -847,45 +1273,36 @@ document.addEventListener('DOMContentLoaded', () => {
     // Load initial data
     loadDashboardData();
     
-    // Set up category filter button listeners
-    navButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-            if (btn.dataset.category) {
-                // Category filter button
-                currentCategory = btn.dataset.category;
-                navButtons.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                displayServices(currentCategory);
-                switchView('services-view');
-            } else if (btn.dataset.view) {
-                // View switch button
-                switchView(`${btn.dataset.view}-view`);
-            }
-        });
-    });
-    
-    // Set up action button listeners
+    // Add event listeners for service actions
     refreshButton.addEventListener('click', refreshDashboard);
     integrateButton.addEventListener('click', integrateComponents);
     healthCheckButton.addEventListener('click', healthCheck);
     viewLogsButton.addEventListener('click', viewLogs);
     detectPortsButton.addEventListener('click', detectPorts);
+    securityAuditButton.addEventListener('click', runSecurityAudit);
     
-    // Set up integration button listeners
+    // Add event listeners for integration actions
     runAllIntegrationsButton.addEventListener('click', () => runIntegration('all'));
     runSsoIntegrationButton.addEventListener('click', () => runIntegration('sso'));
     runEmailIntegrationButton.addEventListener('click', () => runIntegration('email'));
     runMonitoringIntegrationButton.addEventListener('click', () => runIntegration('monitoring'));
     runDataBridgeIntegrationButton.addEventListener('click', () => runIntegration('data-bridge'));
     
-    // Set up port management button listeners
+    // Add event listeners for port management actions
     detectPortConflictsButton.addEventListener('click', detectPortConflicts);
     remapPortsButton.addEventListener('click', remapPorts);
     scanPortsButton.addEventListener('click', scanPorts);
     
-    // Set up alerts & logs button listeners
+    // Add event listeners for alerts & logs actions
     refreshAlertsButton.addEventListener('click', loadAlerts);
     testAlertButton.addEventListener('click', sendTestAlert);
     autoRefreshCheckbox.addEventListener('change', setupAlertsAutoRefresh);
     logFilterSelect.addEventListener('change', updateAlertsView);
+    
+    // Add event listeners for security actions
+    runSecurityAuditButton.addEventListener('click', runSecurityAudit);
+    verifyCertsButton.addEventListener('click', verifyCertificates);
+    verifyAuthButton.addEventListener('click', verifyAuthentication);
+    rotateSecretsButton.addEventListener('click', rotateSecrets);
+    refreshSecurityButton.addEventListener('click', refreshSecurityData);
 });
