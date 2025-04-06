@@ -96,12 +96,13 @@ setup_first_run_environment() {
   # Install essential dependencies first
   log "INFO" "Installing essential dependencies..."
   echo -e "${BOLD}Installing required dependencies...${NC}"
-  apt-get update
+  apt-get update -qq
   
   # Install basic utilities required for the Makefile to run
+  # Use -qq for quieter output and -y for automatic yes to prompts
   log "INFO" "Installing basic utilities (curl, git, wget, make, jq, bc)"
   echo -e "${BLUE}Installing basic utilities...${NC}"
-  apt-get install -y curl git wget make jq bc openssl unzip procps
+  apt-get install -qq -y curl git wget make jq bc openssl unzip procps htop
   
   # Create base directories
   log "INFO" "Setting up required directories..."
@@ -127,39 +128,103 @@ setup_first_run_environment() {
     echo -e "${BOLD}Cloning AgencyStack repository...${NC}"
     
     # Check if we already have an installation
-    if [ -d "/opt/agency_stack/repo" ] || [ -d "/opt/agency_stack/clients" ]; then
+    if [ -d "/opt/agency_stack/repo" ] || [ -d "/opt/agency_stack/clients" ] || [ -f "/opt/agency_stack/config.env" ]; then
       log "WARN" "Existing installation found at /opt/agency_stack"
       echo -e "${YELLOW}WARNING: Existing installation found at /opt/agency_stack${NC}"
       
-      # In non-interactive mode, we need to provide a default behavior
-      # Always use a backup-and-continue approach in one-line mode
-      log "INFO" "Running in non-interactive mode, creating backup and continuing"
-      echo -e "${BLUE}Creating backup of existing installation and continuing...${NC}"
-      
-      # Create backup timestamp
-      BACKUP_TS=$(date +"%Y%m%d%H%M%S")
-      BACKUP_DIR="/opt/agency_stack_backup_${BACKUP_TS}"
-      
-      # Create backup
-      mkdir -p "$BACKUP_DIR"
-      cp -r /opt/agency_stack/* "$BACKUP_DIR/" 2>/dev/null || true
-      log "INFO" "Created backup at $BACKUP_DIR"
-      echo -e "${GREEN}Created backup at $BACKUP_DIR${NC}"
-      
-      # Clean up old repo
-      if [ -d "/opt/agency_stack/repo" ]; then
-        rm -rf /opt/agency_stack/repo
-        log "INFO" "Removed existing repository"
+      if [ "$ONE_LINE_MODE" = true ]; then
+        # Non-interactive mode - automatic backup and continue
+        log "INFO" "Running in non-interactive mode, creating backup and continuing"
+        echo -e "${BLUE}Creating backup of existing installation and continuing...${NC}"
+        
+        # Create backup timestamp in format YYYYMMDDHHMMSS
+        BACKUP_TS=$(date +"%Y%m%d%H%M%S")
+        BACKUP_DIR="/opt/agency_stack_backup_${BACKUP_TS}"
+        
+        # Create backup with clear logging
+        log "INFO" "Creating backup at $BACKUP_DIR"
+        echo -e "${GREEN}Creating backup at $BACKUP_DIR${NC}"
+        mkdir -p "$BACKUP_DIR"
+        cp -r /opt/agency_stack/* "$BACKUP_DIR/" 2>/dev/null || true
+        log "INFO" "Backup completed at $BACKUP_DIR"
+        echo -e "${GREEN}Backup completed at $BACKUP_DIR${NC}"
+        
+        # Clean up old repo
+        if [ -d "/opt/agency_stack/repo" ]; then
+          rm -rf /opt/agency_stack/repo
+          log "INFO" "Removed existing repository"
+        fi
+      else
+        # Interactive mode - ask user
+        echo -e "What would you like to do?"
+        echo "  1. Backup and reinstall (recommended)"
+        echo "  2. Remove and reinstall (data will be lost)"
+        echo "  3. Exit installation"
+        read -p "Enter choice [1-3]: " choice
+        
+        case "$choice" in
+          1)
+            BACKUP_TS=$(date +"%Y%m%d%H%M%S")
+            BACKUP_DIR="/opt/agency_stack_backup_${BACKUP_TS}"
+            log "INFO" "Creating backup at $BACKUP_DIR"
+            echo -e "${GREEN}Creating backup at $BACKUP_DIR${NC}"
+            mkdir -p "$BACKUP_DIR"
+            cp -r /opt/agency_stack/* "$BACKUP_DIR/" 2>/dev/null || true
+            log "INFO" "Backup completed"
+            echo -e "${GREEN}Backup completed${NC}"
+            rm -rf /opt/agency_stack/repo
+            log "INFO" "Removed existing repository"
+            ;;
+          2)
+            log "INFO" "User chose to remove and reinstall"
+            echo -e "${YELLOW}Removing existing installation...${NC}"
+            rm -rf /opt/agency_stack/repo
+            log "INFO" "Removed existing repository"
+            ;;
+          3)
+            log "INFO" "User chose to exit installation"
+            echo -e "${YELLOW}Exiting installation at user request${NC}"
+            exit 0
+            ;;
+          *)
+            log "ERROR" "Invalid choice. Exiting."
+            echo -e "${RED}Invalid choice. Exiting.${NC}"
+            exit 1
+            ;;
+        esac
       fi
     fi
     
     # Now clone the repository - this should work whether we had an existing installation or not
     log "INFO" "Cloning fresh repository"
-    git clone https://github.com/nerdofmouth/agency-stack.git /opt/agency_stack/repo || {
-      log "ERROR" "Failed to clone repository"
-      echo -e "${RED}Failed to clone repository. Check network connection and try again.${NC}"
+    echo -e "${BLUE}Cloning fresh repository from GitHub...${NC}"
+    
+    # Try multiple times with exponential backoff in case of network issues
+    RETRY_COUNT=0
+    MAX_RETRIES=3
+    RETRY_DELAY=5
+    CLONE_SUCCESS=false
+    
+    while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ "$CLONE_SUCCESS" = false ]; do
+      git clone https://github.com/nerdofmouth/agency-stack.git /opt/agency_stack/repo && CLONE_SUCCESS=true
+      
+      if [ "$CLONE_SUCCESS" = false ]; then
+        RETRY_COUNT=$((RETRY_COUNT + 1))
+        if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+          log "WARN" "Failed to clone repository, retrying in $RETRY_DELAY seconds (attempt $RETRY_COUNT of $MAX_RETRIES)"
+          echo -e "${YELLOW}Failed to clone repository, retrying in $RETRY_DELAY seconds (attempt $RETRY_COUNT of $MAX_RETRIES)${NC}"
+          sleep $RETRY_DELAY
+          RETRY_DELAY=$((RETRY_DELAY * 2))
+        fi
+      fi
+    done
+    
+    if [ "$CLONE_SUCCESS" = false ]; then
+      log "ERROR" "Failed to clone repository after $MAX_RETRIES attempts"
+      echo -e "${RED}Failed to clone repository after $MAX_RETRIES attempts.${NC}"
+      echo -e "${YELLOW}Please check your network connection and try again.${NC}"
       exit 1
-    }
+    fi
     
     # Change to the repository directory
     cd /opt/agency_stack/repo || {
@@ -168,15 +233,30 @@ setup_first_run_environment() {
       exit 1
     }
     
-    # Run prep-dirs target
+    # Run prep-dirs target with retry logic
     log "INFO" "Running make prep-dirs..."
     echo -e "${BOLD}Running prep-dirs target...${NC}"
     
     if [ -f "Makefile" ]; then
-      make prep-dirs || {
-        log "WARN" "make prep-dirs encountered issues, continuing anyway"
-        echo -e "${YELLOW}prep-dirs encountered issues, continuing...${NC}"
-      }
+      # Try up to 3 times with a small delay between attempts
+      RETRY_COUNT=0
+      MAX_RETRIES=3
+      while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+        if make prep-dirs; then
+          log "INFO" "Successfully ran make prep-dirs"
+          break
+        else
+          RETRY_COUNT=$((RETRY_COUNT + 1))
+          if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+            log "WARN" "make prep-dirs failed, retrying (attempt $RETRY_COUNT of $MAX_RETRIES)"
+            echo -e "${YELLOW}make prep-dirs failed, retrying...${NC}"
+            sleep 2
+          else
+            log "WARN" "make prep-dirs encountered issues after $MAX_RETRIES attempts, continuing anyway"
+            echo -e "${YELLOW}make prep-dirs encountered issues, continuing...${NC}"
+          fi
+        fi
+      done
     else
       log "WARN" "Makefile not found, skipping prep-dirs"
       echo -e "${YELLOW}Makefile not found, skipping prep-dirs${NC}"
