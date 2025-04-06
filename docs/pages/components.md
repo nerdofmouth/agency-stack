@@ -5,205 +5,144 @@ title: Components Overview - AgencyStack Documentation
 
 # Components Overview
 
-AgencyStack consists of a carefully curated selection of open-source applications that work together to provide a complete agency infrastructure solution.
+AgencyStack consists of a carefully curated selection of open-source applications that work together to provide a complete agency infrastructure solution. This page provides an overview of all available components, organized by category.
 
 ## Core Infrastructure
 
-| Component | Description | Default URL |
-|-----------|-------------|-------------|
-| **Traefik** | Edge router and reverse proxy, handles SSL certificates | N/A |
-| **Portainer** | Container management UI | https://portainer.yourdomain.com |
-| **Docker** | Container runtime | N/A |
-| **DroneCI** | Continuous Integration/Deployment server | https://drone.yourdomain.com |
+| Component | Description | Default URL | Alpha Status |
+|-----------|-------------|-------------|-------------|
+| **Traefik** | Edge router and reverse proxy, handles SSL certificates | N/A | ✅ Ready |
+| **Portainer** | Container management UI | https://portainer.yourdomain.com | ✅ Ready |
+| **Docker** | Container runtime | N/A | ✅ Ready |
+| **DroneCI** | Continuous Integration/Deployment server | https://drone.yourdomain.com | ✅ Ready |
+| **Etcd** | Distributed key-value store | N/A | ✅ Ready |
+
+## Security & Authentication
+
+| Component | Description | Default URL | Alpha Status |
+|-----------|-------------|-------------|-------------|
+| **Keycloak** | Identity and access management | https://auth.yourdomain.com | ✅ Ready |
+| **Fail2Ban** | Intrusion prevention system | N/A | ✅ Ready |
+| **CrowdSec** | Collaborative security | N/A | ✅ Ready |
+| **Signing Timestamps** | Secure document timestamping | N/A | 🔄 In Progress |
+
+## Monitoring & Observability
+
+| Component | Description | Default URL | Alpha Status |
+|-----------|-------------|-------------|-------------|
+| **Prometheus** | Metrics collection and alerting | https://prometheus.yourdomain.com | ✅ Ready |
+| **Grafana** | Metrics visualization and dashboards | https://grafana.yourdomain.com | ✅ Ready |
+| **Loki** | Log aggregation system | N/A | ✅ Ready |
+| **Netdata** | Real-time performance monitoring | https://netdata.yourdomain.com | 🔄 In Progress |
 
 ## Business Applications
 
-| Component | Description | Default URL |
-|-----------|-------------|-------------|
-| **ERPNext** | Enterprise Resource Planning system | https://erp.yourdomain.com |
-| **KillBill** | Open-source subscription billing | https://billing.yourdomain.com |
-| **Cal.com** | Scheduling and appointment application | https://cal.yourdomain.com |
-| **Documenso** | Document signing platform | https://sign.yourdomain.com |
+| Component | Description | Default URL | Alpha Status |
+|-----------|-------------|-------------|-------------|
+| **ERPNext** | Enterprise Resource Planning system | https://erp.yourdomain.com | ✅ Ready |
+| **KillBill** | Open-source subscription billing | https://billing.yourdomain.com | ✅ Ready |
+| **Cal.com** | Scheduling and appointment application | https://cal.yourdomain.com | ✅ Ready |
+| **Documenso** | Document signing platform | https://sign.yourdomain.com | ✅ Ready |
 
 ## Content Management
 
-| Component | Description | Default URL |
-|-----------|-------------|-------------|
-| **WordPress** | Content management system | https://blog.yourdomain.com |
-| **Ghost** | Modern publishing platform | https://news.yourdomain.com |
-| **Focalboard** | Project management board | https://board.yourdomain.com |
-| **PeerTube** | Self-hosted video streaming platform | https://peertube.yourdomain.com |
-| **Seafile** | File sync and share solution | https://files.yourdomain.com |
-| **Builder.io** | Visual content management | https://builder.yourdomain.com |
-
-For detailed Builder.io integration instructions, see our [Builder.io Integration Guide](/pages/builderio-integration.html).
+| Component | Description | Default URL | Alpha Status |
+|-----------|-------------|-------------|-------------|
+| **WordPress** | Content management system | https://blog.yourdomain.com | ✅ Ready |
+| **Ghost** | Modern publishing platform | https://news.yourdomain.com | ✅ Ready |
+| **Focalboard** | Project management board | https://board.yourdomain.com | ✅ Ready |
+| **PeerTube** | Self-hosted video streaming platform | https://video.yourdomain.com | ✅ Ready |
+| **Seafile** | File sync and share solution | https://files.yourdomain.com | ✅ Ready |
+| **Builder.io** | Visual content management | https://builder.yourdomain.com | ✅ Ready |
 
 ## Team Collaboration
 
-| Component | Description | Default URL |
-|-----------|-------------|-------------|
-| **Focalboard** | Project management tool | https://board.yourdomain.com |
-| **TaskWarrior/Calcure** | Task and calendar management | https://tasks.yourdomain.com |
+| Component | Description | Default URL | Alpha Status |
+|-----------|-------------|-------------|-------------|
+| **Focalboard** | Project management tool | https://board.yourdomain.com | ✅ Ready |
+| **TaskWarrior/Calcure** | Task and calendar management | https://tasks.yourdomain.com | ✅ Ready |
+| **Chatwoot** | Customer messaging platform | https://chat.yourdomain.com | ✅ Ready |
+| **CryptoSync** | Secure file synchronization | N/A | ✅ Ready |
 
 ## Marketing and Analytics
 
-| Component | Description | Default URL |
-|-----------|-------------|-------------|
-| **Listmonk** | Self-hosted newsletter and mailing list manager | https://mail.yourdomain.com |
-| **PostHog** | Open-source product analytics | https://analytics.yourdomain.com |
-| **WebPush** | Web push notification service | https://push.yourdomain.com |
+| Component | Description | Default URL | Alpha Status |
+|-----------|-------------|-------------|-------------|
+| **Listmonk** | Newsletter and mailing list manager | https://mail.yourdomain.com | ✅ Ready |
+| **PostHog** | Product analytics platform | https://analytics.yourdomain.com | 🔄 In Progress |
+| **WebPush** | Web push notification service | N/A | 🔄 In Progress |
 
-## Integration
+## AI & Machine Learning
 
-| Component | Description | Default URL |
-|-----------|-------------|-------------|
-| **n8n** | Workflow automation tool | https://n8n.yourdomain.com |
-| **OpenIntegrationHub** | Integration framework | https://integration.yourdomain.com |
+| Component | Description | Default URL | Alpha Status |
+|-----------|-------------|-------------|-------------|
+| **Ollama** | Local LLM server | N/A | ✅ Ready |
+| **LangChain** | AI framework and orchestration | N/A | ✅ Ready |
+| **Vector DB** | Vector database for embeddings | N/A | ✅ Ready |
+| **AI Dashboard** | AI management interface | https://ai.yourdomain.com | ✅ Ready |
+| **Agent Orchestrator** | AI agent management | N/A | ✅ Ready |
+| **Resource Watcher** | Resource monitoring for AI | N/A | ✅ Ready |
 
-## System Monitoring
+## Integration & Automation
 
-| Component | Description | Default URL |
-|-----------|-------------|-------------|
-| **Netdata** | Real-time performance monitoring | https://monitor.yourdomain.com |
-| **Grafana** | Metrics visualization and monitoring platform | https://grafana.yourdomain.com |
-| **Fail2ban** | Intrusion prevention framework | N/A |
-| **Buddy System** | Self-healing infrastructure service | N/A |
-
-## Security & Identity Management
-
-| Component | Description | Default URL |
-|-----------|-------------|-------------|
-| **Keycloak** | Open-source identity and access management | https://auth.yourdomain.com |
-
-### Keycloak Identity Provider
-
-AgencyStack includes Keycloak, a comprehensive identity and access management solution:
-
-**Features:**
-- Single Sign-On (SSO) for all applications
-- Identity Brokering and Social Login
-- User Federation (LDAP, Active Directory)
-- Two-Factor Authentication
-- Fine-grained authorization
-- Standard protocols support (OpenID Connect, SAML, OAuth 2.0)
-- User self-service
-
-**Default URLs:**
-- Admin Console: https://auth.yourdomain.com/auth/admin
-- Account Console: https://auth.yourdomain.com/auth/realms/agency/account
-
-For detailed integration instructions with other AgencyStack components, see our [Identity Integration Guide](/pages/identity-integration.html).
-
-### Grafana Dashboard
-
-AgencyStack includes Grafana for advanced monitoring and visualization:
-
-**Features:**
-- Customizable dashboards
-- Multiple data source integration
-- Alerting and notification engine
-- User-friendly query builder
-- Role-based access control
-- API for automation and integration
-
-**Default URLs:**
-- Dashboard: https://grafana.yourdomain.com
-
-For detailed Grafana setup and integration information, see our [Monitoring Guide](/pages/monitoring.html).
-
-## Security & Storage
-
-| Component | Description | Status |
-|-----------|-------------|--------|
-| **[Vaultwarden](components/vaultwarden.md)** | Self-hosted password manager | ✅ |
-| **[Cryptosync](components/cryptosync.md)** | Encrypted local vaults + remote cloud sync | ✅ |
+| Component | Description | Default URL | Alpha Status |
+|-----------|-------------|-------------|-------------|
+| **n8n** | Workflow automation platform | https://n8n.yourdomain.com | ✅ Ready |
+| **OpenIntegrationHub** | Data integration platform | https://integration.yourdomain.com | 🔄 In Progress |
 
 ## Communication
 
-| Component | Description | Default URL |
-|-----------|-------------|-------------|
-| **VoIP System** | Complete Voice over IP telephony service | https://voip.yourdomain.com |
-| **Mailu** | Complete email server with webmail, SMTP, and IMAP | https://mail.yourdomain.com |
+| Component | Description | Default URL | Alpha Status |
+|-----------|-------------|-------------|-------------|
+| **VoIP System** | Complete Voice over IP telephony service | https://voip.yourdomain.com | ✅ Ready |
+| **Mailu** | Complete email server with webmail, SMTP, and IMAP | https://mail.yourdomain.com | ✅ Ready |
 
-### Mailu Email Server
+## Utility & Infrastructure
 
-AgencyStack includes Mailu, a complete, Docker-based mail server solution:
+| Component | Description | Default URL | Alpha Status |
+|-----------|-------------|-------------|-------------|
+| **Multi-Tenancy** | Client isolation and management | N/A | ✅ Ready |
+| **Backup Strategy** | System backup and recovery | N/A | 🔄 In Progress |
+| **Launchpad Dashboard** | System dashboard and launcher | https://dashboard.yourdomain.com | ✅ Ready |
+| **Tailscale** | Secure network connectivity | N/A | 🔄 In Progress |
 
-**Features:**
-- SMTP server for sending and receiving emails
-- IMAP server for accessing emails
-- Webmail interface (Roundcube) for browser-based email access
-- Admin panel for managing domains, users, and aliases
-- Anti-spam filtering (with RSpamd)
-- Automatic DKIM, SPF, and DMARC setup
-- TLS encryption with Let's Encrypt integration
+## Component Documentation
 
-**Default URLs:**
-- Admin panel: https://mailu.yourdomain.com/admin
-- Webmail: https://webmail.yourdomain.com
-- SMTP: smtp.yourdomain.com (port 587)
-- IMAP: imap.yourdomain.com (port 993)
+Each component has its own dedicated documentation page that includes:
 
-For detailed email client setup instructions, see our [Email Client Setup Guide](/pages/email-client-setup.html).
+- Installation instructions
+- Configuration options
+- Security considerations
+- Monitoring and logging
+- Troubleshooting tips
 
-### VoIP Details
+Use the links in the tables above to access the detailed documentation for each component.
 
-The AgencyStack VoIP component provides a comprehensive communication solution:
+## Installation Commands
 
-**Server Components:**
-- **FreePBX/Asterisk**: Open-source PBX system for call routing and management
-- **WebRTC Gateway**: For browser-based calling without plugins
-- **SIP Trunking**: Connect to external phone networks
-- **Voicemail to Email**: Automatic email delivery of voice messages
+Most components can be installed using a simple make command:
 
-**Client Applications:**
-- **Desktop**: Supports softphones like Zoiper, MicroSIP, and Bria (Windows, macOS, Linux)
-- **Mobile**: 
-  - **Android**: Zoiper, Linphone, Grandstream Wave (available on Google Play)
-  - **iOS**: Zoiper, Linphone, Acrobits Softphone (available on App Store)
-- **Web Interface**: Browser-based calling interface with no installation required
-- **Hardware Support**: Compatible with standard SIP desk phones from Yealink, Polycom, etc.
+```bash
+# Install a component
+make <component>
 
-For detailed client setup instructions, see our [VOIP Client Setup Guide](/pages/voip-client-setup.html) that you can share with end-users.
+# Check component status
+make <component>-status
 
-**Features:**
-- Call recording and monitoring
-- IVR (Interactive Voice Response) menus
-- Conference rooms
-- Call queues and ring groups
-- Detailed call reporting
+# View component logs
+make <component>-logs
 
-All client applications are FOSS (Free and Open Source Software) or have FOSS alternatives available.
-
-## Component Selection
-
-During installation, you can choose which component groups to install based on your needs. The Core Infrastructure is always installed as it provides the foundation for all other components.
-
-For production environments, we recommend starting with the Core Infrastructure and gradually adding component groups as needed.
-
-## Component Configuration
-
-Each component includes sensible defaults, but can be customized by editing the configuration files in:
-
-```
-/opt/agency_stack/config/<component-name>/
+# Restart a component
+make <component>-restart
 ```
 
-For client-specific configurations, these are located in:
+Replace `<component>` with the component name (e.g., `peertube`, `prometheus`, `wordpress`).
 
-```
-/opt/agency_stack/clients/<client-domain>/config/
-```
+## Component Integration
 
-## Resource Requirements
+AgencyStack components are designed to work together seamlessly. Common integrations include:
 
-| Component Group | Minimum RAM | Recommended RAM | Disk Space |
-|-----------------|-------------|----------------|------------|
-| Core Infrastructure | 2 GB | 4 GB | 10 GB |
-| Business Suite | 4 GB | 8 GB | 20 GB |
-| Content Suite | 4 GB | 8 GB | 20 GB+ |
-| Team Suite | 2 GB | 4 GB | 10 GB |
-| Marketing Suite | 2 GB | 4 GB | 10 GB |
-| Full Stack | 8 GB | 16 GB+ | 60 GB+ |
-
-For detailed information about each component, including setup and configuration instructions, visit their respective documentation pages.
+1. **Single Sign-On**: Most components integrate with Keycloak for unified authentication
+2. **Monitoring**: All components expose metrics for Prometheus and logs for Loki
+3. **Reverse Proxy**: All web-based components are accessible through Traefik
+4. **Multi-tenancy**: Components support client isolation where applicable
