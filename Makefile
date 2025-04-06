@@ -73,6 +73,7 @@ help:
 	@echo "  $(BOLD)make setup-cronjobs$(RESET)    Setup cron jobs for scheduled tasks"
 	@echo "  $(BOLD)make view-alerts$(RESET)       View recent alerts"
 	@echo "  $(BOLD)make log-summary$(RESET)       Display summary of logs"
+	@echo "  $(BOLD)make alpha-check$(RESET)       Check Alpha milestone readiness status"
 	@echo ""
 	@echo "$(BOLD)Multi-Tenancy Commands:$(RESET)"
 	@echo "  $(BOLD)make create-client CLIENT_ID=name CLIENT_NAME=\"Full Name\" CLIENT_DOMAIN=domain.com$(RESET)  Create a new client"
@@ -1207,3 +1208,9 @@ install-ai-suite: validate
 	@make agent-orchestrator
 	@make resource-watcher
 	@echo "$(GREEN)✅ AI suite installation complete!$(RESET)"
+
+# Alpha Release Readiness Check
+alpha-check:
+	@echo "$(MAGENTA)$(BOLD)🔍 Checking Alpha Release Readiness...$(RESET)"
+	@$(SCRIPTS_DIR)/utils/alpha_check.sh
+	@echo "$(CYAN)Full report available at: docs/pages/components/alpha_ready.md$(RESET)"
