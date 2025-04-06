@@ -1195,3 +1195,170 @@ ai-agent-tools-status:
 		echo "  - Status: $(shell if pgrep -f "next.*5120" > /dev/null; then echo "$(GREEN)Running$(RESET)"; else echo "$(RED)Not Running$(RESET)"; fi)"; \
 		echo "$(YELLOW)To start the Agent Tools Panel, run: make ai-agent-tools-start$(RESET)"; \
 	fi
+
+## Resource Watcher Targets
+resource-watcher:
+	@echo "$(MAGENTA)$(BOLD)📊 Installing Resource Watcher - AI Resource Monitoring Agent...$(RESET)"
+	@$(SCRIPTS_DIR)/components/install_resource_watcher.sh --client-id=$(CLIENT_ID) --domain=$(DOMAIN) $(if $(WITH_DEPS),--with-deps,) $(if $(FORCE),--force,) $(if $(ENABLE_MONITORING),--enable-monitoring,) $(if $(VERBOSE),--verbose,)
+	@echo "$(GREEN)Resource Watcher installed successfully!$(RESET)"
+	@echo "$(CYAN)To check status: make resource-watcher-status$(RESET)"
+
+resource-watcher-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Resource Watcher Status...$(RESET)"
+	@if [ -d "/opt/agency_stack/resource_watcher" ]; then \
+		echo "$(GREEN)Resource Watcher is installed.$(RESET)"; \
+		if docker ps | grep -q "resource-watcher"; then \
+			echo "$(GREEN)Resource Watcher is running.$(RESET)"; \
+		else \
+			echo "$(RED)Resource Watcher is installed but not running.$(RESET)"; \
+		fi \
+	else \
+		echo "$(RED)Resource Watcher is not installed.$(RESET)"; \
+	fi
+	@curl -s http://localhost:5220/health || echo "Could not connect to Resource Watcher. Is it running?"
+	@echo ""
+
+resource-watcher-logs:
+	@echo "$(MAGENTA)$(BOLD)📋 Viewing Resource Watcher logs...$(RESET)"
+	@if [ -d "/opt/agency_stack/resource_watcher" ]; then \
+		docker logs -n 50 resource-watcher; \
+	else \
+		echo "$(RED)Resource Watcher is not installed.$(RESET)"; \
+	fi
+
+## Install AI Suite Targets
+install-ai-suite:
+	@echo "$(MAGENTA)$(BOLD)🧠 Installing Complete AI Suite...$(RESET)"
+	@echo "$(YELLOW)This will install Ollama, LangChain, AI Dashboard, Agent Orchestrator, Resource Watcher, and Agent Tools.$(RESET)"
+	@read -p "$(BOLD)Continue? [y/N] $(RESET)" confirm; \
+	[[ $$confirm == [yY] || $$confirm == [yY][eE][sS] ]] || exit 1
+	@$(MAKE) ollama
+	@$(MAKE) langchain
+	@$(MAKE) ai-dashboard
+	@$(MAKE) agent-orchestrator
+	@$(MAKE) resource-watcher
+	@$(MAKE) ai-agent-tools
+	@echo "$(GREEN)$(BOLD)✅ AI Suite installation complete!$(RESET)"
+	@echo "$(CYAN)Run 'make ai-alpha-check' to verify the installation.$(RESET)"
+
+## AI Alpha Check Targets
+ai-alpha-check:
+	@echo "$(MAGENTA)$(BOLD)🔍 Running AI Alpha Readiness Check...$(RESET)"
+	@echo "$(CYAN)Checking installed components...$(RESET)"
+	@echo "-------------------------------------------"
+	
+	@echo "1. Checking Ollama..."
+	@if [ -d "/opt/agency_stack/ollama" ]; then \
+		echo "  $(GREEN)✓ Ollama is installed$(RESET)"; \
+		if curl -s http://localhost:11434/api/tags &>/dev/null; then \
+			echo "  $(GREEN)✓ Ollama API is accessible$(RESET)"; \
+		else \
+			echo "  $(RED)✗ Ollama API is not accessible$(RESET)"; \
+		fi \
+	else \
+		echo "  $(RED)✗ Ollama is not installed$(RESET)"; \
+	fi
+	
+	@echo "2. Checking LangChain..."
+	@if [ -d "/opt/agency_stack/langchain" ]; then \
+		echo "  $(GREEN)✓ LangChain is installed$(RESET)"; \
+		if curl -s http://localhost:5111/health &>/dev/null; then \
+			echo "  $(GREEN)✓ LangChain API is accessible$(RESET)"; \
+		else \
+			echo "  $(RED)✗ LangChain API is not accessible$(RESET)"; \
+		fi \
+	else \
+		echo "  $(RED)✗ LangChain is not installed$(RESET)"; \
+	fi
+	
+	@echo "3. Checking AI Dashboard..."
+	@if [ -d "/opt/agency_stack/ai_dashboard" ]; then \
+		echo "  $(GREEN)✓ AI Dashboard is installed$(RESET)"; \
+		if docker ps | grep -q "ai-dashboard"; then \
+			echo "  $(GREEN)✓ AI Dashboard is running$(RESET)"; \
+		else \
+			echo "  $(RED)✗ AI Dashboard is not running$(RESET)"; \
+		fi \
+	else \
+		echo "  $(RED)✗ AI Dashboard is not installed$(RESET)"; \
+	fi
+	
+	@echo "4. Checking Agent Orchestrator..."
+	@if [ -d "/opt/agency_stack/agent_orchestrator" ]; then \
+		echo "  $(GREEN)✓ Agent Orchestrator is installed$(RESET)"; \
+		if curl -s http://localhost:5210/health &>/dev/null; then \
+			echo "  $(GREEN)✓ Agent Orchestrator API is accessible$(RESET)"; \
+		else \
+			echo "  $(RED)✗ Agent Orchestrator API is not accessible$(RESET)"; \
+		fi \
+	else \
+		echo "  $(RED)✗ Agent Orchestrator is not installed$(RESET)"; \
+	fi
+	
+	@echo "5. Checking Resource Watcher..."
+	@if [ -d "/opt/agency_stack/resource_watcher" ]; then \
+		echo "  $(GREEN)✓ Resource Watcher is installed$(RESET)"; \
+		if curl -s http://localhost:5220/health &>/dev/null; then \
+			echo "  $(GREEN)✓ Resource Watcher API is accessible$(RESET)"; \
+		else \
+			echo "  $(RED)✗ Resource Watcher API is not accessible$(RESET)"; \
+		fi \
+	else \
+		echo "  $(RED)✗ Resource Watcher is not installed$(RESET)"; \
+	fi
+	
+	@echo "6. Checking Agent Tools Bridge..."
+	@if [ -d "$(ROOT_DIR)/apps/agent_tools" ]; then \
+		echo "  $(GREEN)✓ Agent Tools Bridge is installed$(RESET)"; \
+		if pgrep -f "next.*5120" > /dev/null; then \
+			echo "  $(GREEN)✓ Agent Tools Bridge is running$(RESET)"; \
+		else \
+			echo "  $(RED)✗ Agent Tools Bridge is not running$(RESET)"; \
+		fi \
+	else \
+		echo "  $(RED)✗ Agent Tools Bridge is not installed$(RESET)"; \
+	fi
+	
+	@echo "-------------------------------------------"
+	@echo "$(CYAN)Checking port availability...$(RESET)"
+	@echo "Ollama: $(shell if netstat -tuln | grep -q \":11434 \"; then echo \"$(GREEN)✓ Available$(RESET)\"; else echo \"$(RED)✗ Not available$(RESET)\"; fi)"
+	@echo "LangChain: $(shell if netstat -tuln | grep -q \":5111 \"; then echo \"$(GREEN)✓ Available$(RESET)\"; else echo \"$(RED)✗ Not available$(RESET)\"; fi)"
+	@echo "AI Dashboard: $(shell if netstat -tuln | grep -q \":5130 \"; then echo \"$(GREEN)✓ Available$(RESET)\"; else echo \"$(RED)✗ Not available$(RESET)\"; fi)"
+	@echo "Agent Orchestrator: $(shell if netstat -tuln | grep -q \":5210 \"; then echo \"$(GREEN)✓ Available$(RESET)\"; else echo \"$(RED)✗ Not available$(RESET)\"; fi)"
+	@echo "Resource Watcher: $(shell if netstat -tuln | grep -q \":5220 \"; then echo \"$(GREEN)✓ Available$(RESET)\"; else echo \"$(RED)✗ Not available$(RESET)\"; fi)"
+	@echo "Agent Tools Bridge: $(shell if netstat -tuln | grep -q \":5120 \"; then echo \"$(GREEN)✓ Available$(RESET)\"; else echo \"$(RED)✗ Not available$(RESET)\"; fi)"
+	
+	@echo "-------------------------------------------"
+	@echo "$(CYAN)Checking dependencies...$(RESET)"
+	@echo "Docker: $(shell if command -v docker &> /dev/null; then echo \"$(GREEN)✓ Installed$(RESET)\"; else echo \"$(RED)✗ Not installed$(RESET)\"; fi)"
+	@echo "Docker Compose: $(shell if command -v docker-compose &> /dev/null; then echo \"$(GREEN)✓ Installed$(RESET)\"; else echo \"$(RED)✗ Not installed$(RESET)\"; fi)"
+	@echo "Node.js: $(shell if command -v node &> /dev/null; then echo \"$(GREEN)✓ Installed$(RESET)\"; else echo \"$(RED)✗ Not installed$(RESET)\"; fi)"
+	@echo "npm: $(shell if command -v npm &> /dev/null; then echo \"$(GREEN)✓ Installed$(RESET)\"; else echo \"$(RED)✗ Not installed$(RESET)\"; fi)"
+	
+	@echo "-------------------------------------------"
+	@echo "$(CYAN)Checking required directories...$(RESET)"
+	@echo "AI config dir: $(shell if [ -d \"/opt/agency_stack/config/ai\" ]; then echo \"$(GREEN)✓ Exists$(RESET)\"; else echo \"$(RED)✗ Missing$(RESET)\"; fi)"
+	@echo "AI logs dir: $(shell if [ -d \"/var/log/agency_stack/ai\" ]; then echo \"$(GREEN)✓ Exists$(RESET)\"; else echo \"$(RED)✗ Missing$(RESET)\"; fi)"
+	@echo "Client configs dir: $(shell if [ -d \"/opt/agency_stack/clients\" ]; then echo \"$(GREEN)✓ Exists$(RESET)\"; else echo \"$(RED)✗ Missing$(RESET)\"; fi)"
+	
+	@echo "-------------------------------------------"
+	@echo "$(BOLD)$(MAGENTA)AI Alpha Status Summary:$(RESET)"
+	@echo "$(shell \
+		INSTALLED=0; \
+		for comp in ollama langchain ai_dashboard agent_orchestrator resource_watcher; do \
+			if [ -d \"/opt/agency_stack/$$comp\" ]; then \
+				INSTALLED=$$((INSTALLED+1)); \
+			fi \
+		done; \
+		if [ -d \"$(ROOT_DIR)/apps/agent_tools\" ]; then \
+			INSTALLED=$$((INSTALLED+1)); \
+		fi; \
+		if [ $$INSTALLED -eq 6 ]; then \
+			echo \"$(GREEN)All components installed ($$INSTALLED/6)$(RESET)\"; \
+		elif [ $$INSTALLED -ge 4 ]; then \
+			echo \"$(YELLOW)Most components installed ($$INSTALLED/6)$(RESET)\"; \
+		else \
+			echo \"$(RED)Few components installed ($$INSTALLED/6)$(RESET)\"; \
+		fi \
+	)"
+	@echo "See detailed status in: /docs/pages/ai/alpha_status.md"
