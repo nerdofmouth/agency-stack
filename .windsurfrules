@@ -27,6 +27,12 @@ This ruleset governs all agent and AI activity inside this workspace. It applies
      - `make <component>-restart` — restart
      - *(Optional)*: `make <component>-test`
 5. 🧠 Use `scripts/utils/*.sh` utilities instead of duplicating logic.
+5.1: Use `scripts/utils/setup_component_directories.sh` to create component directories and placeholders.
+5.2: Use `scripts/utils/alpha_check.sh` to validate components.
+5.3: Use `scripts/utils/validate_component.sh` to validate components.
+5.4: Do not offer to execute, run, install, or otherwise invoke the make files or anything in this install script. I will do that myself.
+5.5: Do not offer to execute, run, install, or otherwise invoke the make files or anything in this install script. I will do that myself.
+5.6: Do not offer to execute, run, install, or otherwise invoke the make files or anything in this install script. I will do that myself.
 
 ---
 

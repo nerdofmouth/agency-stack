@@ -1316,3 +1316,107 @@ install-all: prep-dirs env-check
 	@echo "$(GREEN)$(BOLD)✅ AgencyStack installation complete!$(RESET)"
 	@echo "$(BLUE)Run 'make alpha-check' to verify all components are working correctly.$(RESET)"
 	@echo "$(BLUE)Run 'make dashboard' to open the AgencyStack dashboard.$(RESET)"
+
+# Docker Infrastructure Targets
+docker: prep-dirs env-check
+	@echo "$(MAGENTA)$(BOLD)🐳 Installing Docker...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_docker.sh $(if $(FORCE),--force,) \
+		$(if $(CLIENT_ID),--client-id $(CLIENT_ID),) \
+		$(if $(DOMAIN),--domain $(DOMAIN),)
+	@. $(SCRIPTS_DIR)/utils/common.sh && log "INFO" "Docker installation completed via Makefile"
+	@echo "$(GREEN)Docker installation complete$(RESET)"
+
+docker-status:
+	@echo "$(MAGENTA)$(BOLD)🔍 Checking Docker Status...$(RESET)"
+	@if command -v docker &>/dev/null; then \
+		echo "$(GREEN)✓ Docker installed: $(shell docker --version)$(RESET)"; \
+		echo "$(CYAN)Runtime info:$(RESET)"; \
+		docker info | grep -E "Server Version|OS/Arch|Containers|Images|Storage Driver|Logging Driver|Cgroup Driver|Swarm|Live Restore Enabled"; \
+		echo ""; \
+		echo "$(CYAN)Running containers:$(RESET)"; \
+		docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"; \
+	else \
+		echo "$(RED)✗ Docker is not installed$(RESET)"; \
+		echo "Run 'make docker' to install"; \
+	fi
+
+docker-logs:
+	@echo "$(MAGENTA)$(BOLD)📋 Viewing Docker logs...$(RESET)"
+	@if [ -f /var/log/agency_stack/components/docker.log ]; then \
+		tail -n 50 /var/log/agency_stack/components/docker.log; \
+	else \
+		echo "$(YELLOW)Docker log file not found. Showing system logs instead:$(RESET)"; \
+		journalctl -u docker -n 50; \
+	fi
+	@echo ""
+	@echo "$(YELLOW)For more logs: $(RESET)journalctl -u docker"
+
+docker-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Docker...$(RESET)"
+	@echo "$(YELLOW)This will restart the Docker daemon and may temporarily disrupt running containers.$(RESET)"
+	@. $(SCRIPTS_DIR)/utils/common.sh && confirm "Continue with restart?" || exit 0
+	@sudo systemctl restart docker
+	@echo "$(GREEN)Docker daemon restarted$(RESET)"
+	@echo "$(CYAN)Status: $(RESET)$(shell systemctl is-active docker)"
+
+# Docker Compose Targets
+docker_compose: prep-dirs env-check
+	@echo "$(MAGENTA)$(BOLD)🐙 Installing Docker Compose...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_docker_compose.sh $(if $(FORCE),--force,) \
+		$(if $(CLIENT_ID),--client-id $(CLIENT_ID),) \
+		$(if $(DOMAIN),--domain $(DOMAIN),) \
+		$(if $(COMPOSE_VERSION),--compose-version $(COMPOSE_VERSION),)
+	@. $(SCRIPTS_DIR)/utils/common.sh && log "INFO" "Docker Compose installation completed via Makefile"
+	@echo "$(GREEN)Docker Compose installation complete$(RESET)"
+
+docker_compose-status:
+	@echo "$(MAGENTA)$(BOLD)🔍 Checking Docker Compose Status...$(RESET)"
+	@if docker compose version &>/dev/null; then \
+		echo "$(GREEN)✓ Docker Compose plugin installed: $(shell docker compose version --short)$(RESET)"; \
+		echo ""; \
+		echo "$(CYAN)Available Docker Compose configurations:$(RESET)"; \
+		find /opt/agency_stack -name "docker-compose.yml" 2>/dev/null | sort || echo "No configurations found"; \
+	elif command -v docker-compose &>/dev/null; then \
+		echo "$(GREEN)✓ Docker Compose standalone installed: $(shell docker-compose --version | cut -d ' ' -f 3 | tr -d ',')$(RESET)"; \
+		echo "$(YELLOW)Note: Using standalone version, not the Docker CLI plugin$(RESET)"; \
+		echo ""; \
+		echo "$(CYAN)Available Docker Compose configurations:$(RESET)"; \
+		find /opt/agency_stack -name "docker-compose.yml" 2>/dev/null | sort || echo "No configurations found"; \
+	else \
+		echo "$(RED)✗ Docker Compose is not installed$(RESET)"; \
+		echo "Run 'make docker_compose' to install"; \
+	fi
+
+docker_compose-logs:
+	@echo "$(MAGENTA)$(BOLD)📋 Viewing Docker Compose logs...$(RESET)"
+	@if [ -f /var/log/agency_stack/components/docker_compose.log ]; then \
+		tail -n 50 /var/log/agency_stack/components/docker_compose.log; \
+	else \
+		echo "$(YELLOW)Docker Compose log file not found.$(RESET)"; \
+	fi
+	@echo ""
+	@echo "$(YELLOW)For more logs: $(RESET)less /var/log/agency_stack/components/docker_compose.log"
+
+docker_compose-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Docker Compose services...$(RESET)"
+	@echo "$(YELLOW)This will restart all Docker Compose services in AgencyStack.$(RESET)"
+	@. $(SCRIPTS_DIR)/utils/common.sh && confirm "Continue with restart?" || exit 0
+	@echo "$(CYAN)Restarting services...$(RESET)"
+	@for dir in $$(find /opt/agency_stack -name "docker-compose.yml" 2>/dev/null); do \
+		echo "Restarting compose services in $$(dirname $$dir)"; \
+		(cd $$(dirname $$dir) && docker compose restart); \
+	done
+	@echo "$(GREEN)Docker Compose services restarted$(RESET)"
+
+# Setup utility targets
+setup-dirs: prep-dirs
+	@echo "$(MAGENTA)$(BOLD)🔧 Setting up component directories and placeholders...$(RESET)"
+	@$(SCRIPTS_DIR)/utils/setup_component_directories.sh $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(VERBOSE),--verbose,)
+	@echo "$(GREEN)Component directories and placeholders created$(RESET)"
+	@echo "$(BLUE)This helps with alpha-check validation before components are installed$(RESET)"
+
+setup-dirs-force: prep-dirs
+	@echo "$(MAGENTA)$(BOLD)🔧 Forcibly setting up component directories and placeholders...$(RESET)"
+	@$(SCRIPTS_DIR)/utils/setup_component_directories.sh $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) --force $(if $(VERBOSE),--verbose,)
+	@echo "$(GREEN)Component directories and placeholders forcibly recreated$(RESET)"
+	@echo "$(BLUE)This helps with alpha-check validation before components are installed$(RESET)"
