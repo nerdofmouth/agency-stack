@@ -13,7 +13,7 @@ This guide provides a convenient way to install AgencyStack using our integrated
 Copy and paste the following command into your terminal:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/nerdofmouth/agency-stack/main/scripts/install.sh | sudo bash
+curl -fsSL https://stack.nerdofmouth.com/install.sh | sudo bash
 ```
 
 ## What the Installer Does
