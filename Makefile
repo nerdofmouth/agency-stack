@@ -1163,3 +1163,35 @@ agent-orchestrator-test:
 	@curl -s http://localhost:5210/health || echo "Could not connect to Agent Orchestrator. Is it running?"
 	@echo ""
 	@echo "To open in browser, visit: https://agent.$(DOMAIN)"
+
+## AI Agent Tools Targets
+ai-agent-tools:
+	@echo "$(MAGENTA)$(BOLD)🤖 Installing AI Agent Tools Panel...$(RESET)"
+	@if [ ! -d "$(ROOT_DIR)/apps/agent_tools" ]; then \
+		echo "$(RED)Agent Tools directory not found!$(RESET)"; \
+		exit 1; \
+	fi
+	@cd $(ROOT_DIR)/apps/agent_tools && npm install && npm run build
+	@echo "$(GREEN)AI Agent Tools Panel installed successfully!$(RESET)"
+	@echo "$(CYAN)To start the Agent Tools Panel, run: make ai-agent-tools-start$(RESET)"
+
+ai-agent-tools-start:
+	@echo "$(MAGENTA)$(BOLD)🚀 Starting AI Agent Tools Panel...$(RESET)"
+	@if [ ! -d "$(ROOT_DIR)/apps/agent_tools" ]; then \
+		echo "$(RED)Agent Tools directory not found!$(RESET)"; \
+		exit 1; \
+	fi
+	@cd $(ROOT_DIR)/apps/agent_tools && npm run dev
+
+ai-agent-tools-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking AI Agent Tools Panel Status...$(RESET)"
+	@if [ ! -d "$(ROOT_DIR)/apps/agent_tools" ]; then \
+		echo "$(RED)Agent Tools Panel is not installed.$(RESET)"; \
+	else \
+		echo "$(GREEN)Agent Tools Panel is installed.$(RESET)"; \
+		echo "$(CYAN)Configuration:$(RESET)"; \
+		echo "  - Directory: $(ROOT_DIR)/apps/agent_tools"; \
+		echo "  - Port: 5120"; \
+		echo "  - Status: $(shell if pgrep -f "next.*5120" > /dev/null; then echo "$(GREEN)Running$(RESET)"; else echo "$(RED)Not Running$(RESET)"; fi)"; \
+		echo "$(YELLOW)To start the Agent Tools Panel, run: make ai-agent-tools-start$(RESET)"; \
+	fi
