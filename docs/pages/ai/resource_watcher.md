@@ -1,18 +1,31 @@
 # Resource Watcher
 
-The Resource Watcher is a microservice component of AgencyStack that monitors system resources and provides metrics, alerts, and intelligent recommendations based on resource usage patterns.
+## Overview
+
+The Resource Watcher is a microservice component of AgencyStack that monitors system resources and provides metrics, alerts, and intelligent recommendations based on resource usage patterns. It works as an AI system monitoring agent in the AgencyStack ecosystem, enabling intelligent resource management and proactive issue resolution.
 
 ## Features
 
 - **Real-time Resource Monitoring**: Tracks CPU, memory, disk, and network usage
 - **Docker Container Monitoring**: Monitors Docker container resource utilization
+- **Performance Metrics**: Collects and aggregates performance data for analysis
+- **Model Usage Tracking**: Monitors LLM model usage, including token counts and inference times
+- **Status Reporting**: Provides real-time status updates to the Agent Orchestrator
 - **Prometheus Integration**: Exposes metrics in Prometheus format
 - **Intelligent Analysis**: Uses LLMs to provide insights and recommendations (optional)
 - **Alert Generation**: Generates alerts based on configurable thresholds
 - **REST API**: Provides a comprehensive API for accessing metrics and insights
 - **Multi-tenant Support**: Supports multiple clients with isolated environments
+- **Loki Integration**: Forwards logs to Loki for aggregation
 
 ## Installation
+
+### Prerequisites
+
+- Docker
+- AgencyStack core components
+- Agent Orchestrator (recommended)
+- Prometheus/Loki monitoring (optional but recommended)
 
 The Resource Watcher can be installed using the installation script:
 
@@ -30,21 +43,39 @@ The Resource Watcher can be installed using the installation script:
 | `--langchain-port` | Port for LangChain service | 5111 |
 | `--ollama-port` | Port for Ollama service | 11434 |
 | `--prometheus-port` | Port for Prometheus service | 9090 |
+| `--metrics-port` | Port for Prometheus metrics (default: 5221) |
 | `--with-deps` | Install dependencies if not already installed | false |
 | `--force` | Force reinstallation even if already installed | false |
 | `--use-ollama` | Use Ollama for LLM analysis | false |
 | `--enable-llm` | Enable LLM-enhanced analysis | false |
 | `--enable-prometheus` | Enable Prometheus integration | false |
+| `--enable-monitoring` | Set up Prometheus and Loki monitoring | false |
 | `--help` | Display help message and exit | - |
 
-## API Endpoints
+### Makefile Targets
+
+```bash
+# Install Resource Watcher
+make resource-watcher
+
+# Check the status of the Resource Watcher
+make resource-watcher-status
+
+# View logs
+make resource-watcher-logs
+
+# View current metrics
+make resource-watcher-metrics
+```
+
+## API Reference
 
 The Resource Watcher provides the following API endpoints:
 
 ### Health Check
 
 ```
-GET /healthz
+GET /health
 ```
 
 Returns the current health status of the service.
@@ -163,189 +194,272 @@ Returns the current system metrics.
 }
 ```
 
-### Prometheus Metrics
+### Resource Metrics
 
 ```
-GET /metrics/prometheus
+GET /metrics/components
 ```
 
-Returns the current metrics in Prometheus format for scraping.
+Retrieves the current resource usage metrics for all monitored AI components.
 
-### Historical Metrics
+**Request:**
+```
+GET /metrics/components?client_id=client1
+```
+
+**Response:**
+```json
+{
+  "metrics": [
+    {
+      "component": "ollama",
+      "resources": {
+        "cpu_usage": 15.2,
+        "memory_usage": 1245.6,
+        "memory_usage_percent": 35.8,
+        "disk_usage": 10240,
+        "network_in": 12.5,
+        "network_out": 8.3
+      },
+      "status": "healthy"
+    },
+    {
+      "component": "langchain",
+      "resources": {
+        "cpu_usage": 8.7,
+        "memory_usage": 512.3,
+        "memory_usage_percent": 14.6,
+        "disk_usage": 1024,
+        "network_in": 5.2,
+        "network_out": 3.1
+      },
+      "status": "healthy"
+    }
+  ],
+  "timestamp": "2025-04-05T19:45:00Z"
+}
+```
+
+### Model Usage
 
 ```
-GET /metrics/history
+GET /metrics/models
 ```
 
-Returns historical metrics within a specified time range.
+Retrieves usage statistics for LLM models.
 
-**Query Parameters:**
-- `start`: ISO format start time (optional)
-- `end`: ISO format end time (optional)
-- `limit`: Maximum number of metrics to return (default: 100)
+**Request:**
+```
+GET /metrics/models?client_id=client1
+```
 
-### Alerts
+**Response:**
+```json
+{
+  "models": [
+    {
+      "name": "llama2",
+      "provider": "ollama",
+      "requests_count": 124,
+      "tokens_input": 15678,
+      "tokens_output": 32456,
+      "avg_latency_ms": 235.6,
+      "last_used": "2025-04-05T19:40:00Z"
+    },
+    {
+      "name": "mistral",
+      "provider": "ollama",
+      "requests_count": 56,
+      "tokens_input": 7890,
+      "tokens_output": 12345,
+      "avg_latency_ms": 185.2,
+      "last_used": "2025-04-05T19:42:00Z"
+    }
+  ],
+  "timestamp": "2025-04-05T19:45:00Z"
+}
+```
+
+### Resource Alerts
 
 ```
 GET /alerts
 ```
 
-Returns alerts within a specified time range and filtering criteria.
+Retrieves active resource alerts.
 
-**Query Parameters:**
-- `level`: Filter by alert level (optional, e.g., "warning", "critical")
-- `resource_type`: Filter by resource type (optional, e.g., "cpu", "memory")
-- `start`: ISO format start time (optional)
-- `end`: ISO format end time (optional)
-- `limit`: Maximum number of alerts to return (default: 100)
-
-### Resource Summary
-
+**Request:**
 ```
-GET /summary
+GET /alerts?client_id=client1
 ```
 
-Returns a summary of resource usage with optional LLM-enhanced insights.
-
-**Query Parameters:**
-- `time_range`: Time range for the summary (default: "1h", options: "1h", "6h", "24h", "7d")
-- `include_insights`: Whether to include LLM-enhanced insights (default: false)
-
-**Example Response:**
+**Response:**
 ```json
 {
-  "start_time": "2023-05-23T13:30:45.123456",
-  "end_time": "2023-05-23T14:30:45.123456",
-  "system": {
-    "hostname": "agency-server",
-    "platform": "Linux",
-    "platform_version": "5.15.0-1019-azure",
-    "client_id": "acme"
-  },
-  "cpu_avg": 15.3,
-  "cpu_max": 45.2,
-  "memory_avg": 42.8,
-  "memory_max": 48.5,
-  "disk_usage_avg": {
-    "/": 29.5
-  },
-  "network_traffic_mb": {
-    "eth0": {
-      "sent": 5.2,
-      "received": 12.8
-    }
-  },
   "alerts": [
     {
-      "timestamp": "2023-05-23T14:15:23.123456",
-      "level": "warning",
-      "resource_type": "cpu",
-      "message": "CPU usage exceeded 40% threshold (45.2%)"
-    }
-  ],
-  "anomalies": [
-    {
-      "title": "CPU spike detected",
-      "description": "A significant CPU spike occurred at 14:15, reaching 45.2%",
-      "severity": "medium"
-    }
-  ],
-  "recommendations": [
-    {
-      "title": "Investigate CPU usage",
-      "description": "The CPU usage spike correlates with scheduled backup processes",
-      "action": "Consider rescheduling backups to off-peak hours"
+      "component": "ollama",
+      "alert_type": "high_memory_usage",
+      "value": 85.2,
+      "threshold": 80.0,
+      "timestamp": "2025-04-05T19:43:00Z",
+      "severity": "warning"
     }
   ]
 }
 ```
 
-## Integration with Prometheus
+## Configuration
 
-The Resource Watcher can be integrated with Prometheus for long-term metrics storage and alerting:
+The Resource Watcher can be configured through environment variables or a configuration file:
 
-1. Enable Prometheus integration during installation:
+### Environment Variables
+
+```
+RESOURCE_WATCHER_PORT=5220
+RESOURCE_WATCHER_METRICS_PORT=5221
+RESOURCE_WATCHER_POLL_INTERVAL=15
+RESOURCE_WATCHER_LOG_LEVEL=info
+RESOURCE_WATCHER_ORCHESTRATOR_URL=http://localhost:5210
+```
+
+### Configuration File
+
+Located at `/opt/agency_stack/resource_watcher/config.json`:
+
+```json
+{
+  "port": 5220,
+  "metrics_port": 5221,
+  "poll_interval_seconds": 15,
+  "log_level": "info",
+  "orchestrator_url": "http://localhost:5210",
+  "alerts": {
+    "cpu_threshold_percent": 80,
+    "memory_threshold_percent": 80,
+    "disk_threshold_percent": 90
+  },
+  "components": [
+    {
+      "name": "ollama",
+      "container_name": "ollama",
+      "ports": [11434, 11435],
+      "custom_metrics": ["model_load_time", "inference_time"]
+    },
+    {
+      "name": "langchain",
+      "container_name": "langchain",
+      "ports": [5111, 5112],
+      "custom_metrics": ["chain_execution_time", "embedding_time"]
+    }
+  ]
+}
+```
+
+## Integration with AgencyStack
+
+The Resource Watcher integrates with:
+
+- **Agent Orchestrator**: Provides resource data for intelligent automation
+- **Prometheus**: Exposes metrics for long-term storage and visualization
+- **Loki**: Forwards logs for aggregation and search
+- **AI Dashboard**: Stats are visible through the AI control panel
+
+## Architecture Diagram
+
+```
+                                +---------------+
+                                | AI Dashboard  |
+                                +---------------+
+                                       ^
+                                       |
+      +---------------+        +-------------------+        +---------------+
+      |   Prometheus  |<------>| Resource Watcher  |<------>|     Loki     |
+      +---------------+        +-------------------+        +---------------+
+                                       ^
+                                       |
+                   +-----------------+-----------------+
+                   |                 |                 |
+           +---------------+  +---------------+  +---------------+
+           |    Ollama     |  |   LangChain   |  |  Other AI     |
+           +---------------+  +---------------+  |  Components   |
+                                                 +---------------+
+```
+
+## Monitoring
+
+### Prometheus Metrics
+
+The Resource Watcher exposes the following Prometheus metrics:
+
+- `resource_watcher_component_cpu_usage`: CPU usage percentage by component
+- `resource_watcher_component_memory_usage`: Memory usage in MB by component
+- `resource_watcher_component_memory_usage_percent`: Memory usage percentage by component
+- `resource_watcher_component_disk_usage`: Disk usage in MB by component
+- `resource_watcher_model_request_count`: Request count by model
+- `resource_watcher_model_tokens_processed`: Token count by model and direction (input/output)
+- `resource_watcher_model_latency`: Average latency in milliseconds by model
+
+### Grafana Dashboard
+
+A Grafana dashboard template is provided for visualizing Resource Watcher metrics. Import the dashboard from:
+
+```
+/opt/agency_stack/resource_watcher/grafana/dashboard.json
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Cannot connect to Docker**: Ensure Docker is running and the Resource Watcher has proper permissions.
    ```bash
-   ./scripts/components/install_resource_watcher.sh --enable-prometheus
+   systemctl status docker
    ```
 
-2. Configure Prometheus to scrape metrics from the Resource Watcher:
-   ```yaml
-   scrape_configs:
-     - job_name: 'resource-watcher'
-       scrape_interval: 15s
-       static_configs:
-         - targets: ['resource-watcher:5211']
-   ```
-
-## LLM-Enhanced Mode
-
-The Resource Watcher can use LLMs (Large Language Models) to provide intelligent analysis and recommendations:
-
-1. Enable LLM integration during installation:
+2. **No metrics data**: Check if components are properly tagged for monitoring.
    ```bash
-   ./scripts/components/install_resource_watcher.sh --enable-llm
+   docker ps --format "{{.Names}}"
    ```
 
-2. Choose between LangChain or Ollama for LLM processing:
-   ```bash
-   # LangChain (default)
-   ./scripts/components/install_resource_watcher.sh --enable-llm
-   
-   # Ollama
-   ./scripts/components/install_resource_watcher.sh --enable-llm --use-ollama
-   ```
+3. **High resource usage**: Adjust resource limits for AI components in their respective configurations.
 
-3. Access LLM-enhanced insights via the API:
-   ```
-   GET /summary?include_insights=true
-   ```
+### Logs
 
-## Makefile Integration
-
-The Resource Watcher provides Makefile targets for easy management:
+View Resource Watcher logs with:
 
 ```bash
-# Installation
-make resource-watcher
-
-# Check status
-make resource-watcher-status
-
-# View logs
 make resource-watcher-logs
+```
 
-# Restart service
-make resource-watcher-restart
+Or directly:
 
-# View metrics
-make resource-watcher-metrics
+```bash
+docker logs resource-watcher
 ```
 
 ## Security Considerations
 
-The Resource Watcher implements the following security measures:
+- Resource Watcher runs with limited privileges
+- API endpoints require client_id authentication
+- Metrics are isolated per tenant
+- No sensitive data is exposed via metrics
 
-- Runs in an isolated Docker container
-- Uses non-root user within the container
-- Read-only access to system resources via volume mounts
-- Client isolation for multi-tenant deployments
-- TLS encryption with Traefik integration (when using domains)
-- Configurable rate limiting
+## Upgrade Procedure
 
-## Troubleshooting
+To upgrade the Resource Watcher:
 
-Common issues and their solutions:
+1. Backup the configuration:
+   ```bash
+   cp /opt/agency_stack/resource_watcher/config.json /tmp/resource_watcher_config_backup.json
+   ```
 
-1. **Service fails to start**:
-   - Check the logs: `make resource-watcher-logs`
-   - Ensure Docker is running: `systemctl status docker`
-   - Verify port availability: `netstat -tuln | grep 5211`
+2. Run the installation with the force flag:
+   ```bash
+   make resource-watcher FORCE=true
+   ```
 
-2. **Missing metrics**:
-   - Check collection interval: `docker exec resource-watcher-{client_id} env | grep COLLECTION`
-   - Verify data directory permissions: `ls -la /opt/agency_stack/clients/{client_id}/monitoring/resource_watcher/data`
-
-3. **LLM integration not working**:
-   - Verify LLM service is running: `make ollama-status` or `make langchain-status`
-   - Check connection URLs in environment variables: `docker exec resource-watcher-{client_id} env | grep URL`
+3. Verify the upgrade:
+   ```bash
+   make resource-watcher-status
+   ```
