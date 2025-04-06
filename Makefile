@@ -34,6 +34,9 @@ help:
 	@echo "  $(BOLD)make test-env$(RESET)         Test the environment"
 	@echo "  $(BOLD)make backup$(RESET)           Backup all data"
 	@echo "  $(BOLD)make clean$(RESET)            Remove all containers and volumes"
+	@echo "  $(BOLD)make prep-dirs$(RESET)        Create required directories for AgencyStack"
+	@echo "  $(BOLD)make env-check$(RESET)        Validate environment variables"
+	@echo "  $(BOLD)make docs-index$(RESET)       Generate documentation index and TOC"
 	@echo "  $(BOLD)make stack-info$(RESET)       Display AgencyStack information"
 	@echo "  $(BOLD)make talknerdy$(RESET)        Display a random nerdy quote"
 	@echo "  $(BOLD)make rootofmouth$(RESET)      Display system performance stats"
@@ -150,6 +153,43 @@ clean:
 	@read -p "This will remove all containers and volumes. Are you sure? [y/N] " confirm; \
 	[[ $$confirm == [yY] || $$confirm == [yY][eE][sS] ]] || exit 1
 	@sudo docker-compose down -v
+
+# Prepare required directories
+prep-dirs:
+	@echo "$(MAGENTA)$(BOLD)🏗️ Creating required AgencyStack directories...$(RESET)"
+	@sudo mkdir -p /opt/agency_stack/
+	@sudo mkdir -p /opt/agency_stack/clients/
+	@sudo mkdir -p /opt/agency_stack/secrets/
+	@sudo mkdir -p /var/log/agency_stack/components/
+	@sudo mkdir -p /var/log/agency_stack/clients/
+	@sudo mkdir -p /var/log/agency_stack/integrations/
+	@sudo chown -R $(shell whoami):$(shell whoami) /opt/agency_stack/ 2>/dev/null || true
+	@sudo chmod -R 750 /opt/agency_stack/ 2>/dev/null || true
+	@sudo chown -R $(shell whoami):$(shell whoami) /var/log/agency_stack/ 2>/dev/null || true
+	@sudo chmod -R 750 /var/log/agency_stack/ 2>/dev/null || true
+	@echo "$(GREEN)✓ All required directories created with proper permissions$(RESET)"
+
+# Check environment variables
+env-check:
+	@echo "$(MAGENTA)$(BOLD)🔍 Validating Environment Variables...$(RESET)"
+	@bash $(SCRIPTS_DIR)/env_check.sh
+	@echo ""
+	@echo "$(BLUE)If you need to update your environment variables:$(RESET)"
+	@echo "1. Edit your .env file: $(BOLD)nano .env$(RESET)"
+	@echo "2. Run this check again: $(BOLD)make env-check$(RESET)"
+	@echo ""
+	@echo "$(BLUE)For documentation on all available environment variables:$(RESET)"
+	@echo "$(BOLD)cat docs/pages/setup/env.md$(RESET)"
+
+# Generate documentation index and TOC
+docs-index:
+	@echo "$(MAGENTA)$(BOLD)📚 Generating Documentation Index...$(RESET)"
+	@bash $(SCRIPTS_DIR)/generate_docs_index.sh
+	@echo ""
+	@echo "$(GREEN)Documentation index generated successfully.$(RESET)"
+	@echo "$(BLUE)Main index: $(BOLD)docs/pages/index.md$(RESET)"
+	@echo "$(BLUE)Components index: $(BOLD)docs/pages/components.md$(RESET)"
+	@echo "$(BLUE)Ports reference: $(BOLD)docs/pages/ports.md$(RESET)"
 
 # Display AgencyStack information
 stack-info:
@@ -1135,6 +1175,50 @@ install-ai-suite:
 	@echo "$(CYAN)Run 'make ai-alpha-check' to verify the installation.$(RESET)"
 
 ## AI Alpha Check Targets
+alpha-check:
+	@echo "$(MAGENTA)$(BOLD)🔍 Running AgencyStack Alpha Check...$(RESET)"
+	@bash $(SCRIPTS_DIR)/alpha_check.sh
+	@echo ""
+	@echo "$(BLUE)Check log file for detailed results:$(RESET)"
+	@echo "$(BOLD)cat /var/log/agency_stack/alpha_check.log$(RESET)"
+
+ui-alpha-check:
+	@echo "$(MAGENTA)$(BOLD)🖥️ Running AgencyStack UI Alpha Check...$(RESET)"
+	@echo "$(BLUE)Checking UI components and dashboard functionality...$(RESET)"
+	@echo ""
+	
+	@echo "$(CYAN)Checking dashboard and UI components...$(RESET)"
+	@if docker ps | grep -q "agency-dashboard"; then \
+		echo "$(GREEN)✓ Dashboard container is running$(RESET)"; \
+	else \
+		echo "$(RED)❌ Dashboard container is not running$(RESET)"; \
+	fi
+	
+	@echo "$(CYAN)Checking Traefik routes...$(RESET)"
+	@if [ -f "/opt/agency_stack/traefik/rules/dashboard.yml" ]; then \
+		echo "$(GREEN)✓ Dashboard routing is configured$(RESET)"; \
+	else \
+		echo "$(RED)❌ Dashboard routing is not configured$(RESET)"; \
+	fi
+	
+	@echo "$(CYAN)Checking UI data sources...$(RESET)"
+	@if [ -f "/opt/agency_stack/dashboard/data/dashboard_data.json" ]; then \
+		echo "$(GREEN)✓ Dashboard data source exists$(RESET)"; \
+	else \
+		echo "$(RED)❌ Dashboard data source is missing$(RESET)"; \
+	fi
+	
+	@echo "$(CYAN)Checking UI auth integration...$(RESET)"
+	@if grep -q "auth_config" "/opt/agency_stack/dashboard/config/config.json" 2>/dev/null; then \
+		echo "$(GREEN)✓ UI authentication is configured$(RESET)"; \
+	else \
+		echo "$(YELLOW)⚠️ UI authentication may not be configured$(RESET)"; \
+	fi
+	
+	@echo ""
+	@echo "$(BLUE)To open the dashboard:$(RESET)"
+	@echo "$(BOLD)make dashboard-open$(RESET)"
+
 ai-alpha-check:
 	@echo "$(CYAN)This is a deprecated implementation. Using the consolidated version...$(RESET)"
 	@$(MAKE) -f $(MAKEFILE_LIST) ai-alpha-check-consolidated
@@ -1146,3 +1230,46 @@ ai-alpha-check-consolidated:
 	
 	@echo "1. Checking Ollama..."
 	@if [ -d "/opt/agency_stack/ollama" ]; then \
+		echo "$(GREEN)✓ Ollama is installed$(RESET)"; \
+	else \
+		echo "$(RED)❌ Ollama is not installed$(RESET)"; \
+	fi
+	
+	@echo "2. Checking LangChain..."
+	@if [ -d "/opt/agency_stack/langchain" ]; then \
+		echo "$(GREEN)✓ LangChain is installed$(RESET)"; \
+	else \
+		echo "$(RED)❌ LangChain is not installed$(RESET)"; \
+	fi
+	
+	@echo "3. Checking AI Dashboard..."
+	@if [ -d "/opt/agency_stack/ai_dashboard" ]; then \
+		echo "$(GREEN)✓ AI Dashboard is installed$(RESET)"; \
+	else \
+		echo "$(RED)❌ AI Dashboard is not installed$(RESET)"; \
+	fi
+	
+	@echo "4. Checking Agent Orchestrator..."
+	@if [ -d "/opt/agency_stack/agent_orchestrator" ]; then \
+		echo "$(GREEN)✓ Agent Orchestrator is installed$(RESET)"; \
+	else \
+		echo "$(RED)❌ Agent Orchestrator is not installed$(RESET)"; \
+	fi
+	
+	@echo "5. Checking Resource Watcher..."
+	@if [ -d "/opt/agency_stack/resource_watcher" ]; then \
+		echo "$(GREEN)✓ Resource Watcher is installed$(RESET)"; \
+	else \
+		echo "$(RED)❌ Resource Watcher is not installed$(RESET)"; \
+	fi
+	
+	@echo "6. Checking Agent Tools..."
+	@if [ -d "/opt/agency_stack/agent_tools" ]; then \
+		echo "$(GREEN)✓ Agent Tools are installed$(RESET)"; \
+	else \
+		echo "$(RED)❌ Agent Tools are not installed$(RESET)"; \
+	fi
+	
+	@echo ""
+	@echo "$(BLUE)To open the AI Dashboard:$(RESET)"
+	@echo "$(BOLD)make ai-dashboard-test$(RESET)"
