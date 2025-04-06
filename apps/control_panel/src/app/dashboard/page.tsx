@@ -8,44 +8,59 @@
 
 import { useState, useEffect } from 'react';
 import { useClientId } from '@/hooks/useClientId';
-import { componentRegistry, getAllCategories } from '@/lib/component-registry';
+import { loadComponentRegistry, getAllCategories, getAllTags, Component } from '@/components/registry';
+import ComponentPanel from '@/components/ComponentPanel';
 
 export default function Dashboard() {
   const { clientId, isLoading: clientIdLoading } = useClientId();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [components, setComponents] = useState<Component[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [tags, setTags] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
-  // Get all categories for filter
-  const categories = getAllCategories();
+  // Load component registry on mount
+  useEffect(() => {
+    const fetchComponents = async () => {
+      setIsLoading(true);
+      try {
+        const componentsData = await loadComponentRegistry();
+        setComponents(componentsData);
+        setCategories(getAllCategories(componentsData));
+        setTags(getAllTags(componentsData));
+      } catch (error) {
+        console.error('Failed to load components:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchComponents();
+  }, []);
   
-  // Filter components based on search term and category
-  const filteredComponents = componentRegistry.filter(component => {
+  // Refresh components when an action is completed
+  const handleActionComplete = async () => {
+    try {
+      const updatedComponents = await loadComponentRegistry();
+      setComponents(updatedComponents);
+    } catch (error) {
+      console.error('Failed to refresh components:', error);
+    }
+  };
+  
+  // Filter components based on search term, category, and tag
+  const filteredComponents = components.filter(component => {
     const matchesSearch = searchTerm === '' || 
       component.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       component.description.toLowerCase().includes(searchTerm.toLowerCase());
       
     const matchesCategory = selectedCategory === null || component.category === selectedCategory;
+    const matchesTag = selectedTag === null || component.tags.includes(selectedTag);
     
-    return matchesSearch && matchesCategory;
+    return matchesSearch && matchesCategory && matchesTag;
   });
-  
-  // Status badge component
-  const StatusBadge = ({ status }: { status: string }) => {
-    const baseClasses = "text-xs font-medium px-2.5 py-0.5 rounded-full";
-    
-    const statusClasses = {
-      healthy: `${baseClasses} bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200`,
-      warning: `${baseClasses} bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200`,
-      error: `${baseClasses} bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200`,
-      inactive: `${baseClasses} bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200`
-    };
-    
-    return (
-      <span className={statusClasses[status as keyof typeof statusClasses] || statusClasses.inactive}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </span>
-    );
-  };
 
   return (
     <div className="space-y-6">
@@ -89,7 +104,7 @@ export default function Dashboard() {
         </div>
 
         {/* Category Filter */}
-        <div className="md:w-64">
+        <div className="md:w-48">
           <select
             className="bg-white dark:bg-agency-800 border border-gray-300 dark:border-agency-700 text-agency-800 dark:text-agency-200 text-sm rounded-lg block w-full p-2.5"
             value={selectedCategory || ''}
@@ -103,57 +118,45 @@ export default function Dashboard() {
             ))}
           </select>
         </div>
+        
+        {/* Tag Filter */}
+        <div className="md:w-48">
+          <select
+            className="bg-white dark:bg-agency-800 border border-gray-300 dark:border-agency-700 text-agency-800 dark:text-agency-200 text-sm rounded-lg block w-full p-2.5"
+            value={selectedTag || ''}
+            onChange={(e) => setSelectedTag(e.target.value === '' ? null : e.target.value)}
+          >
+            <option value="">All Tags</option>
+            {tags.map((tag) => (
+              <option key={tag} value={tag}>
+                {tag.charAt(0).toUpperCase() + tag.slice(1)}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
+      {/* Loading state */}
+      {isLoading && (
+        <div className="flex justify-center items-center py-10">
+          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-agency-600"></div>
+        </div>
+      )}
+
       {/* Components Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {filteredComponents.map((component) => (
-          <div 
-            key={component.id}
-            className="card hover:shadow-lg transition-shadow cursor-pointer"
-          >
-            <div className="flex justify-between items-start">
-              <div className="flex items-center">
-                <div className="p-2 rounded-lg bg-agency-100 dark:bg-agency-800">
-                  {/* This would use dynamic icon imports in a real implementation */}
-                  <svg className="w-6 h-6 text-agency-600 dark:text-agency-300" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-4">
-                  <h3 className="text-lg font-medium text-agency-800 dark:text-agency-100">
-                    {component.name}
-                  </h3>
-                  <p className="text-sm text-agency-600 dark:text-agency-400">
-                    {component.description}
-                  </p>
-                </div>
-              </div>
-              <StatusBadge status={component.status.status} />
-            </div>
-            
-            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-agency-700">
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-agency-500 dark:text-agency-400">
-                  Last updated: {new Date(component.status.lastUpdated).toLocaleString()}
-                </span>
-                
-                <button className="btn btn-primary text-xs py-1">
-                  Manage
-                </button>
-              </div>
-              
-              {component.status.message && (
-                <p className="mt-2 text-sm text-agency-600 dark:text-agency-400">
-                  {component.status.message}
-                </p>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+      {!isLoading && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
+          {filteredComponents.map((component) => (
+            <ComponentPanel 
+              key={component.id} 
+              component={component} 
+              onActionComplete={handleActionComplete}
+            />
+          ))}
+        </div>
+      )}
       
-      {filteredComponents.length === 0 && (
+      {!isLoading && filteredComponents.length === 0 && (
         <div className="text-center py-10">
           <p className="text-agency-600 dark:text-agency-400">
             No components match your filters.
