@@ -37,15 +37,21 @@ The one-line installer performs the following operations:
    - Creates all required directories according to AgencyStack DevOps rules
    - Sets up client and component directories
 
-5. **Repository Setup**:
+5. **Existing Installation Handling**:
+   - Automatically detects if AgencyStack is already installed
+   - In non-interactive mode (one-line installation), creates a backup of the existing installation
+   - Backup is stored at `/opt/agency_stack_backup_<timestamp>/`
+   - Proceeds with a fresh installation while preserving your data
+
+6. **Repository Setup**:
    - Clones the AgencyStack repository (if not already present)
    - Prepares the environment for component installation
 
-6. **Makefile Integration**:
+7. **Makefile Integration**:
    - Runs `make prep-dirs` to set up component directories
    - Runs `make env-check` to validate the environment
 
-7. **Seamless Transition**:
+8. **Seamless Transition**:
    - Proceeds to the regular installation flow after preparation
    - Presents the component selection menu
 

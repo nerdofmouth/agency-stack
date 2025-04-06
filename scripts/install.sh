@@ -117,10 +117,36 @@ setup_first_run_environment() {
   fi
   
   # Clone repository if not already present and we're in one-line mode
-  if [ ! -d "/opt/agency_stack/repo" ] && [ "$ONE_LINE_MODE" = true ]; then
+  if [ "$ONE_LINE_MODE" = true ]; then
     log "INFO" "Cloning AgencyStack repository..."
     echo -e "${BOLD}Cloning AgencyStack repository...${NC}"
     
+    # Check if we already have an installation
+    if [ -d "/opt/agency_stack/repo" ] || [ -d "/opt/agency_stack/clients" ]; then
+      log "WARN" "Existing installation found at /opt/agency_stack"
+      echo -e "${YELLOW}WARNING: Existing installation found at /opt/agency_stack${NC}"
+      
+      # In non-interactive mode, we need to provide a default behavior
+      log "INFO" "Running in non-interactive mode, creating backup and continuing"
+      echo -e "${BLUE}Creating backup of existing installation and continuing...${NC}"
+      
+      # Create backup timestamp
+      BACKUP_TS=$(date +"%Y%m%d%H%M%S")
+      BACKUP_DIR="/opt/agency_stack_backup_${BACKUP_TS}"
+      
+      # Create backup
+      mkdir -p "$BACKUP_DIR"
+      cp -r /opt/agency_stack/* "$BACKUP_DIR/" 2>/dev/null || true
+      log "INFO" "Created backup at $BACKUP_DIR"
+      echo -e "${GREEN}Created backup at $BACKUP_DIR${NC}"
+      
+      # Clean up old repo
+      if [ -d "/opt/agency_stack/repo" ]; then
+        rm -rf /opt/agency_stack/repo
+      fi
+    fi
+    
+    # Now clone the repository
     git clone https://github.com/nerdofmouth/agency-stack.git /opt/agency_stack/repo
     
     # Change to the repository directory
