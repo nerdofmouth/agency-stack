@@ -759,7 +759,7 @@ prometheus-reload:
 
 prometheus-alerts:
 	@echo "$(MAGENTA)$(BOLD)🔔 Viewing Prometheus Alerts...$(RESET)"
-	@curl -s http://localhost:9090/api/v1/alerts | jq . || echo "$(RED)Failed to fetch alerts. Is Prometheus running?$(RESET)"
+	@curl -s http://localhost:9090/api/v1/alerts | jq || echo "$(RED)Failed to fetch alerts. Is Prometheus running?$(RESET)"
 
 prometheus-config:
 	@echo "$(MAGENTA)$(BOLD)⚙️ Configuring Prometheus...$(RESET)"
@@ -1128,6 +1128,7 @@ ai-dashboard:
 ai-dashboard-status:
 	@echo "Checking AI Dashboard status..."
 	@docker ps -f "name=ai-dashboard-$(CLIENT_ID)" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+	@echo "$(CYAN)Logs can be viewed with: make ai-dashboard-logs$(RESET)"
 
 ai-dashboard-logs:
 	@echo "Viewing AI Dashboard logs..."
@@ -1163,3 +1164,46 @@ agent-orchestrator-test:
 	@curl -s http://localhost:5210/health || echo "Could not connect to Agent Orchestrator. Is it running?"
 	@echo ""
 	@echo "To open in browser, visit: https://agent.$(DOMAIN)"
+
+## Resource Watcher Targets
+resource-watcher:
+	@echo "$(MAGENTA)$(BOLD)🔍 Installing Resource Watcher...$(RESET)"
+	@./scripts/components/install_resource_watcher.sh --client-id=$(CLIENT_ID) --domain=$(DOMAIN) $(RESOURCE_WATCHER_FLAGS)
+
+resource-watcher-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Resource Watcher status...$(RESET)"
+	@docker ps -f "name=resource-watcher-$(CLIENT_ID)" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+	@echo "$(CYAN)Logs can be viewed with: make resource-watcher-logs$(RESET)"
+
+resource-watcher-logs:
+	@echo "$(MAGENTA)$(BOLD)📋 Viewing Resource Watcher logs...$(RESET)"
+	@docker logs resource-watcher-$(CLIENT_ID) -f --tail=100
+
+resource-watcher-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Resource Watcher...$(RESET)"
+	@docker restart resource-watcher-$(CLIENT_ID)
+
+resource-watcher-metrics:
+	@echo "$(MAGENTA)$(BOLD)📊 Viewing current system metrics...$(RESET)"
+	@PORT=$$(docker port resource-watcher-$(CLIENT_ID) 5211/tcp | sed 's/0.0.0.0://'); \
+	curl -s "http://localhost:$${PORT}/metrics" | jq
+
+resource-watcher-summary:
+	@echo "$(MAGENTA)$(BOLD)📈 Viewing resource usage summary...$(RESET)"
+	@PORT=$$(docker port resource-watcher-$(CLIENT_ID) 5211/tcp | sed 's/0.0.0.0://'); \
+	curl -s "http://localhost:$${PORT}/summary?include_insights=true" | jq
+
+resource-watcher-alerts:
+	@echo "$(MAGENTA)$(BOLD)⚠️ Viewing recent alerts...$(RESET)"
+	@PORT=$$(docker port resource-watcher-$(CLIENT_ID) 5211/tcp | sed 's/0.0.0.0://'); \
+	curl -s "http://localhost:$${PORT}/alerts?limit=10" | jq
+
+## Complete AI Suite Installation
+install-ai-suite: validate
+	@echo "$(MAGENTA)$(BOLD)🧠 Installing complete AI suite...$(RESET)"
+	@make langchain
+	@make ollama
+	@make ai-dashboard
+	@make agent-orchestrator
+	@make resource-watcher
+	@echo "$(GREEN)✅ AI suite installation complete!$(RESET)"
