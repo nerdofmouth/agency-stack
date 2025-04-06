@@ -16,7 +16,7 @@ interface ComponentPanelProps {
 }
 
 export default function ComponentPanel({ component, onActionComplete }: ComponentPanelProps) {
-  const { clientId, isAdmin } = useClientId();
+  const { clientId, isAdmin, readOnlyMode, canPerformActions } = useClientId();
   const [isExpanded, setIsExpanded] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -50,6 +50,12 @@ export default function ComponentPanel({ component, onActionComplete }: Componen
   
   // Execute component action
   const handleAction = async (action: string) => {
+    // If in read-only mode, show message but don't execute action
+    if (readOnlyMode) {
+      setActionMessage("Read-only mode: Actions disabled for demo/testing");
+      return;
+    }
+    
     try {
       setActionLoading(action);
       setActionMessage(null);
@@ -155,6 +161,12 @@ export default function ComponentPanel({ component, onActionComplete }: Componen
           {component.multiTenant && component.status.clientId && (
             <span className="text-xs mt-1 text-agency-600 dark:text-agency-400">
               Client: {component.status.clientId}
+            </span>
+          )}
+          
+          {readOnlyMode && (
+            <span className="text-xs mt-1 text-amber-600 dark:text-amber-400 font-medium">
+              Read-only Mode
             </span>
           )}
         </div>
@@ -276,7 +288,7 @@ export default function ComponentPanel({ component, onActionComplete }: Componen
           </button>
           
           {/* Actions dropdown */}
-          {canAccess && (
+          {canAccess && !readOnlyMode && (
             <div className="relative inline-block text-left">
               <button
                 className="btn btn-primary text-xs py-1"
@@ -305,8 +317,21 @@ export default function ComponentPanel({ component, onActionComplete }: Componen
             </div>
           )}
           
+          {/* Read-only indicator for actions dropdown */}
+          {canAccess && readOnlyMode && (
+            <div className="relative inline-block text-left">
+              <button
+                className="btn btn-primary text-xs py-1 opacity-70 cursor-not-allowed"
+                disabled={true}
+                title="Actions disabled in read-only mode"
+              >
+                Actions
+              </button>
+            </div>
+          )}
+          
           {/* Individual action buttons as an alternative to dropdown */}
-          {canAccess && !isExpanded && (
+          {canAccess && !isExpanded && !readOnlyMode && (
             <div className="flex gap-1">
               {component.actions.start && component.status.status !== 'running' && (
                 <button

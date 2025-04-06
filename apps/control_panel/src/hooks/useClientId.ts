@@ -1,93 +1,98 @@
 /**
  * useClientId Hook
  * 
- * This hook provides client ID awareness for AgencyStack's multi-tenant architecture.
- * Currently returns a mock value, but will later integrate with Keycloak/SSO.
+ * Provides client ID awareness for multi-tenant architecture
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
-export const useClientId = () => {
+// In a real implementation, this would come from an authenticated session
+// or be fetched from an API based on the current user
+export function useClientId() {
   const [clientId, setClientId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
+  const [role, setRole] = useState<'admin' | 'client'>('client');
+  const [readOnlyMode, setReadOnlyMode] = useState(false);
+  
+  // Check if URL has a read-only flag for demo/testing
   useEffect(() => {
-    const getClientId = async () => {
+    // Check if ?readonly=true is in the URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const readonly = urlParams.get('readonly');
+    setReadOnlyMode(readonly === 'true');
+    
+    // Could also check for localStorage or environment variable
+    const localReadOnly = localStorage.getItem('agency_readonly_mode');
+    if (localReadOnly === 'true') {
+      setReadOnlyMode(true);
+    }
+  }, []);
+  
+  // Simulate loading clientId from server/session
+  useEffect(() => {
+    const fetchClientId = async () => {
+      setIsLoading(true);
       try {
-        // TODO: Replace with actual Keycloak integration
-        // This is a placeholder mock implementation
-        
-        // In production, this would:
-        // 1. Check authentication state
-        // 2. Extract client ID from token/session
-        // 3. Validate permissions
-        
-        // Mock delay to simulate network request
+        // In a real implementation, fetch from API or auth session
+        // Simulate network delay for development
         await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Mock client ID (in production, this would come from Keycloak)
-        const mockClientId = 'agency_primary';
+        // Check URL for clientId parameter (for testing)
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlClientId = urlParams.get('clientId');
         
-        setClientId(mockClientId);
-        setIsLoading(false);
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error('Failed to get client ID'));
+        if (urlClientId) {
+          setClientId(urlClientId);
+        } else {
+          // Default to 'client_alpha' for development
+          setClientId('client_alpha');
+        }
+        
+        // Check if admin role
+        const urlRole = urlParams.get('role');
+        if (urlRole === 'admin') {
+          setRole('admin');
+        } else {
+          setRole('client');
+        }
+      } catch (error) {
+        console.error('Failed to fetch client ID:', error);
+        setClientId(null);
+      } finally {
         setIsLoading(false);
       }
     };
-
-    getClientId();
-  }, []);
-
-  /**
-   * Switch to a different client context
-   * This would be used when an admin switches between client contexts
-   */
-  const switchClient = async (newClientId: string) => {
-    setIsLoading(true);
     
-    try {
-      // Mock delay to simulate network request
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // In production, this would:
-      // 1. Validate the user has permission to access this client
-      // 2. Update session state
-      // 3. Refresh relevant data
-      
+    fetchClientId();
+  }, []);
+  
+  // Helper function to check if current user is admin
+  const isAdmin = useCallback(() => {
+    return role === 'admin';
+  }, [role]);
+  
+  // Function to switch client (only available to admins)
+  const switchClient = useCallback((newClientId: string) => {
+    if (role === 'admin' && !readOnlyMode) {
       setClientId(newClientId);
-      setIsLoading(false);
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to switch client'));
-      setIsLoading(false);
+      return true;
     }
-  };
-
-  // Check if the current user is an admin (has access to multiple clients)
-  // In production, this would check roles in the auth token
-  const isAdmin = () => {
-    return true; // Mock implementation
-  };
-
-  // Get available clients for the current user
-  // In production, this would come from an API endpoint
-  const getAvailableClients = () => {
-    return [
-      { id: 'agency_primary', name: 'Agency Primary' },
-      { id: 'client_alpha', name: 'Client Alpha' },
-      { id: 'client_beta', name: 'Client Beta' }
-    ];
-  };
-
-  return {
-    clientId,
-    isLoading,
-    error,
+    return false;
+  }, [role, readOnlyMode]);
+  
+  // Function to check if actions are allowed
+  const canPerformActions = useCallback(() => {
+    return !readOnlyMode;
+  }, [readOnlyMode]);
+  
+  return { 
+    clientId, 
+    isLoading, 
+    isAdmin, 
     switchClient,
-    isAdmin,
-    getAvailableClients
+    readOnlyMode,
+    canPerformActions
   };
-};
+}
 
 export default useClientId;
