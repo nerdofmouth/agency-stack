@@ -34,6 +34,7 @@ This document provides a comprehensive list of all port assignments used by Agen
 | **Fail2Ban** | Service | N/A | N/A | Host-level security |
 | **CrowdSec** | API | 8080 | HTTP | Security API |
 | **CrowdSec** | Dashboard | 3000 | HTTP | Management UI |
+| **CrowdSec** | Metrics | 6060 | HTTP | Prometheus metrics endpoint |
 
 ## Business Applications
 
@@ -64,6 +65,12 @@ This document provides a comprehensive list of all port assignments used by Agen
 | **Seafile** | Seafile | 12001 | TCP | Internal service |
 | **Focalboard** | Web UI | 8007 | HTTP | Project management |
 | **Builder.io** | Web UI | 8008 | HTTP | Visual CMS |
+
+## Utility & Infrastructure
+
+| Component | Service | Port | Protocol | Notes |
+|-----------|---------|------|----------|-------|
+| **TaskWarrior** | Web UI | 8080 | HTTP | Task management interface |
 
 ## Marketing & Analytics
 

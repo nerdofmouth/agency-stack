@@ -24,6 +24,8 @@ AgencyStack consists of a carefully curated selection of open-source application
 | **Keycloak** | Identity and access management | https://auth.yourdomain.com | ✅ Ready |
 | **Fail2Ban** | Intrusion prevention system | N/A | ✅ Ready |
 | **CrowdSec** | Collaborative security | N/A | ✅ Ready |
+| **Traefik SSL** | SSL/TLS certificate management for Traefik | N/A | ✅ Ready |
+| **Multi-Tenancy** | Client isolation and multi-tenant infrastructure | N/A | ✅ Ready |
 | **Signing Timestamps** | Secure document timestamping | N/A | 🔄 In Progress |
 
 ## Monitoring & Observability
@@ -60,7 +62,7 @@ AgencyStack consists of a carefully curated selection of open-source application
 | Component | Description | Default URL | Alpha Status |
 |-----------|-------------|-------------|-------------|
 | **Focalboard** | Project management tool | https://board.yourdomain.com | ✅ Ready |
-| **TaskWarrior/Calcure** | Task and calendar management | https://tasks.yourdomain.com | ✅ Ready |
+| **TaskWarrior & Calcurse** | Task and calendar management | http://taskwarrior.yourdomain.com | ✅ Ready |
 | **Chatwoot** | Customer messaging platform | https://chat.yourdomain.com | ✅ Ready |
 | **CryptoSync** | Secure file synchronization | N/A | ✅ Ready |
 
