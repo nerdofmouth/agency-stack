@@ -5,14 +5,19 @@
 
 # Detect if script is being run via curl one-liner
 ONE_LINE_MODE=false
-if [ -t 0 ]; then
-  # Terminal is a TTY (normal execution)
-  ONE_LINE_MODE=false
-else
-  # Check if being piped (like in a curl command)
-  if [ -p /dev/stdin ]; then
-    ONE_LINE_MODE=true
-  fi
+if [ ! -t 0 ]; then
+  # If standard input is not a terminal, we're being piped to
+  ONE_LINE_MODE=true
+fi
+
+# Force non-interactive mode when being piped
+if [ "$ONE_LINE_MODE" = true ]; then
+  export DEBIAN_FRONTEND=noninteractive
+  # Force git to be non-interactive too
+  export GIT_TERMINAL_PROMPT=0
+  # Prevent any other tools from prompting
+  export APT_LISTCHANGES_FRONTEND=none
+  export APT_LISTBUGS_FRONTEND=none
 fi
 
 # Installation variables
@@ -127,6 +132,7 @@ setup_first_run_environment() {
       echo -e "${YELLOW}WARNING: Existing installation found at /opt/agency_stack${NC}"
       
       # In non-interactive mode, we need to provide a default behavior
+      # Always use a backup-and-continue approach in one-line mode
       log "INFO" "Running in non-interactive mode, creating backup and continuing"
       echo -e "${BLUE}Creating backup of existing installation and continuing...${NC}"
       
@@ -143,11 +149,17 @@ setup_first_run_environment() {
       # Clean up old repo
       if [ -d "/opt/agency_stack/repo" ]; then
         rm -rf /opt/agency_stack/repo
+        log "INFO" "Removed existing repository"
       fi
     fi
     
-    # Now clone the repository
-    git clone https://github.com/nerdofmouth/agency-stack.git /opt/agency_stack/repo
+    # Now clone the repository - this should work whether we had an existing installation or not
+    log "INFO" "Cloning fresh repository"
+    git clone https://github.com/nerdofmouth/agency-stack.git /opt/agency_stack/repo || {
+      log "ERROR" "Failed to clone repository"
+      echo -e "${RED}Failed to clone repository. Check network connection and try again.${NC}"
+      exit 1
+    }
     
     # Change to the repository directory
     cd /opt/agency_stack/repo || {
