@@ -10,9 +10,13 @@ A declaration of independence for digital agencies, creative professionals, and 
 
 ## One-Line Installation
 
+For fresh installations, use our one-line installer:
+
 ```bash
-curl -sSL https://stack.nerdofmouth.com/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/nerdofmouth/agency-stack/main/scripts/install.sh | sudo bash
 ```
+
+This installer automatically handles first-run dependencies, creates required directories, and prepares your system for AgencyStack component installation. For detailed installation instructions, see [One-Line Installation Guide](docs/pages/one_line_install.md).
 
 ## Vision
 
@@ -104,7 +108,7 @@ Visit our documentation at [https://stack.nerdofmouth.com](https://stack.nerdofm
 
 ```bash
 # One-line installer (recommended)
-curl -sSL https://stack.nerdofmouth.com/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/nerdofmouth/agency-stack/main/scripts/install.sh | sudo bash
 
 # OR clone and install manually
 git clone https://github.com/nerdofmouth/agency-stack.git /opt/agency-stack

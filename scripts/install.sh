@@ -3,6 +3,18 @@
 # https://stack.nerdofmouth.com
 # This script helps manage the installation of the AgencyStack components
 
+# Detect if script is being run via curl one-liner
+ONE_LINE_MODE=false
+if [ -t 0 ]; then
+  # Terminal is a TTY (normal execution)
+  ONE_LINE_MODE=false
+else
+  # Check if being piped (like in a curl command)
+  if [ -p /dev/stdin ]; then
+    ONE_LINE_MODE=true
+  fi
+fi
+
 # Installation variables
 SCRIPT_DIR="$(dirname "$0")/agency_stack_bootstrap_bundle_v10"
 PARENT_DIR=$(dirname "$SCRIPT_DIR")
@@ -43,6 +55,117 @@ log() {
 if [ "$EUID" -ne 0 ]; then
   echo -e "${RED}Please run as root or with sudo${NC}"
   exit 1
+fi
+
+# Function to handle first-run environment setup (for one-line installation)
+setup_first_run_environment() {
+  log "INFO" "Setting up first-run environment for one-line installation"
+  echo -e "${MAGENTA}${BOLD}"
+  echo "   _____                             _____ __             __  "
+  echo "  /  _  \   ____   ____   ____     / ___// /_____ ______/ /__"
+  echo " /  /_\  \ / ___\ /    \_/ __ \    \__ \/ __/ __ \/ ___/ //_/"
+  echo "/    |    / /_/  >   |  \  ___/   ___/ / /_/ /_/ / /__/ ,<   "
+  echo "\____|__  \___  /|___|  /\___  > /____/\__/\__,_/\___/_/|_|  "
+  echo "        \/_____/      \/     \/                              "
+  echo -e "${NC}"
+
+  echo -e "${CYAN}One-Line Installer${NC}"
+  echo "By Nerd of Mouth - Deploy Smart. Speak Nerd."
+  echo "https://stack.nerdofmouth.com"
+  echo ""
+  echo "\"The Agency Project: Metal + Meaning.\""
+  echo ""
+  
+  # System check
+  log "INFO" "Performing system checks..."
+  OS=$(grep -oP '(?<=^ID=).+' /etc/os-release | tr -d '"')
+  VERSION=$(grep -oP '(?<=^VERSION_ID=).+' /etc/os-release | tr -d '"')
+  PRETTY_NAME=$(grep -oP '(?<=^PRETTY_NAME=).+' /etc/os-release | tr -d '"')
+
+  if [[ "$OS" == "debian" || "$OS" == "ubuntu" ]]; then
+    echo -e "✓ Detected ${GREEN}$PRETTY_NAME${NC} - Recommended OS"
+  else
+    echo -e "${YELLOW}⚠️ Detected $PRETTY_NAME - Not officially supported but will attempt installation${NC}"
+  fi
+  
+  # Install essential dependencies first
+  log "INFO" "Installing essential dependencies..."
+  echo -e "${BOLD}Installing required dependencies...${NC}"
+  apt-get update
+  
+  # Install basic utilities required for the Makefile to run
+  log "INFO" "Installing basic utilities (curl, git, wget, make, jq, bc)"
+  echo -e "${BLUE}Installing basic utilities...${NC}"
+  apt-get install -y curl git wget make jq bc openssl unzip procps
+  
+  # Create base directories
+  log "INFO" "Setting up required directories..."
+  echo -e "${BOLD}Setting up required directory structure...${NC}"
+  
+  # Create base directories according to AgencyStack DevOps rules
+  mkdir -p /opt/agency_stack/clients/default
+  mkdir -p /opt/agency_stack/secrets
+  mkdir -p /var/log/agency_stack/clients
+  mkdir -p /var/log/agency_stack/components
+  mkdir -p /var/log/agency_stack/integrations
+  
+  # If we have the component directory setup utility, use it
+  if [ -f "$(dirname "$SCRIPT_DIR")/scripts/utils/setup_component_directories.sh" ]; then
+    log "INFO" "Running component directory setup utility"
+    echo -e "${BLUE}Setting up component directories using utility script...${NC}"
+    bash "$(dirname "$SCRIPT_DIR")/scripts/utils/setup_component_directories.sh" --force
+  fi
+  
+  # Clone repository if not already present and we're in one-line mode
+  if [ ! -d "/opt/agency_stack/repo" ] && [ "$ONE_LINE_MODE" = true ]; then
+    log "INFO" "Cloning AgencyStack repository..."
+    echo -e "${BOLD}Cloning AgencyStack repository...${NC}"
+    
+    git clone https://github.com/nerdofmouth/agency-stack.git /opt/agency_stack/repo
+    
+    # Change to the repository directory
+    cd /opt/agency_stack/repo || {
+      log "ERROR" "Failed to change to repository directory"
+      echo -e "${RED}Failed to change to repository directory${NC}"
+      exit 1
+    }
+    
+    # Run prep-dirs target
+    log "INFO" "Running make prep-dirs..."
+    echo -e "${BOLD}Running prep-dirs target...${NC}"
+    
+    if [ -f "Makefile" ]; then
+      make prep-dirs || {
+        log "WARN" "make prep-dirs encountered issues, continuing anyway"
+        echo -e "${YELLOW}prep-dirs encountered issues, continuing...${NC}"
+      }
+    else
+      log "WARN" "Makefile not found, skipping prep-dirs"
+      echo -e "${YELLOW}Makefile not found, skipping prep-dirs${NC}"
+    fi
+    
+    # Run env-check to validate environment
+    log "INFO" "Running make env-check..."
+    echo -e "${BOLD}Running environment check...${NC}"
+    
+    if [ -f "Makefile" ]; then
+      make env-check || {
+        log "WARN" "Environment check reported issues"
+        echo -e "${YELLOW}Environment check reported issues, these will be fixed during installation${NC}"
+      }
+    else
+      log "WARN" "Makefile not found, skipping env-check"
+      echo -e "${YELLOW}Makefile not found, skipping env-check${NC}"
+    fi
+  fi
+  
+  log "INFO" "First-run environment setup completed"
+  echo -e "${GREEN}Environment preparation completed!${NC}"
+}
+
+# Run first-run setup if in one-line mode
+if [ "$ONE_LINE_MODE" = true ]; then
+  setup_first_run_environment
 fi
 
 # Function to check dependencies
