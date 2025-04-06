@@ -1,0 +1,1332 @@
+# 🛠️ AgencyStack DevOps Rules (Local Windsurf `rules.md`)
+
+## ⚙️ Build System & Infrastructure Stack
+1. 🧱 My infrastructure framework is **AgencyStack** – a multi-tenant, hardenable, sovereign DevOps toolkit.
+2. 📦 Each component must install via a **bash script under `/scripts/components`** and be controlled via **Makefile targets**.
+3. ♻️ The **installation experience must be idempotent**, local-first, and support automation on airgapped servers.
+
+## 🧪 Testing & Validation
+4. ✅ Validate all components using `make <component>-status` and `make alpha-check`.
+5. 🧪 Mock mode must be available for all LLM-powered components (under `/scripts/mock/`) for UI and logic testing.
+
+## 📁 Filesystem Structure & Conventions
+6. 📂 Do not create files outside of these directories:
+   - `/scripts/components/`
+   - `/scripts/mock/`
+   - `/docs/pages/components/`
+   - `/opt/agency_stack/...` for install paths
+   - `/var/log/agency_stack/...` for logs
+7. 🚫 Do not hardcode paths or use `/usr`, `/etc`, or `$HOME`.
+
+## 🔒 Security & Sovereignty
+8. 🛡️ All installations must:
+   - 🪵 Log to `/var/log/agency_stack/components/<component>.log`
+   - 🧭 Use client-aware paths like `/opt/agency_stack/clients/${CLIENT_ID}/`
+   - 📴 Avoid cloud APIs unless explicitly enabled with flags (e.g., `--enable-openai`).
+9. 🗝️ No centralized authentication unless integrating with self-hosted Keycloak realms.
+
+## 🌐 Networking & Monitoring
+10. 📡 If the component uses a port, define it in `component_registry.json` and document in `/docs/pages/ports.md`.
+11. 📈 Add `/metrics` endpoints when Prometheus-compatible.
+12. 📊 Set Docker resource limits where applicable.
+
+## 📖 Documentation
+13. 📚 Each component must have a Markdown doc in `/docs/pages/components/`.
+14. 🧾 Do not auto-generate docs unless explicitly triggered.
+15. ✍️ Use simple English and follow alpha milestone formatting patterns.
+
+
+CLAUDE INSTALL INSTRUCTION TEMPLATE
+
+You are building a new component installer for AgencyStack, a sovereign infrastructure stack. Follow these DevOps standards strictly:
+
+Installer Script
+
+Create install_<component>.sh under /scripts/components/
+
+Must be hardened, idempotent, and multi-tenant aware
+
+Use /opt/agency_stack/clients/${CLIENT_ID}/ for all client-specific config
+
+Log actions to /var/log/agency_stack/components/<component>.log
+
+Makefile Targets Add the following Make targets:
+
+make <component> – install
+
+make <component>-status – systemctl or container status check
+
+make <component>-logs – tail logs
+
+make <component>-restart – restart the service or container
+
+Optional: make <component>-test – test interface or API
+
+Component Registry
+
+Add the component to component_registry.json
+
+Set flags: "installed", "makefile", "docs", "hardened", "monitoring", "multi_tenant", "sso" (if applicable)
+
+Documentation
+
+Create /docs/pages/components/<component>.md
+
+Include: overview, install steps, ports, config, security, logs, restart, monitoring
+
+Update /docs/pages/components.md index
+
+Add to /docs/pages/ports.md if ports are exposed
+
+Integration
+
+Make sure it is tracked by make alpha-check
+
+Confirm it emits logs, has status check, and responds to CLI/UI triggers
+
+Security & Monitoring
+
+Ensure TLS if networked
+
+Add /metrics if Prometheus-compatible
+
+Enable container resource limits if Docker-based
+
+Bonus: Mock Mode
+
+If component has APIs, implement mock_<component>.sh or route under /scripts/mock/
+
+This installer must feel polished, auditable, reproducible, and sovereign. Make no assumptions about internet access or centralized secrets.
+
+
+
+{
+  "title": "AgencyStack Alpha Integration Checklist",
+  "generated_at": "2025-04-06T04:33:40.506117",
+  "milestone": "Alpha Readiness",
+  "goals": [
+    "Ensure all components listed in registry have corresponding install scripts",
+    "Verify all Makefile targets function correctly",
+    "Create or validate documentation for all components",
+    "Finalize alpha-check and readiness reporting"
+  ],
+  "components_to_validate": [
+    "elasticsearch",
+    "etcd",
+    "builderio",
+    "seafile",
+    "focalboard",
+    "cryptosync",
+    "wordpress",
+    "ghost",
+    "vector_db"
+  ],
+  "tasks": [
+    {
+      "task": "Create install_<component>.sh script",
+      "applies_to": "All components listed above"
+    },
+    {
+      "task": "Verify make targets (install, status, logs, restart)",
+      "applies_to": "All components"
+    },
+    {
+      "task": "Document in /docs/pages/components/<component>.md",
+      "applies_to": "All components"
+    },
+    {
+      "task": "Update /docs/pages/components.md index",
+      "applies_to": "All components"
+    },
+    {
+      "task": "Update /docs/pages/ports.md (if applicable)",
+      "applies_to": "Components with exposed ports"
+    },
+    {
+      "task": "Add to alpha-check verification logic",
+      "applies_to": "All new/recovered components"
+    }
+  ]
+}
+
+{
+  "schema_version": "1.0.0",
+  "last_updated": "2025-04-05T20:35:00-05:00",
+  "components": {
+    "infrastructure": {
+      "traefik": {
+        "name": "Traefik",
+        "category": "Core Infrastructure",
+        "version": "2.9.8",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Edge router and reverse proxy"
+      },
+      "portainer": {
+        "name": "Portainer",
+        "category": "Core Infrastructure",
+        "version": "2.17.1",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Container management UI"
+      },
+      "droneci": {
+        "name": "DroneCI",
+        "category": "Core Infrastructure",
+        "version": "2.20.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Continuous Integration/Deployment server"
+      },
+      "docker": {
+        "name": "Docker",
+        "component_id": "docker",
+        "category": "Core Infrastructure",
+        "version": "24.0.5",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": false,
+          "sso": false,
+          "dashboard": false,
+          "logs": true,
+          "docs": false,
+          "auditable": true,
+          "traefik_tls": false,
+          "multi_tenant": true
+        },
+        "description": "Container runtime for all AgencyStack components",
+        "ports": {
+          "daemon": 2375
+        }
+      },
+      "docker_compose": {
+        "name": "Docker Compose",
+        "component_id": "docker_compose",
+        "category": "Core Infrastructure",
+        "version": "2.18.1",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": false,
+          "sso": false,
+          "dashboard": false,
+          "logs": true,
+          "docs": false,
+          "auditable": true,
+          "traefik_tls": false,
+          "multi_tenant": true
+        },
+        "description": "Multi-container Docker application orchestrator",
+        "ports": {
+          "none": 0
+        }
+      },
+      "infrastructure": {
+        "name": "Infrastructure",
+        "component_id": "infrastructure",
+        "category": "Core Infrastructure",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": false,
+          "sso": false,
+          "dashboard": false,
+          "logs": true,
+          "docs": false,
+          "auditable": true,
+          "traefik_tls": false,
+          "multi_tenant": true
+        },
+        "description": "Core infrastructure setup for AgencyStack components",
+        "ports": {
+          "none": 0
+        }
+      },
+      "traefik_ssl": {
+        "name": "Traefik SSL",
+        "component_id": "traefik_ssl",
+        "category": "Core Infrastructure",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": false,
+          "sso": false,
+          "dashboard": false,
+          "logs": true,
+          "docs": false,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "SSL/TLS configuration for Traefik with Let's Encrypt integration",
+        "ports": {
+          "none": 0
+        }
+      }
+    },
+    "business": {
+      "erpnext": {
+        "name": "ERPNext",
+        "category": "Business Applications",
+        "version": "14.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Enterprise Resource Planning system"
+      },
+      "killbill": {
+        "name": "KillBill",
+        "category": "Business Applications",
+        "version": "0.24.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Open-source subscription billing"
+      },
+      "calcom": {
+        "name": "Cal.com",
+        "category": "Business Applications",
+        "version": "2.9.4",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Scheduling and appointment application"
+      },
+      "documenso": {
+        "name": "Documenso",
+        "category": "Business Applications",
+        "version": "1.3.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Document signing platform"
+      },
+      "chatwoot": {
+        "name": "Chatwoot",
+        "category": "Business Applications",
+        "version": "v3.5.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Customer messaging platform that helps businesses talk to customers",
+        "ports": {
+          "web": 3002
+        }
+      }
+    },
+    "content": {
+      "wordpress": {
+        "name": "WordPress",
+        "category": "Content Management",
+        "version": "6.4.2",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Content management system"
+      },
+      "ghost": {
+        "name": "Ghost",
+        "category": "Content Management",
+        "version": "5.59.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Modern publishing platform"
+      },
+      "focalboard": {
+        "name": "Focalboard",
+        "category": "Content Management",
+        "version": "7.8.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Project management board"
+      },
+      "peertube": {
+        "name": "PeerTube",
+        "category": "Content Management",
+        "version": "5.1.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Self-hosted video streaming platform"
+      },
+      "seafile": {
+        "name": "Seafile",
+        "category": "Content Management",
+        "version": "10.0.1",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "File sync and share solution"
+      },
+      "builderio": {
+        "name": "Builder.io",
+        "category": "Content Management",
+        "version": "2.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": false,
+          "makefile": true,
+          "sso": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": false
+        },
+        "description": "Visual content management"
+      }
+    },
+    "security": {
+      "keycloak": {
+        "name": "Keycloak",
+        "category": "Security",
+        "version": "21.1.2",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Single sign-on and identity management"
+      },
+      "vault": {
+        "name": "Vault",
+        "category": "Security",
+        "version": "1.14.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Secret management"
+      },
+      "crowdsec": {
+        "name": "CrowdSec",
+        "category": "Security",
+        "version": "1.5.1",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Security automation"
+      },
+      "fail2ban": {
+        "name": "Fail2Ban",
+        "component_id": "fail2ban",
+        "category": "Security",
+        "version": "1.0.2",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": false,
+          "sso": false,
+          "dashboard": false,
+          "logs": true,
+          "docs": false,
+          "auditable": true,
+          "traefik_tls": false,
+          "multi_tenant": true
+        },
+        "description": "Intrusion prevention system that protects servers from brute-force attacks",
+        "ports": {
+          "none": 0
+        }
+      },
+      "security": {
+        "name": "Security",
+        "component_id": "security",
+        "category": "Security",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": false,
+          "sso": false,
+          "dashboard": false,
+          "logs": true,
+          "docs": false,
+          "auditable": true,
+          "traefik_tls": false,
+          "multi_tenant": true
+        },
+        "description": "Core security infrastructure and hardening for AgencyStack",
+        "ports": {
+          "none": 0
+        }
+      },
+      "signing_timestamps": {
+        "name": "Signing Timestamps",
+        "component_id": "signing_timestamps",
+        "category": "Security",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": false,
+          "sso": false,
+          "dashboard": false,
+          "logs": true,
+          "docs": false,
+          "auditable": true,
+          "traefik_tls": false,
+          "multi_tenant": true
+        },
+        "description": "Secure timestamp service for document and code signing",
+        "ports": {
+          "none": 0
+        }
+      }
+    },
+    "security_storage": {
+      "cryptosync": {
+        "name": "Cryptosync",
+        "component_id": "cryptosync",
+        "category": "Security & Storage",
+        "version": "v1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso_ready": false,
+          "monitoring": false,
+          "backup_ready": true,
+          "traefik": false,
+          "ports_defined": false,
+          "multi_tenant": true
+        },
+        "description": "Encrypted local vaults + remote cloud sync via gocryptfs and rclone"
+      }
+    },
+    "collaboration": {
+      "etebase": {
+        "component_id": "etebase",
+        "name": "Etebase",
+        "category": "Collaboration",
+        "version": "v0.7.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso_ready": false,
+          "monitoring": true,
+          "backup_ready": true,
+          "traefik": true,
+          "ports_defined": true,
+          "multi_tenant": true
+        },
+        "description": "Encrypted self-hosted CalDAV and CardDAV server for private calendar, contact, and task sync.",
+        "ports": {
+          "http": 8732
+        }
+      }
+    },
+    "communication": {
+      "mailu": {
+        "name": "Mailu",
+        "category": "Email & Communication",
+        "version": "2.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Self-hosted email solution",
+        "ports": {
+          "smtp": 25,
+          "imap": 143,
+          "imaps": 993,
+          "web": 8020
+        }
+      },
+      "mattermost": {
+        "name": "Mattermost",
+        "category": "Email & Communication",
+        "version": "7.10.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Team messaging platform",
+        "ports": {
+          "web": 8065
+        }
+      },
+      "listmonk": {
+        "name": "Listmonk",
+        "category": "Email & Communication",
+        "version": "v2.5.1",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Self-hosted newsletter and mailing list manager",
+        "ports": {
+          "web": 9000
+        }
+      },
+      "voip": {
+        "name": "VoIP",
+        "category": "Email & Communication",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "VoIP solution (FusionPBX + FreeSWITCH)",
+        "ports": {
+          "sip_udp": 5060,
+          "sip_tcp": 5060,
+          "sip_tls": 5061,
+          "rtp_range": "16384-32768",
+          "fusionpbx_web": 8082,
+          "fusionpbx_admin": 8445
+        }
+      }
+    },
+    "monitoring": {
+      "prometheus": {
+        "name": "Prometheus",
+        "category": "Monitoring & Observability",
+        "version": "2.44.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Metrics collection and alerting",
+        "ports": {
+          "prometheus": 9090,
+          "alertmanager": 9093,
+          "node_exporter": 9100,
+          "pushgateway": 9091
+        }
+      },
+      "grafana": {
+        "name": "Grafana",
+        "category": "Monitoring & Observability",
+        "version": "10.1.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Visualization and analytics"
+      },
+      "loki": {
+        "name": "Loki",
+        "category": "Monitoring & Observability",
+        "version": "2.9.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Log aggregation"
+      },
+      "netdata": {
+        "name": "Netdata",
+        "component_id": "netdata",
+        "category": "Monitoring & Observability",
+        "version": "1.43.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": false,
+          "sso": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": false,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Real-time performance monitoring with thousands of metrics",
+        "ports": {
+          "web": 19999
+        }
+      }
+    },
+    "analytics": {
+      "posthog": {
+        "name": "PostHog",
+        "component_id": "posthog",
+        "category": "Analytics",
+        "version": "1.43.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": false,
+          "sso": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": false,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Open-source product analytics platform",
+        "ports": {
+          "web": 8000,
+          "api": 8001
+        }
+      }
+    },
+    "devops": {
+      "gitea": {
+        "name": "Gitea",
+        "category": "DevOps",
+        "version": "1.20.1",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Self-hosted Git service"
+      },
+      "droneci": {
+        "name": "Drone CI",
+        "category": "DevOps",
+        "version": "2.19.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Continuous Integration and Delivery platform",
+        "ports": {
+          "web": 3001,
+          "rpc": 3002,
+          "runner": 3003
+        }
+      }
+    },
+    "integration": {
+      "n8n": {
+        "name": "n8n",
+        "component_id": "n8n",
+        "category": "Integration & Automation",
+        "version": "1.16.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": false,
+          "sso": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": false,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Workflow automation tool with visual programming interface",
+        "ports": {
+          "web": 5678
+        }
+      },
+      "openintegrationhub": {
+        "name": "Open Integration Hub",
+        "component_id": "openintegrationhub",
+        "category": "Integration & Automation",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": false,
+          "sso": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": false,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Open source integration framework to connect applications and services",
+        "ports": {
+          "web": 3000,
+          "api": 3001
+        }
+      }
+    },
+    "utility": {
+      "multi_tenancy": {
+        "name": "Multi-Tenancy",
+        "component_id": "multi_tenancy",
+        "category": "Utility",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": false,
+          "sso": false,
+          "dashboard": false,
+          "logs": true,
+          "docs": false,
+          "auditable": true,
+          "traefik_tls": false,
+          "multi_tenant": true
+        },
+        "description": "Client isolation and multi-tenancy support for AgencyStack",
+        "ports": {
+          "none": 0
+        }
+      },
+      "taskwarrior_calcure": {
+        "name": "Taskwarrior & Calcure",
+        "component_id": "taskwarrior_calcure",
+        "category": "Utility",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": false,
+          "sso": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": false,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Task management and calendar solution",
+        "ports": {
+          "web": 8080
+        }
+      },
+      "backup_strategy": {
+        "name": "Backup Strategy",
+        "component_id": "backup_strategy",
+        "category": "Utility",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": false,
+          "sso": false,
+          "dashboard": false,
+          "logs": true,
+          "docs": false,
+          "auditable": true,
+          "traefik_tls": false,
+          "multi_tenant": true
+        },
+        "description": "Comprehensive backup solution for AgencyStack components and data",
+        "ports": {
+          "none": 0
+        }
+      },
+      "prerequisites": {
+        "name": "Prerequisites",
+        "component_id": "prerequisites",
+        "category": "Utility",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": false,
+          "sso": false,
+          "dashboard": false,
+          "logs": true,
+          "docs": false,
+          "auditable": true,
+          "traefik_tls": false,
+          "multi_tenant": true
+        },
+        "description": "System prerequisites checker and installer for AgencyStack",
+        "ports": {
+          "none": 0
+        }
+      },
+      "launchpad_dashboard": {
+        "name": "Launchpad Dashboard",
+        "component_id": "launchpad_dashboard",
+        "category": "Utility",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": false,
+          "sso": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": false,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true
+        },
+        "description": "Central dashboard for AgencyStack components and services",
+        "ports": {
+          "web": 8090
+        }
+      },
+      "webpush": {
+        "name": "WebPush",
+        "component_id": "webpush",
+        "category": "Utility",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": false,
+          "sso": false,
+          "dashboard": false,
+          "logs": true,
+          "docs": false,
+          "auditable": true,
+          "traefik_tls": false,
+          "multi_tenant": true
+        },
+        "description": "Web push notification service for AgencyStack",
+        "ports": {
+          "api": 9000
+        }
+      },
+      "tailscale": {
+        "name": "Tailscale",
+        "component_id": "tailscale",
+        "category": "Utility",
+        "version": "1.50.1",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": false,
+          "sso": false,
+          "dashboard": false,
+          "logs": true,
+          "docs": false,
+          "auditable": true,
+          "traefik_tls": false,
+          "multi_tenant": true
+        },
+        "description": "Zero-config VPN for secure access to AgencyStack services",
+        "ports": {
+          "none": 0
+        }
+      },
+      "all": {
+        "name": "All Components",
+        "component_id": "all",
+        "category": "Utility",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": false,
+          "sso": false,
+          "dashboard": false,
+          "logs": true,
+          "docs": false,
+          "auditable": true,
+          "traefik_tls": false,
+          "multi_tenant": true
+        },
+        "description": "Meta-component for installing all AgencyStack components",
+        "ports": {
+          "none": 0
+        }
+      }
+    },
+    "content_tools": {
+      "markdown_lexical": {
+        "name": "Markdown Lexical",
+        "component_id": "markdown_lexical",
+        "category": "Content Tools",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": false,
+          "sso": false,
+          "dashboard": false,
+          "logs": true,
+          "docs": false,
+          "auditable": true,
+          "traefik_tls": false,
+          "multi_tenant": true
+        },
+        "description": "Advanced markdown editor with lexical framework integration",
+        "ports": {
+          "none": 0
+        }
+      },
+      "wordpress_module": {
+        "name": "WordPress Module",
+        "component_id": "wordpress_module",
+        "category": "Content Tools",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": false,
+          "sso": false,
+          "dashboard": false,
+          "logs": true,
+          "docs": false,
+          "auditable": true,
+          "traefik_tls": false,
+          "multi_tenant": true
+        },
+        "description": "WordPress extension module for AgencyStack integration",
+        "ports": {
+          "none": 0
+        }
+      }
+    },
+    "ai": {
+      "ollama": {
+        "name": "Ollama",
+        "component_id": "ollama",
+        "category": "AI",
+        "version": "0.1.27",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso_ready": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik": false,
+          "multi_tenant": true,
+          "monitoring": true
+        },
+        "description": "Local LLM inference server with multi-model support",
+        "ports": {
+          "api": 11434,
+          "metrics": 11435
+        }
+      },
+      "langchain": {
+        "name": "LangChain",
+        "component_id": "langchain",
+        "category": "AI",
+        "version": "0.1.5",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso_ready": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik": true,
+          "multi_tenant": true,
+          "monitoring": true
+        },
+        "description": "Framework for LLM application development and orchestration",
+        "ports": {
+          "api": 5111,
+          "metrics": 5112
+        }
+      },
+      "ai_dashboard": {
+        "name": "AI Dashboard",
+        "component_id": "ai_dashboard",
+        "category": "AI",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso_ready": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik": true,
+          "multi_tenant": true,
+          "monitoring": true
+        },
+        "description": "Control panel for managing AI models and services",
+        "ports": {
+          "web": 5130
+        }
+      },
+      "agent_orchestrator": {
+        "name": "Agent Orchestrator",
+        "component_id": "agent_orchestrator",
+        "category": "AI",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso_ready": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik": true,
+          "multi_tenant": true,
+          "monitoring": true
+        },
+        "description": "AI-powered system monitoring and automation service",
+        "ports": {
+          "api": 5210,
+          "metrics": 5211
+        }
+      },
+      "resource_watcher": {
+        "name": "Resource Watcher",
+        "component_id": "resource_watcher",
+        "category": "AI",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso_ready": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik": true,
+          "multi_tenant": true,
+          "monitoring": true
+        },
+        "description": "System resource monitoring agent for AI components",
+        "ports": {
+          "api": 5220,
+          "metrics": 5221
+        }
+      },
+      "agent_tools": {
+        "name": "Agent Tools Bridge",
+        "component_id": "agent_tools",
+        "category": "AI",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso_ready": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik": true,
+          "multi_tenant": true,
+          "monitoring": true
+        },
+        "description": "UI bridge connecting Agent Orchestrator to AI Control Panel",
+        "ports": {
+          "web": 5120
+        }
+      }
+    }
+  }
+}
