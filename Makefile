@@ -1273,3 +1273,46 @@ ai-alpha-check-consolidated:
 	@echo ""
 	@echo "$(BLUE)To open the AI Dashboard:$(RESET)"
 	@echo "$(BOLD)make ai-dashboard-test$(RESET)"
+
+# Install all components in the correct order
+install-all: prep-dirs env-check
+	@echo "$(MAGENTA)$(BOLD)🚀 Installing Complete AgencyStack...$(RESET)"
+	@echo "$(YELLOW)This will install all components in the proper order. This may take some time.$(RESET)"
+	@read -p "$(BOLD)Continue? [y/N] $(RESET)" confirm; \
+	[[ $$confirm == [yY] || $$confirm == [yY][eE][sS] ]] || exit 1
+	
+	@echo "$(CYAN)Step 1/7: Installing core infrastructure...$(RESET)"
+	@$(MAKE) -f $(MAKEFILE_LIST) infrastructure
+	@$(MAKE) -f $(MAKEFILE_LIST) traefik-ssl
+	
+	@echo "$(CYAN)Step 2/7: Installing security components...$(RESET)"
+	@$(MAKE) -f $(MAKEFILE_LIST) security-infrastructure
+	@$(MAKE) -f $(MAKEFILE_LIST) keycloak
+	
+	@echo "$(CYAN)Step 3/7: Installing monitoring stack...$(RESET)"
+	@$(MAKE) -f $(MAKEFILE_LIST) prometheus
+	@$(MAKE) -f $(MAKEFILE_LIST) grafana
+	@$(MAKE) -f $(MAKEFILE_LIST) loki
+	
+	@echo "$(CYAN)Step 4/7: Installing core services...$(RESET)"
+	@$(MAKE) -f $(MAKEFILE_LIST) mailu
+	@$(MAKE) -f $(MAKEFILE_LIST) peertube
+	@$(MAKE) -f $(MAKEFILE_LIST) wordpress
+	
+	@echo "$(CYAN)Step 5/7: Installing integration tools...$(RESET)"
+	@$(MAKE) -f $(MAKEFILE_LIST) n8n
+	@$(MAKE) -f $(MAKEFILE_LIST) openintegrationhub
+	
+	@echo "$(CYAN)Step 6/7: Installing AI components...$(RESET)"
+	@$(MAKE) -f $(MAKEFILE_LIST) install-ai-suite
+	
+	@echo "$(CYAN)Step 7/7: Finalizing installation...$(RESET)"
+	@$(MAKE) -f $(MAKEFILE_LIST) dashboard-update
+	@$(MAKE) -f $(MAKEFILE_LIST) integrate-sso
+	@$(MAKE) -f $(MAKEFILE_LIST) integrate-monitoring
+	@$(MAKE) -f $(MAKEFILE_LIST) setup-log-rotation
+	@$(MAKE) -f $(MAKEFILE_LIST) setup-cron
+	
+	@echo "$(GREEN)$(BOLD)✅ AgencyStack installation complete!$(RESET)"
+	@echo "$(BLUE)Run 'make alpha-check' to verify all components are working correctly.$(RESET)"
+	@echo "$(BLUE)Run 'make dashboard' to open the AgencyStack dashboard.$(RESET)"

@@ -19,8 +19,19 @@ BASE_DIR="$(dirname "$SCRIPT_DIR")"
 LOGS_DIR="/var/log/agency_stack"
 ALPHA_LOG="${LOGS_DIR}/alpha_check.log"
 
-# Ensure log directory exists
-mkdir -p "$LOGS_DIR" 2>/dev/null || true
+# Ensure log directory exists with proper permissions
+if [ ! -d "$LOGS_DIR" ]; then
+    sudo mkdir -p "$LOGS_DIR" 2>/dev/null || true
+    sudo chown $(whoami):$(whoami) "$LOGS_DIR" 2>/dev/null || true
+    sudo chmod 755 "$LOGS_DIR" 2>/dev/null || true
+fi
+
+# Ensure log file exists with proper permissions
+if [ ! -f "$ALPHA_LOG" ] || [ ! -w "$ALPHA_LOG" ]; then
+    sudo touch "$ALPHA_LOG" 2>/dev/null || true
+    sudo chown $(whoami):$(whoami) "$ALPHA_LOG" 2>/dev/null || true
+    sudo chmod 644 "$ALPHA_LOG" 2>/dev/null || true
+fi
 
 # Component registry
 COMPONENT_REGISTRY="${BASE_DIR}/component_registry.json"
