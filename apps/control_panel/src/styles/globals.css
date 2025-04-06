@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-rgb: 255, 255, 255;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-rgb: 37, 48, 63;
+  }
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: rgb(var(--background-rgb));
+}
+
+@layer components {
+  .sidebar-item {
+    @apply flex items-center gap-3 px-4 py-3 rounded-lg transition-colors;
+  }
+  
+  .sidebar-item-active {
+    @apply bg-agency-200 text-agency-950 dark:bg-agency-800 dark:text-agency-50;
+  }
+  
+  .sidebar-item-inactive {
+    @apply text-agency-700 hover:bg-agency-100 dark:text-agency-300 dark:hover:bg-agency-900;
+  }
+
+  .card {
+    @apply bg-white dark:bg-agency-950 rounded-xl shadow-md p-5 border border-gray-200 dark:border-agency-800;
+  }
+
+  .status-healthy {
+    @apply bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100;
+  }
+
+  .status-warning {
+    @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100;
+  }
+
+  .status-error {
+    @apply bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100;
+  }
+
+  .status-inactive {
+    @apply bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100;
+  }
+
+  .btn {
+    @apply px-4 py-2 rounded-lg font-medium transition-colors;
+  }
+
+  .btn-primary {
+    @apply bg-agency-600 text-white hover:bg-agency-700 dark:bg-agency-700 dark:hover:bg-agency-600;
+  }
+
+  .btn-secondary {
+    @apply bg-agency-200 text-agency-800 hover:bg-agency-300 dark:bg-agency-800 dark:text-agency-200 dark:hover:bg-agency-700;
+  }
+
+  .btn-danger {
+    @apply bg-red-600 text-white hover:bg-red-700;
+  }
+}
