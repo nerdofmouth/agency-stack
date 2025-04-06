@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "last_updated": "2025-04-05T03:11:30-05:00",
+  "last_updated": "2025-04-05T19:30:00-05:00",
   "components": {
     "infrastructure": {
       "traefik": {
@@ -588,6 +588,124 @@
         "ports": {
           "api": 11434,
           "metrics": 11435
+        }
+      },
+      "langchain": {
+        "name": "LangChain",
+        "component_id": "langchain",
+        "category": "AI",
+        "version": "0.1.5",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso_ready": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik": true,
+          "multi_tenant": true,
+          "monitoring": true
+        },
+        "description": "Framework for LLM application development and orchestration",
+        "ports": {
+          "api": 5111,
+          "metrics": 5112
+        }
+      },
+      "ai_dashboard": {
+        "name": "AI Dashboard",
+        "component_id": "ai_dashboard",
+        "category": "AI",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso_ready": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik": true,
+          "multi_tenant": true,
+          "monitoring": true
+        },
+        "description": "Control panel for managing AI models and services",
+        "ports": {
+          "web": 5130
+        }
+      },
+      "agent_orchestrator": {
+        "name": "Agent Orchestrator",
+        "component_id": "agent_orchestrator",
+        "category": "AI",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso_ready": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik": true,
+          "multi_tenant": true,
+          "monitoring": true
+        },
+        "description": "AI-powered system monitoring and automation service",
+        "ports": {
+          "api": 5210,
+          "metrics": 5211
+        }
+      },
+      "resource_watcher": {
+        "name": "Resource Watcher",
+        "component_id": "resource_watcher",
+        "category": "AI",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso_ready": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik": true,
+          "multi_tenant": true,
+          "monitoring": true
+        },
+        "description": "System resource monitoring agent for AI components",
+        "ports": {
+          "api": 5220,
+          "metrics": 5221
+        }
+      },
+      "agent_tools": {
+        "name": "Agent Tools Bridge",
+        "component_id": "agent_tools",
+        "category": "AI",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso_ready": false,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik": true,
+          "multi_tenant": true,
+          "monitoring": true
+        },
+        "description": "UI bridge connecting Agent Orchestrator to AI Control Panel",
+        "ports": {
+          "web": 5120
         }
       }
     }
