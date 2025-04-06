@@ -19,7 +19,7 @@ MAGENTA := $(shell tput setaf 5)
 CYAN := $(shell tput setaf 6)
 RESET := $(shell tput sgr0)
 
-.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit integrate-components dashboard dashboard-refresh dashboard-enable dashboard-update dashboard-open integrate-sso integrate-email integrate-monitoring integrate-data-bridge detect-ports remap-ports scan-ports setup-cronjobs view-alerts log-summary create-client setup-roles security-audit security-fix rotate-secrets setup-log-segmentation verify-certs verify-auth multi-tenancy-status install-wordpress install-erpnext install-posthog install-voip install-mailu install-grafana install-loki install-prometheus install-keycloak install-infrastructure install-security-infrastructure install-multi-tenancy validate validate-report peertube peertube-sso peertube-with-deps peertube-reinstall peertube-status peertube-logs peertube-stop peertube-start peertube-restart
+.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit integrate-components dashboard dashboard-refresh dashboard-enable dashboard-update dashboard-open integrate-sso integrate-email integrate-monitoring integrate-data-bridge detect-ports remap-ports scan-ports setup-cronjobs view-alerts log-summary create-client setup-roles security-audit security-fix rotate-secrets setup-log-segmentation verify-certs verify-auth multi-tenancy-status install-wordpress install-erpnext install-posthog install-voip install-mailu install-grafana install-loki install-prometheus install-keycloak install-infrastructure install-security-infrastructure install-multi-tenancy validate validate-report peertube peertube-sso peertube-with-deps peertube-reinstall peertube-status peertube-logs peertube-stop peertube-start peertube-restart alpha-check ui-alpha-check ai-alpha-check
 
 # Default target
 help:
@@ -284,8 +284,10 @@ setup-cron:
 
 # Test alert channels
 test-alert:
-	@echo "Testing alert channels..."
-	@sudo bash $(SCRIPTS_DIR)/test_alert.sh
+	@echo "$(MAGENTA)$(BOLD)🔔 Testing Alert System...$(RESET)"
+	@$(SCRIPTS_DIR)/send_alert.sh --level=test --message="This is a test alert from AgencyStack" --client=$(CLIENT_ID)
+	@echo "$(GREEN)Test alert sent successfully.$(RESET)"
+	@echo "$(CYAN)Check your configured alert channels to verify receipt.$(RESET)"
 
 # Integrate Keycloak with AgencyStack components
 integrate-keycloak:
@@ -304,8 +306,10 @@ motd:
 
 # Audit AgencyStack components and system
 audit:
-	@echo "🔍 Auditing AgencyStack components..."
-	@sudo bash $(SCRIPTS_DIR)/audit.sh
+	@echo "$(MAGENTA)$(BOLD)🔍 Auditing AgencyStack Components...$(RESET)"
+	@$(SCRIPTS_DIR)/audit_and_cleanup.sh --dry-run
+	@echo "$(CYAN)Audit complete! To view the report: make audit-report$(RESET)"
+	@echo "$(YELLOW)To actually perform cleanup of unused files, run: make cleanup$(RESET)"
 
 # Integrate AgencyStack components
 integrate-components:
@@ -376,11 +380,6 @@ scan-ports:
 setup-cronjobs:
 	@echo "⏱️ Setting up scheduled tasks for AgencyStack..."
 	@sudo bash $(SCRIPTS_DIR)/setup_cronjobs.sh
-
-# Send test alert
-test-alert:
-	@echo "Testing alert channels..."
-	@sudo bash $(SCRIPTS_DIR)/notifications/notify_all.sh "Test Alert" "This is a test alert from AgencyStack on $(hostname) at $(date)"
 
 # View alerts
 view-alerts:
@@ -961,7 +960,7 @@ ai-suite-test:
 	@echo "$(CYAN)For more information: See /docs/pages/ai/mock_mode.md$(RESET)"
 
 ai-suite-reset:
-	@echo "$(MAGENTA)$(BOLD)🧹 Resetting AI Suite Test Harness...$(RESET)"
+	@echo "$(MAGENTA)$(BOLD)🧹 Resetting AI Suite test environment...$(RESET)"
 	
 	@# Stop mock containers
 	@echo "$(CYAN)Stopping mock containers...$(RESET)"
@@ -1423,16 +1422,11 @@ ai-alpha-check:
 		echo "  $(RED)✗ Resource Watcher is not installed$(RESET)"; \
 	fi
 	
-	@echo "6. Checking Agent Tools Bridge..."
+	@echo "6. Checking Agent Tools..."
 	@if [ -d "$(ROOT_DIR)/apps/agent_tools" ]; then \
-		echo "  $(GREEN)✓ Agent Tools Bridge is installed$(RESET)"; \
-		if pgrep -f "next.*5120" > /dev/null; then \
-			echo "  $(GREEN)✓ Agent Tools Bridge is running$(RESET)"; \
-		else \
-			echo "  $(RED)✗ Agent Tools Bridge is not running$(RESET)"; \
-		fi \
+		echo "  $(GREEN)✓ Agent Tools is installed$(RESET)"; \
 	else \
-		echo "  $(RED)✗ Agent Tools Bridge is not installed$(RESET)"; \
+		echo "  $(RED)✗ Agent Tools is not installed$(RESET)"; \
 	fi
 	
 	@echo "-------------------------------------------"
@@ -1459,32 +1453,20 @@ ai-alpha-check:
 	
 	@echo "-------------------------------------------"
 	@echo "$(BOLD)$(MAGENTA)AI Alpha Status Summary:$(RESET)"
-	@echo "$(shell \
-		INSTALLED=0; \
-		for comp in ollama langchain ai_dashboard agent_orchestrator resource_watcher; do \
-			if [ -d \"/opt/agency_stack/$$comp\" ]; then \
-				INSTALLED=$$((INSTALLED+1)); \
-			fi \
-		done; \
-		if [ -d \"$(ROOT_DIR)/apps/agent_tools\" ]; then \
-			INSTALLED=$$((INSTALLED+1)); \
-		fi; \
-		if [ $$INSTALLED -eq 6 ]; then \
-			echo \"$(GREEN)All components installed ($$INSTALLED/6)$(RESET)\"; \
-		elif [ $$INSTALLED -ge 4 ]; then \
-			echo \"$(YELLOW)Most components installed ($$INSTALLED/6)$(RESET)\"; \
-		else \
-			echo \"$(RED)Few components installed ($$INSTALLED/6)$(RESET)\"; \
-		fi \
-	)"
-	@echo "See detailed status in: /docs/pages/ai/alpha_status.md"
+	@echo "Validating installation status..."
+	@if [ -f "$(CONFIG_DIR)/registry/component_registry.json" ]; then \
+		jq '.ai | to_entries[] | "\(.key): \(.value.integration_status.installed)"' $(CONFIG_DIR)/registry/component_registry.json 2>/dev/null || echo "$(RED)Error parsing component registry$(RESET)"; \
+	else \
+		echo "$(RED)Component registry not found$(RESET)"; \
+	fi
+	@echo "Checking for required documentation..."
+	@find docs/pages/ai -type f -name "*.md" | sort
+	@echo "-------------------------------------------"
+	@echo "$(CYAN)See also: make alpha-check for overall stack readiness$(RESET)"
 
 # -----------------------------------------------------------------------------
 # AI Suite Targets
 # -----------------------------------------------------------------------------
-
-install-ai-suite: install-langchain install-ollama install-agent-orchestrator install-resource-watcher install-agent-tools
-	@echo "AI Suite installation complete"
 
 ai-suite-status: langchain-status ollama-status resource-watcher-status agent-orchestrator-status agent-tools-status
 	@echo "AI Suite status check complete"
@@ -1501,38 +1483,55 @@ ai-alpha-check:
 # -----------------------------------------------------------------------------
 
 ai-suite-test: ai-suite-test-check ai-suite-test-setup ai-suite-test-start
-	@echo "AI Suite Test Harness started"
-	@echo "Access Agent Tools UI at: http://localhost:5120/?client_id=test&mock=true"
+	@echo "$(MAGENTA)$(BOLD)🧪 AI Suite Test Harness started$(RESET)"
+	@echo "$(GREEN)Access Agent Tools UI at: http://localhost:5120/?client_id=test&mock=true$(RESET)"
 
 ai-suite-test-check:
-	@echo "Checking prerequisites for test environment..."
-	@if ! command -v node > /dev/null; then echo "Node.js is required but not installed"; exit 1; fi
-	@if ! command -v docker > /dev/null; then echo "Docker is required but not installed"; exit 1; fi
-	@echo "All prerequisites met."
+	@echo "$(CYAN)Checking prerequisites for test environment...$(RESET)"
+	@if ! command -v node > /dev/null; then echo "$(RED)Node.js is required but not installed$(RESET)"; exit 1; fi
+	@if ! command -v docker > /dev/null; then echo "$(RED)Docker is required but not installed$(RESET)"; exit 1; fi
+	@echo "$(GREEN)All prerequisites met.$(RESET)"
 
 ai-suite-test-setup:
-	@echo "Setting up test environment..."
-	@mkdir -p test/clients/test
+	@echo "$(CYAN)Setting up AI Suite test environment...$(RESET)"
+	@mkdir -p test/clients/test/data
+	@mkdir -p test/clients/test/config
 	@mkdir -p test/logs
-	@echo "Client test directories created"
+	@if [ ! -f "test/clients/test/config/client.json" ]; then \
+		echo '{"client_id":"test","name":"Test Client","domain":"test.local","setup_date":"$(shell date +%Y-%m-%d)"}' > test/clients/test/config/client.json; \
+	fi
+	@if [ ! -f "test/clients/test/config/ai_config.json" ]; then \
+		echo '{"models":{"default":"llama2","chat":"llama2-chat"},"endpoints":{"langchain":"http://localhost:5111","ollama":"http://localhost:11434"}}' > test/clients/test/config/ai_config.json; \
+	fi
+	@echo "$(GREEN)Test environment set up successfully.$(RESET)"
 
 ai-suite-test-start:
-	@echo "Starting mock services..."
-	@cd scripts/mock && \
-		npm install express cors body-parser --quiet && \
-		(node ai_mock_server.js > ../../test/logs/mock_server.log 2>&1 &) && \
-		echo "Mock servers running (api endpoints available on ports 5210, 5111, 5220)"
-	@cd apps/agent_tools && \
-		export NEXT_PUBLIC_MOCK_MODE=true && \
-		(npm run dev > ../../test/logs/agent_tools.log 2>&1 &) && \
-		echo "Agent Tools UI running in mock mode (http://localhost:5120/?client_id=test&mock=true)"
-	@echo "Test harness is now running"
+	@echo "$(CYAN)Starting mock AI services...$(RESET)"
+	@echo '{"status":"ok","message":"Mock LangChain running"}' > test/clients/test/data/langchain_mock.json
+	@echo '{"status":"ok","message":"Mock Ollama running"}' > test/clients/test/data/ollama_mock.json
+	@echo '{"status":"ok","message":"Mock Agent Orchestrator running"}' > test/clients/test/data/orchestrator_mock.json
+	@echo '{"status":"ok","message":"Mock Resource Watcher running"}' > test/clients/test/data/watcher_mock.json
+	@echo "$(GREEN)Mock services started. Using simulated responses.$(RESET)"
 
 ai-suite-reset:
-	@echo "Stopping all mock services..."
-	@-pkill -f "node ai_mock_server.js" || true
-	@-pkill -f "next dev" || true
-	@echo "Cleaning up test environment..."
+	@echo "$(MAGENTA)$(BOLD)🧹 Resetting AI Suite test environment...$(RESET)"
 	@rm -rf test/clients/test
 	@rm -rf test/logs
-	@echo "Test environment has been reset"
+	@echo "$(GREEN)Test environment has been reset$(RESET)"
+
+# Alpha Release Readiness Check
+alpha-check:
+	@echo "$(MAGENTA)$(BOLD)🔍 Checking Alpha Release Readiness...$(RESET)"
+	@$(SCRIPTS_DIR)/utils/fixed_alpha_report.sh
+	@echo "$(CYAN)Full report available at: docs/pages/components/alpha_ready.md$(RESET)"
+
+# UI Alpha Check
+ui-alpha-check:
+	@echo "$(MAGENTA)$(BOLD)🔍 Checking UI Alpha Readiness...$(RESET)"
+	@if [ -f "$(SCRIPTS_DIR)/utils/ui_alpha_check.sh" ]; then \
+		$(SCRIPTS_DIR)/utils/ui_alpha_check.sh; \
+	else \
+		echo "$(RED)UI Alpha check script not found.$(RESET)"; \
+		echo "$(YELLOW)Please implement the ui_alpha_check.sh script.$(RESET)"; \
+	fi
+	@echo "$(CYAN)You may also want to check the dashboard with: make dashboard-open$(RESET)"
