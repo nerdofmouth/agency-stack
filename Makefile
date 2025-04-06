@@ -1420,3 +1420,201 @@ setup-dirs-force: prep-dirs
 	@$(SCRIPTS_DIR)/utils/setup_component_directories.sh $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) --force $(if $(VERBOSE),--verbose,)
 	@echo "$(GREEN)Component directories and placeholders forcibly recreated$(RESET)"
 	@echo "$(BLUE)This helps with alpha-check validation before components are installed$(RESET)"
+
+# Traefik SSL Targets
+traefik-ssl: prep-dirs env-check
+	@echo "$(MAGENTA)$(BOLD)🔒 Installing Traefik SSL...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_traefik_ssl.sh $(if $(FORCE),--force,) \
+		$(if $(CLIENT_ID),--client-id $(CLIENT_ID),) \
+		$(if $(DOMAIN),--domain $(DOMAIN),) \
+		$(if $(EMAIL),--email $(EMAIL),)
+	@. $(SCRIPTS_DIR)/utils/common.sh && log "INFO" "Traefik SSL installation completed via Makefile"
+	@echo "$(GREEN)Traefik SSL installation complete$(RESET)"
+
+traefik-ssl-status:
+	@echo "$(MAGENTA)$(BOLD)🔍 Checking Traefik SSL Status...$(RESET)"
+	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/traefik/ssl/acme.json" ]; then \
+		echo "$(GREEN)✓ Traefik SSL configured$(RESET)"; \
+		ls -l "/opt/agency_stack/clients/$(CLIENT_ID)/traefik/ssl/"; \
+	else \
+		echo "$(RED)✗ Traefik SSL not configured$(RESET)"; \
+	fi
+
+traefik-ssl-logs:
+	@echo "$(MAGENTA)$(BOLD)📋 Viewing Traefik SSL logs...$(RESET)"
+	@if [ -f /var/log/agency_stack/components/traefik_ssl.log ]; then \
+		tail -n 50 /var/log/agency_stack/components/traefik_ssl.log; \
+	else \
+		echo "$(YELLOW)Traefik SSL log file not found.$(RESET)"; \
+	fi
+
+traefik-ssl-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Traefik SSL...$(RESET)"
+	@echo "$(YELLOW)This will restart Traefik with SSL configuration.$(RESET)"
+	@sudo systemctl restart traefik
+
+# Fail2Ban Targets
+fail2ban: prep-dirs env-check
+	@echo "$(MAGENTA)$(BOLD)🛡️ Installing Fail2Ban...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_fail2ban.sh $(if $(FORCE),--force,) \
+		$(if $(CLIENT_ID),--client-id $(CLIENT_ID),) \
+		$(if $(DOMAIN),--domain $(DOMAIN),)
+	@. $(SCRIPTS_DIR)/utils/common.sh && log "INFO" "Fail2Ban installation completed via Makefile"
+	@echo "$(GREEN)Fail2Ban installation complete$(RESET)"
+
+fail2ban-status:
+	@echo "$(MAGENTA)$(BOLD)🔍 Checking Fail2Ban Status...$(RESET)"
+	@if systemctl is-active --quiet fail2ban; then \
+		echo "$(GREEN)✓ Fail2Ban is running$(RESET)"; \
+		sudo fail2ban-client status; \
+	else \
+		echo "$(RED)✗ Fail2Ban is not running$(RESET)"; \
+	fi
+
+fail2ban-logs:
+	@echo "$(MAGENTA)$(BOLD)📋 Viewing Fail2Ban logs...$(RESET)"
+	@if [ -f /var/log/agency_stack/components/fail2ban.log ]; then \
+		tail -n 50 /var/log/agency_stack/components/fail2ban.log; \
+	else \
+		echo "$(YELLOW)Fail2Ban component log not found. Showing system logs:$(RESET)"; \
+		sudo journalctl -u fail2ban -n 50; \
+	fi
+
+fail2ban-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Fail2Ban...$(RESET)"
+	@sudo systemctl restart fail2ban
+	@echo "$(GREEN)Fail2Ban restarted$(RESET)"
+
+# CrowdSec Targets
+crowdsec: prep-dirs env-check
+	@echo "$(MAGENTA)$(BOLD)🛡️ Installing CrowdSec...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_crowdsec.sh $(if $(FORCE),--force,) \
+		$(if $(CLIENT_ID),--client-id $(CLIENT_ID),) \
+		$(if $(DOMAIN),--domain $(DOMAIN),) \
+		$(if $(DASHBOARD),--dashboard,)
+	@. $(SCRIPTS_DIR)/utils/common.sh && log "INFO" "CrowdSec installation completed via Makefile"
+	@echo "$(GREEN)CrowdSec installation complete$(RESET)"
+
+crowdsec-status:
+	@echo "$(MAGENTA)$(BOLD)🔍 Checking CrowdSec Status...$(RESET)"
+	@if systemctl is-active --quiet crowdsec; then \
+		echo "$(GREEN)✓ CrowdSec is running$(RESET)"; \
+		sudo cscli status; \
+		echo ""; \
+		echo "$(CYAN)Installed collections:$(RESET)"; \
+		sudo cscli collections list; \
+	else \
+		echo "$(RED)✗ CrowdSec is not running$(RESET)"; \
+	fi
+
+crowdsec-logs:
+	@echo "$(MAGENTA)$(BOLD)📋 Viewing CrowdSec logs...$(RESET)"
+	@if [ -f /var/log/agency_stack/components/crowdsec.log ]; then \
+		tail -n 50 /var/log/agency_stack/components/crowdsec.log; \
+	else \
+		echo "$(YELLOW)CrowdSec component log not found. Showing system logs:$(RESET)"; \
+		sudo journalctl -u crowdsec -n 50; \
+	fi
+
+crowdsec-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting CrowdSec...$(RESET)"
+	@sudo systemctl restart crowdsec
+	@if systemctl is-active --quiet crowdsec-dashboard; then \
+		sudo systemctl restart crowdsec-dashboard; \
+	fi
+	@echo "$(GREEN)CrowdSec restarted$(RESET)"
+
+# Multi-Tenancy Targets
+multi-tenancy: prep-dirs env-check
+	@echo "$(MAGENTA)$(BOLD)🏢 Installing Multi-Tenancy...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_multi_tenancy.sh $(if $(FORCE),--force,) \
+		$(if $(CLIENT_ID),--default-client-id $(CLIENT_ID),) \
+		$(if $(DOMAIN),--root-domain $(DOMAIN),) \
+		$(if $(CLIENTS),--clients $(CLIENTS),) \
+		$(if $(ISOLATION_LEVEL),--isolation-level $(ISOLATION_LEVEL),)
+	@. $(SCRIPTS_DIR)/utils/common.sh && log "INFO" "Multi-Tenancy installation completed via Makefile"
+	@echo "$(GREEN)Multi-Tenancy installation complete$(RESET)"
+
+multi-tenancy-status:
+	@echo "$(MAGENTA)$(BOLD)🔍 Checking Multi-Tenancy Status...$(RESET)"
+	@if [ -f "/opt/agency_stack/multi_tenancy/clients.json" ]; then \
+		echo "$(GREEN)✓ Multi-Tenancy is configured$(RESET)"; \
+		echo "$(CYAN)Registered clients:$(RESET)"; \
+		grep -o "\"client_id\":\"[^\"]*\"" "/opt/agency_stack/multi_tenancy/clients.json" | cut -d':' -f2 | tr -d '"' | while read -r client; do \
+			echo "- $$client"; \
+		done; \
+	else \
+		echo "$(RED)✗ Multi-Tenancy is not configured$(RESET)"; \
+	fi
+
+multi-tenancy-logs:
+	@echo "$(MAGENTA)$(BOLD)📋 Viewing Multi-Tenancy logs...$(RESET)"
+	@if [ -f /var/log/agency_stack/components/multi_tenancy.log ]; then \
+		tail -n 50 /var/log/agency_stack/components/multi_tenancy.log; \
+	else \
+		echo "$(YELLOW)Multi-Tenancy log file not found.$(RESET)"; \
+	fi
+
+multi-tenancy-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Multi-Tenancy services...$(RESET)"
+	@echo "$(YELLOW)Multi-Tenancy has no dedicated service to restart.$(RESET)"
+	@echo "$(CYAN)Verifying Docker networks for client isolation...$(RESET)"
+	@if command -v docker &>/dev/null; then \
+		for network in $$(docker network ls --filter "name=agency_stack_" --format "{{.Name}}"); do \
+			echo "Network: $$network - OK"; \
+		done; \
+	else \
+		echo "Docker not found, cannot verify networks"; \
+	fi
+
+# TaskWarrior & Calcurse Targets
+taskwarrior-calcure: prep-dirs env-check
+	@echo "$(MAGENTA)$(BOLD)📅 Installing TaskWarrior & Calcurse...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_taskwarrior_calcure.sh $(if $(FORCE),--force,) \
+		$(if $(CLIENT_ID),--client-id $(CLIENT_ID),) \
+		$(if $(DOMAIN),--domain $(DOMAIN),) \
+		$(if $(NO_WEB),--no-web-ui,) \
+		$(if $(WEB_PORT),--web-port $(WEB_PORT),)
+	@. $(SCRIPTS_DIR)/utils/common.sh && log "INFO" "TaskWarrior & Calcurse installation completed via Makefile"
+	@echo "$(GREEN)TaskWarrior & Calcurse installation complete$(RESET)"
+
+taskwarrior-calcure-status:
+	@echo "$(MAGENTA)$(BOLD)🔍 Checking TaskWarrior & Calcurse Status...$(RESET)"
+	@if command -v task &>/dev/null && command -v calcurse &>/dev/null; then \
+		echo "$(GREEN)✓ TaskWarrior installed: $(shell task --version)$(RESET)"; \
+		echo "$(GREEN)✓ Calcurse installed: $(shell calcurse --version | head -n 1)$(RESET)"; \
+		if systemctl is-active --quiet taskwarrior-web-$(CLIENT_ID).service 2>/dev/null; then \
+			echo "$(GREEN)✓ TaskWarrior Web UI is running$(RESET)"; \
+		elif docker ps --filter "name=taskwarrior-web-$(CLIENT_ID)" --format "{{.Names}}" | grep -q "taskwarrior-web-$(CLIENT_ID)"; then \
+			echo "$(GREEN)✓ TaskWarrior Web UI container is running$(RESET)"; \
+		else \
+			echo "$(YELLOW)⚠ TaskWarrior Web UI is not running$(RESET)"; \
+		fi \
+	else \
+		echo "$(RED)✗ TaskWarrior and/or Calcurse not installed$(RESET)"; \
+	fi
+
+taskwarrior-calcure-logs:
+	@echo "$(MAGENTA)$(BOLD)📋 Viewing TaskWarrior & Calcurse logs...$(RESET)"
+	@if [ -f /var/log/agency_stack/components/taskwarrior_calcure.log ]; then \
+		tail -n 50 /var/log/agency_stack/components/taskwarrior_calcure.log; \
+	else \
+		echo "$(YELLOW)TaskWarrior & Calcurse log file not found.$(RESET)"; \
+	fi
+	@if systemctl is-active --quiet taskwarrior-web-$(CLIENT_ID).service 2>/dev/null; then \
+		echo ""; \
+		echo "$(CYAN)TaskWarrior Web UI logs:$(RESET)"; \
+		sudo journalctl -u taskwarrior-web-$(CLIENT_ID).service -n 20; \
+	fi
+
+taskwarrior-calcure-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting TaskWarrior & Calcurse services...$(RESET)"
+	@if systemctl is-active --quiet taskwarrior-web-$(CLIENT_ID).service 2>/dev/null; then \
+		sudo systemctl restart taskwarrior-web-$(CLIENT_ID).service; \
+		echo "$(GREEN)TaskWarrior Web UI service restarted$(RESET)"; \
+	elif docker ps --filter "name=taskwarrior-web-$(CLIENT_ID)" --format "{{.Names}}" | grep -q "taskwarrior-web-$(CLIENT_ID)"; then \
+		docker restart taskwarrior-web-$(CLIENT_ID); \
+		echo "$(GREEN)TaskWarrior Web UI container restarted$(RESET)"; \
+	else \
+		echo "$(YELLOW)⚠ No TaskWarrior services found to restart$(RESET)"; \
+	fi
