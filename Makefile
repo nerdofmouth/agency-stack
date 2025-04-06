@@ -886,7 +886,105 @@ peertube-restart:
 	@echo "$(MAGENTA)$(BOLD)🔄 Restarting PeerTube...$(RESET)"
 	@cd $(DOCKER_DIR)/peertube && docker-compose restart
 
-# DevOps Components
+## AI Suite Test Harness
+ai-suite-test:
+	@echo "$(MAGENTA)$(BOLD)🧪 Starting AI Suite Test Harness (Mock Mode)...$(RESET)"
+	@echo "$(YELLOW)This will spin up a sandbox environment with mock AI components.$(RESET)"
+	
+	@# Create test client if it doesn't exist
+	@if [ ! -d "/opt/agency_stack/clients/test" ]; then \
+		mkdir -p /opt/agency_stack/clients/test; \
+		echo "$(GREEN)Created test client directory.$(RESET)"; \
+	fi
+	
+	@# Create test directories for each component
+	@mkdir -p /opt/agency_stack/clients/test/ai/logs
+	@mkdir -p /opt/agency_stack/clients/test/ai/data
+	@mkdir -p /opt/agency_stack/clients/test/ai/config
+	
+	@# Start mock Agent Orchestrator
+	@echo "$(CYAN)Starting Mock Agent Orchestrator...$(RESET)"
+	@docker run -d --rm \
+		--name agent-orchestrator-mock \
+		-p 5210:5210 \
+		-e CLIENT_ID=test \
+		-e MOCK_MODE=true \
+		-e LOG_LEVEL=info \
+		-v /opt/agency_stack/clients/test/ai/logs:/logs \
+		-v /opt/agency_stack/clients/test/ai/data:/data \
+		$(SCRIPTS_DIR)/components/agent_orchestrator_mock.sh || echo "$(RED)Failed to start mock Agent Orchestrator. Using fallback mock server.$(RESET)" && \
+		$(SCRIPTS_DIR)/mock/start_mock_server.sh agent-orchestrator 5210
+	
+	@# Start mock LangChain
+	@echo "$(CYAN)Starting Mock LangChain...$(RESET)"
+	@docker run -d --rm \
+		--name langchain-mock \
+		-p 5111:5111 \
+		-e CLIENT_ID=test \
+		-e MOCK_MODE=true \
+		-e LOG_LEVEL=info \
+		-v /opt/agency_stack/clients/test/ai/logs:/logs \
+		-v /opt/agency_stack/clients/test/ai/data:/data \
+		$(SCRIPTS_DIR)/components/langchain_mock.sh || echo "$(RED)Failed to start mock LangChain. Using fallback mock server.$(RESET)" && \
+		$(SCRIPTS_DIR)/mock/start_mock_server.sh langchain 5111
+	
+	@# Start mock Resource Watcher
+	@echo "$(CYAN)Starting Mock Resource Watcher...$(RESET)"
+	@docker run -d --rm \
+		--name resource-watcher-mock \
+		-p 5220:5220 \
+		-e CLIENT_ID=test \
+		-e MOCK_MODE=true \
+		-e LOG_LEVEL=info \
+		-v /opt/agency_stack/clients/test/ai/logs:/logs \
+		-v /opt/agency_stack/clients/test/ai/data:/data \
+		$(SCRIPTS_DIR)/components/resource_watcher_mock.sh || echo "$(RED)Failed to start mock Resource Watcher. Using fallback mock server.$(RESET)" && \
+		$(SCRIPTS_DIR)/mock/start_mock_server.sh resource-watcher 5220
+	
+	@# Start Agent Tools UI with mock mode enabled
+	@echo "$(CYAN)Starting Agent Tools UI in Mock Mode...$(RESET)"
+	@cd $(ROOT_DIR)/apps/agent_tools && \
+		NEXT_PUBLIC_MOCK_MODE=true \
+		NEXT_PUBLIC_CLIENT_ID=test \
+		npm run dev &
+	
+	@echo "$(GREEN)$(BOLD)✅ AI Suite Test Harness is running!$(RESET)"
+	@echo "$(YELLOW)Mock Mode is ENABLED. All operations are simulated.$(RESET)"
+	@echo ""
+	@echo "$(CYAN)Access points:$(RESET)"
+	@echo "  Agent Tools UI:      http://localhost:5120/?client_id=test&mock=true"
+	@echo "  Agent Orchestrator:  http://localhost:5210"
+	@echo "  LangChain:           http://localhost:5111"
+	@echo "  Resource Watcher:    http://localhost:5220"
+	@echo ""
+	@echo "$(CYAN)To stop the test harness: make ai-suite-reset$(RESET)"
+	@echo "$(CYAN)For more information: See /docs/pages/ai/mock_mode.md$(RESET)"
+
+ai-suite-reset:
+	@echo "$(MAGENTA)$(BOLD)🧹 Resetting AI Suite Test Harness...$(RESET)"
+	
+	@# Stop mock containers
+	@echo "$(CYAN)Stopping mock containers...$(RESET)"
+	@docker stop agent-orchestrator-mock langchain-mock resource-watcher-mock 2>/dev/null || true
+	
+	@# Kill any running Next.js dev server for Agent Tools
+	@echo "$(CYAN)Stopping Agent Tools UI...$(RESET)"
+	@pkill -f "next.*5120" 2>/dev/null || true
+	
+	@# Clear test client directory
+	@echo "$(CYAN)Clearing test client data...$(RESET)"
+	@if [ -d "/opt/agency_stack/clients/test" ]; then \
+		rm -rf /opt/agency_stack/clients/test; \
+		echo "$(GREEN)Removed test client directory.$(RESET)"; \
+	fi
+	
+	@# Create placeholder for next test
+	@mkdir -p /opt/agency_stack/clients/test
+	
+	@echo "$(GREEN)$(BOLD)✅ AI Suite Test Harness has been reset!$(RESET)"
+	@echo "$(CYAN)To start the test harness again: make ai-suite-test$(RESET)"
+
+## DevOps Components
 # ------------------------------------------------------------------------------
 
 # Drone CI - Continuous Integration and Delivery Platform
@@ -1181,7 +1279,10 @@ ai-agent-tools-start:
 		echo "$(RED)Agent Tools directory not found!$(RESET)"; \
 		exit 1; \
 	fi
-	@cd $(ROOT_DIR)/apps/agent_tools && npm run dev
+	@cd $(ROOT_DIR)/apps/agent_tools && \
+		NEXT_PUBLIC_MOCK_MODE=true \
+		NEXT_PUBLIC_CLIENT_ID=$(CLIENT_ID) \
+		npm run dev &
 
 ai-agent-tools-status:
 	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking AI Agent Tools Panel Status...$(RESET)"
@@ -1362,3 +1463,61 @@ ai-alpha-check:
 		fi \
 	)"
 	@echo "See detailed status in: /docs/pages/ai/alpha_status.md"
+
+# -----------------------------------------------------------------------------
+# AI Suite Targets
+# -----------------------------------------------------------------------------
+
+install-ai-suite: install-langchain install-ollama install-agent-orchestrator install-resource-watcher install-agent-tools
+	@echo "AI Suite installation complete"
+
+ai-suite-status: langchain-status ollama-status resource-watcher-status agent-orchestrator-status agent-tools-status
+	@echo "AI Suite status check complete"
+
+ai-alpha-check:
+	@echo "Checking AI Suite Alpha readiness..."
+	@echo "Validating installation status..."
+	@jq '.ai | to_entries[] | "\(.key): \(.value.integration_status.installed)"' config/registry/component_registry.json
+	@echo "Checking for required documentation..."
+	@find docs/pages/ai -type f -name "*.md" | sort
+
+# -----------------------------------------------------------------------------
+# AI Suite Mock Test Harness
+# -----------------------------------------------------------------------------
+
+ai-suite-test: ai-suite-test-check ai-suite-test-setup ai-suite-test-start
+	@echo "AI Suite Test Harness started"
+	@echo "Access Agent Tools UI at: http://localhost:5120/?client_id=test&mock=true"
+
+ai-suite-test-check:
+	@echo "Checking prerequisites for test environment..."
+	@if ! command -v node > /dev/null; then echo "Node.js is required but not installed"; exit 1; fi
+	@if ! command -v docker > /dev/null; then echo "Docker is required but not installed"; exit 1; fi
+	@echo "All prerequisites met."
+
+ai-suite-test-setup:
+	@echo "Setting up test environment..."
+	@mkdir -p test/clients/test
+	@mkdir -p test/logs
+	@echo "Client test directories created"
+
+ai-suite-test-start:
+	@echo "Starting mock services..."
+	@cd scripts/mock && \
+		npm install express cors body-parser --quiet && \
+		(node ai_mock_server.js > ../../test/logs/mock_server.log 2>&1 &) && \
+		echo "Mock servers running (api endpoints available on ports 5210, 5111, 5220)"
+	@cd apps/agent_tools && \
+		export NEXT_PUBLIC_MOCK_MODE=true && \
+		(npm run dev > ../../test/logs/agent_tools.log 2>&1 &) && \
+		echo "Agent Tools UI running in mock mode (http://localhost:5120/?client_id=test&mock=true)"
+	@echo "Test harness is now running"
+
+ai-suite-reset:
+	@echo "Stopping all mock services..."
+	@-pkill -f "node ai_mock_server.js" || true
+	@-pkill -f "next dev" || true
+	@echo "Cleaning up test environment..."
+	@rm -rf test/clients/test
+	@rm -rf test/logs
+	@echo "Test environment has been reset"

@@ -6,24 +6,25 @@ This document provides a comprehensive overview of the AI Suite components' stat
 
 For a component to be considered Alpha-ready, it must meet the following criteria:
 
-- ✅ Install successfully without errors
-- ✅ Integrate with the multi-tenant architecture
-- ✅ Support monitoring via Prometheus/Loki
-- ✅ Include comprehensive documentation
-- ✅ Be accessible via the dashboard
-- ✅ Report status back to the system
-- ✅ Have proper Makefile targets
+- Install successfully without errors
+- Integrate with the multi-tenant architecture
+- Support monitoring via Prometheus/Loki
+- Include comprehensive documentation
+- Be accessible via the dashboard
+- Report status back to the system
+- Have proper Makefile targets
 
 ## Component Status
 
 | Component | Status | Version | Ports | Multi-Tenant | Monitoring | Docs | Alpha-Ready |
 |-----------|--------|---------|-------|--------------|------------|------|------------|
-| Ollama | ✅ | 0.1.27 | 11434 (API), 11435 (Metrics) | ✅ | ✅ | ✅ | ✅ |
-| LangChain | ✅ | 0.1.5 | 5111 (API), 5112 (Metrics) | ✅ | ✅ | ✅ | ✅ |
-| AI Dashboard | ✅ | 1.0.0 | 5130 (Web) | ✅ | ✅ | ✅ | ✅ |
-| Agent Orchestrator | ✅ | 1.0.0 | 5210 (API), 5211 (Metrics) | ✅ | ✅ | ✅ | ✅ |
-| Resource Watcher | ✅ | 1.0.0 | 5220 (API), 5221 (Metrics) | ✅ | ✅ | ✅ | ✅ |
-| Agent Tools Bridge | ✅ | 1.0.0 | 5120 (Web) | ✅ | ✅ | ✅ | ✅ |
+| Ollama | | 0.1.27 | 11434 (API), 11435 (Metrics) | | | | |
+| LangChain | | 0.1.5 | 5111 (API), 5112 (Metrics) | | | | |
+| AI Dashboard | | 1.0.0 | 5130 (Web) | | | | |
+| Agent Orchestrator | | 1.0.0 | 5210 (API), 5211 (Metrics) | | | | |
+| Resource Watcher | | 1.0.0 | 5220 (API), 5221 (Metrics) | | | | |
+| Agent Tools Bridge | | 1.0.0 | 5120 (Web) | | | | |
+| AI Suite Test Harness | | 0.1.0 |  | | | | |
 
 ## Inter-Component Dependencies
 
@@ -53,27 +54,44 @@ The AI Suite components have the following dependencies:
 
 | From | To | Status | Notes |
 |------|---|--------|-------|
-| AI Dashboard | Ollama | ✅ | Model management and inference |
-| AI Dashboard | LangChain | ✅ | Prompt engineering interface |
-| Agent Orchestrator | Ollama | ✅ | Model inference for recommendations |
-| Agent Orchestrator | LangChain | ✅ | Advanced processing and chaining |
-| Resource Watcher | Agent Orchestrator | ✅ | Resource monitoring data integration |
-| Agent Tools Bridge | Agent Orchestrator | ✅ | Recommendations and actions API |
-| Agent Tools Bridge | LangChain | ✅ | Prompt testing functionality |
+| AI Dashboard | Ollama | | Model management and inference |
+| AI Dashboard | LangChain | | Prompt engineering interface |
+| Agent Orchestrator | Ollama | | Model inference for recommendations |
+| Agent Orchestrator | LangChain | | Advanced processing and chaining |
+| Resource Watcher | Agent Orchestrator | | Resource monitoring data integration |
+| Agent Tools Bridge | Agent Orchestrator | | Recommendations and actions API |
+| Agent Tools Bridge | LangChain | | Prompt testing functionality |
 
 ### Monitoring Integration
 
 All components expose:
-- ✅ Prometheus metrics
-- ✅ Loki log aggregation
-- ✅ Health check endpoints
+- Prometheus metrics
+- Loki log aggregation
+- Health check endpoints
 
 ### Multi-tenant Support
 
 All components support:
-- ✅ Client ID segmentation
-- ✅ Isolated configuration per client
-- ✅ Proper Docker networking isolation
+- Client ID segmentation
+- Isolated configuration per client
+- Proper Docker networking isolation
+
+## Mock Mode Test Harness
+
+The AI Suite includes a comprehensive mock mode test harness that allows:
+
+- Testing the interaction between all AI components without real data
+- Simulating various events (high memory usage, slow responses, errors)
+- Validating UI components and workflows in a controlled environment
+- Training users without affecting production systems
+
+The test harness can be started with `make ai-suite-test` and provides simulated:
+- Agent Orchestrator responses
+- LangChain LLM interactions
+- Resource Watcher metrics and logs
+- Agent Tools UI interface
+
+For more details on the mock environment, see [Mock Mode Documentation](./mock_mode.md).
 
 ## Known Issues
 
