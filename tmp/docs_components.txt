@@ -1,0 +1,10 @@
+chatwoot
+cryptosync
+droneci
+etebase
+listmonk
+ollama
+peertube
+prometheus
+summary
+voip

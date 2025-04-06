@@ -19,7 +19,7 @@ MAGENTA := $(shell tput setaf 5)
 CYAN := $(shell tput setaf 6)
 RESET := $(shell tput sgr0)
 
-.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit integrate-components dashboard dashboard-refresh dashboard-enable dashboard-update dashboard-open integrate-sso integrate-email integrate-monitoring integrate-data-bridge detect-ports remap-ports scan-ports setup-cronjobs view-alerts log-summary create-client setup-roles security-audit security-fix rotate-secrets setup-log-segmentation verify-certs verify-auth multi-tenancy-status install-wordpress install-erpnext install-posthog install-voip install-mailu install-grafana install-loki install-prometheus install-keycloak install-infrastructure install-security-infrastructure install-multi-tenancy validate validate-report peertube peertube-sso peertube-with-deps peertube-reinstall peertube-status peertube-logs peertube-stop peertube-start peertube-restart alpha-check ui-alpha-check ai-alpha-check
+.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit-components integrate-components dashboard dashboard-refresh dashboard-enable dashboard-update dashboard-open integrate-sso integrate-email integrate-monitoring integrate-data-bridge detect-ports remap-ports scan-ports setup-cronjobs view-alerts log-summary create-client setup-roles security-audit security-fix rotate-secrets setup-log-segmentation verify-certs verify-auth multi-tenancy-status install-wordpress install-erpnext install-posthog install-voip install-mailu install-grafana install-loki install-prometheus install-keycloak install-infrastructure install-security-infrastructure install-multi-tenancy peertube peertube-sso peertube-with-deps peertube-reinstall peertube-status peertube-logs peertube-stop peertube-start peertube-restart alpha-check ui-alpha-check ai-alpha-check fail2ban fail2ban-status fail2ban-logs fail2ban-restart security security-status security-logs security-infrastructure security-infrastructure-status security-infrastructure-logs signing-timestamps signing-timestamps-status signing-timestamps-logs signing-timestamps-restart docker docker-status docker-logs docker-restart docker-compose docker-compose-status infrastructure infrastructure-status infrastructure-logs traefik-ssl traefik-ssl-status traefik-ssl-logs traefik-ssl-renew openintegrationhub openintegrationhub-status openintegrationhub-logs openintegrationhub-restart n8n n8n-status n8n-logs n8n-restart posthog posthog-status posthog-logs posthog-restart netdata netdata-status netdata-logs netdata-restart multi-tenancy multi-tenancy-logs taskwarrior-calcure taskwarrior-calcure-status taskwarrior-calcure-logs taskwarrior-calcure-restart backup-strategy backup-strategy-status backup-strategy-logs backup-strategy-run prerequisites prerequisites-status launchpad-dashboard launchpad-dashboard-status launchpad-dashboard-logs launchpad-dashboard-restart webpush webpush-status webpush-logs webpush-restart tailscale tailscale-status tailscale-logs tailscale-restart crowdsec crowdsec-status crowdsec-logs crowdsec-restart crowdsec-dashboard mailu mailu-status mailu-logs mailu-restart mailu-test-email
 
 # Default target
 help:
@@ -56,7 +56,7 @@ help:
 	@echo "  $(BOLD)make integrate-keycloak$(RESET) Integrate Keycloak with AgencyStack components"
 	@echo "  $(BOLD)make test-operations$(RESET)  Test AgencyStack operational features"
 	@echo "  $(BOLD)make motd$(RESET)             Generate server message of the day"
-	@echo "  $(BOLD)make audit$(RESET)            Audit running components and system status"
+	@echo "  $(BOLD)make audit-components$(RESET) Audit AgencyStack components and system"
 	@echo "  $(BOLD)make integrate-components$(RESET) Integrate AgencyStack components"
 	@echo "  $(BOLD)make dashboard$(RESET)        Open AgencyStack dashboard"
 	@echo "  $(BOLD)make dashboard-refresh$(RESET) Refresh AgencyStack dashboard"
@@ -229,8 +229,8 @@ mailu-setup:
 
 # Send a test email via Mailu
 mailu-test-email:
-	@echo "📨 Sending test email via Mailu..."
-	@sudo $(SCRIPTS_DIR)/mailu_test_email.sh
+	@echo "$(CYAN)This is a deprecated target. Using the consolidated implementation...$(RESET)"
+	@$(MAKE) -f $(MAKEFILE_LIST) mailu-test-email-consolidated
 
 # View installation and component logs
 logs:
@@ -305,7 +305,7 @@ motd:
 	@sudo bash $(SCRIPTS_DIR)/motd_generator.sh
 
 # Audit AgencyStack components and system
-audit:
+audit-components:
 	@echo "$(MAGENTA)$(BOLD)🔍 Auditing AgencyStack Components...$(RESET)"
 	@$(SCRIPTS_DIR)/audit_and_cleanup.sh --dry-run
 	@echo "$(CYAN)Audit complete! To view the report: make audit-report$(RESET)"
@@ -480,13 +480,18 @@ verify-auth:
 	@echo "👤 Verifying authentication configuration..."
 	@sudo -E bash $(SCRIPTS_DIR)/security/verify_authentication.sh
 
+# DEPRECATED: This target has been consolidated with the newer implementation at line ~546
 multi-tenancy-status:
-	@echo "🏢 Checking multi-tenancy status..."
-	@sudo -E bash $(SCRIPTS_DIR)/security/check_multi_tenancy.sh
+	@echo "$(CYAN)This is a deprecated target. Using the consolidated implementation...$(RESET)"
+	@$(MAKE) -f $(MAKEFILE_LIST) multi-tenancy-status-consolidated
+
+multi-tenancy-status-consolidated:
+	@echo "$(MAGENTA)$(BOLD)📊 Checking Multi-Tenancy Status...$(RESET)"
+	@$(SCRIPTS_DIR)/utils/multi_tenancy_check.sh
 
 cryptosync:
 	@echo "$(MAGENTA)$(BOLD)🔒 Installing Cryptosync...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/install_cryptosync.sh $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) \
+	@$(SCRIPTS_DIR)/components/install_cryptosync.sh $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) \
 		$(if $(MOUNT_DIR),--mount-dir $(MOUNT_DIR),) \
 		$(if $(REMOTE_NAME),--remote-name $(REMOTE_NAME),) \
 		$(if $(CONFIG_NAME),--config-name $(CONFIG_NAME),) \
@@ -543,16 +548,23 @@ cryptosync-logs:
 # Repository Audit and Cleanup Targets
 # ------------------------------------------------------------------------------
 
+# DEPRECATED: This target has been consolidated with the newer implementation at line ~546
 audit:
+	@echo "$(CYAN)This target has been replaced by a newer implementation. Redirecting...$(RESET)"
+	@$(MAKE) -f $(MAKEFILE_LIST) audit-new
+
+audit-consolidated:
 	@echo "$(MAGENTA)$(BOLD)📊 Running AgencyStack Repository Audit...$(RESET)"
 	@sudo $(CURDIR)/scripts/utils/audit_and_cleanup.sh
 
+audit-new:
+	@echo "$(MAGENTA)$(BOLD)🔍 Running Comprehensive AgencyStack Audit...$(RESET)"
+	@sudo $(CURDIR)/scripts/utils/audit_and_cleanup.sh --dry-run
+	@echo "$(CYAN)Audit complete! To view the report: make audit-report$(RESET)"
+	@echo "$(YELLOW)To actually perform cleanup of unused files, run: make cleanup$(RESET)"
+
 quick-audit:
 	@echo "$(MAGENTA)$(BOLD)🔍 Running Quick AgencyStack Repository Audit...$(RESET)"
-	@sudo $(CURDIR)/scripts/utils/audit_and_cleanup.sh --quick
-
-reliable-audit:
-	@echo "$(MAGENTA)$(BOLD)🔍 Running Reliable AgencyStack Repository Audit...$(RESET)"
 	@sudo $(CURDIR)/scripts/utils/quick_audit.sh
 	@echo "$(GREEN)To view detailed report, check: /var/log/agency_stack/audit/quick_audit_$$(date +%Y%m%d).txt$(RESET)"
 
@@ -758,7 +770,7 @@ prometheus-reload:
 
 prometheus-alerts:
 	@echo "$(MAGENTA)$(BOLD)🔔 Viewing Prometheus Alerts...$(RESET)"
-	@curl -s http://localhost:9090/api/v1/alerts | jq . || echo "$(RED)Failed to fetch alerts. Is Prometheus running?$(RESET)"
+	@curl -s http://localhost:9090/api/v1/alerts | jq || echo "$(RED)Failed to fetch alerts. Is Prometheus running?$(RESET)"
 
 prometheus-config:
 	@echo "$(MAGENTA)$(BOLD)⚙️ Configuring Prometheus...$(RESET)"
@@ -983,244 +995,10 @@ ai-suite-reset:
 	@echo "$(GREEN)$(BOLD)✅ AI Suite Test Harness has been reset!$(RESET)"
 	@echo "$(CYAN)To start the test harness again: make ai-suite-test$(RESET)"
 
-## DevOps Components
-# ------------------------------------------------------------------------------
-
-# Drone CI - Continuous Integration and Delivery Platform
-droneci:
-	@echo "Installing Drone CI..."
-	@sudo $(SCRIPTS_DIR)/components/install_droneci.sh --domain $(DRONECI_DOMAIN) $(INSTALL_FLAGS)
-
-droneci-status:
-	@docker ps -a | grep drone || echo "Drone CI is not running"
-
-droneci-logs:
-	@docker logs -f drone-server-$(CLIENT_ID) 2>&1 | tee $(LOG_DIR)/components/droneci.log
-
-droneci-runner-logs:
-	@docker logs -f drone-runner-$(CLIENT_ID) 2>&1 | tee $(LOG_DIR)/components/droneci-runner.log
-
-droneci-stop:
-	@docker-compose -f $(DOCKER_DIR)/droneci/docker-compose.yml down
-
-droneci-start:
-	@docker-compose -f $(DOCKER_DIR)/droneci/docker-compose.yml up -d
-
-droneci-restart:
-	@docker-compose -f $(DOCKER_DIR)/droneci/docker-compose.yml restart
-
-droneci-backup:
-	@echo "Backing up Drone CI data..."
-	@mkdir -p $(BACKUP_DIR)/droneci
-	@$(CONFIG_DIR)/clients/$(CLIENT_ID)/droneci_data/scripts/backup.sh $(BACKUP_DIR)/droneci
-	@echo "Backup completed: $(BACKUP_DIR)/droneci/"
-
-droneci-config:
-	@echo "Opening Drone CI configuration..."
-	@$(EDITOR) $(DOCKER_DIR)/droneci/.env
-
-# Collaboration Components
-# ------------------------------------------------------------------------------
-
-# Etebase - Encrypted CalDAV/CardDAV Server
-etebase:
-	@echo "$(MAGENTA)$(BOLD)🗓️ Installing Etebase...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/install_etebase.sh $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) \
-		$(if $(DOMAIN),--domain $(DOMAIN),) \
-		$(if $(PORT),--port $(PORT),) \
-		$(if $(ADMIN_USER),--admin-user $(ADMIN_USER),) \
-		$(if $(ADMIN_EMAIL),--admin-email $(ADMIN_EMAIL),) \
-		$(if $(ADMIN_PASSWORD),--admin-password $(ADMIN_PASSWORD),) \
-		$(if $(FORCE),--force,) \
-		$(if $(WITH_DEPS),--with-deps,) \
-		$(if $(NO_SSL),--no-ssl,) \
-		$(if $(DISABLE_MONITORING),--disable-monitoring,)
-
-etebase-status:
-	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Etebase status...$(RESET)"
-	@if [ -f "$(CONFIG_DIR)/monitoring/scripts/check_etebase-$(CLIENT_ID).sh" ]; then \
-		$(CONFIG_DIR)/monitoring/scripts/check_etebase-$(CLIENT_ID).sh $(CLIENT_ID); \
-	else \
-		echo "$(RED)Monitoring script not found. Checking container status...$(RESET)"; \
-		docker ps -a | grep etebase-$(CLIENT_ID) || echo "$(RED)Etebase container not found$(RESET)"; \
-	fi
-
-etebase-logs:
-	@echo "$(MAGENTA)$(BOLD)📋 Viewing Etebase logs...$(RESET)"
-	@docker logs -f etebase-$(CLIENT_ID) 2>&1 | tee $(LOG_DIR)/components/etebase.log
-
-etebase-stop:
-	@echo "$(MAGENTA)$(BOLD)🛑 Stopping Etebase...$(RESET)"
-	@cd $(DOCKER_DIR)/etebase && docker-compose down
-
-etebase-start:
-	@echo "$(MAGENTA)$(BOLD)🚀 Starting Etebase...$(RESET)"
-	@cd $(DOCKER_DIR)/etebase && docker-compose up -d
-
-etebase-restart:
-	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Etebase...$(RESET)"
-	@cd $(DOCKER_DIR)/etebase && docker-compose restart
-
-etebase-backup:
-	@echo "$(MAGENTA)$(BOLD)💾 Backing up Etebase data...$(RESET)"
-	@$(CONFIG_DIR)/clients/$(CLIENT_ID)/etebase/scripts/backup.sh "$(CLIENT_ID)" "$(CONFIG_DIR)/backups/etebase"
-	@echo "$(GREEN)Backup completed to: $(CONFIG_DIR)/backups/etebase$(RESET)"
-
-etebase-config:
-	@echo "$(MAGENTA)$(BOLD)⚙️ Opening Etebase configuration...$(RESET)"
-	@$(EDITOR) $(CONFIG_DIR)/clients/$(CLIENT_ID)/etebase/config/credentials.env
-
-# Database Components
-
-# AI Foundation
-.PHONY: ollama ollama-status ollama-logs ollama-stop ollama-start ollama-restart ollama-pull ollama-list ollama-test
-
-ollama:
-	@echo "Installing Ollama..."
-	@mkdir -p /var/log/agency_stack/components/
-	@bash scripts/components/install_ollama.sh $(ARGS)
-
-ollama-status:
-	@echo "Checking Ollama status..."
-	@if [ -f "/opt/agency_stack/monitoring/scripts/check_ollama-$(CLIENT_ID).sh" ]; then \
-		/opt/agency_stack/monitoring/scripts/check_ollama-$(CLIENT_ID).sh $(CLIENT_ID); \
-	else \
-		echo "Ollama monitoring script not found. Please install Ollama first."; \
-		exit 1; \
-	fi
-
-ollama-logs:
-	@echo "Displaying Ollama logs..."
-	@if [ -d "/opt/agency_stack/docker/ollama" ]; then \
-		cd /opt/agency_stack/docker/ollama && docker-compose logs --tail=100 -f; \
-	else \
-		echo "Ollama installation not found. Please install Ollama first."; \
-		exit 1; \
-	fi
-
-ollama-stop:
-	@echo "Stopping Ollama..."
-	@if [ -d "/opt/agency_stack/docker/ollama" ]; then \
-		cd /opt/agency_stack/docker/ollama && docker-compose stop; \
-	else \
-		echo "Ollama installation not found. Please install Ollama first."; \
-		exit 1; \
-	fi
-
-ollama-start:
-	@echo "Starting Ollama..."
-	@if [ -d "/opt/agency_stack/docker/ollama" ]; then \
-		cd /opt/agency_stack/docker/ollama && docker-compose start; \
-	else \
-		echo "Ollama installation not found. Please install Ollama first."; \
-		exit 1; \
-	fi
-
-ollama-restart:
-	@echo "Restarting Ollama..."
-	@if [ -d "/opt/agency_stack/docker/ollama" ]; then \
-		cd /opt/agency_stack/docker/ollama && docker-compose restart; \
-	else \
-		echo "Ollama installation not found. Please install Ollama first."; \
-		exit 1; \
-	fi
-
-ollama-pull:
-	@echo "Pulling Ollama models..."
-	@if command -v ollama-pull-models-$(CLIENT_ID) > /dev/null 2>&1; then \
-		ollama-pull-models-$(CLIENT_ID); \
-	else \
-		echo "Ollama helper scripts not found. Please install Ollama first."; \
-		exit 1; \
-	fi
-
-ollama-list:
-	@echo "Listing Ollama models..."
-	@if command -v ollama-list-models-$(CLIENT_ID) > /dev/null 2>&1; then \
-		ollama-list-models-$(CLIENT_ID); \
-	else \
-		echo "Ollama helper scripts not found. Please install Ollama first."; \
-		exit 1; \
-	fi
-
-ollama-test:
-	@echo "Testing Ollama API..."
-	@if command -v ollama-test-api-$(CLIENT_ID) > /dev/null 2>&1; then \
-		ollama-test-api-$(CLIENT_ID) $(MODEL) "$(PROMPT)"; \
-	else \
-		echo "Ollama helper scripts not found. Please install Ollama first."; \
-		exit 1; \
-	fi
-
-# LangChain
-.PHONY: langchain langchain-status langchain-logs langchain-stop langchain-start langchain-restart langchain-test
-
-langchain:
-	@echo "Installing LangChain..."
-	@mkdir -p /var/log/agency_stack/components/
-	@bash scripts/components/install_langchain.sh $(ARGS)
-
-langchain-status:
-	@echo "Checking LangChain status..."
-	@if [ -f "/opt/agency_stack/monitoring/scripts/check_langchain-$(CLIENT_ID).sh" ]; then \
-		/opt/agency_stack/monitoring/scripts/check_langchain-$(CLIENT_ID).sh $(CLIENT_ID); \
-	else \
-		echo "LangChain monitoring script not found. Please install LangChain first."; \
-		exit 1; \
-	fi
-
-langchain-logs:
-	@echo "Displaying LangChain logs..."
-	@if [ -d "/opt/agency_stack/docker/langchain" ]; then \
-		cd /opt/agency_stack/docker/langchain && docker-compose logs --tail=100 -f; \
-	else \
-		echo "LangChain installation not found. Please install LangChain first."; \
-		exit 1; \
-	fi
-
-langchain-stop:
-	@echo "Stopping LangChain..."
-	@if [ -d "/opt/agency_stack/docker/langchain" ]; then \
-		cd /opt/agency_stack/docker/langchain && docker-compose stop; \
-	else \
-		echo "LangChain installation not found. Please install LangChain first."; \
-		exit 1; \
-	fi
-
-langchain-start:
-	@echo "Starting LangChain..."
-	@if [ -d "/opt/agency_stack/docker/langchain" ]; then \
-		cd /opt/agency_stack/docker/langchain && docker-compose start; \
-	else \
-		echo "LangChain installation not found. Please install LangChain first."; \
-		exit 1; \
-	fi
-
-langchain-restart:
-	@echo "Restarting LangChain..."
-	@if [ -d "/opt/agency_stack/docker/langchain" ]; then \
-		cd /opt/agency_stack/docker/langchain && docker-compose restart; \
-	else \
-		echo "LangChain installation not found. Please install LangChain first."; \
-		exit 1; \
-	fi
-
-langchain-test:
-	@echo "Testing LangChain API..."
-	@if [ -d "/opt/agency_stack/docker/langchain" ]; then \
-		PORT=$$(grep PORT /opt/agency_stack/docker/langchain/.env | cut -d= -f2); \
-		curl -X POST "http://localhost:$${PORT}/prompt" \
-			-H "Content-Type: application/json" \
-			-d '{"template":"Tell me about {topic} in one sentence.","inputs":{"topic":"LangChain"}}'; \
-	else \
-		echo "LangChain installation not found. Please install LangChain first."; \
-		exit 1; \
-	fi
-
 ## AI Dashboard Targets
 ai-dashboard:
 	@echo "Installing AI Dashboard..."
-	@./scripts/components/install_ai_dashboard.sh --client-id=$(CLIENT_ID) --domain=$(DOMAIN) $(AI_DASHBOARD_FLAGS)
+	@sudo $(SCRIPTS_DIR)/components/install_ai_dashboard.sh --client-id=$(CLIENT_ID) --domain=$(DOMAIN) $(AI_DASHBOARD_FLAGS)
 
 ai-dashboard-status:
 	@echo "Checking AI Dashboard status..."
@@ -1306,14 +1084,14 @@ resource-watcher:
 resource-watcher-status:
 	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Resource Watcher Status...$(RESET)"
 	@if [ -d "/opt/agency_stack/resource_watcher" ]; then \
-		echo "$(GREEN)Resource Watcher is installed.$(RESET)"; \
+		echo "$(GREEN)✓ Resource Watcher is installed$(RESET)"; \
 		if docker ps | grep -q "resource-watcher"; then \
-			echo "$(GREEN)Resource Watcher is running.$(RESET)"; \
+			echo "$(GREEN)✓ Resource Watcher is running$(RESET)"; \
 		else \
-			echo "$(RED)Resource Watcher is installed but not running.$(RESET)"; \
+			echo "$(RED)✗ Resource Watcher is installed but not running$(RESET)"; \
 		fi \
 	else \
-		echo "$(RED)Resource Watcher is not installed.$(RESET)"; \
+		echo "$(RED)✗ Resource Watcher is not installed$(RESET)"; \
 	fi
 	@curl -s http://localhost:5220/health || echo "Could not connect to Resource Watcher. Is it running?"
 	@echo ""
@@ -1323,7 +1101,7 @@ resource-watcher-logs:
 	@if [ -d "/opt/agency_stack/resource_watcher" ]; then \
 		docker logs -n 50 resource-watcher; \
 	else \
-		echo "$(RED)Resource Watcher is not installed.$(RESET)"; \
+		echo "$(RED)Resource Watcher is not installed$(RESET)"; \
 	fi
 
 resource-watcher-metrics:
@@ -1358,180 +1136,13 @@ install-ai-suite:
 
 ## AI Alpha Check Targets
 ai-alpha-check:
+	@echo "$(CYAN)This is a deprecated implementation. Using the consolidated version...$(RESET)"
+	@$(MAKE) -f $(MAKEFILE_LIST) ai-alpha-check-consolidated
+
+ai-alpha-check-consolidated:
 	@echo "$(MAGENTA)$(BOLD)🔍 Running AI Alpha Readiness Check...$(RESET)"
 	@echo "$(CYAN)Checking installed components...$(RESET)"
 	@echo "-------------------------------------------"
 	
 	@echo "1. Checking Ollama..."
 	@if [ -d "/opt/agency_stack/ollama" ]; then \
-		echo "  $(GREEN)✓ Ollama is installed$(RESET)"; \
-		if curl -s http://localhost:11434/api/tags &>/dev/null; then \
-			echo "  $(GREEN)✓ Ollama API is accessible$(RESET)"; \
-		else \
-			echo "  $(RED)✗ Ollama API is not accessible$(RESET)"; \
-		fi \
-	else \
-		echo "  $(RED)✗ Ollama is not installed$(RESET)"; \
-	fi
-	
-	@echo "2. Checking LangChain..."
-	@if [ -d "/opt/agency_stack/langchain" ]; then \
-		echo "  $(GREEN)✓ LangChain is installed$(RESET)"; \
-		if curl -s http://localhost:5111/health &>/dev/null; then \
-			echo "  $(GREEN)✓ LangChain API is accessible$(RESET)"; \
-		else \
-			echo "  $(RED)✗ LangChain API is not accessible$(RESET)"; \
-		fi \
-	else \
-		echo "  $(RED)✗ LangChain is not installed$(RESET)"; \
-	fi
-	
-	@echo "3. Checking AI Dashboard..."
-	@if [ -d "/opt/agency_stack/ai_dashboard" ]; then \
-		echo "  $(GREEN)✓ AI Dashboard is installed$(RESET)"; \
-		if docker ps | grep -q "ai-dashboard"; then \
-			echo "  $(GREEN)✓ AI Dashboard is running$(RESET)"; \
-		else \
-			echo "  $(RED)✗ AI Dashboard is not running$(RESET)"; \
-		fi \
-	else \
-		echo "  $(RED)✗ AI Dashboard is not installed$(RESET)"; \
-	fi
-	
-	@echo "4. Checking Agent Orchestrator..."
-	@if [ -d "/opt/agency_stack/agent_orchestrator" ]; then \
-		echo "  $(GREEN)✓ Agent Orchestrator is installed$(RESET)"; \
-		if curl -s http://localhost:5210/health &>/dev/null; then \
-			echo "  $(GREEN)✓ Agent Orchestrator API is accessible$(RESET)"; \
-		else \
-			echo "  $(RED)✗ Agent Orchestrator API is not accessible$(RESET)"; \
-		fi \
-	else \
-		echo "  $(RED)✗ Agent Orchestrator is not installed$(RESET)"; \
-	fi
-	
-	@echo "5. Checking Resource Watcher..."
-	@if [ -d "/opt/agency_stack/resource_watcher" ]; then \
-		echo "  $(GREEN)✓ Resource Watcher is installed$(RESET)"; \
-		if curl -s http://localhost:5220/health &>/dev/null; then \
-			echo "  $(GREEN)✓ Resource Watcher API is accessible$(RESET)"; \
-		else \
-			echo "  $(RED)✗ Resource Watcher API is not accessible$(RESET)"; \
-		fi \
-	else \
-		echo "  $(RED)✗ Resource Watcher is not installed$(RESET)"; \
-	fi
-	
-	@echo "6. Checking Agent Tools..."
-	@if [ -d "$(ROOT_DIR)/apps/agent_tools" ]; then \
-		echo "  $(GREEN)✓ Agent Tools is installed$(RESET)"; \
-	else \
-		echo "  $(RED)✗ Agent Tools is not installed$(RESET)"; \
-	fi
-	
-	@echo "-------------------------------------------"
-	@echo "$(CYAN)Checking port availability...$(RESET)"
-	@echo "Ollama: $(shell if netstat -tuln | grep -q \":11434 \"; then echo \"$(GREEN)✓ Available$(RESET)\"; else echo \"$(RED)✗ Not available$(RESET)\"; fi)"
-	@echo "LangChain: $(shell if netstat -tuln | grep -q \":5111 \"; then echo \"$(GREEN)✓ Available$(RESET)\"; else echo \"$(RED)✗ Not available$(RESET)\"; fi)"
-	@echo "AI Dashboard: $(shell if netstat -tuln | grep -q \":5130 \"; then echo \"$(GREEN)✓ Available$(RESET)\"; else echo \"$(RED)✗ Not available$(RESET)\"; fi)"
-	@echo "Agent Orchestrator: $(shell if netstat -tuln | grep -q \":5210 \"; then echo \"$(GREEN)✓ Available$(RESET)\"; else echo \"$(RED)✗ Not available$(RESET)\"; fi)"
-	@echo "Resource Watcher: $(shell if netstat -tuln | grep -q \":5220 \"; then echo \"$(GREEN)✓ Available$(RESET)\"; else echo \"$(RED)✗ Not available$(RESET)\"; fi)"
-	@echo "Agent Tools Bridge: $(shell if netstat -tuln | grep -q \":5120 \"; then echo \"$(GREEN)✓ Available$(RESET)\"; else echo \"$(RED)✗ Not available$(RESET)\"; fi)"
-	
-	@echo "-------------------------------------------"
-	@echo "$(CYAN)Checking dependencies...$(RESET)"
-	@echo "Docker: $(shell if command -v docker &> /dev/null; then echo \"$(GREEN)✓ Installed$(RESET)\"; else echo \"$(RED)✗ Not installed$(RESET)\"; fi)"
-	@echo "Docker Compose: $(shell if command -v docker-compose &> /dev/null; then echo \"$(GREEN)✓ Installed$(RESET)\"; else echo \"$(RED)✗ Not installed$(RESET)\"; fi)"
-	@echo "Node.js: $(shell if command -v node &> /dev/null; then echo \"$(GREEN)✓ Installed$(RESET)\"; else echo \"$(RED)✗ Not installed$(RESET)\"; fi)"
-	@echo "npm: $(shell if command -v npm &> /dev/null; then echo \"$(GREEN)✓ Installed$(RESET)\"; else echo \"$(RED)✗ Not installed$(RESET)\"; fi)"
-	
-	@echo "-------------------------------------------"
-	@echo "$(CYAN)Checking required directories...$(RESET)"
-	@echo "AI config dir: $(shell if [ -d \"/opt/agency_stack/config/ai\" ]; then echo \"$(GREEN)✓ Exists$(RESET)\"; else echo \"$(RED)✗ Missing$(RESET)\"; fi)"
-	@echo "AI logs dir: $(shell if [ -d \"/var/log/agency_stack/ai\" ]; then echo \"$(GREEN)✓ Exists$(RESET)\"; else echo \"$(RED)✗ Missing$(RESET)\"; fi)"
-	@echo "Client configs dir: $(shell if [ -d \"/opt/agency_stack/clients\" ]; then echo \"$(GREEN)✓ Exists$(RESET)\"; else echo \"$(RED)✗ Missing$(RESET)\"; fi)"
-	
-	@echo "-------------------------------------------"
-	@echo "$(BOLD)$(MAGENTA)AI Alpha Status Summary:$(RESET)"
-	@echo "Validating installation status..."
-	@if [ -f "$(CONFIG_DIR)/registry/component_registry.json" ]; then \
-		jq '.ai | to_entries[] | "\(.key): \(.value.integration_status.installed)"' $(CONFIG_DIR)/registry/component_registry.json 2>/dev/null || echo "$(RED)Error parsing component registry$(RESET)"; \
-	else \
-		echo "$(RED)Component registry not found$(RESET)"; \
-	fi
-	@echo "Checking for required documentation..."
-	@find docs/pages/ai -type f -name "*.md" | sort
-	@echo "-------------------------------------------"
-	@echo "$(CYAN)See also: make alpha-check for overall stack readiness$(RESET)"
-
-# -----------------------------------------------------------------------------
-# AI Suite Targets
-# -----------------------------------------------------------------------------
-
-ai-suite-status: langchain-status ollama-status resource-watcher-status agent-orchestrator-status agent-tools-status
-	@echo "AI Suite status check complete"
-
-ai-alpha-check:
-	@echo "Checking AI Suite Alpha readiness..."
-	@echo "Validating installation status..."
-	@jq '.ai | to_entries[] | "\(.key): \(.value.integration_status.installed)"' config/registry/component_registry.json
-	@echo "Checking for required documentation..."
-	@find docs/pages/ai -type f -name "*.md" | sort
-
-# -----------------------------------------------------------------------------
-# AI Suite Mock Test Harness
-# -----------------------------------------------------------------------------
-
-ai-suite-test: ai-suite-test-check ai-suite-test-setup ai-suite-test-start
-	@echo "$(MAGENTA)$(BOLD)🧪 AI Suite Test Harness started$(RESET)"
-	@echo "$(GREEN)Access Agent Tools UI at: http://localhost:5120/?client_id=test&mock=true$(RESET)"
-
-ai-suite-test-check:
-	@echo "$(CYAN)Checking prerequisites for test environment...$(RESET)"
-	@if ! command -v node > /dev/null; then echo "$(RED)Node.js is required but not installed$(RESET)"; exit 1; fi
-	@if ! command -v docker > /dev/null; then echo "$(RED)Docker is required but not installed$(RESET)"; exit 1; fi
-	@echo "$(GREEN)All prerequisites met.$(RESET)"
-
-ai-suite-test-setup:
-	@echo "$(CYAN)Setting up AI Suite test environment...$(RESET)"
-	@mkdir -p test/clients/test/data
-	@mkdir -p test/clients/test/config
-	@mkdir -p test/logs
-	@if [ ! -f "test/clients/test/config/client.json" ]; then \
-		echo '{"client_id":"test","name":"Test Client","domain":"test.local","setup_date":"$(shell date +%Y-%m-%d)"}' > test/clients/test/config/client.json; \
-	fi
-	@if [ ! -f "test/clients/test/config/ai_config.json" ]; then \
-		echo '{"models":{"default":"llama2","chat":"llama2-chat"},"endpoints":{"langchain":"http://localhost:5111","ollama":"http://localhost:11434"}}' > test/clients/test/config/ai_config.json; \
-	fi
-	@echo "$(GREEN)Test environment set up successfully.$(RESET)"
-
-ai-suite-test-start:
-	@echo "$(CYAN)Starting mock AI services...$(RESET)"
-	@echo '{"status":"ok","message":"Mock LangChain running"}' > test/clients/test/data/langchain_mock.json
-	@echo '{"status":"ok","message":"Mock Ollama running"}' > test/clients/test/data/ollama_mock.json
-	@echo '{"status":"ok","message":"Mock Agent Orchestrator running"}' > test/clients/test/data/orchestrator_mock.json
-	@echo '{"status":"ok","message":"Mock Resource Watcher running"}' > test/clients/test/data/watcher_mock.json
-	@echo "$(GREEN)Mock services started. Using simulated responses.$(RESET)"
-
-ai-suite-reset:
-	@echo "$(MAGENTA)$(BOLD)🧹 Resetting AI Suite test environment...$(RESET)"
-	@rm -rf test/clients/test
-	@rm -rf test/logs
-	@echo "$(GREEN)Test environment has been reset$(RESET)"
-
-# Alpha Release Readiness Check
-alpha-check:
-	@echo "$(MAGENTA)$(BOLD)🔍 Checking Alpha Release Readiness...$(RESET)"
-	@$(SCRIPTS_DIR)/utils/fixed_alpha_report.sh
-	@echo "$(CYAN)Full report available at: docs/pages/components/alpha_ready.md$(RESET)"
-
-# UI Alpha Check
-ui-alpha-check:
-	@echo "$(MAGENTA)$(BOLD)🔍 Checking UI Alpha Readiness...$(RESET)"
-	@if [ -f "$(SCRIPTS_DIR)/utils/ui_alpha_check.sh" ]; then \
-		$(SCRIPTS_DIR)/utils/ui_alpha_check.sh; \
-	else \
-		echo "$(RED)UI Alpha check script not found.$(RESET)"; \
-		echo "$(YELLOW)Please implement the ui_alpha_check.sh script.$(RESET)"; \
-	fi
-	@echo "$(CYAN)You may also want to check the dashboard with: make dashboard-open$(RESET)"
