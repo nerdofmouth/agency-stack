@@ -2002,3 +2002,49 @@ docker-compose-restart:
 		echo "$(RED)❌ Test script not found. Is Docker Compose installed?$(RESET)"; \
 		echo "$(CYAN)Install with: make docker-compose$(RESET)"; \
 	fi
+
+# Fail2ban
+fail2ban: validate
+	@echo "$(MAGENTA)$(BOLD)🔒 Installing Fail2ban Intrusion Prevention...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_fail2ban.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+fail2ban-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Fail2ban Status...$(RESET)"
+	@if command -v fail2ban-server &> /dev/null && systemctl is-active --quiet fail2ban; then \
+		echo "$(GREEN)✅ Fail2ban is installed and running$(RESET)"; \
+		if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/fail2ban/fail2ban-status.sh" ]; then \
+			sudo /opt/agency_stack/clients/$(CLIENT_ID)/fail2ban/fail2ban-status.sh; \
+		else \
+			echo "$(CYAN)Active jails:$(RESET)"; \
+			sudo fail2ban-client status | grep "Jail list" | sed 's/^.*Jail list://'; \
+		fi; \
+	else \
+		echo "$(RED)❌ Fail2ban is not running$(RESET)"; \
+		echo "$(CYAN)Install with: make fail2ban$(RESET)"; \
+	fi
+
+fail2ban-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing Fail2ban Logs...$(RESET)"
+	@if [ -f "/var/log/fail2ban.log" ]; then \
+		echo "$(CYAN)Recent Fail2ban actions:$(RESET)"; \
+		sudo grep "Ban\|Unban" /var/log/fail2ban.log | tail -n 20; \
+		echo ""; \
+		echo "$(CYAN)For installation logs, use:$(RESET)"; \
+		echo "cat /var/log/agency_stack/components/fail2ban.log"; \
+	else \
+		echo "$(YELLOW)Fail2ban logs not found.$(RESET)"; \
+		if [ -f "/var/log/agency_stack/components/fail2ban.log" ]; then \
+			cat /var/log/agency_stack/components/fail2ban.log | tail -n 20; \
+		fi; \
+	fi
+
+fail2ban-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Fail2ban Service...$(RESET)"
+	@if systemctl is-active fail2ban &> /dev/null; then \
+		sudo systemctl restart fail2ban; \
+		echo "$(GREEN)✅ Fail2ban service restarted$(RESET)"; \
+	else \
+		echo "$(RED)❌ Fail2ban service is not running$(RESET)"; \
+		sudo systemctl start fail2ban; \
+		echo "$(GREEN)✅ Fail2ban service started$(RESET)"; \
+	fi
