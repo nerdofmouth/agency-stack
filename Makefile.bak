@@ -1818,6 +1818,24 @@ killbill-restart:
 	@echo "TODO: Implement killbill-restart"
 	@exit 1
 
+# Auto-generated target for loki
+loki:
+	@echo "TODO: Implement loki"
+	@exit 1
+
+# Auto-generated target for loki
+loki-status:
+	@echo "TODO: Implement loki-status"
+	@exit 1
+
+# Auto-generated target for loki
+loki-logs:
+	@echo "TODO: Implement loki-logs"
+	@exit 1
+
+# Auto-generated target for loki
+loki-restart:
+	@echo "TODO: Implement loki-restart"
 	@exit 1
 
 # Auto-generated target for mailu

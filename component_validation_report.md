@@ -1,8 +1,24 @@
 # AgencyStack Component Validation Report
-Generated: 2025-04-07 10:45:35
+Generated: 2025-04-07 15:50:36
 
 ## Summary
 
+## backup_strategy
+#### Component Script
+✅ Component script exists: `install_backup_strategy.sh`
+✅ Script implements idempotence checks
+#### Documentation
+✅ Documentation exists: `backup_strategy.md`
+⚠️ Documentation missing sections: Usage
+#### Makefile Targets
+✅ Target `backup-strategy` exists
+✅ Target `backup-strategy-status` exists
+✅ Target `backup-strategy-logs` exists
+✅ Target `backup-strategy-restart` exists
+✅ All Makefile targets present for backup_strategy
+#### Registry Entry
+✅ Component registered in component_registry.json
+⚠️ backup_strategy had issues, some remain unfixed
 ## builderio
 #### Component Script
 ✅ Component script exists: `install_builderio.sh`
@@ -83,6 +99,37 @@ Generated: 2025-04-07 10:45:35
 #### Registry Entry
 ✅ Component registered in component_registry.json
 ✅ cryptosync passed all validation checks
+## docker
+#### Component Script
+✅ Component script exists: `install_docker.sh`
+✅ Script implements idempotence checks
+#### Documentation
+✅ Documentation exists: `docker.md`
+⚠️ Documentation missing sections: Usage
+#### Makefile Targets
+✅ Target `docker` exists
+✅ Target `docker-status` exists
+✅ Target `docker-logs` exists
+✅ Target `docker-restart` exists
+✅ All Makefile targets present for docker
+#### Registry Entry
+✅ Component registered in component_registry.json
+⚠️ docker had issues, some remain unfixed
+## docker_compose
+#### Component Script
+✅ Component script exists: `install_docker_compose.sh`
+✅ Script implements idempotence checks
+#### Documentation
+❌ Documentation `docker_compose.md` not found
+#### Makefile Targets
+✅ Target `docker-compose` exists
+✅ Target `docker-compose-status` exists
+✅ Target `docker-compose-logs` exists
+✅ Target `docker-compose-restart` exists
+✅ All Makefile targets present for docker_compose
+#### Registry Entry
+✅ Component registered in component_registry.json
+⚠️ docker_compose had issues, some remain unfixed
 ## documenso
 #### Component Script
 ✅ Component script exists: `install_documenso.sh`
@@ -163,6 +210,22 @@ Generated: 2025-04-07 10:45:35
 #### Registry Entry
 ✅ Component registered in component_registry.json
 ✅ etebase passed all validation checks
+## fail2ban
+#### Component Script
+✅ Component script exists: `install_fail2ban.sh`
+✅ Script implements idempotence checks
+#### Documentation
+✅ Documentation exists: `fail2ban.md`
+⚠️ Documentation missing sections: Usage
+#### Makefile Targets
+✅ Target `fail2ban` exists
+✅ Target `fail2ban-status` exists
+✅ Target `fail2ban-logs` exists
+✅ Target `fail2ban-restart` exists
+✅ All Makefile targets present for fail2ban
+#### Registry Entry
+✅ Component registered in component_registry.json
+⚠️ fail2ban had issues, some remain unfixed
 ## focalboard
 #### Component Script
 ✅ Component script exists: `install_focalboard.sh`
@@ -419,6 +482,37 @@ Generated: 2025-04-07 10:45:35
 #### Registry Entry
 ✅ Component registered in component_registry.json
 ⚠️ seafile had issues, some remain unfixed
+## security
+#### Component Script
+✅ Component script exists: `install_security.sh`
+✅ Script implements idempotence checks
+#### Documentation
+✅ Documentation exists: `security.md`
+⚠️ Documentation missing sections: Usage
+#### Makefile Targets
+✅ Target `security` exists
+✅ Target `security-status` exists
+✅ Target `security-logs` exists
+✅ Target `security-restart` exists
+✅ All Makefile targets present for security
+#### Registry Entry
+✅ Component registered in component_registry.json
+⚠️ security had issues, some remain unfixed
+## signing_timestamps
+#### Component Script
+✅ Component script exists: `install_signing_timestamps.sh`
+✅ Script implements idempotence checks
+#### Documentation
+❌ Documentation `signing_timestamps.md` not found
+#### Makefile Targets
+✅ Target `signing-timestamps` exists
+✅ Target `signing-timestamps-status` exists
+✅ Target `signing-timestamps-logs` exists
+✅ Target `signing-timestamps-restart` exists
+✅ All Makefile targets present for signing_timestamps
+#### Registry Entry
+✅ Component registered in component_registry.json
+⚠️ signing_timestamps had issues, some remain unfixed
 ## traefik
 #### Component Script
 ✅ Component script exists: `install_traefik.sh`
@@ -484,6 +578,6 @@ Generated: 2025-04-07 10:45:35
 ✅ Component registered in component_registry.json
 ⚠️ wordpress had issues, some remain unfixed
 ## Summary
-- **Total components**: 35
+- **Total components**: 41
 - **Passed validation**: 8
-- **Failed validation**: 27
+- **Failed validation**: 33
