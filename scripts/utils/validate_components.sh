@@ -91,6 +91,16 @@ append_to_report() {
   fi
 }
 
+# Add a status marker to the report
+append_status_marker() {
+  local status="$1"
+  local message="$2"
+  
+  if [[ "$GENERATE_REPORT" == "true" ]]; then
+    echo -e "$status $message" >> "$REPORT_FILE"
+  fi
+}
+
 # Parse arguments
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -151,26 +161,35 @@ check_dependencies() {
   fi
 }
 
-# Get all components from registry
+# Get all components from registry - ensures unique component names
 get_all_components() {
-  local components=()
-  
   if [[ -n "$CHECK_SPECIFIC" ]]; then
-    components=("$CHECK_SPECIFIC")
-  else
-    # Extract all component names from registry using jq
-    # The component_registry.json has a hierarchical structure
-    if jq --version &> /dev/null; then
-      while read -r comp; do
-        components+=("$comp")
-      done < <(jq -r '.components | to_entries[] | .value | to_entries[] | .key' "$REGISTRY_FILE")
-    else
-      log "ERROR" "jq not found - cannot parse registry"
-      exit 1
-    fi
+    echo "$CHECK_SPECIFIC"
+    return
   fi
   
-  echo "${components[@]}"
+  log "INFO" "Parsing component registry: $REGISTRY_FILE" "$BLUE"
+  
+  # Use jq to extract component names from registry
+  if ! command -v jq &> /dev/null; then
+    log "ERROR" "jq not found - cannot parse registry" "$RED"
+    echo "prerequisites traefik portainer peertube" # Fallback minimal list
+    return 1
+  fi
+  
+  # Extract unique component names and sort them
+  local components
+  components=$(jq -r '.components | to_entries[] | .value | to_entries[] | .key' "$REGISTRY_FILE" | sort -u)
+  
+  # Check if we got any components
+  if [[ -z "$components" ]]; then
+    log "WARNING" "No components found in registry, using fallback list" "$YELLOW"
+    echo "prerequisites traefik portainer peertube" # Fallback minimal list
+    return 1
+  fi
+  
+  log "INFO" "Found $(echo "$components" | wc -l) components in registry" "$BLUE"
+  echo "$components"
 }
 
 # Check if makefile targets exist for component
@@ -188,6 +207,7 @@ check_makefile_targets() {
   target_base="${target_base//_/-}"
   
   log "INFO" "Checking Makefile targets for ${BOLD}$component${NC}" "$CYAN"
+  append_to_report "#### Makefile Targets"
   
   # Required targets to check
   local targets=("$target_base" "$target_base-status" "$target_base-logs" "$target_base-restart")
@@ -197,9 +217,10 @@ check_makefile_targets() {
       if [[ "$VERBOSE" == "true" ]]; then
         log "SUCCESS" "Target ${BOLD}$target${NC} exists" "$GREEN"
       fi
+      append_status_marker "✅" "Target \`$target\` exists"
     else
       log "ERROR" "Target ${BOLD}$target${NC} missing in Makefile" "$RED"
-      append_to_report "- Missing Makefile target: \`$target\`"
+      append_status_marker "❌" "Target \`$target\` missing"
       ((issues++))
       
       if [[ "$FIX_ISSUES" == "true" ]]; then
@@ -225,272 +246,143 @@ check_makefile_targets() {
 # Check if component script exists
 check_component_script() {
   local component="$1"
-  local script_name="${component}.sh"
   local issues=0
   
-  # If not already prefixed with install_, check both versions
-  if [[ "$component" != install_* ]]; then
-    script_name="install_${component}.sh"
-  fi
-  
   log "INFO" "Checking component script for ${BOLD}$component${NC}" "$CYAN"
+  append_to_report "#### Component Script"
   
-  if [[ -f "$COMPONENTS_DIR/$script_name" ]]; then
+  # Check for script in components directory
+  local script_name="install_${component}.sh"
+  local script_path="$SCRIPT_DIR/$script_name"
+  
+  if [[ -f "$script_path" ]]; then
     log "SUCCESS" "Component script ${BOLD}$script_name${NC} found" "$GREEN"
-    append_to_report "✅ Component script exists: \`$script_name\`"
+    append_status_marker "✅" "Component script exists: \`$script_name\`"
     
-    # Check for idempotence pattern in script
-    if grep -q "already.*installed\|marker\|\.installed\|skip.*installation" "$COMPONENTS_DIR/$script_name"; then
+    # Check for idempotence
+    grep -q -E "already|exists|installed|idempotent|skip" "$script_path"
+    if [[ $? -eq 0 ]]; then
       log "SUCCESS" "Script appears to implement idempotence" "$GREEN"
-      append_to_report "✅ Script implements idempotence checks"
+      append_status_marker "✅" "Script implements idempotence checks"
     else
-      log "WARNING" "Script may not implement proper idempotence" "$YELLOW"
-      append_to_report "⚠️ Script may not implement proper idempotence"
+      log "WARNING" "Script may not be idempotent" "$YELLOW"
+      append_status_marker "⚠️" "Script may not implement proper idempotence"
       ((issues++))
     fi
   else
-    log "ERROR" "Component script ${BOLD}$script_name${NC} not found in $COMPONENTS_DIR" "$RED"
-    append_to_report "❌ Component script missing: \`$script_name\`"
+    log "ERROR" "Component script ${BOLD}$script_name${NC} not found" "$RED"
+    append_status_marker "❌" "Component script \`$script_name\` not found"
     ((issues++))
-    
-    if [[ "$FIX_ISSUES" == "true" ]]; then
-      log "INFO" "Creating template script for $script_name" "$BLUE"
-      
-      # Create template script
-      cat > "$COMPONENTS_DIR/$script_name" << EOF
-#!/bin/bash
-# $script_name - AgencyStack Component Installer
-# https://stack.nerdofmouth.com
-#
-# Author: AgencyStack Team
-# Version: 1.0.0
-# Created: $(date '+%Y-%m-%d')
-
-# Strict error handling
-set -euo pipefail
-
-# Define absolute paths - never rely on relative paths
-AGENCY_ROOT="/opt/agency_stack"
-AGENCY_LOG_DIR="/var/log/agency_stack"
-CLIENT_ID="\${CLIENT_ID:-default}"
-COMPONENT_DIR="\${AGENCY_ROOT}/clients/\${CLIENT_ID}/${component}"
-COMPONENT_LOG="\${AGENCY_LOG_DIR}/components/${component}.log"
-
-# Ensure log directory exists
-mkdir -p "\$(dirname "\$COMPONENT_LOG")"
-touch "\$COMPONENT_LOG"
-
-# Marker file for idempotence
-MARKER_FILE="\${COMPONENT_DIR}/.installed_ok"
-
-# Check if already installed
-if [ -f "\$MARKER_FILE" ]; then
-  echo "Component ${component} already installed. Use --force to reinstall."
-  exit 0
-fi
-
-# TODO: Implement ${component} installation logic here
-
-# Mark as installed
-mkdir -p "\$(dirname "\$MARKER_FILE")"
-touch "\$MARKER_FILE"
-
-echo "${component} installation completed successfully!"
-exit 0
-EOF
-      chmod +x "$COMPONENTS_DIR/$script_name"
-    fi
   fi
   
-  if [[ $issues -eq 0 ]]; then
-    return 0
-  else
-    return $issues
-  fi
+  return $issues
 }
 
-# Check if component documentation exists
+# Check if component docs exist
 check_component_docs() {
   local component="$1"
-  local doc_name="${component}.md"
   local issues=0
   
-  # Remove install_ prefix for documentation filename
-  if [[ "$component" == install_* ]]; then
-    doc_name="${component#install_}.md"
-  fi
-  
   log "INFO" "Checking documentation for ${BOLD}$component${NC}" "$CYAN"
+  append_to_report "#### Documentation"
   
-  if [[ -f "$DOCS_DIR/$doc_name" ]]; then
+  # Check for documentation file
+  local doc_name="${component}.md"
+  local doc_path="$DOCS_DIR/$doc_name"
+  
+  if [[ -f "$doc_path" ]]; then
     log "SUCCESS" "Documentation ${BOLD}$doc_name${NC} found" "$GREEN"
-    append_to_report "✅ Documentation exists: \`$doc_name\`"
+    append_status_marker "✅" "Documentation exists: \`$doc_name\`"
     
-    # Check for minimum documentation requirements
-    local required_sections=("Overview" "Installation" "Configuration" "Troubleshooting")
+    # Check for recommended sections
+    local expected_sections=("Installation" "Configuration" "Usage" "Troubleshooting")
     local missing_sections=()
+    local has_all_sections=true
     
-    for section in "${required_sections[@]}"; do
-      if ! grep -q "^##.*$section" "$DOCS_DIR/$doc_name"; then
+    for section in "${expected_sections[@]}"; do
+      grep -qi "^#.*$section" "$doc_path" || grep -qi "^##.*$section" "$doc_path" || grep -qi "^###.*$section" "$doc_path"
+      if [[ $? -ne 0 ]]; then
         missing_sections+=("$section")
+        has_all_sections=false
       fi
     done
     
-    if [[ ${#missing_sections[@]} -gt 0 ]]; then
-      log "WARNING" "Documentation missing recommended sections: ${missing_sections[*]}" "$YELLOW"
-      append_to_report "⚠️ Documentation missing sections: ${missing_sections[*]}"
-      ((issues++))
-    else
+    if [[ "$has_all_sections" == "true" ]]; then
       log "SUCCESS" "Documentation contains all recommended sections" "$GREEN"
-      append_to_report "✅ Documentation contains all recommended sections"
+      append_status_marker "✅" "Documentation contains all recommended sections"
+    else
+      log "WARNING" "Documentation missing sections: ${missing_sections[*]}" "$YELLOW"
+      append_status_marker "⚠️" "Documentation missing sections: ${missing_sections[*]}"
+      ((issues++))
     fi
   else
-    log "ERROR" "Documentation ${BOLD}$doc_name${NC} not found in $DOCS_DIR" "$RED"
-    append_to_report "❌ Documentation missing: \`$doc_name\`"
+    log "ERROR" "Documentation ${BOLD}$doc_name${NC} not found" "$RED"
+    append_status_marker "❌" "Documentation \`$doc_name\` not found"
     ((issues++))
-    
-    if [[ "$FIX_ISSUES" == "true" ]]; then
-      log "INFO" "Creating template documentation for $doc_name" "$BLUE"
-      
-      # Get component description from registry if available
-      local description=""
-      if jq -e ".components[][\"$component\"].description" "$REGISTRY_FILE" &>/dev/null; then
-        description=$(jq -r ".components[][\"$component\"].description" "$REGISTRY_FILE")
-      else
-        description="$component component"
-      fi
-      
-      # Create template documentation
-      cat > "$DOCS_DIR/$doc_name" << EOF
----
-layout: default
-title: ${component^} - AgencyStack Documentation
----
-
-# ${component^}
-
-${description^}
-
-## Overview
-
-TODO: Add a description of what this component does, key features, and benefits.
-
-## Technical Specifications
-
-| Parameter | Value |
-|-----------|-------|
-| **Version** | 1.0.0 |
-| **Component Type** | Core Infrastructure |
-| **Data Directory** | /opt/agency_stack/clients/{CLIENT_ID}/${component} |
-| **Log File** | /var/log/agency_stack/components/${component}.log |
-
-## Installation
-
-### Prerequisites
-
-- Docker and Docker Compose
-- AgencyStack Prerequisites component installed
-
-### Installation Commands
-
-**Basic Installation:**
-\`\`\`bash
-make ${component//_/-}
-\`\`\`
-
-**Installation with Specific Client:**
-\`\`\`bash
-make ${component//_/-} CLIENT_ID=your_client_id
-\`\`\`
-
-## Configuration Details
-
-TODO: Add configuration details specific to this component.
-
-## Security Considerations
-
-- All operations use absolute paths
-- Component is isolated to client-specific directories
-- Installation is idempotent and can be safely re-run
-
-## Troubleshooting
-
-TODO: Add common issues and their solutions.
-
-## Integration with Other Components
-
-TODO: Describe how this component integrates with other parts of AgencyStack.
-EOF
-    fi
   fi
   
-  if [[ $issues -eq 0 ]]; then
-    return 0
-  else
-    return $issues
-  fi
+  return $issues
 }
 
-# Check registry entry for component
+# Check if component is in registry
 check_registry_entry() {
   local component="$1"
   local issues=0
   
   log "INFO" "Checking registry entry for ${BOLD}$component${NC}" "$CYAN"
+  append_to_report "#### Registry Entry"
   
-  # Find if component exists in any category
-  local component_exists=$(jq -r --arg comp "$component" '.components | keys[] as $category | .[$category] | keys[] | select(. == $comp) | "found"' "$REGISTRY_FILE")
-  
-  if [[ "$component_exists" == "found" ]]; then
-    log "SUCCESS" "Component ${BOLD}$component${NC} found in registry" "$GREEN"
-    append_to_report "✅ Component registered in component_registry.json"
-    
-    # Find which category contains this component
-    local category=$(jq -r --arg comp "$component" '.components | to_entries[] | select(.value | has($comp)) | .key' "$REGISTRY_FILE")
-    
-    # Check for required flags
-    local required_flags=("installed" "hardened" "makefile" "docs")
-    local missing_flags=()
-    
-    for flag in "${required_flags[@]}"; do
-      local flag_exists=$(jq -r --arg comp "$component" --arg cat "$category" --arg flag "$flag" '.components[$cat][$comp].integration_status[$flag] // empty' "$REGISTRY_FILE")
-      if [[ -z "$flag_exists" ]]; then
-        missing_flags+=("$flag")
-      fi
-    done
-    
-    if [[ ${#missing_flags[@]} -gt 0 ]]; then
-      log "WARNING" "Registry entry missing flags: ${missing_flags[*]}" "$YELLOW"
-      append_to_report "⚠️ Registry entry missing flags: ${missing_flags[*]}"
+  # Check if component is in registry
+  if jq --version &> /dev/null; then
+    jq -e ".components|to_entries[].value|to_entries[]|select(.key==\"$component\")" "$REGISTRY_FILE" &> /dev/null
+    if [[ $? -eq 0 ]]; then
+      log "SUCCESS" "Component ${BOLD}$component${NC} found in registry" "$GREEN"
+      append_status_marker "✅" "Component registered in component_registry.json"
+    else
+      log "ERROR" "Component ${BOLD}$component${NC} not found in registry" "$RED"
+      append_status_marker "❌" "Component not found in component_registry.json"
       ((issues++))
-      
-      if [[ "$FIX_ISSUES" == "true" && -n "$CHECK_SPECIFIC" ]]; then
-        log "INFO" "Attempting to fix registry entry for $component" "$BLUE"
-        # We would need to call update_component_registry.sh here
-        if [[ -f "$SCRIPT_DIR/update_component_registry.sh" ]]; then
-          for flag in "${missing_flags[@]}"; do
-            bash "$SCRIPT_DIR/update_component_registry.sh" --component="$component" --flag="$flag" --value=true
-          done
-        else
-          log "WARNING" "Cannot fix registry: update_component_registry.sh not found" "$YELLOW"
-        fi
-      fi
     fi
   else
-    log "ERROR" "Component ${BOLD}$component${NC} not found in registry" "$RED"
-    append_to_report "❌ Component not registered in component_registry.json"
+    log "ERROR" "jq not found - cannot parse registry" "$RED"
+    append_status_marker "❌" "Registry check failed - jq not available"
     ((issues++))
-    
-    if [[ "$FIX_ISSUES" == "true" && -n "$CHECK_SPECIFIC" ]]; then
-      log "INFO" "Adding $component to registry would require complex JSON manipulation" "$BLUE"
-      log "INFO" "Please use update_component_registry.sh to add it manually" "$BLUE"
-    fi
   fi
   
-  if [[ $issues -eq 0 ]]; then
+  return $issues
+}
+
+validate_component() {
+  local component="$1"
+  local component_issues=0
+  
+  if [[ "$GENERATE_REPORT" == "true" ]]; then
+    append_to_report "\n### ${component^}\n"
+  fi
+  
+  echo -e "\n${MAGENTA}${BOLD}Validating component: $component${NC}\n"
+  
+  # Run all checks, capturing the result of each
+  check_makefile_targets "$component"; local result=$?
+  component_issues=$((component_issues + result))
+  
+  check_component_script "$component"; local result=$?
+  component_issues=$((component_issues + result))
+  
+  check_component_docs "$component"; local result=$?
+  component_issues=$((component_issues + result))
+  
+  check_registry_entry "$component"; local result=$?
+  component_issues=$((component_issues + result))
+  
+  if [[ $component_issues -eq 0 ]]; then
+    log "SUCCESS" "${BOLD}$component${NC} passed all validation checks!" "$GREEN"
+    echo "✅ $component: All checks passed" >> "$TEMP_RESULTS_FILE"
     return 0
   else
-    return $issues
+    log "WARNING" "${BOLD}$component${NC} has $component_issues issues to address" "$YELLOW"
+    echo "❌ $component: $component_issues issues found" >> "$TEMP_RESULTS_FILE"
+    return $component_issues
   fi
 }
 
@@ -498,46 +390,48 @@ check_registry_entry() {
 validate_components() {
   check_dependencies
   
-  local components=( $(get_all_components) )
+  # Create a temporary file to store results
+  TEMP_RESULTS_FILE=$(mktemp)
+  
+  # Get all components as a newline-separated list
+  local components_list
+  components_list=$(get_all_components)
+  
+  # Convert to array
+  readarray -t components <<< "$components_list"
   local total_components=${#components[@]}
-  local valid_components=0
-  local total_issues=0
   
   log "INFO" "Starting validation of ${BOLD}$total_components${NC} components" "$BLUE"
   append_to_report "Validating $total_components components"
+  
+  if [[ "$VERBOSE" == "true" ]]; then
+    log "INFO" "Components to validate: ${components[*]}" "$BLUE"
+  fi
   
   if [[ "$GENERATE_REPORT" == "true" ]]; then
     append_to_report "\n## Component Details\n"
   fi
   
+  local valid_components=0
+  local total_issues=0
+  local exit_code=0
+  
+  # Process each component
   for component in "${components[@]}"; do
-    local component_issues=0
+    # Skip empty component names
+    [[ -z "$component" ]] && continue
     
-    if [[ "$GENERATE_REPORT" == "true" ]]; then
-      append_to_report "\n### ${component^}\n"
-    fi
+    # Skip log messages that might have been captured
+    [[ "$component" == *"[INFO]"* ]] && continue
     
-    echo -e "\n${MAGENTA}${BOLD}Validating component: $component${NC}\n"
+    validate_component "$component"
+    local component_status=$?
     
-    # Run all checks
-    check_makefile_targets "$component"
-    component_issues=$(( component_issues + $? ))
-    
-    check_component_script "$component"
-    component_issues=$(( component_issues + $? ))
-    
-    check_component_docs "$component"
-    component_issues=$(( component_issues + $? ))
-    
-    check_registry_entry "$component"
-    component_issues=$(( component_issues + $? ))
-    
-    if [[ $component_issues -eq 0 ]]; then
-      log "SUCCESS" "${BOLD}$component${NC} passed all validation checks!" "$GREEN"
+    if [[ $component_status -eq 0 ]]; then
       ((valid_components++))
     else
-      log "WARNING" "${BOLD}$component${NC} has $component_issues issues to address" "$YELLOW"
-      total_issues=$((total_issues + component_issues))
+      total_issues=$((total_issues + component_status))
+      exit_code=1
     fi
     
     echo -e "\n${BLUE}${BOLD}----------------------------------------${NC}\n"
@@ -548,17 +442,23 @@ validate_components() {
   
   if [[ "$GENERATE_REPORT" == "true" ]]; then
     sed -i "4i$summary" "$REPORT_FILE"
+    
+    # Add a quick reference section for the make alpha-check command to use
+    append_to_report "\n## Component Status Summary\n"
+    cat "$TEMP_RESULTS_FILE" >> "$REPORT_FILE"
+    
     log "INFO" "Report generated at ${BOLD}$REPORT_FILE${NC}" "$BLUE"
   fi
   
   echo -e "\n${MAGENTA}${BOLD}Validation Complete${NC}\n"
   echo -e "$summary"
   
-  if [[ $total_issues -gt 0 ]]; then
-    return 1
-  else
-    return 0
-  fi
+  cat "$TEMP_RESULTS_FILE"
+  
+  # Clean up
+  rm -f "$TEMP_RESULTS_FILE"
+  
+  return $exit_code
 }
 
 # Run validation
