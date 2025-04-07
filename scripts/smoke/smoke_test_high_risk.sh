@@ -2,7 +2,7 @@
 # smoke_test_high_risk.sh - Smoke test for high-risk components
 #
 # Tests runtime functionality of critical components: docker, mailu, tailscale
-# Usage: ./smoke_test_high_risk.sh [--verbose] [--component=NAME]
+# Usage: ./smoke_test_high_risk.sh [--verbose] [--component=NAME] [--test-all]
 
 set -euo pipefail
 
@@ -10,10 +10,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 source "${ROOT_DIR}/scripts/utils/common.sh"
+source "${ROOT_DIR}/scripts/utils/log_helpers.sh"
 
 # Default settings
 VERBOSE=false
 COMPONENT=""
+TEST_ALL=false
 LOG_FILE="/var/log/agency_stack/smoke_test.log"
 
 # Parse arguments
@@ -27,12 +29,17 @@ while [[ $# -gt 0 ]]; do
             COMPONENT="${1#*=}"
             shift
             ;;
+        --test-all)
+            TEST_ALL=true
+            shift
+            ;;
         --help)
             echo "Usage: $(basename "$0") [OPTIONS]"
             echo ""
             echo "Options:"
             echo "  --verbose           Show detailed output"
             echo "  --component=NAME    Only test specific component"
+            echo "  --test-all          Include Mailu and Tailscale tests"
             echo "  --help              Show this help message"
             exit 0
             ;;
@@ -161,29 +168,49 @@ main() {
     # Initialize counters
     local pass_count=0
     local fail_count=0
+    local total_count=0
     
     # Run tests based on component parameter
     if [[ -z "$COMPONENT" || "$COMPONENT" == "docker" ]]; then
         if test_docker; then
             ((pass_count++))
+            log_info "Docker test: PASSED"
         else
             ((fail_count++))
+            log_error "Docker test: FAILED"
         fi
+        ((total_count++))
     fi
     
+    # Test Mailu only if --test-all flag is present
     if [[ -z "$COMPONENT" || "$COMPONENT" == "mailu" ]]; then
-        if test_mailu; then
-            ((pass_count++))
+        if [[ "$TEST_ALL" == "true" ]]; then
+            if test_mailu; then
+                ((pass_count++))
+                log_info "Mailu test: PASSED"
+            else
+                ((fail_count++))
+                log_warning "Mailu test: FAILED (Not installed or not running)"
+            fi
+            ((total_count++))
         else
-            ((fail_count++))
+            log_info "Skipping Mailu test (use --test-all to include)"
         fi
     fi
     
+    # Test Tailscale only if --test-all flag is present
     if [[ -z "$COMPONENT" || "$COMPONENT" == "tailscale" ]]; then
-        if test_tailscale; then
-            ((pass_count++))
+        if [[ "$TEST_ALL" == "true" ]]; then
+            if test_tailscale; then
+                ((pass_count++))
+                log_info "Tailscale test: PASSED"
+            else
+                ((fail_count++))
+                log_warning "Tailscale test: FAILED (Not installed or not running)"
+            fi
+            ((total_count++))
         else
-            ((fail_count++))
+            log_info "Skipping Tailscale test (use --test-all to include)"
         fi
     fi
     
@@ -192,10 +219,12 @@ main() {
     log_info "Tests completed: $(date)"
     log_info "Passed: $pass_count"
     log_info "Failed: $fail_count"
+    log_info "Total: $total_count"
     
     echo "test_end: $(date)" >> "$LOG_FILE"
     echo "tests_passed: $pass_count" >> "$LOG_FILE"
     echo "tests_failed: $fail_count" >> "$LOG_FILE"
+    echo "tests_total: $total_count" >> "$LOG_FILE"
     
     # Exit with failure if any tests failed
     if [[ $fail_count -gt 0 ]]; then

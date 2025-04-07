@@ -154,13 +154,43 @@ if [ "$SKIP_DOCKER" = false ]; then
     # Add Docker's official GPG key
     log "INFO: Adding Docker GPG key" "${CYAN}Adding Docker GPG key...${NC}"
     mkdir -p /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
     
-    # Set up the Docker repository
-    log "INFO: Setting up Docker repository" "${CYAN}Setting up Docker repository...${NC}"
-    echo \
-      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-      $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    # Detect OS distribution
+    if [ -f /etc/os-release ]; then
+      . /etc/os-release
+      OS_DISTRO="$ID"
+      OS_VERSION="$VERSION_CODENAME"
+      log "INFO: Detected OS: $OS_DISTRO $OS_VERSION" "${CYAN}Detected OS: $OS_DISTRO $OS_VERSION${NC}"
+    else
+      OS_DISTRO="unknown"
+      OS_VERSION="unknown"
+      log "WARNING: Could not detect OS distribution. Defaulting to Ubuntu" "${YELLOW}Could not detect OS distribution. Defaulting to Ubuntu.${NC}"
+    fi
+    
+    # Use the appropriate Docker repository based on OS distribution
+    case "$OS_DISTRO" in
+      debian)
+        log "INFO: Setting up Docker repository for Debian" "${CYAN}Setting up Docker repository for Debian...${NC}"
+        curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        echo \
+          "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
+          $OS_VERSION stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+        ;;
+      ubuntu)
+        log "INFO: Setting up Docker repository for Ubuntu" "${CYAN}Setting up Docker repository for Ubuntu...${NC}"
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        echo \
+          "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+          $OS_VERSION stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+        ;;
+      *)
+        log "WARNING: Unsupported OS distribution: $OS_DISTRO. Attempting Ubuntu repository at your own risk." "${YELLOW}Unsupported OS distribution: $OS_DISTRO. Attempting Ubuntu repository at your own risk.${NC}"
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        echo \
+          "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+          $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+        ;;
+    esac
     
     # Update package lists again
     log "INFO: Updating package lists" "${CYAN}Updating package lists...${NC}"

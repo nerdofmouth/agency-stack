@@ -10,6 +10,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 source "${ROOT_DIR}/scripts/utils/common.sh"
+source "${ROOT_DIR}/scripts/utils/log_helpers.sh"
 
 # Default settings
 SKIP_SSH_HARDENING=false

@@ -361,3 +361,120 @@ Use them liberally. Improve them responsibly. Teach them through clarity.
 ```bash
 # From zero to sovereign — one log line at a time.
 ```
+## 🧩 WHAT'S NEXT: AgencyStack Alpha Handoff + Final Validation
+
+### ✅ 1. **Snapshot a Fresh VM for Re-Test**
+
+Spin up a brand new VM (or wipe and reset `proto001`) and do a **no-touch install/retest pass**:
+
+```bash
+curl -sSL https://stack.nerdofmouth.com/install.sh | sudo bash
+sudo bash /opt/agency_stack/repo/scripts/install.sh
+make alpha-check
+make smoke-test
+```
+
+✅ **Pass criteria:**
+
+*   No prompt interruptions
+*   Alpha-check is green
+*   All smoke test entries log as expected
+*   `/opt/agency_stack/.installed_ok` is present
+
+* * *
+
+### 🔁 2. **Run One Recovery Cycle Per Fault**
+
+Try this loop:
+
+```bash
+for fault in docker-kill disk-fill marker-remove; do
+  make vm-fault-inject FAULT_TYPE=$faultsleep 5
+  make alpha-check
+done
+```
+
+✅ Ensure:
+
+*   Fault injection logs clearly
+*   `alpha-check` gives WARN or FAIL, then recovers cleanly after reinstall
+
+* * *
+
+### 🧾 3. **Export Docs from Real Logs**
+
+This gives you **real-world installation docs** from your own install runs:
+
+```bash
+for comp in docker tailscale mailu; do
+  bash scripts/utils/generate_docs_from_logs.sh \
+    --component=$comp \
+    --log-file=/var/log/agency_stack/components/${comp}.log \
+    --output-file=docs/pages/components/${comp}.md
+done
+```
+
+✅ Check:
+
+*   That the docs include success/failure markers
+*   That ports and paths are extracted clearly
+*   That these `.md` files are ready for web use
+
+* * *
+
+### 🚢 4. **Finalize Snapshot Image**
+
+Once you're satisfied with re-testing:
+
+```bash
+make vm-snapshot
+```
+
+✅ Should:
+
+*   Zero logs
+*   Write `/opt/agency_stack/.installed_ok`
+*   Write `/opt/agency_stack/healthstamp`
+*   Show `VM prepared for snapshot` in logs
+
+Save the VM image as:
+
+**`agencystack_alpha_snapshot_YYYYMMDD.qcow2`** or `.img` or `.ova`
+
+* * *
+
+### 🔁 5. **Optional (But Recommended): Cross-VM Diff Test**
+
+Clone the snapshot VM to a second instance.
+
+✅ Then run:
+
+```bash
+make install-docker
+make tailscale-status
+make alpha-check
+```
+
+To validate rerun behavior and idempotence on cloned instances.
+
+* * *
+
+### 🚀 6. **Declare Alpha Ready**
+
+You are ready to push the tag:
+
+```bash
+git tag alpha-release-v0.1
+git push origin alpha-release-v0.1
+```
+
+Optional: add signed `.zip` or `.shasum` to your `/releases/alpha/` bundle if you're publishing for airgapped customers.
+
+* * *
+
+## 🧠 Optional Claude Tasks (If You Want to Offload)
+
+*   ✅ Generate Markdown doc headers for the new component pages
+*   ✅ Draft the README section for `make vm-fault-inject`
+*   ✅ Format the healthstamp spec
+*   ✅ Script a beta migration checklist (for converting Alpha installs)
