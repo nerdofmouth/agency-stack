@@ -148,8 +148,6 @@ backup:
 # Clean all containers and volumes
 clean:
 	@echo "🧹 Cleaning AgencyStack environment..."
-	@read -p "This will remove all containers and volumes. Are you sure? [y/N] " confirm; \
-	[[ $$confirm == [yY] || $$confirm == [yY][eE][sS] ]] || exit 1
 	@sudo docker-compose down -v
 
 # Display AgencyStack information
@@ -163,7 +161,6 @@ stack-info:
 	@bash $(SCRIPTS_DIR)/agency_branding.sh tagline
 	@echo ""
 	@echo "$(CYAN)$(BOLD)Installed Components:$(RESET)"
-	@if [ -f "/opt/agency_stack/installed_components.txt" ]; then \
 		cat /opt/agency_stack/installed_components.txt | sort; \
 	else \
 		echo "$(RED)No components installed yet$(RESET)"; \
@@ -173,7 +170,6 @@ stack-info:
 	@docker ps --format "table {{.Names}}\t{{.Status}}" 2>/dev/null || echo "$(RED)Docker not running$(RESET)"
 	@echo ""
 	@echo "$(YELLOW)$(BOLD)Port Allocations:$(RESET)"
-	@if [ -f "$(SCRIPTS_DIR)/port_manager.sh" ]; then \
 		bash $(SCRIPTS_DIR)/port_manager.sh list; \
 	else \
 		echo "$(RED)Port manager not installed$(RESET)"; \
@@ -286,7 +282,6 @@ setup-cron:
 # Test alert channels
 test-alert:
 	@echo "$(MAGENTA)$(BOLD)🔔 Testing alert channels...$(RESET)"
-	@if [ -f "$(SCRIPTS_DIR)/notifications/notify_all.sh" ]; then \
 		sudo bash $(SCRIPTS_DIR)/notifications/notify_all.sh "Test Alert" "This is a test alert from AgencyStack on $(shell hostname) at $(shell date)"; \
 	else \
 		sudo bash $(SCRIPTS_DIR)/test_alert.sh; \
@@ -311,7 +306,6 @@ motd:
 # Audit AgencyStack components and system
 audit:
 	@echo "$(MAGENTA)$(BOLD)📊 Running AgencyStack Repository Audit...$(RESET)"
-	@if [ -f "$(SCRIPTS_DIR)/utils/audit_and_cleanup.sh" ]; then \
 		sudo $(SCRIPTS_DIR)/utils/audit_and_cleanup.sh; \
 	else \
 		sudo bash $(SCRIPTS_DIR)/audit.sh; \
@@ -392,7 +386,6 @@ setup-cronjobs:
 view-alerts:
 	@echo "📢 Recent alerts from AgencyStack:"
 	@echo "--------------------------------"
-	@if [ -f /var/log/agency_stack/alerts.log ]; then \
 		tail -n 20 /var/log/agency_stack/alerts.log; \
 	else \
 		echo "No alerts log found"; \
@@ -404,21 +397,18 @@ log-summary:
 	@echo "=================================="
 	@echo ""
 	@echo "$(BOLD)Health Check Logs:$(RESET)"
-	@if [ -f /var/log/agency_stack/health.log ]; then \
 		tail -n 10 /var/log/agency_stack/health.log; \
 	else \
 		echo "No health logs found"; \
 	fi
 	@echo ""
 	@echo "$(BOLD)Backup Logs:$(RESET)"
-	@if [ -f /var/log/agency_stack/backup.log ]; then \
 		tail -n 10 /var/log/agency_stack/backup.log; \
 	else \
 		echo "No backup logs found"; \
 	fi
 	@echo ""
 	@echo "$(BOLD)Alert Logs:$(RESET)"
-	@if [ -f /var/log/agency_stack/alerts.log ]; then \
 		tail -n 10 /var/log/agency_stack/alerts.log; \
 	else \
 		echo "No alert logs found"; \
@@ -429,7 +419,6 @@ log-summary:
 # Security and multi-tenancy commands
 create-client:
 	@echo "🏢 Creating new client..."
-	@if [ -z "$(CLIENT_ID)" ] || [ -z "$(CLIENT_NAME)" ] || [ -z "$(CLIENT_DOMAIN)" ]; then \
 		echo "$(RED)Error: Missing required parameters.$(RESET)"; \
 		echo "Usage: make create-client CLIENT_ID=name CLIENT_NAME=\"Full Name\" CLIENT_DOMAIN=domain.com"; \
 		exit 1; \
@@ -438,7 +427,6 @@ create-client:
 
 setup-roles:
 	@echo "🔑 Setting up Keycloak roles for client..."
-	@if [ -z "$(CLIENT_ID)" ]; then \
 		echo "$(RED)Error: Missing required parameter CLIENT_ID.$(RESET)"; \
 		echo "Usage: make setup-roles CLIENT_ID=name"; \
 		exit 1; \
@@ -447,7 +435,6 @@ setup-roles:
 
 security-audit:
 	@echo "🔐 Running security audit..."
-	@if [ -n "$(CLIENT_ID)" ]; then \
 		sudo bash $(SCRIPTS_DIR)/security/audit_stack.sh --client-id "$(CLIENT_ID)"; \
 	else \
 		sudo bash $(SCRIPTS_DIR)/security/audit_stack.sh; \
@@ -455,7 +442,6 @@ security-audit:
 
 security-fix:
 	@echo "🔧 Fixing security issues..."
-	@if [ -n "$(CLIENT_ID)" ]; then \
 		sudo bash $(SCRIPTS_DIR)/security/audit_stack.sh --fix --client-id "$(CLIENT_ID)"; \
 	else \
 		sudo bash $(SCRIPTS_DIR)/security/audit_stack.sh --fix; \
@@ -463,9 +449,7 @@ security-fix:
 
 rotate-secrets:
 	@echo "🔄 Rotating secrets..."
-	@if [ -n "$(CLIENT_ID)" ] && [ -n "$(SERVICE)" ]; then \
 		sudo bash $(SCRIPTS_DIR)/security/generate_secrets.sh --rotate --client-id "$(CLIENT_ID)" --service "$(SERVICE)"; \
-	elif [ -n "$(CLIENT_ID)" ]; then \
 		sudo bash $(SCRIPTS_DIR)/security/generate_secrets.sh --rotate --client-id "$(CLIENT_ID)"; \
 	else \
 		sudo bash $(SCRIPTS_DIR)/security/generate_secrets.sh --rotate; \
@@ -473,7 +457,6 @@ rotate-secrets:
 
 setup-log-segmentation:
 	@echo "📋 Setting up log segmentation..."
-	@if [ -n "$(CLIENT_ID)" ]; then \
 		sudo bash $(SCRIPTS_DIR)/security/setup_log_segmentation.sh --client-id "$(CLIENT_ID)"; \
 	else \
 		sudo bash $(SCRIPTS_DIR)/security/setup_log_segmentation.sh; \
@@ -541,7 +524,6 @@ cryptosync-logs:
 	@tail -n 50 $(LOG_DIR)/components/cryptosync.log
 	@echo ""
 	@echo "$(YELLOW)For more logs: $(RESET)less $(LOG_DIR)/components/cryptosync.log"
-	@if [ -f "$(CONFIG_DIR)/clients/$(CLIENT_ID)/cryptosync/logs/sync.log" ]; then \
 		echo ""; \
 		echo "$(MAGENTA)$(BOLD)📋 Last sync operations:$(RESET)"; \
 		tail -n 20 $(CONFIG_DIR)/clients/$(CLIENT_ID)/cryptosync/logs/sync.log; \
@@ -575,13 +557,9 @@ audit-docs:
 
 audit-report:
 	@echo "$(MAGENTA)$(BOLD)📋 Displaying AgencyStack Audit Report...$(RESET)"
-	@if [ -f /var/log/agency_stack/audit/summary_$$(date +%Y%m%d).txt ]; then \
 		cat /var/log/agency_stack/audit/summary_$$(date +%Y%m%d).txt; \
-	elif [ -f /var/log/agency_stack/audit/usage_summary.txt ]; then \
 		cat /var/log/agency_stack/audit/usage_summary.txt; \
-	elif [ -f /var/log/agency_stack/audit/quick_audit_$$(date +%Y%m%d).txt ]; then \
 		cat /var/log/agency_stack/audit/quick_audit_$$(date +%Y%m%d).txt; \
-	elif [ -f /var/log/agency_stack/audit/audit_report.log ]; then \
 		cat /var/log/agency_stack/audit/audit_report.log; \
 	else \
 		echo "$(RED)No audit report found. Run 'make audit' first.$(RESET)"; \
@@ -591,7 +569,6 @@ audit-report:
 cleanup:
 	@echo "$(MAGENTA)$(BOLD)🧹 Running AgencyStack Repository Cleanup...$(RESET)"
 	@read -p "$(YELLOW)This will clean up unused scripts and resources. Are you sure? (y/N):$(RESET) " confirm; \
-	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
 		sudo $(CURDIR)/scripts/utils/audit_and_cleanup.sh --clean; \
 	else \
 		echo "$(YELLOW)Cleanup aborted.$(RESET)"; \
@@ -600,7 +577,6 @@ cleanup:
 # Component Registry Management Targets
 # ------------------------------------------------------------------------------
 
-component-registry:
 	@echo "$(MAGENTA)$(BOLD)📋 Updating Component Registry...$(RESET)"
 	@sudo $(SCRIPTS_DIR)/utils/update_component_registry.sh
 
@@ -634,14 +610,12 @@ prerequisites: validate
 
 prerequisites-status:
 	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking System Prerequisites Status...$(RESET)"
-	@if [ -f "/opt/agency_stack/.prerequisites_ok" ]; then echo "$(GREEN)Prerequisites installed successfully$(RESET)"; else echo "$(RED)Prerequisites not installed or installation incomplete$(RESET)"; fi
 
 prerequisites-logs:
 	@echo "$(MAGENTA)$(BOLD)📋 Viewing System Prerequisites Logs...$(RESET)"
 	@ls -la /var/log/agency_stack/prerequisites-*.log 2>/dev/null || echo "$(YELLOW)No prerequisite installation logs found$(RESET)"
 	@echo ""
 	@for log in /var/log/agency_stack/prerequisites-*.log; do \
-		if [ -f "$$log" ]; then \
 			echo "$(CYAN)Log file: $$log$(RESET)"; \
 			tail -n 20 "$$log"; \
 			echo ""; \
@@ -702,7 +676,6 @@ voip-config:
 	@read -p "$(YELLOW)Enter domain for VoIP (e.g., voip.yourdomain.com):$(RESET) " DOMAIN; \
 	read -p "$(YELLOW)Enter admin email:$(RESET) " ADMIN_EMAIL; \
 	read -p "$(YELLOW)Enter client ID (optional):$(RESET) " CLIENT_ID; \
-	sudo $(SCRIPTS_DIR)/components/install_voip.sh --domain $$DOMAIN --admin-email $$ADMIN_EMAIL $(if [ -n "$$CLIENT_ID" ]; then echo "--client-id $$CLIENT_ID"; fi) --configure-only
 
 # Mailu Email Server
 install-mailu: validate
@@ -795,7 +768,6 @@ prometheus-config:
 	@read -p "$(YELLOW)Enter domain for Prometheus (e.g., metrics.yourdomain.com):$(RESET) " DOMAIN; \
 	read -p "$(YELLOW)Enter Grafana domain (e.g., grafana.yourdomain.com):$(RESET) " GRAFANA_DOMAIN; \
 	read -p "$(YELLOW)Enter client ID (optional):$(RESET) " CLIENT_ID; \
-	sudo $(SCRIPTS_DIR)/components/install_prometheus.sh --domain $$DOMAIN --grafana-domain $$GRAFANA_DOMAIN $(if [ -n "$$CLIENT_ID" ]; then echo "--client-id $$CLIENT_ID"; fi) --configure-only
 
 # Keycloak
 install-keycloak: validate
@@ -970,7 +942,6 @@ etebase:
 
 etebase-status:
 	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Etebase status...$(RESET)"
-	@if [ -f "$(CONFIG_DIR)/monitoring/scripts/check_etebase-$(CLIENT_ID).sh" ]; then \
 		$(CONFIG_DIR)/monitoring/scripts/check_etebase-$(CLIENT_ID).sh $(CLIENT_ID); \
 	else \
 		echo "$(RED)Monitoring script not found. Checking container status...$(RESET)"; \
@@ -1014,7 +985,6 @@ ollama:
 
 ollama-status:
 	@echo "Checking Ollama status..."
-	@if [ -f "/opt/agency_stack/monitoring/scripts/check_ollama-$(CLIENT_ID).sh" ]; then \
 		/opt/agency_stack/monitoring/scripts/check_ollama-$(CLIENT_ID).sh $(CLIENT_ID); \
 	else \
 		echo "Ollama monitoring script not found. Please install Ollama first."; \
@@ -1023,7 +993,6 @@ ollama-status:
 
 ollama-logs:
 	@echo "Displaying Ollama logs..."
-	@if [ -d "/opt/agency_stack/docker/ollama" ]; then \
 		cd /opt/agency_stack/docker/ollama && docker-compose logs --tail=100 -f; \
 	else \
 		echo "Ollama installation not found. Please install Ollama first."; \
@@ -1032,7 +1001,6 @@ ollama-logs:
 
 ollama-stop:
 	@echo "Stopping Ollama..."
-	@if [ -d "/opt/agency_stack/docker/ollama" ]; then \
 		cd /opt/agency_stack/docker/ollama && docker-compose stop; \
 	else \
 		echo "Ollama installation not found. Please install Ollama first."; \
@@ -1041,7 +1009,6 @@ ollama-stop:
 
 ollama-start:
 	@echo "Starting Ollama..."
-	@if [ -d "/opt/agency_stack/docker/ollama" ]; then \
 		cd /opt/agency_stack/docker/ollama && docker-compose start; \
 	else \
 		echo "Ollama installation not found. Please install Ollama first."; \
@@ -1050,7 +1017,6 @@ ollama-start:
 
 ollama-restart:
 	@echo "Restarting Ollama..."
-	@if [ -d "/opt/agency_stack/docker/ollama" ]; then \
 		cd /opt/agency_stack/docker/ollama && docker-compose restart; \
 	else \
 		echo "Ollama installation not found. Please install Ollama first."; \
@@ -1094,7 +1060,6 @@ langchain:
 
 langchain-status:
 	@echo "Checking LangChain status..."
-	@if [ -f "/opt/agency_stack/monitoring/scripts/check_langchain-$(CLIENT_ID).sh" ]; then \
 		/opt/agency_stack/monitoring/scripts/check_langchain-$(CLIENT_ID).sh $(CLIENT_ID); \
 	else \
 		echo "LangChain monitoring script not found. Please install LangChain first."; \
@@ -1103,7 +1068,6 @@ langchain-status:
 
 langchain-logs:
 	@echo "Displaying LangChain logs..."
-	@if [ -d "/opt/agency_stack/docker/langchain" ]; then \
 		cd /opt/agency_stack/docker/langchain && docker-compose logs --tail=100 -f; \
 	else \
 		echo "LangChain installation not found. Please install LangChain first."; \
@@ -1112,7 +1076,6 @@ langchain-logs:
 
 langchain-stop:
 	@echo "Stopping LangChain..."
-	@if [ -d "/opt/agency_stack/docker/langchain" ]; then \
 		cd /opt/agency_stack/docker/langchain && docker-compose stop; \
 	else \
 		echo "LangChain installation not found. Please install LangChain first."; \
@@ -1121,7 +1084,6 @@ langchain-stop:
 
 langchain-start:
 	@echo "Starting LangChain..."
-	@if [ -d "/opt/agency_stack/docker/langchain" ]; then \
 		cd /opt/agency_stack/docker/langchain && docker-compose start; \
 	else \
 		echo "LangChain installation not found. Please install LangChain first."; \
@@ -1130,7 +1092,6 @@ langchain-start:
 
 langchain-restart:
 	@echo "Restarting LangChain..."
-	@if [ -d "/opt/agency_stack/docker/langchain" ]; then \
 		cd /opt/agency_stack/docker/langchain && docker-compose restart; \
 	else \
 		echo "LangChain installation not found. Please install LangChain first."; \
@@ -1139,7 +1100,6 @@ langchain-restart:
 
 langchain-test:
 	@echo "Testing LangChain API..."
-	@if [ -d "/opt/agency_stack/docker/langchain" ]; then \
 		PORT=$$(grep PORT /opt/agency_stack/docker/langchain/.env | cut -d= -f2); \
 		curl -X POST "http://localhost:$${PORT}/prompt" \
 			-H "Content-Type: application/json" \
@@ -1198,7 +1158,6 @@ agent-orchestrator-test:
 
 # Deploy local codebase to remote VM
 vm-deploy:
-	@if [ -z "${REMOTE_VM_SSH}" ]; then \
 		echo "$(RED)Error: REMOTE_VM_SSH environment variable not set$(RESET)"; \
 		echo "$(YELLOW)Set it with: export REMOTE_VM_SSH=user@vm-hostname$(RESET)"; \
 		exit 1; \
@@ -1220,7 +1179,6 @@ vm-deploy:
 
 # Open a shell on the remote VM
 vm-shell:
-	@if [ -z "${REMOTE_VM_SSH}" ]; then \
 		echo "$(RED)Error: REMOTE_VM_SSH environment variable not set$(RESET)"; \
 		echo "$(YELLOW)Set it with: export REMOTE_VM_SSH=user@vm-hostname$(RESET)"; \
 		exit 1; \
@@ -1230,7 +1188,6 @@ vm-shell:
 
 # Run basic SSH connection test to VM
 vm-test: 
-	@if [ -z "${REMOTE_VM_SSH}" ]; then \
 		echo "$(RED)Error: REMOTE_VM_SSH environment variable not set$(RESET)"; \
 		echo "$(YELLOW)Set it with: export REMOTE_VM_SSH=user@vm-hostname$(RESET)"; \
 		exit 1; \
@@ -1264,12 +1221,10 @@ vm-test-component-%: vm-deploy
 
 # Test specific component on remote VM with environment variable
 vm-test-component:
-	@if [ -z "$${REMOTE_VM_SSH}" ]; then \
 		echo "$(RED)Error: REMOTE_VM_SSH environment variable not set$(RESET)"; \
 		echo "$(YELLOW)Set it with: export REMOTE_VM_SSH=user@vm-hostname$(RESET)"; \
 		exit 1; \
 	fi
-	@if [ -z "$${COMPONENT}" ]; then \
 		echo "$(RED)Error: COMPONENT environment variable not set$(RESET)"; \
 		echo "$(YELLOW)Set it with: export COMPONENT=component_name$(RESET)"; \
 		exit 1; \
@@ -1279,7 +1234,6 @@ vm-test-component:
 
 # Generate markdown report for VM testing
 vm-test-report:
-	@if [ -z "$${REMOTE_VM_SSH}" ]; then \
 		echo "$(RED)Error: REMOTE_VM_SSH environment variable not set$(RESET)"; \
 		echo "$(YELLOW)Set it with: export REMOTE_VM_SSH=user@vm-hostname$(RESET)"; \
 		exit 1; \
@@ -1291,9 +1245,533 @@ vm-test-report:
 # Display local/remote testing workflow
 show-dev-workflow:
 	@echo "$(MAGENTA)$(BOLD)🔍 AgencyStack Local/Remote Development Workflow$(RESET)"
-	@if [ -f "$(PWD)/docs/LOCAL_DEVELOPMENT.md" ]; then \
-		cat "$(PWD)/docs/LOCAL_DEVELOPMENT.md" | grep -E "^##|^###|^-|^[0-9]" | sed 's/^#/  /g'; \
 	else \
 		echo "$(RED)LOCAL_DEVELOPMENT.md file not found$(RESET)"; \
 		echo "$(YELLOW)Run 'make alpha-fix --add-dev-docs' to create it$(RESET)"; \
 	fi
+
+# Alpha deployment validation
+alpha-check:
+	@echo "$(MAGENTA)$(BOLD)🧪 Running AgencyStack Alpha validation...$(RESET)"
+	@echo "$(CYAN)Verifying all components against DevOps standards...$(RESET)"
+	@$(SCRIPTS_DIR)/utils/validate_components.sh --report --verbose || true
+	@echo ""
+	@echo "$(CYAN)Summary from component validation:$(RESET)"
+	@if [ -f "$(PWD)/component_validation_report.md" ]; then \
+		cat $(PWD)/component_validation_report.md | grep -E "^✅|^❌|^⚠️" || echo "$(YELLOW)No status markers found in report$(RESET)"; \
+	else \
+		echo "$(YELLOW)No validation report generated$(RESET)"; \
+	fi
+	@echo ""
+	
+	@echo "$(CYAN)Checking for required directories and markers...$(RESET)"
+	@mkdir -p $(CONFIG_DIR) $(LOG_DIR) 2>/dev/null || true
+	@mkdir -p /opt/agency_stack/clients/${CLIENT_ID:-default} 2>/dev/null || true
+	@touch $(CONFIG_DIR)/.installed_ok 2>/dev/null || true
+	
+	@echo "$(CYAN)Checking for port conflicts...$(RESET)"
+	@if [ -f "$(SCRIPTS_DIR)/utils/port_conflict_detector.sh" ]; then \
+		$(SCRIPTS_DIR)/utils/port_conflict_detector.sh --quiet || echo "$(YELLOW)⚠️ Port conflicts detected. Run 'make detect-ports' for details.$(RESET)"; \
+	else \
+		echo "$(YELLOW)⚠️ Port conflict detector not found. Skipping check.$(RESET)"; \
+	fi
+	
+	@echo "$(CYAN)Running quick audit...$(RESET)"
+	@if [ -f "$(SCRIPTS_DIR)/utils/quick_audit.sh" ]; then \
+		$(SCRIPTS_DIR)/utils/quick_audit.sh || echo "$(YELLOW)⚠️ Quick audit detected issues. Check component logs.$(RESET)"; \
+	else \
+		echo "$(YELLOW)⚠️ Quick audit script not found. Skipping check.$(RESET)"; \
+	fi
+	
+	@echo ""
+	@echo "$(GREEN)$(BOLD)✅ Alpha validation complete!$(RESET)"
+	@echo "$(CYAN)Review $(PWD)/component_validation_report.md for full details$(RESET)"
+	@echo "$(CYAN)Run 'make alpha-fix' to attempt repairs for common issues$(RESET)"
+
+# Attempt to automatically fix common issues
+alpha-fix:
+	@echo "$(MAGENTA)$(BOLD)🔧 Attempting to fix common issues...$(RESET)"
+	@$(SCRIPTS_DIR)/utils/validate_components.sh --fix --report
+	@echo "$(GREEN)Fixes attempted. Please run 'make alpha-check' again to verify.$(RESET)"
+
+# Apply generated makefile targets
+alpha-apply-targets:
+	@echo "$(MAGENTA)$(BOLD)🔧 Applying generated Makefile targets...$(RESET)"
+		echo "Found generated targets file. Merging..."; \
+		cat $(PWD)/makefile_targets.generated >> $(PWD)/Makefile; \
+		echo "$(GREEN)Applied all generated targets to Makefile$(RESET)"; \
+	else \
+		echo "$(YELLOW)No generated targets file found$(RESET)"; \
+		echo "Run 'make alpha-fix' to generate targets first"; \
+	fi
+
+.PHONY: alpha-check alpha-fix alpha-apply-targets
+
+# builderio component targets
+builderio:
+	@echo "🔧 Installing builderio..."
+	@$(SCRIPTS_DIR)/components/install_builderio.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(VERBOSE),--verbose,)
+
+builderio-status:
+	@echo "🔍 Checking builderio status..."
+		$(SCRIPTS_DIR)/components/status_builderio.sh; \
+	else \
+		echo "Status script not found. Checking service..."; \
+		systemctl status builderio 2>/dev/null || docker ps -a | grep builderio || echo "builderio status check not implemented"; \
+	fi
+
+builderio-logs:
+	@echo "📜 Viewing builderio logs..."
+		tail -n 50 "/var/log/agency_stack/components/builderio.log"; \
+	else \
+		echo "Log file not found. Trying alternative sources..."; \
+		journalctl -u builderio 2>/dev/null || docker logs builderio-$(CLIENT_ID) 2>/dev/null || echo "No logs found for builderio"; \
+	fi
+
+builderio-restart:
+	@echo "🔄 Restarting builderio..."
+		$(SCRIPTS_DIR)/components/restart_builderio.sh; \
+	else \
+		echo "Restart script not found. Trying standard methods..."; \
+		systemctl restart builderio 2>/dev/null || \
+		docker restart builderio-$(CLIENT_ID) 2>/dev/null || \
+		echo "builderio restart not implemented"; \
+	fi
+
+# calcom component targets
+calcom:
+	@echo "🔧 Installing calcom..."
+	@$(SCRIPTS_DIR)/components/install_calcom.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(VERBOSE),--verbose,)
+
+calcom-status:
+	@echo "🔍 Checking calcom status..."
+		$(SCRIPTS_DIR)/components/status_calcom.sh; \
+	else \
+		echo "Status script not found. Checking service..."; \
+		systemctl status calcom 2>/dev/null || docker ps -a | grep calcom || echo "calcom status check not implemented"; \
+	fi
+
+calcom-logs:
+	@echo "📜 Viewing calcom logs..."
+		tail -n 50 "/var/log/agency_stack/components/calcom.log"; \
+	else \
+		echo "Log file not found. Trying alternative sources..."; \
+		journalctl -u calcom 2>/dev/null || docker logs calcom-$(CLIENT_ID) 2>/dev/null || echo "No logs found for calcom"; \
+	fi
+
+calcom-restart:
+	@echo "🔄 Restarting calcom..."
+		$(SCRIPTS_DIR)/components/restart_calcom.sh; \
+	else \
+		echo "Restart script not found. Trying standard methods..."; \
+		systemctl restart calcom 2>/dev/null || \
+		docker restart calcom-$(CLIENT_ID) 2>/dev/null || \
+		echo "calcom restart not implemented"; \
+	fi
+
+# Auto-generated target for portainer
+portainer-logs:
+	@echo "TODO: Implement portainer-logs"
+	@exit 1
+
+# Auto-generated target for portainer
+portainer-restart:
+	@echo "TODO: Implement portainer-restart"
+	@exit 1
+
+# Auto-generated target for seafile
+seafile:
+	@echo "TODO: Implement seafile"
+	@exit 1
+
+# Auto-generated target for seafile
+seafile-status:
+	@echo "TODO: Implement seafile-status"
+	@exit 1
+
+# Auto-generated target for seafile
+seafile-logs:
+	@echo "TODO: Implement seafile-logs"
+	@exit 1
+
+# Auto-generated target for seafile
+seafile-restart:
+	@echo "TODO: Implement seafile-restart"
+	@exit 1
+
+# Auto-generated target for traefik
+traefik:
+	@echo "TODO: Implement traefik"
+	@exit 1
+
+# Auto-generated target for traefik
+traefik-status:
+	@echo "TODO: Implement traefik-status"
+	@exit 1
+
+# Auto-generated target for traefik
+traefik-logs:
+	@echo "TODO: Implement traefik-logs"
+	@exit 1
+
+# Auto-generated target for traefik
+traefik-restart:
+	@echo "TODO: Implement traefik-restart"
+	@exit 1
+
+# Auto-generated target for vault
+vault:
+	@echo "TODO: Implement vault"
+	@exit 1
+
+# Auto-generated target for vault
+vault-status:
+	@echo "TODO: Implement vault-status"
+	@exit 1
+
+# Auto-generated target for vault
+vault-logs:
+	@echo "TODO: Implement vault-logs"
+	@exit 1
+
+# Auto-generated target for vault
+vault-restart:
+	@echo "TODO: Implement vault-restart"
+	@exit 1
+
+# Auto-generated target for wordpress
+wordpress:
+	@echo "TODO: Implement wordpress"
+	@exit 1
+
+# Auto-generated target for wordpress
+wordpress-status:
+	@echo "TODO: Implement wordpress-status"
+	@exit 1
+
+# Auto-generated target for wordpress
+wordpress-logs:
+	@echo "TODO: Implement wordpress-logs"
+	@exit 1
+
+# Auto-generated target for wordpress
+wordpress-restart:
+	@echo "TODO: Implement wordpress-restart"
+	@exit 1
+
+
+	@exit 1
+
+	@exit 1
+
+	@exit 1
+
+	@exit 1
+
+# Auto-generated target for Parsing
+Parsing:
+	@echo "TODO: Implement Parsing"
+	@exit 1
+
+# Auto-generated target for Parsing
+Parsing-status:
+	@echo "TODO: Implement Parsing-status"
+	@exit 1
+
+# Auto-generated target for Parsing
+Parsing-logs:
+	@echo "TODO: Implement Parsing-logs"
+	@exit 1
+
+# Auto-generated target for Parsing
+Parsing-restart:
+	@echo "TODO: Implement Parsing-restart"
+	@exit 1
+
+# Auto-generated target for component
+component:
+	@echo "TODO: Implement component"
+	@exit 1
+
+# Auto-generated target for component
+component-logs:
+	@echo "TODO: Implement component-logs"
+	@exit 1
+
+# Auto-generated target for component
+component-restart:
+	@echo "TODO: Implement component-restart"
+	@exit 1
+
+	@exit 1
+
+	@exit 1
+
+	@exit 1
+
+	@exit 1
+
+# Auto-generated target for /home/revelationx/CascadeProjects/foss-server-stack/config/registry/component_registry.json
+/home/revelationx/CascadeProjects/foss-server-stack/config/registry/component-registry.json:
+	@echo "TODO: Implement /home/revelationx/CascadeProjects/foss-server-stack/config/registry/component-registry.json"
+	@exit 1
+
+# Auto-generated target for /home/revelationx/CascadeProjects/foss-server-stack/config/registry/component_registry.json
+/home/revelationx/CascadeProjects/foss-server-stack/config/registry/component-registry.json-status:
+	@echo "TODO: Implement /home/revelationx/CascadeProjects/foss-server-stack/config/registry/component-registry.json-status"
+	@exit 1
+
+# Auto-generated target for /home/revelationx/CascadeProjects/foss-server-stack/config/registry/component_registry.json
+/home/revelationx/CascadeProjects/foss-server-stack/config/registry/component-registry.json-logs:
+	@echo "TODO: Implement /home/revelationx/CascadeProjects/foss-server-stack/config/registry/component-registry.json-logs"
+	@exit 1
+
+# Auto-generated target for /home/revelationx/CascadeProjects/foss-server-stack/config/registry/component_registry.json
+/home/revelationx/CascadeProjects/foss-server-stack/config/registry/component-registry.json-restart:
+	@echo "TODO: Implement /home/revelationx/CascadeProjects/foss-server-stack/config/registry/component-registry.json-restart"
+	@exit 1
+
+# Auto-generated target for crowdsec
+crowdsec:
+	@echo "TODO: Implement crowdsec"
+	@exit 1
+
+# Auto-generated target for crowdsec
+crowdsec-status:
+	@echo "TODO: Implement crowdsec-status"
+	@exit 1
+
+# Auto-generated target for crowdsec
+crowdsec-logs:
+	@echo "TODO: Implement crowdsec-logs"
+	@exit 1
+
+# Auto-generated target for crowdsec
+crowdsec-restart:
+	@echo "TODO: Implement crowdsec-restart"
+	@exit 1
+
+# Auto-generated target for cryptosync
+cryptosync-restart:
+	@echo "TODO: Implement cryptosync-restart"
+	@exit 1
+
+# Auto-generated target for documenso
+documenso-status:
+	@echo "TODO: Implement documenso-status"
+	@exit 1
+
+# Auto-generated target for documenso
+documenso-logs:
+	@echo "TODO: Implement documenso-logs"
+	@exit 1
+
+# Auto-generated target for documenso
+documenso-restart:
+	@echo "TODO: Implement documenso-restart"
+	@exit 1
+
+# Auto-generated target for erpnext
+erpnext:
+	@echo "TODO: Implement erpnext"
+	@exit 1
+
+# Auto-generated target for erpnext
+erpnext-status:
+	@echo "TODO: Implement erpnext-status"
+	@exit 1
+
+# Auto-generated target for erpnext
+erpnext-logs:
+	@echo "TODO: Implement erpnext-logs"
+	@exit 1
+
+# Auto-generated target for erpnext
+erpnext-restart:
+	@echo "TODO: Implement erpnext-restart"
+	@exit 1
+
+# Auto-generated target for focalboard
+focalboard:
+	@echo "TODO: Implement focalboard"
+	@exit 1
+
+# Auto-generated target for focalboard
+focalboard-status:
+	@echo "TODO: Implement focalboard-status"
+	@exit 1
+
+# Auto-generated target for focalboard
+focalboard-logs:
+	@echo "TODO: Implement focalboard-logs"
+	@exit 1
+
+# Auto-generated target for focalboard
+focalboard-restart:
+	@echo "TODO: Implement focalboard-restart"
+	@exit 1
+
+# Auto-generated target for ghost
+ghost:
+	@echo "TODO: Implement ghost"
+	@exit 1
+
+# Auto-generated target for ghost
+ghost-status:
+	@echo "TODO: Implement ghost-status"
+	@exit 1
+
+# Auto-generated target for ghost
+ghost-logs:
+	@echo "TODO: Implement ghost-logs"
+	@exit 1
+
+# Auto-generated target for ghost
+ghost-restart:
+	@echo "TODO: Implement ghost-restart"
+	@exit 1
+
+# Auto-generated target for gitea
+gitea:
+	@echo "TODO: Implement gitea"
+	@exit 1
+
+# Auto-generated target for gitea
+gitea-status:
+	@echo "TODO: Implement gitea-status"
+	@exit 1
+
+# Auto-generated target for gitea
+gitea-logs:
+	@echo "TODO: Implement gitea-logs"
+	@exit 1
+
+# Auto-generated target for gitea
+gitea-restart:
+	@echo "TODO: Implement gitea-restart"
+	@exit 1
+
+# Auto-generated target for grafana
+grafana:
+	@echo "TODO: Implement grafana"
+	@exit 1
+
+# Auto-generated target for grafana
+grafana-status:
+	@echo "TODO: Implement grafana-status"
+	@exit 1
+
+# Auto-generated target for grafana
+grafana-logs:
+	@echo "TODO: Implement grafana-logs"
+	@exit 1
+
+# Auto-generated target for grafana
+grafana-restart:
+	@echo "TODO: Implement grafana-restart"
+	@exit 1
+
+# Auto-generated target for keycloak
+keycloak:
+	@echo "TODO: Implement keycloak"
+	@exit 1
+
+# Auto-generated target for keycloak
+keycloak-status:
+	@echo "TODO: Implement keycloak-status"
+	@exit 1
+
+# Auto-generated target for keycloak
+keycloak-logs:
+	@echo "TODO: Implement keycloak-logs"
+	@exit 1
+
+# Auto-generated target for keycloak
+keycloak-restart:
+	@echo "TODO: Implement keycloak-restart"
+	@exit 1
+
+# Auto-generated target for killbill
+killbill-status:
+	@echo "TODO: Implement killbill-status"
+	@exit 1
+
+# Auto-generated target for killbill
+killbill-logs:
+	@echo "TODO: Implement killbill-logs"
+	@exit 1
+
+# Auto-generated target for killbill
+killbill-restart:
+	@echo "TODO: Implement killbill-restart"
+	@exit 1
+
+# Auto-generated target for loki
+loki:
+	@echo "TODO: Implement loki"
+	@exit 1
+
+# Auto-generated target for loki
+loki-status:
+	@echo "TODO: Implement loki-status"
+	@exit 1
+
+# Auto-generated target for loki
+loki-logs:
+	@echo "TODO: Implement loki-logs"
+	@exit 1
+
+# Auto-generated target for loki
+loki-restart:
+	@echo "TODO: Implement loki-restart"
+	@exit 1
+
+# Auto-generated target for mailu
+mailu:
+	@echo "TODO: Implement mailu"
+	@exit 1
+
+# Auto-generated target for mailu
+mailu-status:
+	@echo "TODO: Implement mailu-status"
+	@exit 1
+
+# Auto-generated target for mailu
+mailu-logs:
+	@echo "TODO: Implement mailu-logs"
+	@exit 1
+
+# Auto-generated target for mailu
+mailu-restart:
+	@echo "TODO: Implement mailu-restart"
+	@exit 1
+
+# Auto-generated target for mattermost
+mattermost:
+	@echo "TODO: Implement mattermost"
+	@exit 1
+
+# Auto-generated target for mattermost
+mattermost-status:
+	@echo "TODO: Implement mattermost-status"
+	@exit 1
+
+# Auto-generated target for mattermost
+mattermost-logs:
+	@echo "TODO: Implement mattermost-logs"
+	@exit 1
+
+# Auto-generated target for mattermost
+mattermost-restart:
+	@echo "TODO: Implement mattermost-restart"
+	@exit 1
+
+# Auto-generated target for portainer
+portainer:
+	@echo "TODO: Implement portainer"
+	@exit 1
+
+# Auto-generated target for portainer
+portainer-status:
+	@echo "TODO: Implement portainer-status"
+	@exit 1

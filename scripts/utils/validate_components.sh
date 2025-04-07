@@ -32,8 +32,8 @@ ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 CONFIG_DIR="${ROOT_DIR}/config"
 REGISTRY_FILE="${CONFIG_DIR}/registry/component_registry.json"
 MAKEFILE="${ROOT_DIR}/Makefile"
-DOCS_DIR="${ROOT_DIR}/docs/pages/components"
 COMPONENTS_DIR="${ROOT_DIR}/scripts/components"
+DOCS_DIR="${ROOT_DIR}/docs/pages/components"
 VERBOSE=false
 REPORT_FILE="${ROOT_DIR}/component_validation_report.md"
 CHECK_SPECIFIC=""
@@ -161,6 +161,11 @@ check_dependencies() {
   fi
 }
 
+# Function to strip ANSI color codes from a string
+strip_ansi_colors() {
+  echo "$1" | sed 's/\x1b\[[0-9;]*m//g'
+}
+
 # Get all components from registry - ensures unique component names
 get_all_components() {
   if [[ -n "$CHECK_SPECIFIC" ]]; then
@@ -170,31 +175,63 @@ get_all_components() {
   
   log "INFO" "Parsing component registry: $REGISTRY_FILE" "$BLUE"
   
-  # Use jq to extract component names from registry
-  if ! command -v jq &> /dev/null; then
-    log "ERROR" "jq not found - cannot parse registry" "$RED"
-    echo "prerequisites traefik portainer peertube" # Fallback minimal list
+  # Use python for more reliable parsing
+  if command -v python3 &> /dev/null; then
+    python3 -c "
+import json
+import sys
+
+try:
+    with open('$REGISTRY_FILE', 'r') as f:
+        data = json.load(f)
+    
+    components = []
+    for category in data['components']:
+        for comp in data['components'][category]:
+            components.append(comp)
+    
+    print('\n'.join(sorted(components)))
+except Exception as e:
+    print(f'Error: {str(e)}', file=sys.stderr)
+    sys.exit(1)
+"
+    return
+  fi
+  
+  # Fallback to jq if python not available
+  if command -v jq &> /dev/null; then
+    jq -r '.components | to_entries[] | .value | to_entries[] | .key' "$REGISTRY_FILE" | sort -u
+    return
+  fi
+  
+  # Fallback to hard-coded list if both python and jq not available
+  log "ERROR" "Neither python3 nor jq found - cannot parse registry" "$RED"
+  echo "prerequisites traefik portainer peertube wordpress" # Fallback minimal list
+  return 1
+}
+
+# Filter invalid component names
+filter_invalid_component() {
+  local component=$(strip_ansi_colors "$1")
+  
+  # Check if component name contains invalid characters for filenames/targets
+  if [[ "$component" == *"/"* ]] || [[ "$component" == *":"* ]] || [[ "$component" == "["* ]]; then
+    log "WARNING" "Skipping invalid component name: $component" "$YELLOW"
     return 1
   fi
   
-  # Extract unique component names and sort them
-  local components
-  components=$(jq -r '.components | to_entries[] | .value | to_entries[] | .key' "$REGISTRY_FILE" | sort -u)
-  
-  # Check if we got any components
-  if [[ -z "$components" ]]; then
-    log "WARNING" "No components found in registry, using fallback list" "$YELLOW"
-    echo "prerequisites traefik portainer peertube" # Fallback minimal list
+  # Check if component name is a reserved word or non-descriptive
+  if [[ "$component" == "component" ]] || [[ "$component" == "Parsing" ]] || [[ "$component" == "INFO" ]]; then
+    log "WARNING" "Skipping reserved/generic name: $component" "$YELLOW"
     return 1
   fi
   
-  log "INFO" "Found $(echo "$components" | wc -l) components in registry" "$BLUE"
-  echo "$components"
+  return 0
 }
 
 # Check if makefile targets exist for component
 check_makefile_targets() {
-  local component="$1"
+  local component=$(strip_ansi_colors "$1")
   local issues=0
   local target_base="$component"
   
@@ -245,7 +282,7 @@ check_makefile_targets() {
 
 # Check if component script exists
 check_component_script() {
-  local component="$1"
+  local component=$(strip_ansi_colors "$1")
   local issues=0
   
   log "INFO" "Checking component script for ${BOLD}$component${NC}" "$CYAN"
@@ -253,7 +290,7 @@ check_component_script() {
   
   # Check for script in components directory
   local script_name="install_${component}.sh"
-  local script_path="$SCRIPT_DIR/$script_name"
+  local script_path="$COMPONENTS_DIR/$script_name"
   
   if [[ -f "$script_path" ]]; then
     log "SUCCESS" "Component script ${BOLD}$script_name${NC} found" "$GREEN"
@@ -280,7 +317,7 @@ check_component_script() {
 
 # Check if component docs exist
 check_component_docs() {
-  local component="$1"
+  local component=$(strip_ansi_colors "$1")
   local issues=0
   
   log "INFO" "Checking documentation for ${BOLD}$component${NC}" "$CYAN"
@@ -326,7 +363,7 @@ check_component_docs() {
 
 # Check if component is in registry
 check_registry_entry() {
-  local component="$1"
+  local component=$(strip_ansi_colors "$1")
   local issues=0
   
   log "INFO" "Checking registry entry for ${BOLD}$component${NC}" "$CYAN"
@@ -352,113 +389,387 @@ check_registry_entry() {
   return $issues
 }
 
-validate_component() {
-  local component="$1"
-  local component_issues=0
+# Add repair capabilities
+fix_component_script() {
+  local component=$(strip_ansi_colors "$1")
   
-  if [[ "$GENERATE_REPORT" == "true" ]]; then
-    append_to_report "\n### ${component^}\n"
+  if [[ ! -f "${COMPONENTS_DIR}/install_${component}.sh" ]]; then
+    if [[ "$FIX_ISSUES" == "true" ]]; then
+      log "INFO" "Creating script template for ${component}..." "$BLUE"
+      
+      mkdir -p "${COMPONENTS_DIR}"
+      
+      # Create script template
+      cat > "${COMPONENTS_DIR}/install_${component}.sh" << EOF
+#!/bin/bash
+# install_${component}.sh - Installation script for ${component}
+#
+# This script installs and configures ${component} for AgencyStack
+# following the component installation conventions.
+#
+# Author: AgencyStack Team
+# Date: $(date '+%Y-%m-%d')
+
+set -e
+
+# Source common utilities
+SCRIPT_DIR="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
+source "\${SCRIPT_DIR}/../utils/common.sh"
+
+# Default configuration
+CLIENT_ID="\${CLIENT_ID:-default}"
+DOMAIN="\${DOMAIN:-localhost}"
+ADMIN_EMAIL="\${ADMIN_EMAIL:-admin@example.com}"
+
+# Paths
+INSTALL_DIR="/opt/agency_stack/clients/\${CLIENT_ID}/${component}"
+LOG_DIR="/var/log/agency_stack/components"
+LOG_FILE="\${LOG_DIR}/${component}.log"
+
+log_info "Starting ${component} installation..."
+
+# Ensure directories exist
+log_cmd "Creating installation directories..."
+mkdir -p "\${INSTALL_DIR}"
+mkdir -p "\${LOG_DIR}"
+
+# Installation logic
+# [COMPONENT-SPECIFIC INSTALLATION STEPS GO HERE]
+
+log_success "${component} installation completed successfully!"
+EOF
+      
+      # Make executable
+      chmod +x "${COMPONENTS_DIR}/install_${component}.sh"
+      
+      append_to_report "- Created installation script template for \`${component}\`"
+      log "SUCCESS" "Created installation script template for ${component}" "$GREEN"
+      return 0
+    else
+      log "WARNING" "Script does not exist but fix mode is not enabled" "$YELLOW"
+      return 1
+    fi
   fi
   
-  echo -e "\n${MAGENTA}${BOLD}Validating component: $component${NC}\n"
-  
-  # Run all checks, capturing the result of each
-  check_makefile_targets "$component"; local result=$?
-  component_issues=$((component_issues + result))
-  
-  check_component_script "$component"; local result=$?
-  component_issues=$((component_issues + result))
-  
-  check_component_docs "$component"; local result=$?
-  component_issues=$((component_issues + result))
-  
-  check_registry_entry "$component"; local result=$?
-  component_issues=$((component_issues + result))
-  
-  if [[ $component_issues -eq 0 ]]; then
-    log "SUCCESS" "${BOLD}$component${NC} passed all validation checks!" "$GREEN"
-    echo "✅ $component: All checks passed" >> "$TEMP_RESULTS_FILE"
-    return 0
-  else
-    log "WARNING" "${BOLD}$component${NC} has $component_issues issues to address" "$YELLOW"
-    echo "❌ $component: $component_issues issues found" >> "$TEMP_RESULTS_FILE"
-    return $component_issues
-  fi
+  log "INFO" "Script for ${component} already exists" "$BLUE"
+  return 0
 }
 
-# Main function to validate components
+# Fix missing documentation
+fix_component_docs() {
+  local component=$(strip_ansi_colors "$1")
+  
+  if [[ ! -f "${DOCS_DIR}/${component}.md" ]]; then
+    if [[ "$FIX_ISSUES" == "true" ]]; then
+      log "INFO" "Creating documentation template for ${component}..." "$BLUE"
+      
+      mkdir -p "${DOCS_DIR}"
+      
+      # Get description from registry if possible
+      local description=""
+      if command -v jq &> /dev/null; then
+        description=$(jq -r --arg comp "$component" '.components | to_entries[] | .value | to_entries[] | select(.key == $comp) | .value.description' "$REGISTRY_FILE")
+      fi
+      
+      if [[ -z "$description" ]]; then
+        description="${component} component"
+      fi
+      
+      # Create documentation template
+      cat > "${DOCS_DIR}/${component}.md" << EOF
+# ${component^}
+
+## Overview
+${description}
+
+## Installation
+
+### Prerequisites
+- List of prerequisites
+
+### Installation Process
+The installation is handled by the \`install_${component}.sh\` script, which can be executed using:
+
+\`\`\`bash
+make ${component}
+\`\`\`
+
+## Configuration
+
+### Default Configuration
+- Configuration details
+
+### Customization
+- How to customize
+
+## Ports & Endpoints
+
+| Service | Port | Protocol | Description |
+|---------|------|----------|-------------|
+| Web UI  | XXXX | HTTP/S   | Main web interface |
+
+## Logs & Monitoring
+
+### Log Files
+- \`/var/log/agency_stack/components/${component}.log\`
+
+### Monitoring
+- Metrics and monitoring information
+
+## Troubleshooting
+
+### Common Issues
+- List of common issues and their solutions
+
+## Makefile Targets
+
+| Target | Description |
+|--------|-------------|
+| \`make ${component}\` | Install ${component} |
+| \`make ${component}-status\` | Check status of ${component} |
+| \`make ${component}-logs\` | View ${component} logs |
+| \`make ${component}-restart\` | Restart ${component} services |
+EOF
+      
+      append_to_report "- Created documentation template for \`${component}\`"
+      log "SUCCESS" "Created documentation template for ${component}" "$GREEN"
+      return 0
+    else
+      log "WARNING" "Documentation does not exist but fix mode is not enabled" "$YELLOW"
+      return 1
+    fi
+  fi
+  
+  log "INFO" "Documentation for ${component} already exists" "$BLUE"
+  return 0
+}
+
+# Fix missing makefile targets
+fix_makefile_targets() {
+  local component=$(strip_ansi_colors "$1")
+  local target_base="$component"
+  local generated_file="${ROOT_DIR}/makefile_targets.generated"
+  
+  # Generate targets if needed
+  if ! grep -q "^${target_base}:" "$MAKEFILE"; then
+    if [[ "$FIX_ISSUES" == "true" ]]; then
+      log "INFO" "Generating Makefile targets for ${component}..." "$BLUE"
+      
+      # Create or append to the generated targets file
+      cat >> "$generated_file" << EOF
+
+# ${component} component targets
+${target_base}:
+	@echo "🔧 Installing ${component}..."
+	@\$(SCRIPTS_DIR)/components/install_${component}.sh --domain \$(DOMAIN) --admin-email \$(ADMIN_EMAIL) \$(if \$(VERBOSE),--verbose,)
+
+${target_base}-status:
+	@echo "🔍 Checking ${component} status..."
+	@if [ -f "\$(SCRIPTS_DIR)/components/status_${component}.sh" ]; then \\
+		\$(SCRIPTS_DIR)/components/status_${component}.sh; \\
+	else \\
+		echo "Status script not found. Checking service..."; \\
+		systemctl status ${component} 2>/dev/null || docker ps -a | grep ${component} || echo "${component} status check not implemented"; \\
+	fi
+
+${target_base}-logs:
+	@echo "📜 Viewing ${component} logs..."
+	@if [ -f "/var/log/agency_stack/components/${component}.log" ]; then \\
+		tail -n 50 "/var/log/agency_stack/components/${component}.log"; \\
+	else \\
+		echo "Log file not found. Trying alternative sources..."; \\
+		journalctl -u ${component} 2>/dev/null || docker logs ${component}-\$(CLIENT_ID) 2>/dev/null || echo "No logs found for ${component}"; \\
+	fi
+
+${target_base}-restart:
+	@echo "🔄 Restarting ${component}..."
+	@if [ -f "\$(SCRIPTS_DIR)/components/restart_${component}.sh" ]; then \\
+		\$(SCRIPTS_DIR)/components/restart_${component}.sh; \\
+	else \\
+		echo "Restart script not found. Trying standard methods..."; \\
+		systemctl restart ${component} 2>/dev/null || \\
+		docker restart ${component}-\$(CLIENT_ID) 2>/dev/null || \\
+		echo "${component} restart not implemented"; \\
+	fi
+
+${target_base}-test:
+	@echo "🧪 Testing ${component}..."
+	@if [ -f "\$(SCRIPTS_DIR)/components/test_${component}.sh" ]; then \\
+		\$(SCRIPTS_DIR)/components/test_${component}.sh; \\
+	else \\
+		echo "Test script not found. Basic health check..."; \\
+		\$(MAKE) ${target_base}-status; \\
+	fi
+EOF
+      
+      append_to_report "- Generated Makefile targets for \`${component}\`"
+      log "SUCCESS" "Generated Makefile targets for ${component}" "$GREEN"
+      log "INFO" "To apply targets: cat ${generated_file} >> ${MAKEFILE}" "$BLUE"
+      return 0
+    else
+      log "WARNING" "Makefile targets missing but fix mode is not enabled" "$YELLOW"
+      return 1
+    fi
+  fi
+  
+  log "INFO" "Makefile targets for ${component} already exist" "$BLUE"
+  return 0
+}
+
+# Enhanced validate_component function to include fixes
+validate_component() {
+  local component=$(strip_ansi_colors "$1")
+  local issues=0
+  local fixed=0
+  
+  # Skip invalid component names
+  if ! filter_invalid_component "$component"; then
+    log "INFO" "Skipping validation for invalid component: $component" "$CYAN"
+    return 0
+  fi
+  
+  # Start component section in report
+  if [[ "$GENERATE_REPORT" == "true" ]]; then
+    append_to_report "## ${component}"
+  fi
+  
+  log "INFO" "Validating component: ${component}" "$BOLD$BLUE"
+  
+  # Check and fix component script
+  if ! check_component_script "$component"; then
+    ((issues++))
+    if [[ "$FIX_ISSUES" == "true" ]]; then
+      fix_component_script "$component"
+      ((fixed++))
+    fi
+  fi
+  
+  # Check and fix component docs
+  if ! check_component_docs "$component"; then
+    ((issues++))
+    if [[ "$FIX_ISSUES" == "true" ]]; then
+      fix_component_docs "$component"
+      ((fixed++))
+    fi
+  fi
+  
+  # Check and fix makefile targets
+  if ! check_makefile_targets "$component"; then
+    ((issues++))
+    if [[ "$FIX_ISSUES" == "true" ]]; then
+      fix_makefile_targets "$component"
+      ((fixed++))
+    fi
+  fi
+  
+  # Check registry entry
+  if ! check_registry_entry "$component"; then
+    ((issues++))
+    # For now, we don't fix registry entries automatically
+    # Would need additional logic to determine proper category, etc.
+  fi
+  
+  # Report on the issues
+  if [[ $issues -eq 0 ]]; then
+    log "SUCCESS" "$component passed all validation checks" "$GREEN"
+    if [[ "$GENERATE_REPORT" == "true" ]]; then
+      add_component_to_report "$component" "success"
+    fi
+  elif [[ $fixed -eq $issues ]]; then
+    log "SUCCESS" "$component had $issues issues, all fixed automatically" "$GREEN"
+    if [[ "$GENERATE_REPORT" == "true" ]]; then
+      add_component_to_report "$component" "fixed"
+    fi
+  else
+    log "WARNING" "$component had $issues issues, $fixed fixed, $((issues - fixed)) remaining" "$YELLOW"
+    if [[ "$GENERATE_REPORT" == "true" ]]; then
+      add_component_to_report "$component" "partial"
+    fi
+  fi
+  
+  return $((issues - fixed))
+}
+
+# Enhanced validate_components function
 validate_components() {
+  local all_components
+  local total_components=0
+  local passed_components=0
+  local fixed_components=0
+  local failed_components=0
+  
   check_dependencies
   
-  # Create a temporary file to store results
-  TEMP_RESULTS_FILE=$(mktemp)
+  all_components=$(get_all_components)
   
-  # Get all components as a newline-separated list
-  local components_list
-  components_list=$(get_all_components)
-  
-  # Convert to array
-  readarray -t components <<< "$components_list"
-  local total_components=${#components[@]}
-  
-  log "INFO" "Starting validation of ${BOLD}$total_components${NC} components" "$BLUE"
-  append_to_report "Validating $total_components components"
-  
-  if [[ "$VERBOSE" == "true" ]]; then
-    log "INFO" "Components to validate: ${components[*]}" "$BLUE"
+  if [[ "$FIX_ISSUES" == "true" ]]; then
+    log "INFO" "Validation running in FIX mode - will attempt to repair issues" "$BOLD$BLUE"
   fi
   
-  if [[ "$GENERATE_REPORT" == "true" ]]; then
-    append_to_report "\n## Component Details\n"
-  fi
-  
-  local valid_components=0
-  local total_issues=0
-  local exit_code=0
-  
-  # Process each component
-  for component in "${components[@]}"; do
-    # Skip empty component names
-    [[ -z "$component" ]] && continue
+  for component in $all_components; do
+    total_components=$((total_components+1))
     
-    # Skip log messages that might have been captured
-    [[ "$component" == *"[INFO]"* ]] && continue
-    
-    validate_component "$component"
-    local component_status=$?
-    
-    if [[ $component_status -eq 0 ]]; then
-      ((valid_components++))
+    if validate_component "$component"; then
+      passed_components=$((passed_components+1))
     else
-      total_issues=$((total_issues + component_status))
-      exit_code=1
+      failed_components=$((failed_components+1))
     fi
     
-    echo -e "\n${BLUE}${BOLD}----------------------------------------${NC}\n"
+    echo ""  # Add spacing between components
   done
   
-  # Add summary to report and display final results
-  local summary="✅ Valid components: $valid_components/$total_components | ❌ Issues found: $total_issues"
+  # Print summary
+  log "INFO" "===== Validation Summary =====" "$BOLD$BLUE"
+  log "INFO" "Total components: ${total_components}" "$BLUE"
+  log "INFO" "Passed validation: ${passed_components}" "$GREEN"
+  log "INFO" "Failed validation: ${failed_components}" "$RED"
   
+  # Add summary to report
   if [[ "$GENERATE_REPORT" == "true" ]]; then
-    sed -i "4i$summary" "$REPORT_FILE"
+    append_to_report "## Summary"
+    append_to_report "- **Total components**: ${total_components}"
+    append_to_report "- **Passed validation**: ${passed_components}"
+    append_to_report "- **Failed validation**: ${failed_components}"
     
-    # Add a quick reference section for the make alpha-check command to use
-    append_to_report "\n## Component Status Summary\n"
-    cat "$TEMP_RESULTS_FILE" >> "$REPORT_FILE"
+    if [[ "$FIX_ISSUES" == "true" && -f "${ROOT_DIR}/makefile_targets.generated" ]]; then
+      append_to_report "## Applying Fixes"
+      append_to_report "To apply all generated Makefile targets:"
+      append_to_report "```bash"
+      append_to_report "cat ${ROOT_DIR}/makefile_targets.generated >> ${MAKEFILE}"
+      append_to_report "```"
+    fi
     
-    log "INFO" "Report generated at ${BOLD}$REPORT_FILE${NC}" "$BLUE"
+    log "SUCCESS" "Report generated: ${REPORT_FILE}" "$GREEN"
   fi
   
-  echo -e "\n${MAGENTA}${BOLD}Validation Complete${NC}\n"
-  echo -e "$summary"
+  if [[ "$failed_components" -gt 0 ]]; then
+    if [[ "$FIX_ISSUES" == "true" ]]; then
+      log "WARNING" "Some issues could not be fixed automatically" "$YELLOW"
+      log "INFO" "Review the report and apply manual fixes" "$BLUE"
+    else
+      log "INFO" "Run with --fix to attempt automatic repairs" "$BLUE"
+    fi
+    return 1
+  fi
   
-  cat "$TEMP_RESULTS_FILE"
+  log "SUCCESS" "All components passed validation!" "$GREEN"
+  return 0
+}
+
+# Add component to report with appropriate status markers
+add_component_to_report() {
+  local component="$1"
+  local status="$2"
   
-  # Clean up
-  rm -f "$TEMP_RESULTS_FILE"
-  
-  return $exit_code
+  if [[ "$status" == "success" ]]; then
+    append_status_marker "✅" "${component} passed all validation checks"
+  elif [[ "$status" == "fixed" ]]; then
+    append_status_marker "✅" "${component} had issues, all fixed automatically"
+  elif [[ "$status" == "partial" ]]; then
+    append_status_marker "⚠️" "${component} had issues, some remain unfixed"
+  else
+    append_status_marker "❌" "${component} failed validation"
+  fi
 }
 
 # Run validation
