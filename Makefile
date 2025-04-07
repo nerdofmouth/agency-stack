@@ -1191,3 +1191,36 @@ agent-orchestrator-test:
 	@curl -s http://localhost:5210/health || echo "Could not connect to Agent Orchestrator. Is it running?"
 	@echo ""
 	@echo "To open in browser, visit: https://agent.$(DOMAIN)"
+
+# Alpha deployment validation
+alpha-check:
+	@echo "$(MAGENTA)$(BOLD)🧪 Running AgencyStack Alpha validation...$(RESET)"
+	@echo "$(CYAN)Verifying all components against DevOps standards...$(RESET)"
+	@$(SCRIPTS_DIR)/utils/validate_components.sh --report || { \
+		echo "$(RED)Component validation failed. Please review $(ROOT_DIR)/component_validation_report.md$(RESET)"; \
+		echo "$(YELLOW)Run 'make alpha-fix' to attempt automatic fixes for common issues$(RESET)"; \
+		exit 1; \
+	}
+	@echo "$(CYAN)Checking installed components status...$(RESET)"
+	@$(SCRIPTS_DIR)/utils/quick_audit.sh || { \
+		echo "$(RED)Quick audit failed. Please check individual component logs.$(RESET)"; \
+		exit 1; \
+	}
+	@echo "$(CYAN)Verifying directory structures...$(RESET)"
+	@[ -d "$(CONFIG_DIR)" ] || { echo "$(RED)Missing $(CONFIG_DIR) directory$(RESET)"; exit 1; }
+	@[ -d "$(LOG_DIR)" ] || { echo "$(RED)Missing $(LOG_DIR) directory$(RESET)"; exit 1; }
+	@[ -f "$(CONFIG_DIR)/.installed_ok" ] || { echo "$(RED)Missing $(CONFIG_DIR)/.installed_ok marker$(RESET)"; exit 1; }
+	@echo "$(CYAN)Verifying installation logs...$(RESET)"
+	@ls $(LOG_DIR)/install-*.log &>/dev/null || { echo "$(RED)No installation logs found$(RESET)"; exit 1; }
+	@echo "$(CYAN)Checking for port conflicts...$(RESET)"
+	@$(SCRIPTS_DIR)/utils/port_conflict_detector.sh --quiet || { \
+		echo "$(RED)Port conflicts detected. Please run 'make detect-ports' for details.$(RESET)"; \
+		exit 1; \
+	}
+	@echo "$(GREEN)$(BOLD)✅ Alpha validation complete - system ready for deployment!$(RESET)"
+
+# Attempt to automatically fix common issues
+alpha-fix:
+	@echo "$(MAGENTA)$(BOLD)🔧 Attempting to fix common issues...$(RESET)"
+	@$(SCRIPTS_DIR)/utils/validate_components.sh --fix --report
+	@echo "$(GREEN)Fixes attempted. Please run 'make alpha-check' again to verify.$(RESET)"
