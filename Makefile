@@ -1775,3 +1775,16 @@ portainer:
 portainer-status:
 	@echo "TODO: Implement portainer-status"
 	@exit 1
+
+vm-fault-inject:
+	@echo "Injecting fault into VM for recovery testing..."
+	@scripts/utils/fault_inject.sh $(FAULT_TYPE)
+
+vm-snapshot:
+	@echo "Preparing VM for snapshot..."
+	@sudo scripts/release/prepare_vm_snapshot.sh
+
+# Target to run smoke tests for high-risk components
+smoke-test:
+	@echo "Running smoke tests for high-risk components..."
+	@scripts/smoke/smoke_test_high_risk.sh
