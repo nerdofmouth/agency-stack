@@ -1193,79 +1193,100 @@ agent-orchestrator-test:
 	@echo ""
 	@echo "To open in browser, visit: https://agent.$(DOMAIN)"
 
-# Alpha deployment validation
-alpha-check:
-	@echo "$(MAGENTA)$(BOLD)🧪 Running AgencyStack Alpha validation...$(RESET)"
-	@echo "$(CYAN)Verifying all components against DevOps standards...$(RESET)"
-	@$(SCRIPTS_DIR)/utils/validate_components.sh --report --verbose || true
-	@echo ""
-	@echo "$(CYAN)Summary from component validation:$(RESET)"
-	@if [ -f "$(PWD)/component_validation_report.md" ]; then \
-		cat $(PWD)/component_validation_report.md | grep -E "^✅|^❌|^⚠️" || echo "$(YELLOW)No status markers found in report$(RESET)"; \
-	else \
-		echo "$(YELLOW)No validation report generated$(RESET)"; \
-	fi
-	@echo ""
-	
-	@echo "$(CYAN)Checking for required directories and markers...$(RESET)"
-	@mkdir -p $(CONFIG_DIR) $(LOG_DIR) 2>/dev/null || true
-	@touch $(CONFIG_DIR)/.installed_ok 2>/dev/null || true
-	
-	@echo "$(CYAN)Checking for port conflicts...$(RESET)"
-	@if [ -f "$(SCRIPTS_DIR)/utils/port_conflict_detector.sh" ]; then \
-		$(SCRIPTS_DIR)/utils/port_conflict_detector.sh --quiet || echo "$(YELLOW)⚠️ Port conflicts detected. Run 'make detect-ports' for details.$(RESET)"; \
-	else \
-		echo "$(YELLOW)⚠️ Port conflict detector not found. Skipping check.$(RESET)"; \
-	fi
-	
-	@echo "$(CYAN)Running quick audit...$(RESET)"
-	@if [ -f "$(SCRIPTS_DIR)/utils/quick_audit.sh" ]; then \
-		$(SCRIPTS_DIR)/utils/quick_audit.sh || echo "$(YELLOW)⚠️ Quick audit detected issues. Check component logs.$(RESET)"; \
-	else \
-		echo "$(YELLOW)⚠️ Quick audit script not found. Skipping check.$(RESET)"; \
-	fi
-	
-	@echo ""
-	@echo "$(GREEN)$(BOLD)✅ Alpha validation complete!$(RESET)"
-	@echo "$(CYAN)Review $(PWD)/component_validation_report.md for full details$(RESET)"
-	@echo "$(CYAN)Run 'make alpha-fix' to attempt repairs for common issues$(RESET)"
+# VM testing and deployment targets
+.PHONY: vm-test vm-test-rich vm-test-component-% vm-test-component vm-test-report vm-deploy vm-shell
 
-# Attempt to automatically fix common issues
-alpha-fix:
-	@echo "$(MAGENTA)$(BOLD)🔧 Attempting to fix common issues...$(RESET)"
-	@$(SCRIPTS_DIR)/utils/validate_components.sh --fix --report
-	@echo "$(GREEN)Fixes attempted. Please run 'make alpha-check' again to verify.$(RESET)"
-
-# Run the generate_makefile_targets script to create remote VM testing targets
-update-remote-targets:
-	@echo "$(MAGENTA)$(BOLD)Generating remote VM testing targets...$(RESET)"
-	@$(SCRIPTS_DIR)/utils/generate_makefile_targets.sh
-	@if [ -f "$(PWD)/makefile_targets.generated" ]; then \
-		echo "$(CYAN)Generated VM testing targets. To add them to Makefile:$(RESET)"; \
-		echo "$(YELLOW)make alpha-fix --add-remote-targets$(RESET)"; \
+# Deploy local codebase to remote VM
+vm-deploy:
+	@if [ -z "${REMOTE_VM_SSH}" ]; then \
+		echo "$(RED)Error: REMOTE_VM_SSH environment variable not set$(RESET)"; \
+		echo "$(YELLOW)Set it with: export REMOTE_VM_SSH=user@vm-hostname$(RESET)"; \
+		exit 1; \
 	fi
+	@echo "$(MAGENTA)$(BOLD)🚀 Deploying AgencyStack to ${REMOTE_VM_SSH}...$(RESET)"
+	@echo "$(CYAN)Creating necessary directories...$(RESET)"
+	@ssh -o ConnectTimeout=10 -o BatchMode=no ${REMOTE_VM_SSH} "\
+		mkdir -p /opt/agency_stack && \
+		chown -R root:root /opt/agency_stack && \
+		chmod -R 755 /opt/agency_stack"
+	@echo "$(CYAN)Transferring files (this may take a moment)...$(RESET)"
+	@tar czf - --exclude='.git' --exclude='node_modules' --exclude='*.tar.gz' . | \
+		ssh -o ConnectTimeout=10 -o BatchMode=no ${REMOTE_VM_SSH} "\
+		cd /opt/agency_stack && \
+		tar xzf - && \
+		chown -R root:root . && \
+		chmod -R 755 ."
+	@echo "$(GREEN)$(BOLD)✅ Deployment complete!$(RESET)"
 
-# Run tests on remote VM
+# Open a shell on the remote VM
+vm-shell:
+	@if [ -z "${REMOTE_VM_SSH}" ]; then \
+		echo "$(RED)Error: REMOTE_VM_SSH environment variable not set$(RESET)"; \
+		echo "$(YELLOW)Set it with: export REMOTE_VM_SSH=user@vm-hostname$(RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(MAGENTA)$(BOLD)🔌 Connecting to ${REMOTE_VM_SSH}...$(RESET)"
+	@ssh -t -o ConnectTimeout=10 -o BatchMode=no ${REMOTE_VM_SSH} "cd /opt/agency_stack && export TERM=xterm-256color && bash"
+
+# Run basic SSH connection test to VM
 vm-test: 
+	@if [ -z "${REMOTE_VM_SSH}" ]; then \
+		echo "$(RED)Error: REMOTE_VM_SSH environment variable not set$(RESET)"; \
+		echo "$(YELLOW)Set it with: export REMOTE_VM_SSH=user@vm-hostname$(RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(MAGENTA)$(BOLD)🧪 Testing AgencyStack on remote VM: ${REMOTE_VM_SSH}$(RESET)"
+	@echo "$(CYAN)Testing SSH connection...$(RESET)"
+	@ssh -o ConnectTimeout=10 -o BatchMode=no ${REMOTE_VM_SSH} "echo Connected to \$$(hostname) successfully" || { \
+		echo "$(RED)Failed to connect to remote VM$(RESET)"; \
+		exit 1; \
+	}
+	@echo "$(GREEN)$(BOLD)✅ Remote VM connection successful!$(RESET)"
+	@echo ""
+	@echo "$(CYAN)Available remote testing commands:$(RESET)"
+	@echo "  $(YELLOW)make vm-deploy$(RESET)             - Deploy current codebase to VM"
+	@echo "  $(YELLOW)make vm-shell$(RESET)              - Open shell on the VM"
+	@echo "  $(YELLOW)make vm-test-rich$(RESET)          - Run full test suite on VM"
+	@echo "  $(YELLOW)make vm-test-component-NAME$(RESET) - Test specific component"
+	@echo "  $(YELLOW)make vm-test-report$(RESET)        - Generate markdown test report"
+	@echo ""
+	@echo "$(CYAN)See docs/LOCAL_DEVELOPMENT.md for complete workflow$(RESET)"
+
+# Run comprehensive tests on the VM
+vm-test-rich: vm-deploy
+	@echo "$(MAGENTA)$(BOLD)🧪 Running rich VM test for AgencyStack$(RESET)"
+	@TERM=xterm-256color $(SCRIPTS_DIR)/utils/vm_test_report.sh --verbose all
+
+# Component-specific VM testing (pattern-based target)
+vm-test-component-%: vm-deploy
+	@echo "$(MAGENTA)$(BOLD)🧪 Running rich VM test for component: $(CYAN)$*$(RESET)"
+	@TERM=xterm-256color $(SCRIPTS_DIR)/utils/vm_test_report.sh --verbose $*
+
+# Test specific component on remote VM with environment variable
+vm-test-component:
 	@if [ -z "$${REMOTE_VM_SSH}" ]; then \
 		echo "$(RED)Error: REMOTE_VM_SSH environment variable not set$(RESET)"; \
 		echo "$(YELLOW)Set it with: export REMOTE_VM_SSH=user@vm-hostname$(RESET)"; \
 		exit 1; \
 	fi
-	@echo "$(MAGENTA)$(BOLD)🧪 Testing AgencyStack on remote VM: $${REMOTE_VM_SSH}$(RESET)"
-	@echo "$(CYAN)Testing SSH connection...$(RESET)"
-	@ssh $${REMOTE_VM_SSH} "echo Connected to \$$(hostname) successfully" || { \
-		echo "$(RED)Failed to connect to remote VM$(RESET)"; \
+	@if [ -z "$${COMPONENT}" ]; then \
+		echo "$(RED)Error: COMPONENT environment variable not set$(RESET)"; \
+		echo "$(YELLOW)Set it with: export COMPONENT=component_name$(RESET)"; \
 		exit 1; \
-	}
-	@echo "$(CYAN)Remote VM connection successful!$(RESET)"
-	@echo ""
-	@echo "$(CYAN)Available remote testing commands:$(RESET)"
-	@echo "  $(YELLOW)make deploy-to-vm$(RESET)      - Deploy current codebase to VM"
-	@echo "  $(YELLOW)make vm-alpha-check$(RESET)    - Run alpha-check on VM"
-	@echo "  $(YELLOW)make vm-test-installer$(RESET) - Test one-line installer on VM"
-	@echo ""
-	@echo "$(CYAN)See docs/LOCAL_DEVELOPMENT.md for complete workflow$(RESET)"
+	fi
+	@echo "$(MAGENTA)$(BOLD)🧪 Testing $(CYAN)$${COMPONENT}$(MAGENTA) on remote VM$(RESET)"
+	@TERM=xterm-256color $(SCRIPTS_DIR)/utils/vm_test_report.sh --verbose "$${COMPONENT}"
+
+# Generate markdown report for VM testing
+vm-test-report:
+	@if [ -z "$${REMOTE_VM_SSH}" ]; then \
+		echo "$(RED)Error: REMOTE_VM_SSH environment variable not set$(RESET)"; \
+		echo "$(YELLOW)Set it with: export REMOTE_VM_SSH=user@vm-hostname$(RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(MAGENTA)$(BOLD)📊 Generating test report for $(CYAN)$${COMPONENT:-all}$(MAGENTA) on remote VM$(RESET)"
+	@TERM=xterm-256color $(SCRIPTS_DIR)/utils/vm_test_report.sh --markdown --verbose "$${COMPONENT:-all}"
+	@echo "$(GREEN)Report generated: $(PWD)/vm_test_report.md$(RESET)"
 
 # Display local/remote testing workflow
 show-dev-workflow:
