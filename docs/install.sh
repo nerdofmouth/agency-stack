@@ -66,13 +66,17 @@ for arg in "$@"; do
   fi
 done
 
-echo -e "${MAGENTA}${BOLD}"
-echo -e "   _____                             _____ __             __  "
-echo -e "  /  _  \   ____   ____   ____     / ___// /_____ ______/ /__"
-echo -e " /  /_\  \ / ___\ /    \_/ __ \    \__ \/ __/ __ \/ ___/ //_/"
-echo -e "/    |    / /_/  >   |  \  ___/   ___/ / /_/ /_/ / /__/ ,<   "
-echo -e "\____|__  \___  /|___|  /\___  > /____/\__/\__,_/\___/_/|_|  "
-echo -e "        \/_____/      \/     \/                              "
+
+echo -e "${MAGENTA}${BOLD} "
+echo -e "${MAGENTA}${BOLD}   ____   ____    ___  ____     __  __ __  _____ ______   ____    __  __  _ "
+echo -e "${MAGENTA}${BOLD}  /    | /    |  /  _]|    \   /  ]|  |  |/ ___/|      | /    |  /  ]|  |/ ]"
+echo -e "${MAGENTA}${BOLD} |  o  ||   __| /  [_ |  _  | /  / |  |  (   \_ |      ||  o  | /  / |  ' / "
+echo -e "${MAGENTA}${BOLD} |     ||  |  ||    _]|  |  |/  /  |  ~  |\__  ||_|  |_||     |/  /  |    \ "
+echo -e "${MAGENTA}${BOLD} |  _  ||  |_ ||   [_ |  |  /   \_ |___, |/  \ |  |  |  |  _  /   \_ |     |"
+echo -e "${MAGENTA}${BOLD} |  |  ||     ||     ||  |  \     ||     |\    |  |  |  |  |  \     ||  .  |"
+echo -e "${MAGENTA}${BOLD} |__|__||___,_||_____||__|__|\____||____/  \___|  |__|  |__|__|\____||__|\_|"
+echo -e "${MAGENTA}${BOLD}                                                                            "
+echo -e "${MAGENTA}${BOLD} "
 echo -e "${NC}"
 echo -e "${BLUE}${BOLD}One-Line Installer${NC}"
 echo -e "${CYAN}By Nerd of Mouth - Deploy Smart. Speak Nerd.${NC}"
