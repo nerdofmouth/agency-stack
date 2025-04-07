@@ -3,6 +3,23 @@
 # https://stack.nerdofmouth.com
 # This script helps manage the installation of the AgencyStack components
 
+# Detect if script is being run via curl one-liner
+ONE_LINE_MODE=false
+if [ ! -t 0 ]; then
+  # If standard input is not a terminal, we're being piped to
+  ONE_LINE_MODE=true
+fi
+
+# Force non-interactive mode when being piped
+if [ "$ONE_LINE_MODE" = true ]; then
+  export DEBIAN_FRONTEND=noninteractive
+  # Force git to be non-interactive too
+  export GIT_TERMINAL_PROMPT=0
+  # Prevent any other tools from prompting
+  export APT_LISTCHANGES_FRONTEND=none
+  export APT_LISTBUGS_FRONTEND=none
+fi
+
 # Installation variables
 SCRIPT_DIR="$(dirname "$0")/agency_stack_bootstrap_bundle_v10"
 PARENT_DIR=$(dirname "$SCRIPT_DIR")
@@ -43,6 +60,230 @@ log() {
 if [ "$EUID" -ne 0 ]; then
   echo -e "${RED}Please run as root or with sudo${NC}"
   exit 1
+fi
+
+# Function to handle first-run environment setup (for one-line installation)
+setup_first_run_environment() {
+  log "INFO" "Setting up first-run environment for one-line installation"
+  echo -e "${MAGENTA}${BOLD}"
+  echo "   _____                             _____ __             __  "
+  echo "  /  _  \   ____   ____   ____     / ___// /_____ ______/ /__"
+  echo " /  /_\  \ / ___\ /    \_/ __ \    \__ \/ __/ __ \/ ___/ //_/"
+  echo "/    |    / /_/  >   |  \  ___/   ___/ / /_/ /_/ / /__/ ,<   "
+  echo "\____|__  \___  /|___|  /\___  > /____/\__/\__,_/\___/_/|_|  "
+  echo "        \/_____/      \/     \/                              "
+  echo -e "${NC}"
+
+  echo -e "${CYAN}One-Line Installer${NC}"
+  echo "By Nerd of Mouth - Deploy Smart. Speak Nerd."
+  echo "https://stack.nerdofmouth.com"
+  echo ""
+  echo "\"The Agency Project: Metal + Meaning.\""
+  echo ""
+  
+  # System check
+  log "INFO" "Performing system checks..."
+  OS=$(grep -oP '(?<=^ID=).+' /etc/os-release | tr -d '"')
+  VERSION=$(grep -oP '(?<=^VERSION_ID=).+' /etc/os-release | tr -d '"')
+  PRETTY_NAME=$(grep -oP '(?<=^PRETTY_NAME=).+' /etc/os-release | tr -d '"')
+
+  if [[ "$OS" == "debian" || "$OS" == "ubuntu" ]]; then
+    echo -e "✓ Detected ${GREEN}$PRETTY_NAME${NC} - Recommended OS"
+  else
+    echo -e "${YELLOW}⚠️ Detected $PRETTY_NAME - Not officially supported but will attempt installation${NC}"
+  fi
+  
+  # Install essential dependencies first
+  log "INFO" "Installing essential dependencies..."
+  echo -e "${BOLD}Installing required dependencies...${NC}"
+  apt-get update -qq
+  
+  # Install basic utilities required for the Makefile to run
+  # Use -qq for quieter output and -y for automatic yes to prompts
+  log "INFO" "Installing basic utilities (curl, git, wget, make, jq, bc)"
+  echo -e "${BLUE}Installing basic utilities...${NC}"
+  apt-get install -qq -y curl git wget make jq bc openssl unzip procps htop
+  
+  # Create base directories
+  log "INFO" "Setting up required directories..."
+  echo -e "${BOLD}Setting up required directory structure...${NC}"
+  
+  # Create base directories according to AgencyStack DevOps rules
+  mkdir -p /opt/agency_stack/clients/default
+  mkdir -p /opt/agency_stack/secrets
+  mkdir -p /var/log/agency_stack/clients
+  mkdir -p /var/log/agency_stack/components
+  mkdir -p /var/log/agency_stack/integrations
+  
+  # If we have the component directory setup utility, use it
+  if [ -f "$(dirname "$SCRIPT_DIR")/scripts/utils/setup_component_directories.sh" ]; then
+    log "INFO" "Running component directory setup utility"
+    echo -e "${BLUE}Setting up component directories using utility script...${NC}"
+    bash "$(dirname "$SCRIPT_DIR")/scripts/utils/setup_component_directories.sh" --force
+  fi
+  
+  # Clone repository if not already present and we're in one-line mode
+  if [ "$ONE_LINE_MODE" = true ]; then
+    log "INFO" "Cloning AgencyStack repository..."
+    echo -e "${BOLD}Cloning AgencyStack repository...${NC}"
+    
+    # Check if we already have an installation
+    if [ -d "/opt/agency_stack/repo" ] || [ -d "/opt/agency_stack/clients" ] || [ -f "/opt/agency_stack/config.env" ]; then
+      log "WARN" "Existing installation found at /opt/agency_stack"
+      echo -e "${YELLOW}WARNING: Existing installation found at /opt/agency_stack${NC}"
+      
+      if [ "$ONE_LINE_MODE" = true ]; then
+        # Non-interactive mode - automatic backup and continue
+        log "INFO" "Running in non-interactive mode, creating backup and continuing"
+        echo -e "${BLUE}Creating backup of existing installation and continuing...${NC}"
+        
+        # Create backup timestamp in format YYYYMMDDHHMMSS
+        BACKUP_TS=$(date +"%Y%m%d%H%M%S")
+        BACKUP_DIR="/opt/agency_stack_backup_${BACKUP_TS}"
+        
+        # Create backup with clear logging
+        log "INFO" "Creating backup at $BACKUP_DIR"
+        echo -e "${GREEN}Creating backup at $BACKUP_DIR${NC}"
+        mkdir -p "$BACKUP_DIR"
+        cp -r /opt/agency_stack/* "$BACKUP_DIR/" 2>/dev/null || true
+        log "INFO" "Backup completed at $BACKUP_DIR"
+        echo -e "${GREEN}Backup completed at $BACKUP_DIR${NC}"
+        
+        # Clean up old repo
+        if [ -d "/opt/agency_stack/repo" ]; then
+          rm -rf /opt/agency_stack/repo
+          log "INFO" "Removed existing repository"
+        fi
+      else
+        # Interactive mode - ask user
+        echo -e "What would you like to do?"
+        echo "  1. Backup and reinstall (recommended)"
+        echo "  2. Remove and reinstall (data will be lost)"
+        echo "  3. Exit installation"
+        read -p "Enter choice [1-3]: " choice
+        
+        case "$choice" in
+          1)
+            BACKUP_TS=$(date +"%Y%m%d%H%M%S")
+            BACKUP_DIR="/opt/agency_stack_backup_${BACKUP_TS}"
+            log "INFO" "Creating backup at $BACKUP_DIR"
+            echo -e "${GREEN}Creating backup at $BACKUP_DIR${NC}"
+            mkdir -p "$BACKUP_DIR"
+            cp -r /opt/agency_stack/* "$BACKUP_DIR/" 2>/dev/null || true
+            log "INFO" "Backup completed"
+            echo -e "${GREEN}Backup completed${NC}"
+            rm -rf /opt/agency_stack/repo
+            log "INFO" "Removed existing repository"
+            ;;
+          2)
+            log "INFO" "User chose to remove and reinstall"
+            echo -e "${YELLOW}Removing existing installation...${NC}"
+            rm -rf /opt/agency_stack/repo
+            log "INFO" "Removed existing repository"
+            ;;
+          3)
+            log "INFO" "User chose to exit installation"
+            echo -e "${YELLOW}Exiting installation at user request${NC}"
+            exit 0
+            ;;
+          *)
+            log "ERROR" "Invalid choice. Exiting."
+            echo -e "${RED}Invalid choice. Exiting.${NC}"
+            exit 1
+            ;;
+        esac
+      fi
+    fi
+    
+    # Now clone the repository - this should work whether we had an existing installation or not
+    log "INFO" "Cloning fresh repository"
+    echo -e "${BLUE}Cloning fresh repository from GitHub...${NC}"
+    
+    # Try multiple times with exponential backoff in case of network issues
+    RETRY_COUNT=0
+    MAX_RETRIES=3
+    RETRY_DELAY=5
+    CLONE_SUCCESS=false
+    
+    while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ "$CLONE_SUCCESS" = false ]; do
+      git clone https://github.com/nerdofmouth/agency-stack.git /opt/agency_stack/repo && CLONE_SUCCESS=true
+      
+      if [ "$CLONE_SUCCESS" = false ]; then
+        RETRY_COUNT=$((RETRY_COUNT + 1))
+        if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+          log "WARN" "Failed to clone repository, retrying in $RETRY_DELAY seconds (attempt $RETRY_COUNT of $MAX_RETRIES)"
+          echo -e "${YELLOW}Failed to clone repository, retrying in $RETRY_DELAY seconds (attempt $RETRY_COUNT of $MAX_RETRIES)${NC}"
+          sleep $RETRY_DELAY
+          RETRY_DELAY=$((RETRY_DELAY * 2))
+        fi
+      fi
+    done
+    
+    if [ "$CLONE_SUCCESS" = false ]; then
+      log "ERROR" "Failed to clone repository after $MAX_RETRIES attempts"
+      echo -e "${RED}Failed to clone repository after $MAX_RETRIES attempts.${NC}"
+      echo -e "${YELLOW}Please check your network connection and try again.${NC}"
+      exit 1
+    fi
+    
+    # Change to the repository directory
+    cd /opt/agency_stack/repo || {
+      log "ERROR" "Failed to change to repository directory"
+      echo -e "${RED}Failed to change to repository directory${NC}"
+      exit 1
+    }
+    
+    # Run prep-dirs target with retry logic
+    log "INFO" "Running make prep-dirs..."
+    echo -e "${BOLD}Running prep-dirs target...${NC}"
+    
+    if [ -f "Makefile" ]; then
+      # Try up to 3 times with a small delay between attempts
+      RETRY_COUNT=0
+      MAX_RETRIES=3
+      while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+        if make prep-dirs; then
+          log "INFO" "Successfully ran make prep-dirs"
+          break
+        else
+          RETRY_COUNT=$((RETRY_COUNT + 1))
+          if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+            log "WARN" "make prep-dirs failed, retrying (attempt $RETRY_COUNT of $MAX_RETRIES)"
+            echo -e "${YELLOW}make prep-dirs failed, retrying...${NC}"
+            sleep 2
+          else
+            log "WARN" "make prep-dirs encountered issues after $MAX_RETRIES attempts, continuing anyway"
+            echo -e "${YELLOW}make prep-dirs encountered issues, continuing...${NC}"
+          fi
+        fi
+      done
+    else
+      log "WARN" "Makefile not found, skipping prep-dirs"
+      echo -e "${YELLOW}Makefile not found, skipping prep-dirs${NC}"
+    fi
+    
+    # Run env-check to validate environment
+    log "INFO" "Running make env-check..."
+    echo -e "${BOLD}Running environment check...${NC}"
+    
+    if [ -f "Makefile" ]; then
+      make env-check || {
+        log "WARN" "Environment check reported issues"
+        echo -e "${YELLOW}Environment check reported issues, these will be fixed during installation${NC}"
+      }
+    else
+      log "WARN" "Makefile not found, skipping env-check"
+      echo -e "${YELLOW}Makefile not found, skipping env-check${NC}"
+    fi
+  fi
+  
+  log "INFO" "First-run environment setup completed"
+  echo -e "${GREEN}Environment preparation completed!${NC}"
+}
+
+# Run first-run setup if in one-line mode
+if [ "$ONE_LINE_MODE" = true ]; then
+  setup_first_run_environment
 fi
 
 # Function to check dependencies
