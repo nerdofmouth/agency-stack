@@ -56,13 +56,31 @@ Before installing AgencyStack, make sure you have:
 
 ## Quick Installation (Recommended)
 
-The simplest way to install AgencyStack is with our one-line installer:
+The simplest way to install AgencyStack is with our one-line installer.
+
+### Option 1: One-Step Installation (Fully Automated)
 
 ```bash
 curl -sSL https://stack.nerdofmouth.com/install.sh | sudo bash
 ```
 
-This automated installer will:
+This will download the installer, set up the environment, and launch the interactive component selection menu.
+
+### Option 2: Two-Step Installation (More Interactive)
+
+For a more deliberate, sovereign approach:
+
+```bash
+# Step 1: Prepare the environment only
+curl -sSL https://stack.nerdofmouth.com/install.sh | sudo bash -s -- --prepare-only
+
+# Step 2: Run the interactive installer when you're ready
+sudo bash /opt/agency_stack/repo/scripts/install.sh
+```
+
+This approach gives you time to review the system between preparation and component installation.
+
+The installation process will:
 - Install all required dependencies
 - Configure the system appropriately
 - Set up the core infrastructure components

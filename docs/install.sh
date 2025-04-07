@@ -208,11 +208,25 @@ if [ -f "Makefile" ]; then
     make env-check || echo -e "${YELLOW}Environment check reported issues, continuing...${NC}"
 fi
 
+# Check for --prepare-only flag
+PREPARE_ONLY=false
+for arg in "$@"; do
+  if [ "$arg" = "--prepare-only" ]; then
+    PREPARE_ONLY=true
+  fi
+done
+
 # Run the installer
 echo -e "\n${BLUE}Running AgencyStack installer...${NC}"
-bash scripts/install.sh
+if [ "$PREPARE_ONLY" = true ]; then
+  echo -e "${GREEN}Preparation completed!${NC}"
+  echo -e "${CYAN}You can now run the interactive installer with:${NC}"
+  echo -e "${YELLOW}  sudo bash /opt/agency_stack/repo/scripts/install.sh${NC}\n"
+else
+  bash scripts/install.sh
+fi
 
 # Final message
-echo -e "\n${MAGENTA}${BOLD}AgencyStack installation complete!${NC}"
+echo -e "\n${MAGENTA}${BOLD}AgencyStack installation process completed!${NC}"
 echo -e "${CYAN}For documentation and more information, visit:${NC}"
 echo -e "${GREEN}https://stack.nerdofmouth.com${NC}\n"
