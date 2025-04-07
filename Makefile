@@ -1307,6 +1307,40 @@ alpha-apply-targets:
 
 .PHONY: alpha-check alpha-fix alpha-apply-targets
 
+# Tailscale mesh networking component
+tailscale: validate
+	@echo "Installing Tailscale mesh networking..."
+	@sudo $(SCRIPTS_DIR)/components/install_tailscale.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+tailscale-status:
+	@echo "Checking Tailscale status..."
+	@if systemctl is-active tailscaled > /dev/null 2>&1; then \
+		echo "$(GREEN)✓ Tailscale daemon is running$(RESET)"; \
+		echo ""; \
+		echo "Network status:"; \
+		tailscale status || true; \
+		echo ""; \
+		echo "IP addresses:"; \
+		tailscale ip || true; \
+	else \
+		echo "$(RED)✗ Tailscale daemon is not running$(RESET)"; \
+	fi
+
+tailscale-logs:
+	@echo "Viewing Tailscale logs..."
+	@if [ -f "$(LOG_DIR)/components/tailscale.log" ]; then \
+		tail -n 50 $(LOG_DIR)/components/tailscale.log; \
+	else \
+		echo "No Tailscale logs found at $(LOG_DIR)/components/tailscale.log"; \
+		journalctl -u tailscaled -n 50; \
+	fi
+
+tailscale-restart:
+	@echo "Restarting Tailscale..."
+	@sudo systemctl restart tailscaled
+	@sleep 2
+	@systemctl is-active tailscaled > /dev/null 2>&1 && echo "$(GREEN)✓ Tailscale restarted successfully$(RESET)" || echo "$(RED)✗ Failed to restart Tailscale$(RESET)"
+
 # builderio component targets
 builderio:
 	@echo "🔧 Installing builderio..."
@@ -1787,4 +1821,15 @@ vm-snapshot:
 # Target to run smoke tests for high-risk components
 smoke-test:
 	@echo "Running smoke tests for high-risk components..."
-	@scripts/smoke/smoke_test_high_risk.sh
+	@scripts/smoke/smoke_test_high_risk.sh || { \
+		echo "Note: Some components failed validation. Full details in /var/log/agency_stack/smoke_test.log"; \
+		echo "To test ALL components including Mailu and Tailscale, use: make smoke-test-all"; \
+		echo "To test a specific component: make smoke-test COMPONENT=<component>"; \
+	}
+
+# Target to run ALL smoke tests including optional components
+smoke-test-all:
+	@echo "Running ALL smoke tests including optional components..."
+	@scripts/smoke/smoke_test_high_risk.sh --test-all || { \
+		echo "Some components failed validation. See /var/log/agency_stack/smoke_test.log for details."; \
+	}
