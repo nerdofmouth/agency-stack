@@ -1235,3 +1235,44 @@ alpha-fix:
 	@echo "$(MAGENTA)$(BOLD)🔧 Attempting to fix common issues...$(RESET)"
 	@$(SCRIPTS_DIR)/utils/validate_components.sh --fix --report
 	@echo "$(GREEN)Fixes attempted. Please run 'make alpha-check' again to verify.$(RESET)"
+
+# Run the generate_makefile_targets script to create remote VM testing targets
+update-remote-targets:
+	@echo "$(MAGENTA)$(BOLD)Generating remote VM testing targets...$(RESET)"
+	@$(SCRIPTS_DIR)/utils/generate_makefile_targets.sh
+	@if [ -f "$(PWD)/makefile_targets.generated" ]; then \
+		echo "$(CYAN)Generated VM testing targets. To add them to Makefile:$(RESET)"; \
+		echo "$(YELLOW)make alpha-fix --add-remote-targets$(RESET)"; \
+	fi
+
+# Run tests on remote VM
+vm-test: 
+	@if [ -z "$${REMOTE_VM_SSH}" ]; then \
+		echo "$(RED)Error: REMOTE_VM_SSH environment variable not set$(RESET)"; \
+		echo "$(YELLOW)Set it with: export REMOTE_VM_SSH=user@vm-hostname$(RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(MAGENTA)$(BOLD)🧪 Testing AgencyStack on remote VM: $${REMOTE_VM_SSH}$(RESET)"
+	@echo "$(CYAN)Testing SSH connection...$(RESET)"
+	@ssh $${REMOTE_VM_SSH} "echo Connected to \$$(hostname) successfully" || { \
+		echo "$(RED)Failed to connect to remote VM$(RESET)"; \
+		exit 1; \
+	}
+	@echo "$(CYAN)Remote VM connection successful!$(RESET)"
+	@echo ""
+	@echo "$(CYAN)Available remote testing commands:$(RESET)"
+	@echo "  $(YELLOW)make deploy-to-vm$(RESET)      - Deploy current codebase to VM"
+	@echo "  $(YELLOW)make vm-alpha-check$(RESET)    - Run alpha-check on VM"
+	@echo "  $(YELLOW)make vm-test-installer$(RESET) - Test one-line installer on VM"
+	@echo ""
+	@echo "$(CYAN)See docs/LOCAL_DEVELOPMENT.md for complete workflow$(RESET)"
+
+# Display local/remote testing workflow
+show-dev-workflow:
+	@echo "$(MAGENTA)$(BOLD)🔍 AgencyStack Local/Remote Development Workflow$(RESET)"
+	@if [ -f "$(PWD)/docs/LOCAL_DEVELOPMENT.md" ]; then \
+		cat "$(PWD)/docs/LOCAL_DEVELOPMENT.md" | grep -E "^##|^###|^-|^[0-9]" | sed 's/^#/  /g'; \
+	else \
+		echo "$(RED)LOCAL_DEVELOPMENT.md file not found$(RESET)"; \
+		echo "$(YELLOW)Run 'make alpha-fix --add-dev-docs' to create it$(RESET)"; \
+	fi
