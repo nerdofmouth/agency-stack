@@ -104,6 +104,10 @@ echo -e "${CYAN}This may take a few minutes. Please be patient.${NC}\n"
 
 # Clone the repository
 echo -e "${BLUE}Cloning AgencyStack repository...${NC}"
+
+# Save and restore directory handling
+ORIGINAL_DIR="$(pwd)"
+
 if [ -d "/opt/agency_stack" ]; then
     echo -e "${YELLOW}WARNING: Existing installation found at /opt/agency_stack${NC}"
     
@@ -154,11 +158,14 @@ if [ -d "/opt/agency_stack" ]; then
     fi
 fi
 
-# Create essential directories
+# Create essential directories - BEFORE changing directory
 mkdir -p /opt/agency_stack/clients/default
 mkdir -p /opt/agency_stack/secrets
 mkdir -p /var/log/agency_stack/clients
 mkdir -p /var/log/agency_stack/components
+
+# Change to a safe directory before clone - avoids working directory issues
+cd /tmp || cd /
 
 # Clone repo with retry logic
 MAX_RETRIES=3
@@ -180,6 +187,7 @@ if [ "$SUCCESS" != true ]; then
     exit 1
 fi
 
+# Always use absolute paths from now on - avoid relative path issues
 cd /opt/agency_stack/repo || {
     echo -e "${RED}Failed to change to repository directory${NC}"
     exit 1
