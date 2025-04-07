@@ -2016,7 +2016,7 @@ fail2ban-status:
 			sudo /opt/agency_stack/clients/$(CLIENT_ID)/fail2ban/fail2ban-status.sh; \
 		else \
 			echo "$(CYAN)Active jails:$(RESET)"; \
-			sudo fail2ban-client status | grep "Jail list" | sed 's/^.*Jail list://'; \
+			sudo fail2ban-client status | grep -v "Status:" | grep ALLOW; \
 		fi; \
 	else \
 		echo "$(RED)❌ Fail2ban is not running$(RESET)"; \
@@ -2047,4 +2047,66 @@ fail2ban-restart:
 		echo "$(RED)❌ Fail2ban service is not running$(RESET)"; \
 		sudo systemctl start fail2ban; \
 		echo "$(GREEN)✅ Fail2ban service started$(RESET)"; \
+	fi
+
+# Security
+security: validate
+	@echo "$(MAGENTA)$(BOLD)🔒 Installing Security Hardening...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_security.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+security-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Security Status...$(RESET)"
+	@if [ -f "/opt/agency_stack/security/.installed_ok" ]; then \
+		echo "$(GREEN)✅ Security hardening is installed$(RESET)"; \
+		if command -v ufw &> /dev/null && ufw status | grep -q "Status: active"; then \
+			echo "$(GREEN)✅ Firewall (UFW) is active$(RESET)"; \
+			echo "$(CYAN)Allowed ports:$(RESET)"; \
+			ufw status | grep -v "Status:" | grep ALLOW; \
+		else \
+			echo "$(RED)❌ Firewall (UFW) is not active$(RESET)"; \
+		fi; \
+		if [ -f "/etc/ssh/sshd_config.d/00-hardened.conf" ]; then \
+			echo "$(GREEN)✅ SSH hardening is applied$(RESET)"; \
+		else \
+			echo "$(YELLOW)⚠️ SSH hardening is not applied$(RESET)"; \
+		fi; \
+		if [ -f "/etc/apt/apt.conf.d/50unattended-upgrades" ]; then \
+			echo "$(GREEN)✅ Automatic security updates are configured$(RESET)"; \
+		else \
+			echo "$(YELLOW)⚠️ Automatic security updates are not configured$(RESET)"; \
+		fi; \
+	else \
+		echo "$(RED)❌ Security hardening is not installed$(RESET)"; \
+		echo "$(CYAN)Install with: make security$(RESET)"; \
+	fi
+
+security-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing Security Logs...$(RESET)"
+	@if [ -f "/var/log/agency_stack/components/security.log" ]; then \
+		cat /var/log/agency_stack/components/security.log | tail -n 30; \
+		echo ""; \
+		echo "$(CYAN)For security audit logs, use:$(RESET)"; \
+		if [ -d "/opt/agency_stack/clients/$(CLIENT_ID)/security/audit" ]; then \
+			echo "$(CYAN)Available audit logs:$(RESET)"; \
+			ls -lt /opt/agency_stack/clients/$(CLIENT_ID)/security/audit/ | head -n 5; \
+			echo ""; \
+			if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/security/audit/latest-audit.log" ]; then \
+				echo "$(CYAN)Latest audit summary:$(RESET)"; \
+				head -n 20 /opt/agency_stack/clients/$(CLIENT_ID)/security/audit/latest-audit.log; \
+				echo "..."; \
+			fi; \
+		fi; \
+	else \
+		echo "$(YELLOW)Security installation logs not found.$(RESET)"; \
+	fi
+
+security-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Running Security Audit...$(RESET)"
+	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/security/security-audit.sh" ]; then \
+		sudo /opt/agency_stack/clients/$(CLIENT_ID)/security/security-audit.sh; \
+		echo "$(GREEN)✅ Security audit completed$(RESET)"; \
+		echo "$(CYAN)View the full report at: /opt/agency_stack/clients/$(CLIENT_ID)/security/audit/latest-audit.log$(RESET)"; \
+	else \
+		echo "$(RED)❌ Security audit script not found. Is Security component installed?$(RESET)"; \
+		echo "$(CYAN)Install with: make security$(RESET)"; \
 	fi
