@@ -56,16 +56,53 @@ NC='\033[0m' # No Color
 # Default to prepare-only mode
 PREPARE_ONLY=true
 AUTO_INSTALL=false
+FORCE_MODE=false
 
 # Parse command line arguments
 for arg in "$@"; do
-  if [ "$arg" = "--auto-install" ]; then
-    PREPARE_ONLY=false
-    AUTO_INSTALL=true
-    log "INFO" "Auto-install mode enabled" "${YELLOW}Auto-install mode enabled (will install components after preparation)${NC}"
-  fi
+  case "$arg" in
+    --auto-install)
+      PREPARE_ONLY=false
+      AUTO_INSTALL=true
+      log "INFO" "Auto-install mode enabled" "${YELLOW}Auto-install mode enabled (will install components after preparation)${NC}"
+      ;;
+    --prepare-only)
+      PREPARE_ONLY=true
+      AUTO_INSTALL=false
+      log "INFO" "Prepare-only mode explicitly enabled" "${BLUE}Prepare-only mode explicitly enabled (default)${NC}"
+      ;;
+    --force)
+      FORCE_MODE=true
+      log "INFO" "Force mode enabled" "${YELLOW}Force mode enabled (will reinstall even if already installed)${NC}"
+      ;;
+    *)
+      log "WARN" "Unknown argument: $arg" "${YELLOW}Unknown argument: $arg${NC}"
+      ;;
+  esac
 done
 
+# Set non-interactive environment variables
+# These ensure no user prompts during the installation process
+export DEBIAN_FRONTEND=noninteractive
+export GIT_TERMINAL_PROMPT=0
+export APT_LISTCHANGES_FRONTEND=none
+export APT_LISTBUGS_FRONTEND=none
+export NEEDRESTART_MODE=a
+export NEEDRESTART_SUSPEND=1
+
+# Random tagline
+taglines=(
+    "Run your agency. Reclaim your agency."
+    "Tools for freedom, proof of power."
+    "The Agency Project: Metal + Meaning."
+    "Don't just deploy. Declare independence."
+    "Freedom starts with a shell prompt."
+    "From Zero to Sovereign."
+    "CLI-tested. Compliance-detested."
+    "An agency stack with an agenda: yours."
+    "Stack sovereignty starts here."
+)
+random_index=$((RANDOM % ${#taglines[@]}))
 
 echo -e "${MAGENTA}${BOLD} "
 echo -e "${MAGENTA}${BOLD}   ____   ____    ___  ____     __  __ __  _____ ______   ____    __  __  _ "
@@ -82,19 +119,6 @@ echo -e "${BLUE}${BOLD}One-Line Installer${NC}"
 echo -e "${CYAN}By Nerd of Mouth - Deploy Smart. Speak Nerd.${NC}"
 echo -e "${GREEN}https://stack.nerdofmouth.com${NC}\n"
 
-# Random tagline
-taglines=(
-    "Run your agency. Reclaim your agency."
-    "Tools for freedom, proof of power."
-    "The Agency Project: Metal + Meaning."
-    "Don't just deploy. Declare independence."
-    "Freedom starts with a shell prompt."
-    "From Zero to Sovereign."
-    "CLI-tested. Compliance-detested."
-    "An agency stack with an agenda: yours."
-    "Stack sovereignty starts here."
-)
-random_index=$((RANDOM % ${#taglines[@]}))
 echo -e "${YELLOW}\"${taglines[$random_index]}\"${NC}\n"
 
 log "INFO" "Starting AgencyStack environment preparation" "${BLUE}Starting environment preparation...${NC}"
@@ -167,55 +191,79 @@ ORIGINAL_DIR="$(pwd)"
 if [ -d "${AGENCY_ROOT}" ]; then
     log "WARN" "Existing installation found at ${AGENCY_ROOT}" "${YELLOW}WARNING: Existing installation found at ${AGENCY_ROOT}${NC}"
     
-    # Check for recovery situation
-    if [ -d "${AGENCY_ROOT}" ] && [ ! -f "${AGENCY_ROOT}/.installed_ok" ]; then
-        log "WARN" "Detected partial installation, will attempt recovery" "${YELLOW}Detected partial/incomplete installation, will attempt recovery...${NC}"
-    fi
-    
-    # Auto-backup in one-line mode
-    if [ "$ONE_LINE_MODE" = true ]; then
-        BACKUP_DIR="${AGENCY_BACKUP_DIR}_${TIMESTAMP}"
+    # Check for recovery situation vs. complete installation
+    if [ ! -f "${AGENCY_ROOT}/.installed_ok" ] || [ "$FORCE_MODE" = true ]; then
+        # If force mode or partial installation
+        if [ "$FORCE_MODE" = true ] && [ -f "${AGENCY_ROOT}/.installed_ok" ]; then
+            log "WARN" "Force reinstall requested of complete installation" "${YELLOW}Force reinstall requested of complete installation${NC}"
+        else
+            log "WARN" "Detected partial installation, will attempt recovery" "${YELLOW}Detected partial/incomplete installation, will attempt recovery...${NC}"
+        fi
         
-        log "INFO" "Creating backup at ${BACKUP_DIR}" "${BLUE}Creating backup at ${BACKUP_DIR}...${NC}"
+        # Create backup of partial installation
+        BACKUP_DIR="${AGENCY_BACKUP_DIR}_${TIMESTAMP}"
+        log "INFO" "Creating backup of partial installation at ${BACKUP_DIR}" "${BLUE}Creating backup of partial installation at ${BACKUP_DIR}...${NC}"
         mkdir -p "${BACKUP_DIR}"
         cp -r "${AGENCY_ROOT}"/* "${BACKUP_DIR}/" 2>/dev/null || true
-        
         log "INFO" "Backup created successfully" "${GREEN}Backup created successfully${NC}"
         
-        # Remove only the repo to allow fresh clone
-        if [ -d "${AGENCY_ROOT}/repo" ]; then
-            rm -rf "${AGENCY_ROOT}/repo"
-            log "INFO" "Removed existing repository for fresh clone" 
-        fi
+        # Clean up the partial installation but preserve logs
+        log "INFO" "Preparing clean environment" "${BLUE}Preparing clean environment...${NC}"
+        find "${AGENCY_ROOT}" -mindepth 1 -not -path "${AGENCY_ROOT}/logs*" -not -path "${AGENCY_ROOT}/.prerequisites_ok" -delete 2>/dev/null || true
     else
-        # Interactive mode - show options
-        echo -e "What would you like to do?"
-        echo -e "  1. Backup and reinstall (recommended)"
-        echo -e "  2. Remove and reinstall (data will be lost)"
-        echo -e "  3. Exit installation"
-        read -p "Enter choice [1-3]: " choice
+        log "INFO" "Complete installation already exists" "${GREEN}Complete installation already exists at ${AGENCY_ROOT}${NC}"
         
-        case $choice in
-            1)
-                BACKUP_DIR="${AGENCY_BACKUP_DIR}_${TIMESTAMP}"
-                mkdir -p "${BACKUP_DIR}"
-                cp -r "${AGENCY_ROOT}"/* "${BACKUP_DIR}/" 2>/dev/null || true
-                rm -rf "${AGENCY_ROOT}/repo"
-                log "INFO" "Created backup at ${BACKUP_DIR}" "${GREEN}Created backup at ${BACKUP_DIR}${NC}"
-                ;;
-            2)
-                rm -rf "${AGENCY_ROOT}/repo"
-                log "INFO" "Removed existing repository for fresh install"
-                ;;
-            3)
-                log "INFO" "User chose to exit installation" "${YELLOW}Installation aborted by user.${NC}"
-                exit 0
-                ;;
-            *)
-                log "ERROR" "Invalid choice. Exiting." "${RED}Invalid choice. Exiting.${NC}"
-                exit 1
-                ;;
-        esac
+        # If auto-install and we're already installed, we can just exit
+        if [ "$AUTO_INSTALL" = true ]; then
+            log "INFO" "Skipping installation as it's already complete" "${GREEN}Installation is already complete. Use --force to reinstall.${NC}"
+            
+            cat << EOF
+${GREEN}${BOLD}✅ AgencyStack is already installed!${NC}
+
+${CYAN}To manage your installation:${NC}
+${YELLOW}
+1. To run the interactive installer:
+   sudo bash ${AGENCY_ROOT}/repo/scripts/install.sh
+   
+2. To check system status:
+   cd ${AGENCY_ROOT}/repo && sudo make status
+${NC}
+
+Documentation: ${GREEN}https://stack.nerdofmouth.com${NC}
+EOF
+            exit 0
+        fi
+        
+        # If non-auto-install and interactive mode, ask user what to do
+        if [ "$ONE_LINE_MODE" = false ]; then
+            echo -e "What would you like to do?"
+            echo -e "  1. Backup and reinstall (recommended)"
+            echo -e "  2. Remove and reinstall (data will be lost)"
+            echo -e "  3. Exit installation"
+            read -p "Enter choice [1-3]: " choice
+            
+            case $choice in
+                1)
+                    BACKUP_DIR="${AGENCY_BACKUP_DIR}_${TIMESTAMP}"
+                    mkdir -p "${BACKUP_DIR}"
+                    cp -r "${AGENCY_ROOT}"/* "${BACKUP_DIR}/" 2>/dev/null || true
+                    rm -rf "${AGENCY_ROOT}/repo"
+                    log "INFO" "Created backup at ${BACKUP_DIR}" "${GREEN}Created backup at ${BACKUP_DIR}${NC}"
+                    ;;
+                2)
+                    rm -rf "${AGENCY_ROOT}/repo"
+                    log "INFO" "Removed existing repository for fresh install"
+                    ;;
+                3)
+                    log "INFO" "User chose to exit installation" "${YELLOW}Installation aborted by user.${NC}"
+                    exit 0
+                    ;;
+                *)
+                    log "ERROR" "Invalid choice. Exiting." "${RED}Invalid choice. Exiting.${NC}"
+                    exit 1
+                    ;;
+            esac
+        fi
     fi
 fi
 
@@ -266,24 +314,6 @@ cd "${AGENCY_ROOT}/repo" || {
     exit 1
 }
 
-# Install prerequisites via component script
-if [ -f "${AGENCY_ROOT}/repo/scripts/components/install_prerequisites.sh" ]; then
-    log "INFO" "Installing prerequisites" "${BLUE}Installing prerequisites...${NC}"
-    bash "${AGENCY_ROOT}/repo/scripts/components/install_prerequisites.sh"
-    PREREQ_STATUS=$?
-    
-    if [ $PREREQ_STATUS -ne 0 ]; then
-        log "ERROR" "Prerequisites installation failed" "${RED}Prerequisites installation failed with status code $PREREQ_STATUS${NC}"
-        exit 1
-    else
-        log "INFO" "Prerequisites installed successfully" "${GREEN}Prerequisites installed successfully${NC}"
-    fi
-else
-    log "ERROR" "Prerequisites installation script not found" "${RED}Prerequisites installation script not found at ${AGENCY_ROOT}/repo/scripts/components/install_prerequisites.sh${NC}"
-    log "ERROR" "This may indicate a corrupted or incomplete repository clone" "${YELLOW}This may indicate a corrupted or incomplete repository clone${NC}"
-    exit 1
-fi
-
 # Create installed_ok marker file to indicate successful preparation
 touch "${AGENCY_ROOT}/.installed_ok"
 log "INFO" "Environment preparation completed" "${GREEN}Environment preparation completed successfully!${NC}"
@@ -291,7 +321,7 @@ log "INFO" "Environment preparation completed" "${GREEN}Environment preparation 
 # Run the installer if auto-install was requested
 if [ "$AUTO_INSTALL" = true ]; then
     log "INFO" "Auto-installing components as requested" "${BLUE}Auto-installing components as requested...${NC}"
-    cd "${AGENCY_ROOT}/repo" && bash scripts/install.sh
+    cd "${AGENCY_ROOT}/repo" && bash scripts/install.sh --auto-install
 else
     # Show clear next steps
     cat << EOF

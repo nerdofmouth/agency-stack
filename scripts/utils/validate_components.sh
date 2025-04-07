@@ -143,7 +143,7 @@ check_dependencies() {
   if [[ ! -f "$REGISTRY_FILE" ]]; then
     log "ERROR" "Component registry file not found at: $REGISTRY_FILE"
     exit 1
-  }
+  fi
   
   if [[ ! -f "$MAKEFILE" ]]; then
     log "ERROR" "Makefile not found at: $MAKEFILE"
@@ -159,7 +159,15 @@ get_all_components() {
     components=("$CHECK_SPECIFIC")
   else
     # Extract all component names from registry using jq
-    components=($(jq -r '.components | to_entries[] | .value | to_entries[] | .key' "$REGISTRY_FILE"))
+    # The component_registry.json has a hierarchical structure
+    if jq --version &> /dev/null; then
+      while read -r comp; do
+        components+=("$comp")
+      done < <(jq -r '.components | to_entries[] | .value | to_entries[] | .key' "$REGISTRY_FILE")
+    else
+      log "ERROR" "jq not found - cannot parse registry"
+      exit 1
+    fi
   fi
   
   echo "${components[@]}"
@@ -430,17 +438,23 @@ check_registry_entry() {
   
   log "INFO" "Checking registry entry for ${BOLD}$component${NC}" "$CYAN"
   
-  # Check if component exists in registry
-  if jq -e ".components[][\"$component\"]" "$REGISTRY_FILE" &>/dev/null; then
+  # Find if component exists in any category
+  local component_exists=$(jq -r --arg comp "$component" '.components | keys[] as $category | .[$category] | keys[] | select(. == $comp) | "found"' "$REGISTRY_FILE")
+  
+  if [[ "$component_exists" == "found" ]]; then
     log "SUCCESS" "Component ${BOLD}$component${NC} found in registry" "$GREEN"
     append_to_report "✅ Component registered in component_registry.json"
+    
+    # Find which category contains this component
+    local category=$(jq -r --arg comp "$component" '.components | to_entries[] | select(.value | has($comp)) | .key' "$REGISTRY_FILE")
     
     # Check for required flags
     local required_flags=("installed" "hardened" "makefile" "docs")
     local missing_flags=()
     
     for flag in "${required_flags[@]}"; do
-      if ! jq -e ".components[][\"$component\"].integration_status[\"$flag\"]" "$REGISTRY_FILE" &>/dev/null; then
+      local flag_exists=$(jq -r --arg comp "$component" --arg cat "$category" --arg flag "$flag" '.components[$cat][$comp].integration_status[$flag] // empty' "$REGISTRY_FILE")
+      if [[ -z "$flag_exists" ]]; then
         missing_flags+=("$flag")
       fi
     done
