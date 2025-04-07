@@ -95,14 +95,32 @@ setup_first_run_environment() {
   
   # Install essential dependencies first
   log "INFO" "Installing essential dependencies..."
-  echo -e "${BOLD}Installing required dependencies...${NC}"
-  apt-get update -qq
+  echo -e "${BOLD}Installing system prerequisites...${NC}"
   
-  # Install basic utilities required for the Makefile to run
-  # Use -qq for quieter output and -y for automatic yes to prompts
-  log "INFO" "Installing basic utilities (curl, git, wget, make, jq, bc)"
-  echo -e "${BLUE}Installing basic utilities...${NC}"
-  apt-get install -qq -y curl git wget make jq bc openssl unzip procps htop
+  # Call our dedicated prerequisites component rather than installing packages directly
+  if [ -f "$(dirname "$(dirname "$SCRIPT_DIR")")/scripts/components/install_prerequisites.sh" ]; then
+    log "INFO" "Running dedicated prerequisites component installer"
+    echo -e "${BLUE}Installing prerequisites using component installer...${NC}"
+    bash "$(dirname "$(dirname "$SCRIPT_DIR")")/scripts/components/install_prerequisites.sh"
+    if [ $? -eq 0 ]; then
+      log "INFO" "Prerequisites installation completed successfully"
+      echo -e "${GREEN}✅ Prerequisites installation successful${NC}"
+    else
+      log "WARN" "Prerequisites component installer returned non-zero, using fallback method"
+      # Fallback to basic installation
+      apt-get update -qq
+      apt-get install -qq -y curl git wget make jq bc openssl unzip procps htop
+    fi
+  else
+    # Fallback to basic installation if component isn't available
+    log "INFO" "Prerequisites component not found, using direct installation method"
+    apt-get update -qq
+    # Install basic utilities required for the Makefile to run
+    # Use -qq for quieter output and -y for automatic yes to prompts
+    log "INFO" "Installing basic utilities (curl, git, wget, make, jq, bc)"
+    echo -e "${BLUE}Installing basic utilities...${NC}"
+    apt-get install -qq -y curl git wget make jq bc openssl unzip procps htop
+  fi
   
   # Create base directories
   log "INFO" "Setting up required directories..."
@@ -939,16 +957,6 @@ handle_error() {
 # Set up trap for error handling
 trap 'handle_error "${BASH_COMMAND}" $?' ERR
 
-# Check if we're in prepare-only mode passed from the one-liner
-PREPARE_ONLY=false
-for arg in "$@"; do
-  if [ "$arg" = "--prepare-only" ]; then
-    PREPARE_ONLY=true
-    ONE_LINE_MODE=true # Ensure we handle non-interactive parts properly
-    log "INFO" "Running in prepare-only mode"
-  fi
-done
-
 # Create a management symlink for easier access
 if [ ! -f "/usr/local/bin/agency_stack" ]; then
   log "INFO" "Creating agency_stack management symlink"
@@ -1011,8 +1019,27 @@ fi
 setup_basic_utilities() {
   echo -e "${BLUE}${BOLD} Setting up basic utilities...${NC}"
   log "INFO" "Setting up basic utilities"
-  apt-get update
-  apt-get install -y htop git unzip curl wget
+  
+  # Call our dedicated prerequisites component rather than installing packages directly
+  if [ -f "$(dirname "$0")/../components/install_prerequisites.sh" ]; then
+    log "INFO" "Running dedicated prerequisites component installer"
+    echo -e "${BLUE}Installing prerequisites using component installer...${NC}"
+    bash "$(dirname "$0")/../components/install_prerequisites.sh"
+    if [ $? -eq 0 ]; then
+      log "INFO" "Prerequisites installation completed successfully"
+      echo -e "${GREEN}✅ Prerequisites installation successful${NC}"
+    else
+      log "WARN" "Prerequisites component installer returned non-zero, using fallback method"
+      # Fallback to basic installation
+      apt-get update
+      apt-get install -y htop git unzip curl wget
+    fi
+  else
+    # Fallback to basic installation if component isn't available
+    log "INFO" "Prerequisites component not found, using direct installation method"
+    apt-get update
+    apt-get install -y htop git unzip curl wget
+  fi
   
   # Set up log rotation for production readiness
   echo -e "${BLUE}${BOLD} Setting up log rotation...${NC}"
@@ -1020,7 +1047,7 @@ setup_basic_utilities() {
     bash "$(dirname "$0")/setup_log_rotation.sh"
     log "INFO" "Log rotation configured"
   else
-    log "WARN" "Log rotation script not found"
+    log "WARN" "Log rotation script not found but should be handled by prerequisites component"
   fi
   
   echo -e "${GREEN}Basic utilities setup completed${NC}"
@@ -1061,6 +1088,82 @@ main_menu() {
   
   echo ""
 }
+
+# Set up trap for error handling
+trap 'handle_error "${BASH_COMMAND}" $?' ERR
+
+# Check if we're in prepare-only mode passed from the one-liner
+PREPARE_ONLY=false
+AUTO_INSTALL=false
+for arg in "$@"; do
+  if [ "$arg" = "--prepare-only" ]; then
+    PREPARE_ONLY=true
+    ONE_LINE_MODE=true # Ensure we handle non-interactive parts properly
+    log "INFO" "Running in prepare-only mode"
+  fi
+  if [ "$arg" = "--auto-install" ]; then
+    AUTO_INSTALL=true
+    log "INFO" "Auto-install flag detected, will install components automatically"
+  fi
+done
+
+# Create a management symlink for easier access
+if [ ! -f "/usr/local/bin/agency_stack" ]; then
+  log "INFO" "Creating agency_stack management symlink"
+  cat > /usr/local/bin/agency_stack << 'AGENCYSCRIPT'
+#!/bin/bash
+SCRIPT_DIR="$(dirname $(readlink -f $0))/../share/foss-server-stack"
+
+case "$1" in
+  status)
+    echo " Checking service status..."
+    docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+    ;;
+  ports)
+    if [ -f "$SCRIPT_DIR/port_manager.sh" ]; then
+      "$SCRIPT_DIR/port_manager.sh" list
+    else
+      echo "Port manager not found"
+    fi
+    ;;
+  logs)
+    if [ -z "$2" ]; then
+      echo "Usage: $(basename $0) logs [service_name]"
+      exit 1
+    fi
+    docker logs "$2" --tail 100 -f
+    ;;
+  restart)
+    if [ -z "$2" ]; then
+      echo "Usage: $(basename $0) restart [service_name]"
+      exit 1
+    fi
+    docker restart "$2"
+    ;;
+  install)
+    /opt/foss-server-stack/scripts/install.sh
+    ;;
+  help|*)
+    echo "Usage: agency_stack [command]"
+    echo "Commands:"
+    echo "  status              Show status of all containers"
+    echo "  ports               Show port allocations"
+    echo "  logs [service]      Show logs for a service"
+    echo "  restart [service]   Restart a service"
+    echo "  install             Run the installer"
+    echo "  help                Show this help"
+    ;;
+esac
+AGENCYSCRIPT
+  chmod +x /usr/local/bin/agency_stack
+  
+  # Create directory for support files
+  mkdir -p /usr/local/share/foss-server-stack
+  cp "$(dirname "$0")/port_manager.sh" /usr/local/share/foss-server-stack/ 2>/dev/null || true
+  
+  log "INFO" "Created agency_stack command for easier management"
+  echo -e "${GREEN}Created 'agency_stack' command for easier management${NC}"
+fi
 
 # Start the main menu
 if [ "$PREPARE_ONLY" = false ]; then
