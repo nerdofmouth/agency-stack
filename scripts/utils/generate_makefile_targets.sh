@@ -25,6 +25,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MAKEFILE="$PROJECT_ROOT/Makefile"
 REGISTRY_FILE="$PROJECT_ROOT/config/registry/component_registry.json"
 OUTPUT_FILE="$PROJECT_ROOT/makefile_targets.generated"
+LOCAL_DEV_FILE="$PROJECT_ROOT/docs/LOCAL_DEVELOPMENT.md"
 
 # Check dependencies
 check_dependencies() {
@@ -32,6 +33,19 @@ check_dependencies() {
     echo -e "${RED}Error: jq is required but not installed.${NC}"
     echo "Please install jq with: sudo apt-get install jq"
     exit 1
+  fi
+}
+
+# Verify local development documentation exists
+check_local_dev_docs() {
+  if [[ ! -f "$LOCAL_DEV_FILE" ]]; then
+    echo -e "${YELLOW}Warning: Local development documentation not found at $LOCAL_DEV_FILE${NC}"
+    echo -e "${YELLOW}This documentation is important for understanding the local/remote testing workflow${NC}"
+    echo -e "${YELLOW}Consider adding it with 'make alpha-fix --add-local-dev-docs'${NC}"
+    return 1
+  else
+    echo -e "${GREEN}✓ Local/Remote workflow documentation found${NC}"
+    return 0
   fi
 }
 
@@ -92,6 +106,64 @@ $target_base-restart:
 		echo "\$(YELLOW)Consider creating \$(SCRIPTS_DIR)/components/restart_$component.sh\$(RESET)"; \\
 	fi
 
+$target_base-test-remote:
+	@echo "\$(CYAN)Testing $component in a remote VM environment...\$(RESET)"
+	@if [ -z "\$\${REMOTE_VM_SSH}" ]; then \\
+		echo "\$(YELLOW)⚠️ REMOTE_VM_SSH environment variable not set\$(RESET)"; \\
+		echo "\$(YELLOW)Set it with: export REMOTE_VM_SSH=user@vm-hostname\$(RESET)"; \\
+		exit 1; \\
+	fi
+	@echo "\$(CYAN)Copying component script to remote VM for testing...\$(RESET)"
+	@scp \$(SCRIPTS_DIR)/components/$script_name \$\${REMOTE_VM_SSH}:/tmp/
+	@ssh \$\${REMOTE_VM_SSH} "cd /opt/agency_stack && bash /tmp/$script_name --verbose; echo \$\$?"
+	@echo "\$(CYAN)VM test complete. Check output for errors.\$(RESET)"
+
+EOF
+}
+
+# Add local/remote environment testing information to Makefile
+generate_vm_test_targets() {
+  cat << EOF >> "$OUTPUT_FILE"
+# =============================================================================
+# REMOTE VM TESTING TARGETS 
+# =============================================================================
+
+# Set up connection to test VM and verify environment
+setup-vm-connection:
+	@echo "\$(MAGENTA)\$(BOLD)Setting up remote VM connection...\$(RESET)"
+	@if [ -z "\$\${REMOTE_VM_SSH}" ]; then \\
+		echo "\$(YELLOW)⚠️ REMOTE_VM_SSH environment variable not set\$(RESET)"; \\
+		echo "\$(YELLOW)Set it with: export REMOTE_VM_SSH=user@vm-hostname\$(RESET)"; \\
+		exit 1; \\
+	fi
+	@echo "\$(CYAN)Testing SSH connection to \$\${REMOTE_VM_SSH}...\$(RESET)"
+	@ssh \$\${REMOTE_VM_SSH} "echo Connected to \\\$(hostname) successfully"
+	@echo "\$(GREEN)✅ Connection successful\$(RESET)"
+
+# Deploy current repository to VM for testing
+deploy-to-vm: setup-vm-connection
+	@echo "\$(MAGENTA)\$(BOLD)Deploying current codebase to remote VM...\$(RESET)"
+	@echo "\$(CYAN)Creating temporary archive...\$(RESET)"
+	@tar czf /tmp/agency-stack-deploy.tar.gz -C \$(PWD) --exclude=".git" .
+	@echo "\$(CYAN)Copying files to remote VM...\$(RESET)"
+	@scp /tmp/agency-stack-deploy.tar.gz \$\${REMOTE_VM_SSH}:/tmp/
+	@echo "\$(CYAN)Extracting on remote VM...\$(RESET)"
+	@ssh \$\${REMOTE_VM_SSH} "mkdir -p ~/agency-stack && tar xzf /tmp/agency-stack-deploy.tar.gz -C ~/agency-stack"
+	@echo "\$(GREEN)✅ Deployment complete. Files in ~/agency-stack on remote VM\$(RESET)"
+
+# Run alpha-check on remote VM
+vm-alpha-check: setup-vm-connection
+	@echo "\$(MAGENTA)\$(BOLD)Running alpha-check on remote VM...\$(RESET)"
+	@ssh \$\${REMOTE_VM_SSH} "cd ~/agency-stack && make alpha-check"
+
+# Test one-line installer on remote VM (CAUTION: wipes existing installation!)
+vm-test-installer: setup-vm-connection
+	@echo "\$(MAGENTA)\$(BOLD)Testing one-line installer on remote VM...\$(RESET)"
+	@echo "\$(RED)⚠️ WARNING: This will replace any existing installation!\$(RESET)"
+	@echo "\$(YELLOW)Waiting 5 seconds - press Ctrl+C to abort\$(RESET)"
+	@sleep 5
+	@ssh \$\${REMOTE_VM_SSH} "curl -L https://stack.nerdofmouth.com/install.sh | bash"
+
 EOF
 }
 
@@ -122,6 +194,9 @@ EOF
   local missing_count=0
   local total_count=0
   
+  # Check for local development documentation
+  check_local_dev_docs
+  
   while read -r component; do
     ((total_count++))
     if ! has_makefile_targets "$component"; then
@@ -132,6 +207,9 @@ EOF
       echo -e "${GREEN}✓ Found Makefile targets for: ${BOLD}$component${NC}"
     fi
   done < <(get_all_components)
+  
+  # Add VM testing targets
+  generate_vm_test_targets
   
   echo
   echo -e "${BLUE}${BOLD}Summary:${NC}"
@@ -146,7 +224,12 @@ EOF
     echo -e "${CYAN}  make alpha-fix${NC}"
   else
     echo -e "${GREEN}All components have required Makefile targets!${NC}"
-    rm -f "$OUTPUT_FILE"
+    # Still keep the VM testing targets
+    if [[ -f "$OUTPUT_FILE" && $(wc -l < "$OUTPUT_FILE") -gt 50 ]]; then
+      echo -e "${YELLOW}Added VM testing targets to: ${BOLD}$OUTPUT_FILE${NC}"
+    else
+      rm -f "$OUTPUT_FILE"
+    fi
   fi
 }
 
