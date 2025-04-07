@@ -3,6 +3,23 @@
 # https://stack.nerdofmouth.com
 # Redirects to the main installer script
 
+# Detect if script is being run via curl one-liner
+ONE_LINE_MODE=false
+if [ ! -t 0 ]; then
+  # If standard input is not a terminal, we're being piped to
+  ONE_LINE_MODE=true
+fi
+
+# Force non-interactive mode when being piped
+if [ "$ONE_LINE_MODE" = true ]; then
+  export DEBIAN_FRONTEND=noninteractive
+  # Force git to be non-interactive too
+  export GIT_TERMINAL_PROMPT=0
+  # Prevent any other tools from prompting
+  export APT_LISTCHANGES_FRONTEND=none
+  export APT_LISTBUGS_FRONTEND=none
+fi
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -35,6 +52,7 @@ taglines=(
     "From Zero to Sovereign."
     "CLI-tested. Compliance-detested."
     "An agency stack with an agenda: yours."
+    "Stack sovereignty starts here."
 )
 random_index=$((RANDOM % ${#taglines[@]}))
 echo -e "${YELLOW}\"${taglines[$random_index]}\"${NC}\n"
@@ -51,6 +69,7 @@ fi
 
 # System check
 echo -e "${BLUE}Performing system checks...${NC}"
+
 # Check OS
 if [ -f /etc/os-release ]; then
     . /etc/os-release
@@ -59,9 +78,9 @@ if [ -f /etc/os-release ]; then
         echo -e "Proceeding anyway, but you may encounter issues."
     else
         if [ "$ID" = "debian" ]; then
-            echo -e "${GREEN}✓ Detected Debian ($PRETTY_NAME) - Recommended OS${NC}"
+            echo -e "${GREEN}✓ Detected $PRETTY_NAME - Recommended OS${NC}"
         else
-            echo -e "${GREEN}✓ Detected Ubuntu ($PRETTY_NAME) - Supported OS${NC}"
+            echo -e "${GREEN}✓ Detected $PRETTY_NAME - Supported OS${NC}"
         fi
     fi
 else
@@ -69,26 +88,15 @@ else
     echo -e "Proceeding anyway, but you may encounter issues."
 fi
 
-# Check RAM
-total_ram=$(free -m | awk '/^Mem:/{print $2}')
-if [ "$total_ram" -lt 4000 ]; then
-    echo -e "${YELLOW}Warning: Low memory detected ($total_ram MB). Recommended: 4GB+${NC}"
-    echo -e "Proceeding anyway, but you may encounter performance issues."
-fi
-
-# Check disk space
-free_space=$(df -m / | awk 'NR==2 {print $4}')
-if [ "$free_space" -lt 20000 ]; then
-    echo -e "${YELLOW}Warning: Low disk space detected ($free_space MB free). Recommended: 20GB+${NC}"
-    echo -e "Proceeding anyway, but you may encounter storage issues."
-fi
-
 echo -e "${GREEN}System checks completed.${NC}\n"
 
 # Install dependencies
 echo -e "${BLUE}Installing required dependencies...${NC}"
 apt-get update -q
-apt-get install -y curl git make wget jq
+apt-get install -y curl git make wget jq bc openssl unzip procps
+
+# Setup logging directory
+mkdir -p /var/log/agency_stack
 
 # Download and execute the main installer
 echo -e "\n${BLUE}Downloading and executing the main AgencyStack installer...${NC}"
@@ -98,39 +106,84 @@ echo -e "${CYAN}This may take a few minutes. Please be patient.${NC}\n"
 echo -e "${BLUE}Cloning AgencyStack repository...${NC}"
 if [ -d "/opt/agency_stack" ]; then
     echo -e "${YELLOW}WARNING: Existing installation found at /opt/agency_stack${NC}"
-    echo -e "What would you like to do?"
-    echo -e "  1. Backup and reinstall (recommended)"
-    echo -e "  2. Remove and reinstall (data will be lost)"
-    echo -e "  3. Exit installation"
-    read -p "Enter your choice [1-3]: " choice
     
-    case $choice in
-        1)
-            echo -e "${BLUE}Backing up existing installation...${NC}"
-            timestamp=$(date +%Y%m%d-%H%M%S)
-            backup_dir="/opt/agency_stack-backup-$timestamp"
-            cp -r /opt/agency_stack "$backup_dir"
-            echo -e "${GREEN}Backup created at $backup_dir${NC}"
-            rm -rf /opt/agency_stack
-            ;;
-        2)
-            echo -e "${YELLOW}Removing existing installation...${NC}"
-            rm -rf /opt/agency_stack
-            ;;
-        3)
-            echo -e "${YELLOW}Installation aborted by user.${NC}"
-            exit 0
-            ;;
-        *)
-            echo -e "${RED}Invalid choice. Exiting.${NC}"
-            exit 1
-            ;;
-    esac
+    # Auto-backup in non-interactive mode
+    if [ "$ONE_LINE_MODE" = true ]; then
+        timestamp=$(date +%Y%m%d%H%M%S)
+        backup_dir="/opt/agency_stack_backup_${timestamp}"
+        
+        echo -e "${BLUE}Creating backup at $backup_dir...${NC}"
+        mkdir -p "$backup_dir"
+        cp -r /opt/agency_stack/* "$backup_dir/" 2>/dev/null || true
+        
+        echo -e "${GREEN}Backup created successfully${NC}"
+        
+        # Remove only the repo to allow fresh clone
+        if [ -d "/opt/agency_stack/repo" ]; then
+            rm -rf /opt/agency_stack/repo
+        fi
+    else
+        # Interactive mode - show options
+        echo -e "What would you like to do?"
+        echo -e "  1. Backup and reinstall (recommended)"
+        echo -e "  2. Remove and reinstall (data will be lost)"
+        echo -e "  3. Exit installation"
+        read -p "Enter choice [1-3]: " choice
+        
+        case $choice in
+            1)
+                timestamp=$(date +%Y%m%d%H%M%S)
+                backup_dir="/opt/agency_stack_backup_${timestamp}"
+                mkdir -p "$backup_dir"
+                cp -r /opt/agency_stack/* "$backup_dir/" 2>/dev/null || true
+                rm -rf /opt/agency_stack/repo
+                echo -e "${GREEN}Created backup at $backup_dir${NC}"
+                ;;
+            2)
+                rm -rf /opt/agency_stack/repo
+                ;;
+            3)
+                echo -e "${YELLOW}Installation aborted by user.${NC}"
+                exit 0
+                ;;
+            *)
+                echo -e "${RED}Invalid choice. Exiting.${NC}"
+                exit 1
+                ;;
+        esac
+    fi
 fi
 
-# Clone the repository and run the installer
-git clone https://github.com/nerdofmouth/agency-stack.git /opt/agency_stack
-cd /opt/agency_stack
+# Create essential directories
+mkdir -p /opt/agency_stack/clients/default
+mkdir -p /opt/agency_stack/secrets
+mkdir -p /var/log/agency_stack/clients
+mkdir -p /var/log/agency_stack/components
+
+# Clone repo with retry logic
+MAX_RETRIES=3
+SUCCESS=false
+
+for i in $(seq 1 $MAX_RETRIES); do
+    if git clone https://github.com/nerdofmouth/agency-stack.git /opt/agency_stack/repo; then
+        SUCCESS=true
+        break
+    else
+        echo -e "${YELLOW}Git clone failed, attempt $i of $MAX_RETRIES${NC}"
+        sleep 2
+    fi
+done
+
+if [ "$SUCCESS" != true ]; then
+    echo -e "${RED}Failed to clone repository after $MAX_RETRIES attempts.${NC}"
+    echo -e "${YELLOW}Please check your network connection and try again.${NC}"
+    exit 1
+fi
+
+cd /opt/agency_stack/repo || {
+    echo -e "${RED}Failed to change to repository directory${NC}"
+    exit 1
+}
 
 # Make scripts executable
 chmod +x scripts/*.sh
@@ -138,9 +191,18 @@ if [ -d "scripts/agency_stack_bootstrap_bundle_v10" ]; then
     chmod +x scripts/agency_stack_bootstrap_bundle_v10/*.sh
 fi
 
+# Run prep-dirs if Makefile exists
+if [ -f "Makefile" ]; then
+    echo -e "${BLUE}Running make prep-dirs...${NC}"
+    make prep-dirs || echo -e "${YELLOW}make prep-dirs encountered issues, continuing...${NC}"
+    
+    echo -e "${BLUE}Running environment check...${NC}"
+    make env-check || echo -e "${YELLOW}Environment check reported issues, continuing...${NC}"
+fi
+
 # Run the installer
 echo -e "\n${BLUE}Running AgencyStack installer...${NC}"
-make install
+bash scripts/install.sh
 
 # Final message
 echo -e "\n${MAGENTA}${BOLD}AgencyStack installation complete!${NC}"
