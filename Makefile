@@ -727,6 +727,76 @@ install-loki: validate
 	@echo "Installing Loki log aggregation..."
 	@sudo $(SCRIPTS_DIR)/components/install_loki.sh --domain logs.$(DOMAIN) $(if $(GRAFANA_DOMAIN),--grafana-domain $(GRAFANA_DOMAIN),--grafana-domain grafana.$(DOMAIN)) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
+loki-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Loki Status...$(RESET)"
+	@if [ -n "$(CLIENT_ID)" ]; then \
+		LOKI_CONTAINER="$(CLIENT_ID)_loki"; \
+	else \
+		SITE_NAME=$$(echo "$(DOMAIN)" | sed 's/\./_/g'); \
+		LOKI_CONTAINER="loki_$${SITE_NAME}"; \
+	fi; \
+	if docker ps --format '{{.Names}}' | grep -q "$$LOKI_CONTAINER"; then \
+		echo "$(GREEN)✅ Loki is running$(RESET)"; \
+		docker ps --filter "name=$$LOKI_CONTAINER" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"; \
+		echo ""; \
+		if docker ps --format '{{.Names}}' | grep -q "$(CLIENT_ID)_promtail" || docker ps --format '{{.Names}}' | grep -q "promtail_$${SITE_NAME}"; then \
+			echo "$(GREEN)✅ Promtail log collector is running$(RESET)"; \
+			docker ps --filter "name=promtail" --format "table {{.Names}}\t{{.Status}}"; \
+		else \
+			echo "$(YELLOW)⚠️ Promtail log collector is not running$(RESET)"; \
+		fi; \
+	else \
+		echo "$(RED)❌ Loki is not running$(RESET)"; \
+		echo "$(CYAN)Install with: make loki DOMAIN=yourdomain.com$(RESET)"; \
+	fi; \
+	if [ -d "/opt/agency_stack/loki/$(DOMAIN)" ]; then \
+		echo ""; \
+		echo "$(CYAN)Configuration directory: /opt/agency_stack/loki/$(DOMAIN)$(RESET)"; \
+	fi
+
+loki-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing Loki Logs...$(RESET)"
+	@if [ -n "$(CLIENT_ID)" ]; then \
+		LOKI_CONTAINER="$(CLIENT_ID)_loki"; \
+		PROMTAIL_CONTAINER="$(CLIENT_ID)_promtail"; \
+	else \
+		SITE_NAME=$$(echo "$(DOMAIN)" | sed 's/\./_/g'); \
+		LOKI_CONTAINER="loki_$${SITE_NAME}"; \
+		PROMTAIL_CONTAINER="promtail_$${SITE_NAME}"; \
+	fi; \
+	if docker ps --format '{{.Names}}' | grep -q "$$LOKI_CONTAINER"; then \
+		echo "$(CYAN)====== Loki Server Logs ======$(RESET)"; \
+		docker logs --tail 50 "$$LOKI_CONTAINER"; \
+		echo ""; \
+		if docker ps --format '{{.Names}}' | grep -q "$$PROMTAIL_CONTAINER"; then \
+			echo "$(CYAN)====== Promtail Collector Logs ======$(RESET)"; \
+			docker logs --tail 20 "$$PROMTAIL_CONTAINER"; \
+		fi; \
+	else \
+		echo "$(RED)❌ Loki container is not running$(RESET)"; \
+		if [ -f "/var/log/agency_stack/components/loki.log" ]; then \
+			echo "$(CYAN)Installation logs:$(RESET)"; \
+			tail -n 30 /var/log/agency_stack/components/loki.log; \
+		fi; \
+	fi
+
+loki-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Loki...$(RESET)"
+	@if [ -n "$(CLIENT_ID)" ]; then \
+		LOKI_DIR="/opt/agency_stack/loki/$(DOMAIN)"; \
+	else \
+		LOKI_DIR="/opt/agency_stack/loki/$(DOMAIN)"; \
+	fi; \
+	if [ -d "$$LOKI_DIR" ] && [ -f "$$LOKI_DIR/docker-compose.yml" ]; then \
+		echo "$(CYAN)Restarting Loki containers...$(RESET)"; \
+		cd "$$LOKI_DIR" && docker-compose restart; \
+		echo "$(GREEN)✅ Loki has been restarted$(RESET)"; \
+		echo "$(CYAN)Check status with: make loki-status$(RESET)"; \
+	else \
+		echo "$(RED)❌ Loki configuration not found at $$LOKI_DIR$(RESET)"; \
+		echo "$(CYAN)Install with: make loki DOMAIN=yourdomain.com$(RESET)"; \
+	fi
+
 # Prometheus
 install-prometheus: validate
 	@echo "$(MAGENTA)$(BOLD)📊 Installing Prometheus Monitoring...$(RESET)"
@@ -1329,9 +1399,13 @@ tailscale-status:
 tailscale-logs:
 	@echo "Viewing Tailscale logs..."
 	@if [ -f "$(LOG_DIR)/components/tailscale.log" ]; then \
-		tail -n 50 $(LOG_DIR)/components/tailscale.log; \
+		echo "$(CYAN)Recent Tailscale actions:$(RESET)"; \
+		sudo grep "Tailscale" /var/log/syslog | tail -n 20; \
+		echo ""; \
+		echo "$(CYAN)For installation logs, use:$(RESET)"; \
+		echo "cat /var/log/agency_stack/components/tailscale.log"; \
 	else \
-		echo "No Tailscale logs found at $(LOG_DIR)/components/tailscale.log"; \
+		echo "$(YELLOW)Tailscale logs not found.$(RESET)"; \
 		journalctl -u tailscaled -n 50; \
 	fi
 
