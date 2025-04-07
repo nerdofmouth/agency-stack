@@ -1967,3 +1967,38 @@ docker-restart:
 		sudo systemctl start docker; \
 		echo "$(GREEN)✅ Docker service started$(RESET)"; \
 	fi
+
+# Docker Compose
+docker-compose: validate
+	@echo "$(MAGENTA)$(BOLD)🐙 Installing Docker Compose...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_docker_compose.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+docker-compose-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Docker Compose Status...$(RESET)"
+	@if command -v docker-compose &> /dev/null; then \
+		echo "$(GREEN)✅ Docker Compose is installed$(RESET)"; \
+		echo "$(CYAN)Version: $(shell docker-compose --version)$(RESET)"; \
+		if [ -f "/opt/agency_stack/docker_compose/version.txt" ]; then \
+			echo "$(CYAN)Installed version: $(shell cat /opt/agency_stack/docker_compose/version.txt)$(RESET)"; \
+		fi; \
+	else \
+		echo "$(RED)❌ Docker Compose is not installed$(RESET)"; \
+		echo "$(CYAN)Install with: make docker-compose$(RESET)"; \
+	fi
+
+docker-compose-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing Docker Compose Logs...$(RESET)"
+	@if [ -f "/var/log/agency_stack/components/docker_compose.log" ]; then \
+		cat /var/log/agency_stack/components/docker_compose.log | tail -n 30; \
+	else \
+		echo "$(YELLOW)Docker Compose installation logs not found.$(RESET)"; \
+	fi
+
+docker-compose-restart:
+	@echo "$(MAGENTA)$(BOLD)🧪 Testing Docker Compose...$(RESET)"
+	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/docker_compose/test-docker-compose.sh" ]; then \
+		sudo /opt/agency_stack/clients/$(CLIENT_ID)/docker_compose/test-docker-compose.sh; \
+	else \
+		echo "$(RED)❌ Test script not found. Is Docker Compose installed?$(RESET)"; \
+		echo "$(CYAN)Install with: make docker-compose$(RESET)"; \
+	fi
