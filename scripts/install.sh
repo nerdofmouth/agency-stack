@@ -127,58 +127,72 @@ setup_first_run_environment() {
     log "INFO" "Cloning AgencyStack repository..."
     echo -e "${BOLD}Cloning AgencyStack repository...${NC}"
     
+    # Store the original working directory
+    ORIGINAL_DIR="$(pwd)"
+    
     # Check if we already have an installation
-    if [ -d "/opt/agency_stack/repo" ] || [ -d "/opt/agency_stack/clients" ] || [ -f "/opt/agency_stack/config.env" ]; then
+    if [ -d "/opt/agency_stack" ] || [ -d "/opt/agency_stack/clients" ]; then
       log "WARN" "Existing installation found at /opt/agency_stack"
       echo -e "${YELLOW}WARNING: Existing installation found at /opt/agency_stack${NC}"
       
+      # In non-interactive mode, automatically backup and continue
       if [ "$ONE_LINE_MODE" = true ]; then
-        # Non-interactive mode - automatic backup and continue
         log "INFO" "Running in non-interactive mode, creating backup and continuing"
         echo -e "${BLUE}Creating backup of existing installation and continuing...${NC}"
         
-        # Create backup timestamp in format YYYYMMDDHHMMSS
+        # Create timestamped backup
         BACKUP_TS=$(date +"%Y%m%d%H%M%S")
         BACKUP_DIR="/opt/agency_stack_backup_${BACKUP_TS}"
         
-        # Create backup with clear logging
         log "INFO" "Creating backup at $BACKUP_DIR"
-        echo -e "${GREEN}Creating backup at $BACKUP_DIR${NC}"
+        echo -e "${BLUE}Creating backup at $BACKUP_DIR${NC}"
+        
         mkdir -p "$BACKUP_DIR"
         cp -r /opt/agency_stack/* "$BACKUP_DIR/" 2>/dev/null || true
+        
         log "INFO" "Backup completed at $BACKUP_DIR"
         echo -e "${GREEN}Backup completed at $BACKUP_DIR${NC}"
         
-        # Clean up old repo
+        # Remove the repo directory to allow fresh clone
         if [ -d "/opt/agency_stack/repo" ]; then
           rm -rf /opt/agency_stack/repo
           log "INFO" "Removed existing repository"
         fi
+        
+        # Move to a safe directory
+        cd /tmp || cd / 
+        
       else
-        # Interactive mode - ask user
+        # Interactive mode - show options to user
         echo -e "What would you like to do?"
-        echo "  1. Backup and reinstall (recommended)"
-        echo "  2. Remove and reinstall (data will be lost)"
-        echo "  3. Exit installation"
-        read -p "Enter choice [1-3]: " choice
+        echo -e "  1. Backup and reinstall (recommended)"
+        echo -e "  2. Remove and reinstall (data will be lost)"
+        echo -e "  3. Exit installation"
+        read -p "Enter your choice [1-3]: " choice
         
         case "$choice" in
           1)
+            # Create timestamped backup
             BACKUP_TS=$(date +"%Y%m%d%H%M%S")
             BACKUP_DIR="/opt/agency_stack_backup_${BACKUP_TS}"
-            log "INFO" "Creating backup at $BACKUP_DIR"
-            echo -e "${GREEN}Creating backup at $BACKUP_DIR${NC}"
             mkdir -p "$BACKUP_DIR"
             cp -r /opt/agency_stack/* "$BACKUP_DIR/" 2>/dev/null || true
-            log "INFO" "Backup completed"
-            echo -e "${GREEN}Backup completed${NC}"
+            
+            # Clean up repo directory
             rm -rf /opt/agency_stack/repo
-            log "INFO" "Removed existing repository"
+            
+            # Move to a safe directory
+            cd /tmp || cd /
+            
+            log "INFO" "Created backup at $BACKUP_DIR"
+            echo -e "${GREEN}Created backup at $BACKUP_DIR${NC}"
             ;;
           2)
-            log "INFO" "User chose to remove and reinstall"
-            echo -e "${YELLOW}Removing existing installation...${NC}"
             rm -rf /opt/agency_stack/repo
+            
+            # Move to a safe directory
+            cd /tmp || cd /
+            
             log "INFO" "Removed existing repository"
             ;;
           3)
@@ -198,6 +212,9 @@ setup_first_run_environment() {
     # Now clone the repository - this should work whether we had an existing installation or not
     log "INFO" "Cloning fresh repository"
     echo -e "${BLUE}Cloning fresh repository from GitHub...${NC}"
+    
+    # Always work from a safe directory for Git operations
+    cd /tmp || cd /
     
     # Try multiple times with exponential backoff in case of network issues
     RETRY_COUNT=0
