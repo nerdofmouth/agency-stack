@@ -101,15 +101,21 @@ setup_first_run_environment() {
   if [ -f "$(dirname "$(dirname "$SCRIPT_DIR")")/scripts/components/install_prerequisites.sh" ]; then
     log "INFO" "Running dedicated prerequisites component installer"
     echo -e "${BLUE}Installing prerequisites using component installer...${NC}"
-    bash "$(dirname "$(dirname "$SCRIPT_DIR")")/scripts/components/install_prerequisites.sh"
-    if [ $? -eq 0 ]; then
-      log "INFO" "Prerequisites installation completed successfully"
-      echo -e "${GREEN}✅ Prerequisites installation successful${NC}"
+    
+    # Check if prerequisites have already been installed
+    if [ -f "/opt/agency_stack/.prerequisites_ok" ]; then
+      log "INFO" "Prerequisites already installed" "${GREEN}✅ Prerequisites already installed, skipping...${NC}"
     else
-      log "WARN" "Prerequisites component installer returned non-zero, using fallback method"
-      # Fallback to basic installation
-      apt-get update -qq
-      apt-get install -qq -y curl git wget make jq bc openssl unzip procps htop
+      bash "$(dirname "$(dirname "$SCRIPT_DIR")")/scripts/components/install_prerequisites.sh"
+      if [ $? -eq 0 ]; then
+        log "INFO" "Prerequisites installation completed successfully"
+        echo -e "${GREEN}✅ Prerequisites installation successful${NC}"
+      else
+        log "WARN" "Prerequisites component installer returned non-zero, using fallback method"
+        # Fallback to basic installation
+        apt-get update -qq
+        apt-get install -qq -y curl git wget make jq bc openssl unzip procps htop
+      fi
     fi
   else
     # Fallback to basic installation if component isn't available
@@ -1024,15 +1030,21 @@ setup_basic_utilities() {
   if [ -f "$(dirname "$0")/../components/install_prerequisites.sh" ]; then
     log "INFO" "Running dedicated prerequisites component installer"
     echo -e "${BLUE}Installing prerequisites using component installer...${NC}"
-    bash "$(dirname "$0")/../components/install_prerequisites.sh"
-    if [ $? -eq 0 ]; then
-      log "INFO" "Prerequisites installation completed successfully"
-      echo -e "${GREEN}✅ Prerequisites installation successful${NC}"
+    
+    # Check if prerequisites have already been installed
+    if [ -f "${AGENCY_ROOT}/.prerequisites_ok" ]; then
+      log "INFO" "Prerequisites already installed" "${GREEN}✅ Prerequisites already installed, skipping...${NC}"
     else
-      log "WARN" "Prerequisites component installer returned non-zero, using fallback method"
-      # Fallback to basic installation
-      apt-get update
-      apt-get install -y htop git unzip curl wget
+      bash "$(dirname "$0")/../components/install_prerequisites.sh"
+      if [ $? -eq 0 ]; then
+        log "INFO" "Prerequisites installation completed successfully"
+        echo -e "${GREEN}✅ Prerequisites installation successful${NC}"
+      else
+        log "WARN" "Prerequisites component installer returned non-zero, using fallback method"
+        # Fallback to basic installation
+        apt-get update
+        apt-get install -y htop git unzip curl wget
+      fi
     fi
   else
     # Fallback to basic installation if component isn't available

@@ -129,12 +129,18 @@ log "INFO" "Installing required dependencies" "${BLUE}Installing required depend
 # Try to use our dedicated prerequisites component installer if it's available
 if [ -f "$(dirname "$0")/../scripts/components/install_prerequisites.sh" ]; then
   log "INFO" "Using dedicated prerequisites component installer" "${BLUE}Using dedicated prerequisites component installer...${NC}"
-  bash "$(dirname "$0")/../scripts/components/install_prerequisites.sh" || {
-    log "WARN" "Prerequisites installer failed, falling back to basic installation" "${YELLOW}Prerequisites installer failed, using fallback method...${NC}"
-    # Fallback installation
-    apt-get update -q
-    apt-get install -y curl git make wget jq bc openssl unzip procps
-  }
+  
+  # Check if prerequisites have already been installed
+  if [ -f "${AGENCY_ROOT}/.prerequisites_ok" ]; then
+    log "INFO" "Prerequisites already installed" "${GREEN}✅ Prerequisites already installed, skipping...${NC}"
+  else
+    bash "$(dirname "$0")/../scripts/components/install_prerequisites.sh" || {
+      log "WARN" "Prerequisites installer failed, falling back to basic installation" "${YELLOW}Prerequisites installer failed, using fallback method...${NC}"
+      # Fallback installation
+      apt-get update -q
+      apt-get install -y curl git make wget jq bc openssl unzip procps
+    }
+  fi
 else
   # Fallback for one-line installer without repo access yet
   log "INFO" "Prerequisites component not available yet, using basic installation" "${YELLOW}Prerequisites component not available yet, using basic installation...${NC}"
@@ -237,9 +243,15 @@ fi
 # Now that we have the repository, run the prerequisites component with absolute path
 if [ -f "${AGENCY_ROOT}/repo/scripts/components/install_prerequisites.sh" ]; then
   log "INFO" "Running prerequisites component with full repository" "${BLUE}Running prerequisites component with full repository...${NC}"
-  bash "${AGENCY_ROOT}/repo/scripts/components/install_prerequisites.sh" || {
-    log "WARN" "Prerequisites component returned non-zero, continuing with installation" "${YELLOW}Prerequisites component returned non-zero, continuing with installation...${NC}"
-  }
+  
+  # Check if prerequisites have already been installed
+  if [ -f "${AGENCY_ROOT}/.prerequisites_ok" ]; then
+    log "INFO" "Prerequisites already installed" "${GREEN}✅ Prerequisites already installed, skipping...${NC}"
+  else
+    bash "${AGENCY_ROOT}/repo/scripts/components/install_prerequisites.sh" || {
+      log "WARN" "Prerequisites component returned non-zero, continuing with installation" "${YELLOW}Prerequisites component returned non-zero, continuing with installation...${NC}"
+    }
+  fi
 fi
 
 log "INFO" "Repository cloned successfully" "${GREEN}Repository cloned successfully${NC}"
