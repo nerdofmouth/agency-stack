@@ -1833,3 +1833,137 @@ smoke-test-all:
 	@scripts/smoke/smoke_test_high_risk.sh --test-all || { \
 		echo "Some components failed validation. See /var/log/agency_stack/smoke_test.log for details."; \
 	}
+
+# Backup Strategy
+backup-strategy: validate
+	@echo "$(MAGENTA)$(BOLD)💾 Installing Backup Strategy (Restic)...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_backup_strategy.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+backup-strategy-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Backup Strategy Status...$(RESET)"
+	@if [ -f "/opt/agency_stack/backup_strategy/.installed_ok" ]; then \
+		echo "$(GREEN)✅ Backup Strategy is installed$(RESET)"; \
+		if [ -f "/etc/cron.d/agency-stack-backup-$(CLIENT_ID)" ]; then \
+			echo "$(GREEN)✅ Backup cron job is configured$(RESET)"; \
+		else \
+			echo "$(RED)❌ Backup cron job is not configured$(RESET)"; \
+		fi; \
+	else \
+		echo "$(RED)❌ Backup Strategy is not installed$(RESET)"; \
+	fi
+	@echo "$(CYAN)Logs can be viewed with: make backup-strategy-logs$(RESET)"
+
+backup-strategy-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing Backup Strategy Logs...$(RESET)"
+	@if [ -d "/opt/agency_stack/clients/$(CLIENT_ID)/backup_strategy/logs" ]; then \
+		ls -lat /opt/agency_stack/clients/$(CLIENT_ID)/backup_strategy/logs/ | head -n 5; \
+		echo ""; \
+		if [ -n "$$(ls -A /opt/agency_stack/clients/$(CLIENT_ID)/backup_strategy/logs/ 2>/dev/null)" ]; then \
+			echo "$(CYAN)Latest log:$(RESET)"; \
+			cat "$$(ls -t /opt/agency_stack/clients/$(CLIENT_ID)/backup_strategy/logs/* | head -n 1)"; \
+		else \
+			echo "$(YELLOW)No backup logs found yet.$(RESET)"; \
+		fi \
+	else \
+		cat /var/log/agency_stack/components/backup_strategy.log | tail -n 20; \
+	fi
+
+backup-strategy-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Running Backup Strategy...$(RESET)"
+	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/backup_strategy/scripts/backup.sh" ]; then \
+		sudo /opt/agency_stack/clients/$(CLIENT_ID)/backup_strategy/scripts/backup.sh; \
+	else \
+		echo "$(RED)Backup script not found. Is Backup Strategy installed?$(RESET)"; \
+		echo "$(CYAN)Install with: make backup-strategy$(RESET)"; \
+	fi
+
+# Signing Timestamps
+signing-timestamps: validate
+	@echo "$(MAGENTA)$(BOLD)🔏 Installing Signing & Timestamps...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_signing_timestamps.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+signing-timestamps-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Signing & Timestamps Status...$(RESET)"
+	@if [ -f "/opt/agency_stack/signing_timestamps/.installed_ok" ]; then \
+		echo "$(GREEN)✅ Signing & Timestamps is installed$(RESET)"; \
+		if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/signing_timestamps/server-public-key.asc" ]; then \
+			echo "$(GREEN)✅ Server signing key is configured$(RESET)"; \
+			echo "$(CYAN)Key fingerprint:$(RESET)"; \
+			cat /opt/agency_stack/clients/$(CLIENT_ID)/signing_timestamps/server-key-fingerprint.txt | grep -A 1 "Key fingerprint"; \
+		else \
+			echo "$(YELLOW)⚠️ Server signing key is not yet generated$(RESET)"; \
+			echo "$(CYAN)Run: sudo /opt/agency_stack/clients/$(CLIENT_ID)/signing_timestamps/scripts/generate-server-key.sh$(RESET)"; \
+		fi; \
+	else \
+		echo "$(RED)❌ Signing & Timestamps is not installed$(RESET)"; \
+	fi
+	@echo "$(CYAN)Logs can be viewed with: make signing-timestamps-logs$(RESET)"
+
+signing-timestamps-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing Signing & Timestamps Logs...$(RESET)"
+	@if [ -d "/opt/agency_stack/clients/$(CLIENT_ID)/signing_timestamps/logs" ]; then \
+		ls -lat /opt/agency_stack/clients/$(CLIENT_ID)/signing_timestamps/logs/ | head -n 5; \
+		echo ""; \
+		if [ -n "$$(ls -A /opt/agency_stack/clients/$(CLIENT_ID)/signing_timestamps/logs/ 2>/dev/null)" ]; then \
+			echo "$(CYAN)Latest log:$(RESET)"; \
+			cat "$$(ls -t /opt/agency_stack/clients/$(CLIENT_ID)/signing_timestamps/logs/* | head -n 1)"; \
+		else \
+			echo "$(YELLOW)No signing logs found yet.$(RESET)"; \
+		fi \
+	else \
+		cat /var/log/agency_stack/components/signing_timestamps.log | tail -n 20; \
+	fi
+
+signing-timestamps-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Regenerating Signing Keys...$(RESET)"
+	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/signing_timestamps/scripts/generate-server-key.sh" ]; then \
+		sudo /opt/agency_stack/clients/$(CLIENT_ID)/signing_timestamps/scripts/generate-server-key.sh; \
+	else \
+		echo "$(RED)Scripts not found. Is Signing & Timestamps installed?$(RESET)"; \
+		echo "$(CYAN)Install with: make signing-timestamps$(RESET)"; \
+	fi
+
+# Docker
+docker: validate
+	@echo "$(MAGENTA)$(BOLD)🐳 Installing Docker Container Runtime...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_docker.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+docker-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Docker Status...$(RESET)"
+	@if command -v docker &> /dev/null; then \
+		echo "$(GREEN)✅ Docker is installed$(RESET)"; \
+		echo "$(CYAN)Version: $(shell docker --version)$(RESET)"; \
+		echo "$(CYAN)Running containers: $(shell docker ps --format '{{.Names}}' | wc -l)$(RESET)"; \
+		if docker network inspect agency_stack_network &> /dev/null; then \
+			echo "$(GREEN)✅ AgencyStack Docker network is configured$(RESET)"; \
+		else \
+			echo "$(RED)❌ AgencyStack Docker network is missing$(RESET)"; \
+			echo "$(CYAN)Create with: docker network create agency_stack_network$(RESET)"; \
+		fi; \
+	else \
+		echo "$(RED)❌ Docker is not installed$(RESET)"; \
+		echo "$(CYAN)Install with: make docker$(RESET)"; \
+	fi
+
+docker-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing Docker Logs...$(RESET)"
+	@if [ -f "/var/log/agency_stack/components/docker.log" ]; then \
+		cat /var/log/agency_stack/components/docker.log | tail -n 30; \
+	else \
+		echo "$(YELLOW)Docker installation logs not found.$(RESET)"; \
+		if command -v docker &> /dev/null; then \
+			echo "$(CYAN)Docker system logs:$(RESET)"; \
+			journalctl -u docker --no-pager | tail -n 20; \
+		fi; \
+	fi
+
+docker-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Docker Service...$(RESET)"
+	@if systemctl is-active docker &> /dev/null; then \
+		sudo systemctl restart docker; \
+		echo "$(GREEN)✅ Docker service restarted$(RESET)"; \
+	else \
+		echo "$(RED)❌ Docker service is not running$(RESET)"; \
+		sudo systemctl start docker; \
+		echo "$(GREEN)✅ Docker service started$(RESET)"; \
+	fi
