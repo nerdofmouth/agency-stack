@@ -49,28 +49,38 @@ BAN_TIME="${BAN_TIME:-3600}"
 FIND_TIME="${FIND_TIME:-600}"
 MAX_RETRY="${MAX_RETRY:-5}"
 IGNORE_IP="${IGNORE_IP:-127.0.0.1/8}"
+TEST_MODE=false
 
-# Show help
+# Show help message
 show_help() {
-  echo "Usage: $0 [options]"
-  echo
-  echo "Installs and configures Fail2ban intrusion prevention for AgencyStack"
-  echo
-  echo "Options:"
-  echo "  --domain DOMAIN            Domain name for the installation"
-  echo "  --admin-email EMAIL        Admin email for notifications"
-  echo "  --client-id ID             Client ID for multi-tenant setup"
-  echo "  --ban-time SECONDS         Ban duration in seconds (default: 3600)"
-  echo "  --find-time SECONDS        Time window for max-retry (default: 600)"
-  echo "  --max-retry COUNT          Max failures before ban (default: 5)"
-  echo "  --ignore-ip IP/CIDR        IP addresses to ignore (default: 127.0.0.1/8)"
-  echo "  --force                    Force reinstallation even if already installed"
-  echo "  --with-deps                Install dependencies if missing"
-  echo "  --verbose                  Enable verbose output"
-  echo "  --enable-cloud             Enable cloud storage backends"
-  echo "  --enable-openai            Enable OpenAI API integration"
-  echo "  --use-github               Use GitHub for repository operations"
-  echo "  -h, --help                 Show this help message"
+  echo -e "${MAGENTA}${BOLD}AgencyStack Fail2ban Setup${NC}"
+  echo -e "=============================="
+  echo -e "This script installs and configures Fail2ban for intrusion prevention."
+  echo -e ""
+  echo -e "${CYAN}Usage:${NC}"
+  echo -e "  $0 [options]"
+  echo -e ""
+  echo -e "${CYAN}Options:${NC}"
+  echo -e "  ${BOLD}--domain${NC} <domain>        Domain for this installation (default: localhost)"
+  echo -e "  ${BOLD}--client-id${NC} <client_id>  Client ID for multi-tenant setup (default: default)"
+  echo -e "  ${BOLD}--admin-email${NC} <email>    Admin email for notifications (default: admin@example.com)"
+  echo -e "  ${BOLD}--ban-time${NC} <seconds>     Ban duration in seconds (default: 3600)"
+  echo -e "  ${BOLD}--find-time${NC} <seconds>    Time window for finding failures (default: 600)"
+  echo -e "  ${BOLD}--max-retry${NC} <count>      Maximum number of failures before ban (default: 5)"
+  echo -e "  ${BOLD}--ignore-ip${NC} <ip>         IP address to ignore (default: 127.0.0.1/8)"
+  echo -e "  ${BOLD}--test-mode${NC}              Enable test mode (increases max retries, adds your IP to whitelist)"
+  echo -e "  ${BOLD}--enable-cloud${NC}           Enable cloud service integrations"
+  echo -e "  ${BOLD}--enable-openai${NC}          Enable OpenAI integrations"
+  echo -e "  ${BOLD}--use-github${NC}             Use GitHub for repositories"
+  echo -e "  ${BOLD}--force${NC}                  Force reinstallation even if Fail2ban is already installed"
+  echo -e "  ${BOLD}--with-deps${NC}              Automatically install dependencies if missing"
+  echo -e "  ${BOLD}--verbose${NC}                Show detailed output during installation"
+  echo -e "  ${BOLD}--help${NC}                   Show this help message and exit"
+  echo -e ""
+  echo -e "${CYAN}Example:${NC}"
+  echo -e "  $0 --domain example.com --admin-email admin@example.com --ban-time 7200"
+  echo -e ""
+  exit 0
 }
 
 # Parse arguments
@@ -104,6 +114,22 @@ while [[ $# -gt 0 ]]; do
     --ignore-ip)
       IGNORE_IP="$2"
       shift 2
+      ;;
+    --test-mode)
+      TEST_MODE=true
+      MAX_RETRY=15  # Increase retry limit to avoid accidental lockouts
+      # Get the current SSH IP and add it to the ignore list
+      CURRENT_IP=$(who am i | awk '{print $5}' | sed 's/[()]//g' | cut -d':' -f1)
+      if [[ -n "$CURRENT_IP" ]] && [[ "$CURRENT_IP" != "127.0.0.1" ]]; then
+        if [[ -z "$IGNORE_IP" ]]; then
+          IGNORE_IP="$CURRENT_IP"
+        else
+          IGNORE_IP="$IGNORE_IP $CURRENT_IP"
+        fi
+      fi
+      log "WARNING" "Test mode enabled - Using safer Fail2ban settings" "${YELLOW}⚠️ Test mode enabled - Using safer Fail2ban settings${NC}"
+      log "INFO" "SSH IP $CURRENT_IP added to ignore list" "${CYAN}SSH IP $CURRENT_IP added to ignore list${NC}"
+      shift
       ;;
     --force)
       FORCE=true
@@ -207,33 +233,48 @@ if [ -f /etc/fail2ban/jail.conf ]; then
   cp /etc/fail2ban/jail.conf "${COMPONENT_CONFIG_DIR}/jail.conf.original"
 fi
 
-# Create custom jail.local file
-log "INFO" "Creating custom Fail2ban configuration" "${CYAN}Creating custom Fail2ban configuration...${NC}"
-cat > /etc/fail2ban/jail.local <<EOL
+# Configure jail.local
+log "INFO" "Creating Fail2ban jail configuration" "${CYAN}Creating Fail2ban jail configuration...${NC}"
+
+if [ "$TEST_MODE" = true ]; then
+  log "WARNING" "Test mode: Using relaxed settings for testing" "${YELLOW}⚠️ Test mode: Using relaxed settings for testing${NC}"
+  cat > /etc/fail2ban/jail.local <<EOL
 [DEFAULT]
-# "bantime" is the number of seconds that a host is banned
-bantime = ${BAN_TIME}
-
-# A host is banned if it has generated "maxretry" during the last "findtime" seconds
-findtime = ${FIND_TIME}
+# "bantime" is the number of seconds that a host is banned.
+bantime  = 300
+# A host is banned if it has generated "maxretry" during the last "findtime"
+# seconds.
+findtime  = ${FIND_TIME}
+# "maxretry" is the number of failures before a host get banned.
 maxretry = ${MAX_RETRY}
-
-# "ignoreip" can be a list of IP addresses, CIDR masks or DNS hosts
+# "ignoreip" can be a list of IP addresses, CIDR masks or DNS hosts. Fail2ban
+# will not ban a host which matches an address in this list.
 ignoreip = ${IGNORE_IP}
-
-# Email notifications
+# Email settings - only used if action contains email notification
 destemail = ${ADMIN_EMAIL}
-sendername = Fail2Ban (${DOMAIN})
-mta = sendmail
-action = %(action_mwl)s
-
-# Default ban action (ufw, iptables, etc.)
-banaction = iptables-multiport
-
-# Logging
-logtarget = /var/log/fail2ban.log
-loglevel = INFO
+sender = fail2ban@${DOMAIN}
+# Testing mode - reduced severity
+action = %(action_)s
 EOL
+else
+  cat > /etc/fail2ban/jail.local <<EOL
+[DEFAULT]
+# "bantime" is the number of seconds that a host is banned.
+bantime  = ${BAN_TIME}
+# A host is banned if it has generated "maxretry" during the last "findtime"
+# seconds.
+findtime  = ${FIND_TIME}
+# "maxretry" is the number of failures before a host get banned.
+maxretry = ${MAX_RETRY}
+# "ignoreip" can be a list of IP addresses, CIDR masks or DNS hosts. Fail2ban
+# will not ban a host which matches an address in this list.
+ignoreip = ${IGNORE_IP}
+# Email settings - only used if action contains email notification
+destemail = ${ADMIN_EMAIL}
+sender = fail2ban@${DOMAIN}
+action = %(action_mwl)s
+EOL
+fi
 
 # Create SSH jail configuration
 log "INFO" "Creating SSH jail configuration" "${CYAN}Creating SSH jail configuration...${NC}"

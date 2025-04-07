@@ -44,6 +44,7 @@ VERBOSE=false
 ENABLE_CLOUD=false
 ENABLE_OPENAI=false
 USE_GITHUB=false
+TEST_MODE=false
 
 # Security specific configuration
 ENABLE_UFW=true
@@ -76,6 +77,7 @@ show_help() {
   echo "  --enable-cloud             Enable cloud storage backends"
   echo "  --enable-openai            Enable OpenAI API integration"
   echo "  --use-github               Use GitHub for repository operations"
+  echo "  --test-mode                Enable test mode (skips SSH hardening, maintains remote access)"
   echo "  -h, --help                 Show this help message"
 }
 
@@ -141,6 +143,12 @@ while [[ $# -gt 0 ]]; do
       ;;
     --use-github)
       USE_GITHUB=true
+      shift
+      ;;
+    --test-mode)
+      TEST_MODE=true
+      ENABLE_SSH_HARDENING=false
+      log "WARNING" "Test mode enabled - SSH hardening disabled" "${YELLOW}⚠️ Test mode enabled - SSH hardening disabled${NC}"
       shift
       ;;
     -h|--help)
@@ -290,11 +298,14 @@ fi
 if [[ "${ENABLE_SSH_HARDENING}" == "true" ]]; then
   log "INFO" "Hardening SSH configuration" "${CYAN}Hardening SSH configuration...${NC}"
   
-  # Backup original SSH config
-  cp /etc/ssh/sshd_config "${COMPONENT_CONFIG_DIR}/sshd_config.original"
-  
-  # Create hardened SSH config
-  cat > /etc/ssh/sshd_config.d/00-hardened.conf <<EOL
+  if [[ "${TEST_MODE}" == "true" ]]; then
+    log "WARNING" "Test mode: Skipping SSH hardening" "${YELLOW}⚠️ Test mode: Skipping SSH hardening to maintain access${NC}"
+  else
+    # Backup original SSH config
+    cp /etc/ssh/sshd_config "${COMPONENT_CONFIG_DIR}/sshd_config.original"
+    
+    # Create hardened SSH config
+    cat > /etc/ssh/sshd_config.d/00-hardened.conf <<EOL
 # Hardened SSH Configuration for AgencyStack
 # Generated on $(date)
 
@@ -336,28 +347,29 @@ SyslogFacility AUTH
 LogLevel VERBOSE
 EOL
 
-  # Change permissions on SSH config
-  chmod 644 /etc/ssh/sshd_config.d/00-hardened.conf
-  
-  # Restart SSH to apply changes
-  log "INFO" "Restarting SSH service" "${CYAN}Restarting SSH service...${NC}"
-  systemctl restart ssh >> "${INSTALL_LOG}" 2>&1
-  
-  # Check SSH service status
-  if systemctl is-active --quiet ssh; then
-    log "SUCCESS" "SSH service restarted with hardened configuration" "${GREEN}✅ SSH service restarted with hardened configuration.${NC}"
-  else
-    log "ERROR" "SSH service failed to restart" "${RED}❌ SSH service failed to restart. Reverting changes...${NC}"
+    # Change permissions on SSH config
+    chmod 644 /etc/ssh/sshd_config.d/00-hardened.conf
     
-    # Revert changes if SSH failed to restart
-    rm /etc/ssh/sshd_config.d/00-hardened.conf
-    systemctl restart ssh
+    # Restart SSH to apply changes
+    log "INFO" "Restarting SSH service" "${CYAN}Restarting SSH service...${NC}"
+    systemctl restart ssh >> "${INSTALL_LOG}" 2>&1
     
-    log "INFO" "SSH configuration restored to original" "${YELLOW}⚠️ SSH configuration restored to original.${NC}"
+    # Check SSH service status
+    if systemctl is-active --quiet ssh; then
+      log "SUCCESS" "SSH service restarted with hardened configuration" "${GREEN}✅ SSH service restarted with hardened configuration.${NC}"
+    else
+      log "ERROR" "SSH service failed to restart" "${RED}❌ SSH service failed to restart. Reverting changes...${NC}"
+      
+      # Revert changes if SSH failed to restart
+      rm /etc/ssh/sshd_config.d/00-hardened.conf
+      systemctl restart ssh
+      
+      log "INFO" "SSH configuration restored to original" "${YELLOW}⚠️ SSH configuration restored to original.${NC}"
+    fi
+    
+    # Save SSH configuration to component directory
+    cp /etc/ssh/sshd_config.d/00-hardened.conf "${COMPONENT_CONFIG_DIR}/sshd_config.hardened"
   fi
-  
-  # Save SSH configuration to component directory
-  cp /etc/ssh/sshd_config.d/00-hardened.conf "${COMPONENT_CONFIG_DIR}/sshd_config.hardened"
 fi
 
 # System Hardening

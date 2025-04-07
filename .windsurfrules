@@ -513,10 +513,10 @@ if [ ! -f ~/.ssh/id_rsa ]; then
 fi
 
 # 2. Copy SSH key to target VM (as root and deploy user)
-ssh-copy-id root@<vm-hostname>
+ssh-copy-id root@proto001.nerdofmouth.com
 
 # 3. Create a deployment user with proper permissions
-ssh root@<vm-hostname> "useradd -m -s /bin/bash deploy && \
+ssh root@proto001.nerdofmouth.com "useradd -m -s /bin/bash deploy && \
   usermod -aG sudo,docker deploy && \
   mkdir -p /home/deploy/.ssh && \
   cp -r /root/.ssh/authorized_keys /home/deploy/.ssh/ && \
@@ -525,7 +525,7 @@ ssh root@<vm-hostname> "useradd -m -s /bin/bash deploy && \
   chmod 600 /home/deploy/.ssh/authorized_keys"
 
 # 4. Test SSH access
-ssh deploy@<vm-hostname> "echo 'SSH access configured correctly'"
+ssh deploy@proto001.nerdofmouth.com "echo 'SSH access configured correctly'"
 
 
 ## 4️⃣ VM Setup Process Checklist
@@ -550,7 +550,70 @@ VM hardening should ONLY be done as the FINAL step before creating a snapshot fo
 
 ```bash
 # Only run this when VM setup is COMPLETE
-ssh deploy@<vm-hostname> "cd /opt/agency_stack/repo && sudo make vm-snapshot"
+ssh deploy@proto001.nerdofmouth.com  "cd /opt/agency_stack/repo && sudo make vm-snapshot"
 ```
 
 Do **not** run hardening steps during development to avoid losing SSH access.
+
+# 🔧 Development & Testing Security Constraints
+
+## Testing Security Components Safely
+
+When testing security components in development environments, use these test mode parameters to prevent SSH lockouts:
+
+```bash
+# Test security hardening without SSH changes (maintains remote access)
+make security DOMAIN=proto001.nerdofmouth.com ADMIN_EMAIL=admin@nerdofmouth.com --test-mode
+
+# Test Fail2ban with relaxed settings and your IP whitelisted
+make fail2ban DOMAIN=proto001.nerdofmouth.com ADMIN_EMAIL=admin@nerdofmouth.com --test-mode
+```
+
+## **Component Installation Order for Testing**
+
+For safe testing, install components in this recommended order:
+
+1. Non-disruptive components first:
+    *   `backup-strategy`
+    *   `docker` (if not already installed)
+    *   `docker-compose` (if not already installed)
+    *   `signing-timestamps`
+2. Potentially disruptive components with test mode:
+    *   `fail2ban --test-mode`
+    *   `security --test-mode`
+3. Other system components based on requirements
+
+## **Production Deployment Hardening**
+
+For production environments, remove test mode flags to apply full security:
+
+```bash
+# Apply full security hardening (USE ONLY ON PRODUCTION-READY SYSTEMS)make security
+make fail2ban
+```
+
+# **🔒 VM Hardening (Only for Final Distribution)**
+
+VM hardening should ONLY be done as the FINAL step before creating a snapshot for distribution:
+
+```bash
+# Only run this when VM setup is COMPLETE
+ssh deploy@proto001.nerdofmouth.com "cd /opt/agency_stack/repo && sudo make vm-snapshot"
+```
+
+## **Accessibility vs. Security Balance**
+
+*   Development/Testing: Prioritize SSH accessibility using `--test-mode`
+*   Staging/Pre-Production: Test with partial hardening
+*   Production: Apply full security measures
+
+```bash
+# Apply full security hardening (USE ONLY ON PRODUCTION-READY SYSTEMS)make security
+make fail2ban
+```
+
+This ruleset update provides clear guidance on:
+1. How to use the new test mode parameters
+2. The recommended component installation order for testing
+3. When to apply full security hardening
+4. How to balance accessibility with security across different environments
