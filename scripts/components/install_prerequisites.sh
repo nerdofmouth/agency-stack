@@ -202,6 +202,12 @@ check_core_infrastructure() {
 
 # Main installation function
 install_prerequisites() {
+  # Check if prerequisites have already been installed
+  if [ -f "${AGENCY_ROOT}/.prerequisites_ok" ]; then
+    log "INFO" "Prerequisites already installed" "${GREEN}Prerequisites already installed, skipping...${NC}"
+    return 0
+  fi
+
   log "INFO" "Starting prerequisites installation" "${BLUE}Installing system prerequisites...${NC}"
   
   # Create required directories
@@ -219,9 +225,14 @@ install_prerequisites() {
   # If the core infrastructure script exists, use it for additional setup
   if check_core_infrastructure; then
     log "INFO" "Running core infrastructure script" "${CYAN}Running core infrastructure script...${NC}"
-    bash "${AGENCY_CORE_DIR}/install_infrastructure.sh" --prerequisites-only || {
-      log "WARN" "Core infrastructure script returned non-zero, continuing with basic setup" "${YELLOW}Core script returned non-zero, continuing with basic setup${NC}"
-    }
+    
+    # Try to run with --prerequisites-only first, then fallback to no arguments if it fails
+    if ! bash "${AGENCY_CORE_DIR}/install_infrastructure.sh" --prerequisites-only 2>/dev/null; then
+      log "INFO" "Trying core infrastructure script with no arguments" "${YELLOW}--prerequisites-only option not recognized, trying without arguments...${NC}"
+      bash "${AGENCY_CORE_DIR}/install_infrastructure.sh" || {
+        log "WARN" "Core infrastructure script returned non-zero, continuing with basic setup" "${YELLOW}Core script returned non-zero, continuing with basic setup${NC}"
+      }
+    fi
   fi
   
   # Create marker file indicating successful prerequisites installation
