@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "last_updated": "2025-04-05T03:11:30-05:00",
+  "last_updated": "2025-04-07T15:29:23-05:00",
   "components": {
     "infrastructure": {
       "prerequisites": {
@@ -74,6 +74,42 @@
           "multi_tenant": false
         },
         "description": "Continuous Integration/Deployment server"
+      },
+      "docker": {
+        "name": "Docker",
+        "category": "Core Infrastructure",
+        "version": "latest",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": false,
+          "dashboard": false,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": false,
+          "multi_tenant": true
+        },
+        "description": "Container runtime engine"
+      },
+      "docker_compose": {
+        "name": "Docker Compose",
+        "category": "Core Infrastructure",
+        "version": "latest",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": false,
+          "dashboard": false,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": false,
+          "multi_tenant": true
+        },
+        "description": "Multi-container Docker application orchestration"
       }
     },
     "business": {
@@ -335,6 +371,60 @@
           "multi_tenant": false
         },
         "description": "Security automation"
+      },
+      "fail2ban": {
+        "name": "Fail2ban",
+        "category": "Security & Identity",
+        "version": "latest",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": false,
+          "dashboard": false,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": false,
+          "multi_tenant": true
+        },
+        "description": "Intrusion prevention framework"
+      },
+      "security": {
+        "name": "Security Hardening",
+        "category": "Security & Identity",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": false,
+          "dashboard": false,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": false,
+          "multi_tenant": true
+        },
+        "description": "System security hardening measures"
+      },
+      "signing_timestamps": {
+        "name": "Signing & Timestamps",
+        "category": "Security & Identity",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": false,
+          "dashboard": false,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": false,
+          "multi_tenant": true
+        },
+        "description": "Document signing and timestamping service"
       }
     },
     "security_storage": {
@@ -355,6 +445,24 @@
           "multi_tenant": true
         },
         "description": "Encrypted local vaults + remote cloud sync via gocryptfs and rclone"
+      },
+      "backup_strategy": {
+        "name": "Backup Strategy",
+        "category": "Security & Storage",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": false,
+          "dashboard": false,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": false,
+          "multi_tenant": true
+        },
+        "description": "Automated backup system using Restic"
       }
     },
     "collaboration": {
