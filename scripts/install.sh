@@ -855,69 +855,74 @@ install_component() {
   # Update component state to pending
   update_state "$script" "pending"
   
+  # Check if script exists in main directory or components subdirectory
   if [ -f "$SCRIPT_DIR/$script" ]; then
-    # Create a progress bar
-    echo -ne "${YELLOW}Progress: [                    ] 0%${NC}\r"
-    
-    # Run the script and capture output to log
-    (bash "$SCRIPT_DIR/$script" 2>&1 | tee -a "$LOGFILE") &
-    local pid=$!
-    
-    # Show spinner while the script is running
-    while kill -0 $pid 2>/dev/null; do
-      for i in {1..40}; do
-        if kill -0 $pid 2>/dev/null; then
-          sleep 0.1
-          percent=$((i * 100 / 40))
-          completed=$((i / 2))
-          remaining=$((20 - completed))
-          progress="["
-          for ((j=0; j<completed; j++)); do progress+="#"; done
-          for ((j=0; j<remaining; j++)); do progress+=" "; done
-          progress+="]"
-          echo -ne "${YELLOW}Progress: $progress $percent%${NC}\r"
-        else
-          break
-        fi
-      done
-    done
-    
-    wait $pid
-    local exit_code=$?
-    
-    echo -ne "${GREEN}Progress: [####################] 100%${NC}\n"
-    
-    if [ $exit_code -eq 0 ]; then
-      update_state "$script" "installed"
-      log "INFO" "Installation of $script completed successfully"
-      echo -e "${GREEN}${BOLD} AgencyStack component $script installed successfully${NC}"
-      # Record successful installation
-      echo "$(date +"%Y-%m-%d %H:%M:%S") - $script" >> /opt/agency_stack/installed_components.txt
-      
-      # Show motto after successful installation
-      source "$SCRIPT_PATH/agency_branding.sh" && random_tagline
-      echo ""
-      
-      # Show port allocation if port manager exists
-      if [ -f "$PORT_MANAGER" ]; then
-        local ports=$("$PORT_MANAGER" list 2>/dev/null)
-        if [ -n "$ports" ]; then
-          echo -e "${CYAN}Updated port allocations after installation:${NC}"
-          echo "$ports" | grep -i "$(basename "$script" .sh)" || echo "$ports" | tail -n 3
-        fi
-      fi
-      
-      return 0
-    else
-      update_state "$script" "failed"
-      log "ERROR" "Installation of $script failed with exit code $exit_code"
-      echo -e "${RED}${BOLD} AgencyStack component $script installation failed${NC}"
-      return 1
-    fi
+    SCRIPT_PATH="$SCRIPT_DIR/$script"
+  elif [ -f "$SCRIPT_DIR/components/$script" ]; then
+    SCRIPT_PATH="$SCRIPT_DIR/components/$script"
   else
     update_state "$script" "failed"
     log "ERROR" "Script not found: $script"
     echo -e "${RED} Script not found: $script${NC}"
+    return 1
+  fi
+  
+  # Create a progress bar
+  echo -ne "${YELLOW}Progress: [                    ] 0%${NC}\r"
+  
+  # Run the script and capture output to log
+  (bash "$SCRIPT_PATH" 2>&1 | tee -a "$LOGFILE") &
+  local pid=$!
+  
+  # Show spinner while the script is running
+  while kill -0 $pid 2>/dev/null; do
+    for i in {1..40}; do
+      if kill -0 $pid 2>/dev/null; then
+        sleep 0.1
+        percent=$((i * 100 / 40))
+        completed=$((i / 2))
+        remaining=$((20 - completed))
+        progress="["
+        for ((j=0; j<completed; j++)); do progress+="#"; done
+        for ((j=0; j<remaining; j++)); do progress+=" "; done
+        progress+="]"
+        echo -ne "${YELLOW}Progress: $progress $percent%${NC}\r"
+      else
+        break
+      fi
+    done
+  done
+  
+  wait $pid
+  local exit_code=$?
+  
+  echo -ne "${GREEN}Progress: [####################] 100%${NC}\n"
+  
+  if [ $exit_code -eq 0 ]; then
+    update_state "$script" "installed"
+    log "INFO" "Installation of $script completed successfully"
+    echo -e "${GREEN}${BOLD} AgencyStack component $script installed successfully${NC}"
+    # Record successful installation
+    echo "$(date +"%Y-%m-%d %H:%M:%S") - $script" >> /opt/agency_stack/installed_components.txt
+    
+    # Show motto after successful installation
+    source "$SCRIPT_PATH/agency_branding.sh" && random_tagline
+    echo ""
+    
+    # Show port allocation if port manager exists
+    if [ -f "$PORT_MANAGER" ]; then
+      local ports=$("$PORT_MANAGER" list 2>/dev/null)
+      if [ -n "$ports" ]; then
+        echo -e "${CYAN}Updated port allocations after installation:${NC}"
+        echo "$ports" | grep -i "$(basename "$script" .sh)" || echo "$ports" | tail -n 3
+      fi
+    fi
+    
+    return 0
+  else
+    update_state "$script" "failed"
+    log "ERROR" "Installation of $script failed with exit code $exit_code"
+    echo -e "${RED}${BOLD} AgencyStack component $script installation failed${NC}"
     return 1
   fi
 }

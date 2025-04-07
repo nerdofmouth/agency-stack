@@ -11,6 +11,7 @@ AgencyStack consists of a carefully curated selection of open-source application
 
 | Component | Description | Default URL |
 |-----------|-------------|-------------|
+| **System Prerequisites** | Core system packages and configurations | N/A |
 | **Traefik** | Edge router and reverse proxy, handles SSL certificates | N/A |
 | **Portainer** | Container management UI | https://portainer.yourdomain.com |
 | **Docker** | Container runtime | N/A |

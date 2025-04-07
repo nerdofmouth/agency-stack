@@ -96,6 +96,7 @@ help:
 	@echo "  $(BOLD)make cryptosync-logs$(RESET)  View Cryptosync logs"
 	@echo ""
 	@echo "$(BOLD)Component Installation Commands:$(RESET)"
+	@echo "  $(BOLD)make prerequisites$(RESET)            Install System Prerequisites"
 	@echo "  $(BOLD)make install-wordpress$(RESET)          Install WordPress"
 	@echo "  $(BOLD)make install-erpnext$(RESET)           Install ERPNext"
 	@echo "  $(BOLD)make install-posthog$(RESET)           Install PostHog"
@@ -624,6 +625,33 @@ validate:
 
 validate-report: REPORT := true
 validate-report: validate
+
+# Prerequisites Component
+prerequisites: validate
+	@echo "$(MAGENTA)$(BOLD)🔧 Installing System Prerequisites...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_prerequisites.sh $(if $(DOMAIN),--domain $(DOMAIN),) $(if $(ADMIN_EMAIL),--admin-email $(ADMIN_EMAIL),) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+prerequisites-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking System Prerequisites Status...$(RESET)"
+	@if [ -f "/opt/agency_stack/.prerequisites_ok" ]; then echo "$(GREEN)Prerequisites installed successfully$(RESET)"; else echo "$(RED)Prerequisites not installed or installation incomplete$(RESET)"; fi
+
+prerequisites-logs:
+	@echo "$(MAGENTA)$(BOLD)📋 Viewing System Prerequisites Logs...$(RESET)"
+	@ls -la /var/log/agency_stack/prerequisites-*.log 2>/dev/null || echo "$(YELLOW)No prerequisite installation logs found$(RESET)"
+	@echo ""
+	@for log in /var/log/agency_stack/prerequisites-*.log; do \
+		if [ -f "$$log" ]; then \
+			echo "$(CYAN)Log file: $$log$(RESET)"; \
+			tail -n 20 "$$log"; \
+			echo ""; \
+		fi; \
+	done
+
+prerequisites-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Reinstalling System Prerequisites...$(RESET)"
+	@echo "$(YELLOW)Removing Prerequisites marker file...$(RESET)"
+	@sudo rm -f /opt/agency_stack/.prerequisites_ok 
+	@sudo $(SCRIPTS_DIR)/components/install_prerequisites.sh $(if $(DOMAIN),--domain $(DOMAIN),) $(if $(ADMIN_EMAIL),--admin-email $(ADMIN_EMAIL),) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
 # WordPress
 install-wordpress: validate
