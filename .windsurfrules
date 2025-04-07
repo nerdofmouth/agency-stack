@@ -478,3 +478,79 @@ Optional: add signed `.zip` or `.shasum` to your `/releases/alpha/` bundle if yo
 *   ✅ Draft the README section for `make vm-fault-inject`
 *   ✅ Format the healthstamp spec
 *   ✅ Script a beta migration checklist (for converting Alpha installs)
+
+# 🛑 Repository Integrity Policy
+
+- **NO DIRECT REMOTE MODIFICATIONS**: Never modify scripts, configurations, or any files directly on the target VM.
+- **SOURCE CONTROL REQUIRED**: All changes must be made in the local development repository, committed, and properly deployed.
+- **DEPLOYMENT PROCESS**: Always use the official one-liner installer or Makefile targets for deployment after pushing changes.
+
+## 🔄 Correct Workflow
+
+1. Develop and test in local repository
+2. Commit changes with descriptive messages
+3. Push to the repository
+4. Deploy using one-liner: `curl -sSL [https://stack.nerdofmouth.com/install.sh](https://stack.nerdofmouth.com/install.sh) | sudo bash`
+5. Test using standardized Makefile targets
+
+## ⚠️ Safety Protocols
+
+- DO NOT run arbitrary Docker commands on production VMs
+- DO NOT bypass installation scripts with manual installations
+- DO NOT modify utility scripts (`/scripts/utils/*`) directly on VMs
+- DO NOT modify configuration files directly on VMs
+- DO NOT modify Makefile targets directly on VMs
+- DO NOT modify component scripts directly on VMs
+
+# 🔐 Required SSH Configuration - FIRST STEPS
+
+SSH passwordless authentication MUST be set up immediately after VM creation:
+
+```bash
+# 1. Generate SSH key if you don't have one
+if [ ! -f ~/.ssh/id_rsa ]; then
+  ssh-keygen -t rsa -b 4096 -C "agency-stack-admin"
+fi
+
+# 2. Copy SSH key to target VM (as root and deploy user)
+ssh-copy-id root@<vm-hostname>
+
+# 3. Create a deployment user with proper permissions
+ssh root@<vm-hostname> "useradd -m -s /bin/bash deploy && \
+  usermod -aG sudo,docker deploy && \
+  mkdir -p /home/deploy/.ssh && \
+  cp -r /root/.ssh/authorized_keys /home/deploy/.ssh/ && \
+  chown -R deploy:deploy /home/deploy/.ssh && \
+  chmod 700 /home/deploy/.ssh && \
+  chmod 600 /home/deploy/.ssh/authorized_keys"
+
+# 4. Test SSH access
+ssh deploy@<vm-hostname> "echo 'SSH access configured correctly'"
+
+
+## 4️⃣ VM Setup Process Checklist
+
+
+# 🔄 VM Setup Process (In Order)
+
+1. ✅ Create fresh VM
+2. ✅ Set up passwordless SSH (root)
+3. ✅ Create deployment user
+4. ✅ Set up passwordless SSH (deploy)
+5. ✅ Run SSH configuration test
+6. ✅ Run one-liner installer
+7. ✅ Verify base prerequisites
+8. ✅ Install required components with Makefile
+9. ✅ Run validation tests
+10. ✅ Document findings
+
+# 🔒 VM Hardening (Only for Final Distribution)
+
+VM hardening should ONLY be done as the FINAL step before creating a snapshot for distribution:
+
+```bash
+# Only run this when VM setup is COMPLETE
+ssh deploy@<vm-hostname> "cd /opt/agency_stack/repo && sudo make vm-snapshot"
+```
+
+Do **not** run hardening steps during development to avoid losing SSH access.
