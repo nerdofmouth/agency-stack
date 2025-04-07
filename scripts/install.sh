@@ -939,6 +939,16 @@ handle_error() {
 # Set up trap for error handling
 trap 'handle_error "${BASH_COMMAND}" $?' ERR
 
+# Check if we're in prepare-only mode passed from the one-liner
+PREPARE_ONLY=false
+for arg in "$@"; do
+  if [ "$arg" = "--prepare-only" ]; then
+    PREPARE_ONLY=true
+    ONE_LINE_MODE=true # Ensure we handle non-interactive parts properly
+    log "INFO" "Running in prepare-only mode"
+  fi
+done
+
 # Create a management symlink for easier access
 if [ ! -f "/usr/local/bin/agency_stack" ]; then
   log "INFO" "Creating agency_stack management symlink"
@@ -1053,4 +1063,6 @@ main_menu() {
 }
 
 # Start the main menu
-main_menu
+if [ "$PREPARE_ONLY" = false ]; then
+  main_menu
+fi
