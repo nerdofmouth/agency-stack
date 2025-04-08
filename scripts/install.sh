@@ -62,269 +62,6 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-# Function to handle first-run environment setup (for one-line installation)
-setup_first_run_environment() {
-  log "INFO" "Setting up first-run environment for one-line installation"
-  echo -e "${MAGENTA}${BOLD}"
-  echo -e "${MAGENTA}${BOLD} "
-  echo -e "${MAGENTA}${BOLD}   ____   ____    ___  ____     __  __ __  _____ ______   ____    __  __  _ "
-  echo -e "${MAGENTA}${BOLD}  /    | /    |  /  _]|    \   /  ]|  |  |/ ___/|      | /    |  /  ]|  |/ ]"
-  echo -e "${MAGENTA}${BOLD} |  o  ||   __| /  [_ |  _  | /  / |  |  (   \_ |      ||  o  | /  / |  ' / "
-  echo -e "${MAGENTA}${BOLD} |     ||  |  ||    _]|  |  |/  /  |  ~  |\__  ||_|  |_||     |/  /  |    \ "
-  echo -e "${MAGENTA}${BOLD} |  _  ||  |_ ||   [_ |  |  /   \_ |___, |/  \ |  |  |  |  _  /   \_ |     |"
-  echo -e "${MAGENTA}${BOLD} |  |  ||     ||     ||  |  \     ||     |\    |  |  |  |  |  \     ||  .  |"
-  echo -e "${MAGENTA}${BOLD} |__|__||___,_||_____||__|__|\____||____/  \___|  |__|  |__|__|\____||__|\_|"
-  echo -e "${MAGENTA}${BOLD}                                                                            "
-  echo -e "${MAGENTA}${BOLD} "
-  echo -e "${NC}"
-  echo -e "${CYAN}One-Line Installer${NC}"
-  echo "By Nerd of Mouth - Deploy Smart. Speak Nerd."
-  echo "https://stack.nerdofmouth.com"
-  echo ""
-  echo "\"The Agency Project: Metal + Meaning.\""
-  echo ""
-  
-  # System check
-  log "INFO" "Performing system checks..."
-  OS=$(grep -oP '(?<=^ID=).+' /etc/os-release | tr -d '"')
-  VERSION=$(grep -oP '(?<=^VERSION_ID=).+' /etc/os-release | tr -d '"')
-  PRETTY_NAME=$(grep -oP '(?<=^PRETTY_NAME=).+' /etc/os-release | tr -d '"')
-
-  if [[ "$OS" == "debian" || "$OS" == "ubuntu" ]]; then
-    echo -e "✓ Detected ${GREEN}$PRETTY_NAME${NC} - Recommended OS"
-  else
-    echo -e "${YELLOW}⚠️ Detected $PRETTY_NAME - Not officially supported but will attempt installation${NC}"
-  fi
-  
-  # Install essential dependencies first
-  log "INFO" "Installing essential dependencies..."
-  echo -e "${BOLD}Installing system prerequisites...${NC}"
-  
-  # Call our dedicated prerequisites component rather than installing packages directly
-  if [ -f "$(dirname "$(dirname "$SCRIPT_DIR")")/scripts/components/install_prerequisites.sh" ]; then
-    log "INFO" "Running dedicated prerequisites component installer"
-    echo -e "${BLUE}Installing prerequisites using component installer...${NC}"
-    
-    # Check if prerequisites have already been installed
-    if [ -f "/opt/agency_stack/.prerequisites_ok" ]; then
-      log "INFO" "Prerequisites already installed" "${GREEN}✅ Prerequisites already installed, skipping...${NC}"
-    else
-      bash "$(dirname "$(dirname "$SCRIPT_DIR")")/scripts/components/install_prerequisites.sh"
-      if [ $? -eq 0 ]; then
-        log "INFO" "Prerequisites installation completed successfully"
-        echo -e "${GREEN}✅ Prerequisites installation successful${NC}"
-      else
-        log "WARN" "Prerequisites component installer returned non-zero, using fallback method"
-        # Fallback to basic installation
-        apt-get update -qq
-        apt-get install -qq -y curl git wget make jq bc openssl unzip procps htop
-      fi
-    fi
-  else
-    # Fallback to basic installation if component isn't available
-    log "INFO" "Prerequisites component not found, using direct installation method"
-    apt-get update -qq
-    # Install basic utilities required for the Makefile to run
-    # Use -qq for quieter output and -y for automatic yes to prompts
-    log "INFO" "Installing basic utilities (curl, git, wget, make, jq, bc)"
-    echo -e "${BLUE}Installing basic utilities...${NC}"
-    apt-get install -qq -y curl git wget make jq bc openssl unzip procps htop
-  fi
-  
-  # Create base directories
-  log "INFO" "Setting up required directories..."
-  echo -e "${BOLD}Setting up required directory structure...${NC}"
-  
-  # Create base directories according to AgencyStack DevOps rules
-  mkdir -p /opt/agency_stack/clients/default
-  mkdir -p /opt/agency_stack/secrets
-  mkdir -p /var/log/agency_stack/clients
-  mkdir -p /var/log/agency_stack/components
-  mkdir -p /var/log/agency_stack/integrations
-  
-  # If we have the component directory setup utility, use it
-  if [ -f "$(dirname "$SCRIPT_DIR")/scripts/utils/setup_component_directories.sh" ]; then
-    log "INFO" "Running component directory setup utility"
-    echo -e "${BLUE}Setting up component directories using utility script...${NC}"
-    bash "$(dirname "$SCRIPT_DIR")/scripts/utils/setup_component_directories.sh" --force
-  fi
-  
-  # Clone repository if not already present and we're in one-line mode
-  if [ "$ONE_LINE_MODE" = true ]; then
-    log "INFO" "Cloning AgencyStack repository..."
-    echo -e "${BOLD}Cloning AgencyStack repository...${NC}"
-    
-    # Store the original working directory
-    ORIGINAL_DIR="$(pwd)"
-    
-    # Check if we already have an installation
-    if [ -d "/opt/agency_stack" ] || [ -d "/opt/agency_stack/clients" ]; then
-      log "WARN" "Existing installation found at /opt/agency_stack"
-      echo -e "${YELLOW}WARNING: Existing installation found at /opt/agency_stack${NC}"
-      
-      # In non-interactive mode, automatically backup and continue
-      if [ "$ONE_LINE_MODE" = true ]; then
-        log "INFO" "Running in non-interactive mode, creating backup and continuing"
-        echo -e "${BLUE}Creating backup of existing installation and continuing...${NC}"
-        
-        # Create timestamped backup
-        BACKUP_TS=$(date +"%Y%m%d%H%M%S")
-        BACKUP_DIR="/opt/agency_stack_backup_${BACKUP_TS}"
-        
-        log "INFO" "Creating backup at $BACKUP_DIR"
-        echo -e "${BLUE}Creating backup at $BACKUP_DIR${NC}"
-        
-        mkdir -p "$BACKUP_DIR"
-        cp -r /opt/agency_stack/* "$BACKUP_DIR/" 2>/dev/null || true
-        
-        log "INFO" "Backup completed at $BACKUP_DIR"
-        echo -e "${GREEN}Backup completed at $BACKUP_DIR${NC}"
-        
-        # Remove the repo directory to allow fresh clone
-        if [ -d "/opt/agency_stack/repo" ]; then
-          rm -rf /opt/agency_stack/repo
-          log "INFO" "Removed existing repository"
-        fi
-        
-        # Move to a safe directory
-        cd /tmp || cd / 
-        
-      else
-        # Interactive mode - show options to user
-        echo -e "What would you like to do?"
-        echo -e "  1. Backup and reinstall (recommended)"
-        echo -e "  2. Remove and reinstall (data will be lost)"
-        echo -e "  3. Exit installation"
-        read -p "Enter your choice [1-3]: " choice
-        
-        case "$choice" in
-          1)
-            # Create timestamped backup
-            BACKUP_TS=$(date +"%Y%m%d%H%M%S")
-            BACKUP_DIR="/opt/agency_stack_backup_${BACKUP_TS}"
-            mkdir -p "$BACKUP_DIR"
-            cp -r /opt/agency_stack/* "$BACKUP_DIR/" 2>/dev/null || true
-            
-            # Clean up repo directory
-            rm -rf /opt/agency_stack/repo
-            
-            # Move to a safe directory
-            cd /tmp || cd /
-            
-            log "INFO" "Created backup at $BACKUP_DIR"
-            echo -e "${GREEN}Created backup at $BACKUP_DIR${NC}"
-            ;;
-          2)
-            rm -rf /opt/agency_stack/repo
-            
-            # Move to a safe directory
-            cd /tmp || cd /
-            
-            log "INFO" "Removed existing repository"
-            ;;
-          3)
-            log "INFO" "User chose to exit installation"
-            echo -e "${YELLOW}Exiting installation at user request${NC}"
-            exit 0
-            ;;
-          *)
-            log "ERROR" "Invalid choice. Exiting."
-            echo -e "${RED}Invalid choice. Exiting.${NC}"
-            exit 1
-            ;;
-        esac
-      fi
-    fi
-    
-    # Now clone the repository - this should work whether we had an existing installation or not
-    log "INFO" "Cloning fresh repository"
-    echo -e "${BLUE}Cloning fresh repository from GitHub...${NC}"
-    
-    # Always work from a safe directory for Git operations
-    cd /tmp || cd /
-    
-    # Try multiple times with exponential backoff in case of network issues
-    RETRY_COUNT=0
-    MAX_RETRIES=3
-    RETRY_DELAY=5
-    CLONE_SUCCESS=false
-    
-    while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ "$CLONE_SUCCESS" = false ]; do
-      git clone https://github.com/nerdofmouth/agency-stack.git /opt/agency_stack/repo && CLONE_SUCCESS=true
-      
-      if [ "$CLONE_SUCCESS" = false ]; then
-        RETRY_COUNT=$((RETRY_COUNT + 1))
-        if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-          log "WARN" "Failed to clone repository, retrying in $RETRY_DELAY seconds (attempt $RETRY_COUNT of $MAX_RETRIES)"
-          echo -e "${YELLOW}Failed to clone repository, retrying in $RETRY_DELAY seconds (attempt $RETRY_COUNT of $MAX_RETRIES)${NC}"
-          sleep $RETRY_DELAY
-          RETRY_DELAY=$((RETRY_DELAY * 2))
-        fi
-      fi
-    done
-    
-    if [ "$CLONE_SUCCESS" = false ]; then
-      log "ERROR" "Failed to clone repository after $MAX_RETRIES attempts"
-      echo -e "${RED}Failed to clone repository after $MAX_RETRIES attempts.${NC}"
-      echo -e "${YELLOW}Please check your network connection and try again.${NC}"
-      exit 1
-    fi
-    
-    # Change to the repository directory
-    cd /opt/agency_stack/repo || {
-      log "ERROR" "Failed to change to repository directory"
-      echo -e "${RED}Failed to change to repository directory${NC}"
-      exit 1
-    }
-    
-    # Run prep-dirs target with retry logic
-    log "INFO" "Running make prep-dirs..."
-    echo -e "${BOLD}Running prep-dirs target...${NC}"
-    
-    if [ -f "Makefile" ]; then
-      # Try up to 3 times with a small delay between attempts
-      RETRY_COUNT=0
-      MAX_RETRIES=3
-      while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-        if make prep-dirs; then
-          log "INFO" "Successfully ran make prep-dirs"
-          break
-        else
-          RETRY_COUNT=$((RETRY_COUNT + 1))
-          if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-            log "WARN" "make prep-dirs failed, retrying (attempt $RETRY_COUNT of $MAX_RETRIES)"
-            echo -e "${YELLOW}make prep-dirs failed, retrying...${NC}"
-            sleep 2
-          else
-            log "WARN" "make prep-dirs encountered issues after $MAX_RETRIES attempts, continuing anyway"
-            echo -e "${YELLOW}make prep-dirs encountered issues, continuing...${NC}"
-          fi
-        fi
-      done
-    else
-      log "WARN" "Makefile not found, skipping prep-dirs"
-      echo -e "${YELLOW}Makefile not found, skipping prep-dirs${NC}"
-    fi
-    
-    # Run env-check to validate environment
-    log "INFO" "Running make env-check..."
-    echo -e "${BOLD}Running environment check...${NC}"
-    
-    if [ -f "Makefile" ]; then
-      make env-check || {
-        log "WARN" "Environment check reported issues"
-        echo -e "${YELLOW}Environment check reported issues, these will be fixed during installation${NC}"
-      }
-    else
-      log "WARN" "Makefile not found, skipping env-check"
-      echo -e "${YELLOW}Makefile not found, skipping env-check${NC}"
-    fi
-  fi
-  
-  log "INFO" "First-run environment setup completed"
-  echo -e "${GREEN}Environment preparation completed!${NC}"
-}
-
 # Add this function for ensuring script permissions
 ensure_script_permissions() {
   log "INFO" "Ensuring component scripts have proper executable permissions..."
@@ -337,6 +74,65 @@ ensure_script_permissions() {
   find "${SCRIPT_DIR}/utils" -name "*.sh" -type f -exec chmod +x {} \;
   
   log "SUCCESS" "Component script permissions configured"
+}
+
+# Basic pre-flight check function to be used in both one-line and regular mode
+basic_preflight_check() {
+  echo -e "${BLUE}${BOLD}Performing basic pre-flight checks...${NC}"
+  
+  # Check RAM
+  TOTAL_RAM=$(free -g | awk '/^Mem:/{print $2}')
+  if [ "$TOTAL_RAM" -lt 8 ]; then
+    echo -e "${RED}❌ RAM: ${TOTAL_RAM}GB - Insufficient RAM detected${NC}"
+    echo -e "${YELLOW}   Minimum 8GB required, 16GB+ recommended for full stack${NC}"
+    log "ERROR" "Insufficient RAM detected: ${TOTAL_RAM}GB (minimum 8GB required)"
+    if [ "$ONE_LINE_MODE" = true ]; then
+      log "ERROR" "Non-interactive installation aborted due to insufficient RAM"
+      exit 1
+    else
+      read -p "Continue anyway? This may lead to performance issues. [y/N] " continue_anyway
+      if [[ ! "$continue_anyway" =~ ^[Yy]$ ]]; then
+        log "INFO" "Installation aborted by user due to insufficient RAM"
+        exit 1
+      fi
+    fi
+  else
+    echo -e "${GREEN}✅ RAM: ${TOTAL_RAM}GB - Sufficient${NC}"
+    log "INFO" "RAM check passed: ${TOTAL_RAM}GB available"
+  fi
+  
+  # Check disk space
+  DISK_SPACE=$(df -h / | awk 'NR==2 {print $4}' | sed 's/G//')
+  if (( $(echo "$DISK_SPACE < 50" | bc -l) )); then
+    echo -e "${RED}❌ Disk Space: ${DISK_SPACE}GB - Insufficient disk space${NC}"
+    echo -e "${YELLOW}   Minimum 50GB required, 100GB+ recommended for full stack${NC}"
+    log "ERROR" "Insufficient disk space: ${DISK_SPACE}GB (minimum 50GB required)"
+    if [ "$ONE_LINE_MODE" = true ]; then
+      log "ERROR" "Non-interactive installation aborted due to insufficient disk space"
+      exit 1
+    else
+      read -p "Continue anyway? This may lead to storage issues. [y/N] " continue_anyway
+      if [[ ! "$continue_anyway" =~ ^[Yy]$ ]]; then
+        log "INFO" "Installation aborted by user due to insufficient disk space"
+        exit 1
+      fi
+    fi
+  else
+    echo -e "${GREEN}✅ Disk Space: ${DISK_SPACE}GB - Sufficient${NC}"
+    log "INFO" "Disk space check passed: ${DISK_SPACE}GB available"
+  fi
+  
+  # Check for public static IP
+  PUBLIC_IP=$(curl -s https://ipinfo.io/ip)
+  if [ -z "$PUBLIC_IP" ]; then
+    echo -e "${YELLOW}⚠️ Warning: Could not detect public IP address${NC}"
+    log "WARNING" "Could not detect public IP address"
+  else
+    echo -e "${GREEN}✅ Public IP: $PUBLIC_IP${NC}"
+    log "INFO" "Public IP detected: $PUBLIC_IP"
+  fi
+  
+  log "INFO" "Basic pre-flight check completed"
 }
 
 # Modify setup_first_run_environment to call ensure_script_permissions
@@ -372,6 +168,9 @@ setup_first_run_environment() {
   else
     echo -e "${YELLOW}⚠️ Detected $PRETTY_NAME - Not officially supported but will attempt installation${NC}"
   fi
+  
+  # Run basic pre-flight check before installation
+  basic_preflight_check
   
   # Install essential dependencies first
   log "INFO" "Installing essential dependencies..."
@@ -603,6 +402,58 @@ setup_first_run_environment() {
   
   log "INFO" "First-run environment setup completed"
   echo -e "${GREEN}Environment preparation completed!${NC}"
+}
+
+# Add pre-flight verification section
+run_preflight_verification() {
+  log "INFO" "Running pre-flight installation verification..."
+  
+  # First try to find preflight check script relative to current script
+  PREFLIGHT_SCRIPT="$(dirname "$0")/components/preflight_check.sh"
+  
+  # If not found, try the repository path
+  if [ ! -f "$PREFLIGHT_SCRIPT" ] && [ -d "/opt/agency_stack/repo" ]; then
+    PREFLIGHT_SCRIPT="/opt/agency_stack/repo/scripts/components/preflight_check.sh"
+  fi
+  
+  if [ -f "$PREFLIGHT_SCRIPT" ]; then
+    echo -e "${CYAN}${BOLD}🔍 Performing pre-installation checklist verification...${NC}"
+    log "INFO" "Running preflight check using script at $PREFLIGHT_SCRIPT"
+    
+    # Set domain parameter if defined
+    DOMAIN_PARAM=""
+    if [ -n "$PRIMARY_DOMAIN" ]; then
+      DOMAIN_PARAM="--domain $PRIMARY_DOMAIN"
+    elif [ -n "$DOMAIN" ]; then
+      DOMAIN_PARAM="--domain $DOMAIN"
+    fi
+    
+    # Run the preflight check with appropriate parameters
+    bash "$PREFLIGHT_SCRIPT" $DOMAIN_PARAM $([ "$INTERACTIVE" = false ] && echo "--non-interactive")
+    PREFLIGHT_EXIT=$?
+    
+    if [ $PREFLIGHT_EXIT -ne 0 ]; then
+      if [ "$INTERACTIVE" = true ]; then
+        echo ""
+        echo -e "${YELLOW}⚠️ Pre-flight verification detected issues that may prevent successful installation.${NC}"
+        read -p "Would you like to continue anyway? [y/N] " continue_anyway
+        if [[ ! "$continue_anyway" =~ ^[Yy]$ ]]; then
+          log "INFO" "Installation aborted by user after pre-flight warnings"
+          exit 1
+        fi
+        log "WARN" "User chose to continue despite pre-flight verification warnings"
+      else
+        log "ERROR" "Pre-flight verification failed in non-interactive mode. Aborting."
+        exit 1
+      fi
+    else
+      log "SUCCESS" "Pre-flight verification passed successfully"
+      echo -e "${GREEN}✅ Pre-flight verification completed successfully${NC}"
+    fi
+  else
+    log "WARN" "Pre-flight verification script not found at $PREFLIGHT_SCRIPT. Skipping verification."
+    echo -e "${YELLOW}⚠️ Pre-flight verification script not found. It is recommended to run 'make preflight-check' before installation.${NC}"
+  fi
 }
 
 # Run first-run setup if in one-line mode
@@ -949,6 +800,9 @@ function check_dns_configuration() {
 
 # Check DNS configuration
 check_dns_configuration
+
+# Run comprehensive pre-flight verification
+run_preflight_verification
 
 # Check system dependencies
 check_dependencies
@@ -1467,5 +1321,6 @@ fi
 
 # Start the main menu
 if [ "$PREPARE_ONLY" = false ]; then
+  run_preflight_verification
   main_menu
 fi

@@ -185,6 +185,44 @@ cleanup() {
     fi
 }
 
+# Function to run pre-installation checks
+run_pre_installation_checks() {
+  local component="$1"
+  local skip_checks="${2:-false}"
+  
+  if [ "$skip_checks" = "true" ]; then
+    log_info "Skipping pre-installation checks due to skip_checks=true"
+    return 0
+  fi
+  
+  log_info "Running pre-installation checks for $component"
+  
+  # Check if preflight script exists
+  local preflight_script="${SCRIPT_DIR:-$(dirname "$0")/..}/../components/preflight_check.sh"
+  if [ -f "$preflight_script" ]; then
+    log_info "Found preflight check script, running verification"
+    
+    # Run with reduced checks for component installation
+    bash "$preflight_script" --domain "$DOMAIN" --skip-ssh --skip-ports
+    local preflight_status=$?
+    
+    if [ $preflight_status -ne 0 ]; then
+      log_warning "Pre-installation checks detected issues that may affect $component"
+      if [ "${FORCE:-false}" != "true" ]; then
+        log_error "Installation aborted due to failed pre-installation checks"
+        log_info "You can bypass this with --force flag or by running 'make preflight-check' to see details"
+        return 1
+      else
+        log_warning "Continuing installation despite pre-installation check warnings (--force)"
+      fi
+    fi
+  else
+    log_info "No preflight check script found, continuing with installation"
+  fi
+  
+  return 0
+}
+
 # Set trap for cleanup
 trap cleanup EXIT
 
