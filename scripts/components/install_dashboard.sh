@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 # Set up logging
-LOG_FILE="/var/log/agency_stack/components/dashboard.log"
+LOG_FILE=${LOG_FILE:-/var/log/agency_stack/components/dashboard.log}
 mkdir -p "$(dirname "$LOG_FILE")"
 
 # Create our own logging functions
@@ -39,14 +39,16 @@ log_success() {
 # Default values
 DASHBOARD_PORT=3000
 DASHBOARD_DIR="/opt/agency_stack/apps/dashboard"
+CLIENT_ID=${CLIENT_ID:-default}
+DOMAIN=${DOMAIN:-localhost}
+KEYCLOAK_REALM=${KEYCLOAK_REALM:-agency_stack}
+KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-dashboard}
 DASHBOARD_LOGS_DIR="/var/log/agency_stack/components"
 DASHBOARD_REPO="https://github.com/nerdofmouth/agency-stack-dashboard.git"
 DASHBOARD_BRANCH="main"
-DOMAIN="proto001.alpha.nerdofmouth.com"
 
 # Parse command-line arguments
 ADMIN_EMAIL=""
-CLIENT_ID=""
 FORCE=false
 WITH_DEPS=false
 VERBOSE=false
@@ -205,200 +207,151 @@ check_keycloak() {
   return 0
 }
 
-# Clone or update dashboard source code
+# Setup dashboard source code
 setup_dashboard_source() {
-  log_info "Setting up dashboard source code"
+  log_info "Setting up dashboard source code..."
   
-  if [[ -d "${DASHBOARD_DIR}/.git" ]]; then
-    log_info "Dashboard repository already exists, updating..."
-    cd "$DASHBOARD_DIR" || return 1
-    git fetch origin
-    git reset --hard "origin/${DASHBOARD_BRANCH}"
-    git clean -fdx
-  else
-    log_info "Cloning dashboard repository..."
-    
-    # For testing, if repository doesn't exist yet, create a basic structure
-    if [[ "$USE_GITHUB" != "true" ]] || ! git clone -b "$DASHBOARD_BRANCH" "$DASHBOARD_REPO" "$DASHBOARD_DIR" 2>/dev/null; then
-      log_warning "Could not clone repository, creating basic structure instead"
-      mkdir -p "${DASHBOARD_DIR}/pages"
-      
-      # Create minimal Next.js structure
-      echo 'export default function Home() { return <h1>AgencyStack Dashboard</h1>; }' > "${DASHBOARD_DIR}/pages/index.js"
-      
-      # Create package.json
-      cat > "${DASHBOARD_DIR}/package.json" <<EOF
-{
-  "name": "agency-stack-dashboard",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
-  },
-  "dependencies": {
-    "next": "^12.3.4",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
-  }
-}
-EOF
-    else
-      log_info "Successfully cloned dashboard repository"
-    fi
-  fi
+  # Ensure the dashboard directory exists
+  mkdir -p "${DASHBOARD_DIR}"
   
-  log_info "Dashboard source code setup complete"
-  return 0
+  # Copy dashboard source files from the repository to installation directory
+  log_info "Copying dashboard source files from repository..."
+  
+  # Copy API endpoints
+  mkdir -p "${DASHBOARD_DIR}/pages/api"
+  cp -r "${REPO_ROOT}/dashboard/api/"* "${DASHBOARD_DIR}/pages/api/"
+  
+  # Copy pages
+  cp -r "${REPO_ROOT}/dashboard/pages/"* "${DASHBOARD_DIR}/pages/"
+  
+  # Copy components
+  mkdir -p "${DASHBOARD_DIR}/components"
+  cp -r "${REPO_ROOT}/dashboard/components/"* "${DASHBOARD_DIR}/components/"
+  
+  # Copy styles
+  mkdir -p "${DASHBOARD_DIR}/styles"
+  cp -r "${REPO_ROOT}/dashboard/styles/"* "${DASHBOARD_DIR}/styles/"
+  
+  # Copy package.json
+  cp "${REPO_ROOT}/dashboard/package.json" "${DASHBOARD_DIR}/"
+  
+  log_success "Dashboard source files copied successfully."
 }
 
 # Generate environment configuration
 generate_env_config() {
-  log_info "Generating environment configuration"
+  log_info "Generating environment configuration..."
   
-  local keycloak_config=""
-  local keycloak_client_id="agency-stack-dashboard"
-  local keycloak_realm="agency-stack"
-  local keycloak_url="https://auth.${DOMAIN}"
-  local api_url="https://${DOMAIN}/api"
-  
-  # Check for client-specific Keycloak config
-  if [[ -n "$CLIENT_ID" && -f "/opt/agency_stack/clients/${CLIENT_ID}/keycloak/config.json" ]]; then
-    keycloak_config="/opt/agency_stack/clients/${CLIENT_ID}/keycloak/config.json"
-    log_info "Using client-specific Keycloak config: $keycloak_config"
-    
-    # Extract values from client config
-    if command -v jq &>/dev/null; then
-      keycloak_realm=$(jq -r '.realm // "agency-stack"' "$keycloak_config")
-      keycloak_url=$(jq -r '.url // "https://auth.proto001.alpha.nerdofmouth.com"' "$keycloak_config")
-      keycloak_client_id=$(jq -r '.clients[] | select(.clientId == "agency-stack-dashboard") | .clientId // "agency-stack-dashboard"' "$keycloak_config")
-    fi
-  # Check for global Keycloak config
-  elif [[ -f "/opt/agency_stack/secrets/keycloak.env" ]]; then
-    keycloak_config="/opt/agency_stack/secrets/keycloak.env"
-    log_info "Using global Keycloak config: $keycloak_config"
-    
-    # Source the env file to get variables
-    # shellcheck disable=SC1090
-    source "$keycloak_config"
-    
-    # Use variables from the sourced file if they exist
-    keycloak_realm="${KEYCLOAK_REALM:-$keycloak_realm}"
-    keycloak_url="${KEYCLOAK_URL:-$keycloak_url}"
-    keycloak_client_id="${KEYCLOAK_CLIENT_ID:-$keycloak_client_id}"
-  else
-    log_warning "No Keycloak configuration found, using defaults"
-  fi
-  
-  # Create .env.local file
+  # Create .env.local file for NextJS dashboard
   cat > "${DASHBOARD_DIR}/.env.local" <<EOF
-# Generated by AgencyStack installer - $(date)
-NEXT_PUBLIC_APP_NAME="AgencyStack Dashboard"
-NEXT_PUBLIC_APP_DESCRIPTION="Real-time monitoring of AgencyStack components"
-NEXT_PUBLIC_KEYCLOAK_REALM=${keycloak_realm}
-NEXT_PUBLIC_KEYCLOAK_URL=${keycloak_url}
-NEXT_PUBLIC_KEYCLOAK_CLIENT_ID=${keycloak_client_id}
-NEXT_PUBLIC_API_URL=${api_url}
-NEXT_PUBLIC_COMPONENT_REGISTRY_PATH="/opt/agency_stack/config/registry/component_registry.json"
-NEXT_PUBLIC_LOGS_DIR="/var/log/agency_stack/components"
-NEXT_PUBLIC_INSTALL_DIR="/opt/agency_stack"
+# AgencyStack Dashboard Configuration
+# Auto-generated by install_dashboard.sh
+
+# Basic Configuration
+NEXT_PUBLIC_APP_NAME=AgencyStack Dashboard
+NEXT_PUBLIC_DOMAIN=${DOMAIN}
+NEXT_PUBLIC_CLIENT_ID=${CLIENT_ID}
+
+# Keycloak SSO Configuration
+NEXT_PUBLIC_KEYCLOAK_URL=https://keycloak.${DOMAIN}
+NEXT_PUBLIC_KEYCLOAK_REALM=${KEYCLOAK_REALM}
+NEXT_PUBLIC_KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID}
+
+# API Configuration
+NEXT_PUBLIC_API_URL=/api
 EOF
 
-  if [[ -n "$CLIENT_ID" ]]; then
-    echo "NEXT_PUBLIC_CLIENT_ID=${CLIENT_ID}" >> "${DASHBOARD_DIR}/.env.local"
-    echo "NEXT_PUBLIC_CLIENT_INSTALL_DIR=/opt/agency_stack/clients/${CLIENT_ID}" >> "${DASHBOARD_DIR}/.env.local"
-  fi
+  # Make sure permissions are correct
+  chmod 644 "${DASHBOARD_DIR}/.env.local"
   
-  log_info "Environment configuration generated: ${DASHBOARD_DIR}/.env.local"
-  return 0
+  log_success "Environment configuration generated."
 }
 
 # Build the dashboard application
 build_dashboard() {
-  log_info "Building dashboard application"
+  log_info "Building dashboard application..."
   
-  cd "$DASHBOARD_DIR" || return 1
+  cd "${DASHBOARD_DIR}" || return 1
   
-  log_info "Installing dependencies with pnpm"
-  if ! pnpm install --frozen-lockfile; then
-    log_error "Failed to install dependencies with pnpm, trying npm"
-    npm install
-    if [[ $? -ne 0 ]]; then
-      log_error "Failed to install dependencies"
-      return 1
-    fi
-  fi
+  # Ensure npm dependencies are installed
+  log_info "Installing npm dependencies..."
+  npm install --quiet || {
+    log_error "Failed to install npm dependencies"
+    return 1
+  }
   
-  log_info "Building Next.js application"
-  if ! pnpm build; then
-    log_error "Failed to build with pnpm, trying npm"
-    npm run build
-    if [[ $? -ne 0 ]]; then
-      log_error "Failed to build application"
-      return 1
-    fi
-  fi
+  # Build the Next.js application
+  log_info "Building Next.js application..."
+  npm run build || {
+    log_error "Failed to build Next.js application"
+    return 1
+  }
   
-  log_info "Dashboard build completed successfully"
+  log_success "Dashboard application built successfully"
   return 0
 }
 
 # Setup process manager (pm2) for the dashboard
 setup_process_manager() {
-  log_info "Setting up process manager"
+  log_info "Setting up process manager for dashboard..."
   
-  # Install pm2 if not already installed
+  # Check if pm2 is installed
   if ! command -v pm2 &>/dev/null; then
-    log_info "Installing pm2"
-    npm install -g pm2
-    if [[ $? -ne 0 ]]; then
+    log_info "Installing pm2 process manager..."
+    npm install -g pm2 || {
       log_error "Failed to install pm2"
       return 1
-    fi
+    }
   fi
   
-  # Create pm2 ecosystem config
+  # Create the ecosystem.config.js file for pm2
+  log_info "Creating pm2 ecosystem configuration..."
   cat > "${DASHBOARD_DIR}/ecosystem.config.js" <<EOF
 module.exports = {
-  apps: [
-    {
-      name: "agency-stack-dashboard",
-      script: "node_modules/next/dist/bin/next",
-      args: "start",
-      cwd: "${DASHBOARD_DIR}",
-      instances: 1,
-      autorestart: true,
-      watch: false,
-      max_memory_restart: "500M",
-      env: {
-        NODE_ENV: "production",
-        PORT: ${DASHBOARD_PORT}
-      },
-      log_file: "${DASHBOARD_LOGS_DIR}/dashboard-pm2.log",
-      out_file: "${DASHBOARD_LOGS_DIR}/dashboard-out.log",
-      error_file: "${DASHBOARD_LOGS_DIR}/dashboard-error.log",
-      merge_logs: true,
-      time: true
+  apps: [{
+    name: 'agencystack-dashboard',
+    script: 'npm',
+    args: 'start',
+    instances: 1,
+    autorestart: true,
+    watch: false,
+    max_memory_restart: '500M',
+    env: {
+      NODE_ENV: 'production',
+      PORT: ${DASHBOARD_PORT}
     }
-  ]
+  }]
 };
 EOF
   
-  # Start or restart the application
-  cd "$DASHBOARD_DIR" || return 1
-  pm2 start ecosystem.config.js --update-env
-  
-  # Save pm2 configuration so it persists across reboots
-  pm2 save
-  
-  # Set up pm2 to start on system boot if needed
-  if ! systemctl is-enabled pm2-root &>/dev/null; then
-    pm2 startup
-    systemctl enable pm2-root
+  # Stop any existing dashboard process
+  if pm2 list | grep -q "agencystack-dashboard"; then
+    log_info "Stopping existing dashboard process..."
+    pm2 stop agencystack-dashboard || true
+    pm2 delete agencystack-dashboard || true
   fi
   
-  log_info "Process manager setup complete"
+  # Start the dashboard process
+  log_info "Starting dashboard process with pm2..."
+  cd "${DASHBOARD_DIR}" || return 1
+  pm2 start ecosystem.config.js || {
+    log_error "Failed to start dashboard process"
+    return 1
+  }
+  
+  # Save the pm2 process list so it survives reboots
+  log_info "Saving pm2 process list..."
+  pm2 save || {
+    log_warning "Failed to save pm2 process list, dashboard may not auto-start after reboot"
+  }
+  
+  # Set up pm2 to start on boot
+  log_info "Setting up pm2 to start on boot..."
+  pm2 startup || {
+    log_warning "Failed to set up pm2 startup, dashboard may not auto-start after reboot"
+  }
+  
+  log_success "Process manager setup complete"
   return 0
 }
 
