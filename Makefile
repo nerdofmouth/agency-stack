@@ -954,7 +954,7 @@ peertube-restart:
 # Drone CI - Continuous Integration and Delivery Platform
 droneci:
 	@echo "Installing Drone CI..."
-	@sudo $(SCRIPTS_DIR)/components/install_droneci.sh --domain $(DRONECI_DOMAIN) $(INSTALL_FLAGS)
+	@sudo $(SCRIPTS_DIR)/components/install_droneci.sh --domain $(DOMAIN) $(INSTALL_FLAGS)
 
 droneci-status:
 	@docker ps -a | grep drone || echo "Drone CI is not running"
@@ -2161,7 +2161,7 @@ security-restart:
 # Dashboard Component
 dashboard: validate
 	@echo "$(MAGENTA)$(BOLD)🚀 Installing AgencyStack Next.js Dashboard...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/install_dashboard.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+	@sudo $(SCRIPTS_DIR)/components/install_dashboard.sh --domain "$(DOMAIN)" --admin-email "$(ADMIN_EMAIL)" $(if $(CLIENT_ID),--client-id "$(CLIENT_ID)",) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
 dashboard-status:
 	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Dashboard Status...$(RESET)"
