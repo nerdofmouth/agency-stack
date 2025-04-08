@@ -105,6 +105,37 @@ Each entry in `component_registry.json` must include:
 
 ---
 
+
+* * *
+
+## 📘 Instruction Block for AgencyStack Alpha/Beta Rulebook
+
+Let's add a clean instruction update:
+
+* * *
+
+### 🔒 SSO & Identity Management Protocol — Beta Phase Forward
+
+As of the Alpha milestone, all components with `sso: true` **must** integrate with **Keycloak** as the primary identity provider unless explicitly excluded in writing.
+
+**Requirements**:
+
+*   Each `sso: true` component must:
+    *   Support Keycloak-based login via OIDC or SAML
+    *   Use tenant-isolated realms when multi\_tenant = true
+    *   Enforce role-based access controls mapped via Keycloak groups
+    *   Participate in unified session management where applicable
+*   Installation scripts must:
+    *   Check for Keycloak availability and realm readiness
+    *   Fail loudly if Keycloak is missing or misconfigured
+    *   Offer `--enable-keycloak` as an install flag
+*   `component_registry.json` entries must include:
+    *   `sso_configured: true` only after actual live integration is tested
+
+Keycloak is now a **system-wide dependency for SSO** and will be validated as part of `make alpha-check` and future `make beta-check` workflows.
+
+
+
 ### 📖 Component Documentation
 
 Each component requires:
@@ -649,3 +680,34 @@ If a component does not yet support Keycloak, install scripts must:
 
 - Ignore `--enable-keycloak` without failure
 - Log a warning like:
+
+
+
+## 🚦Priority Testing Roadmap: Demonstrating Live Value
+
+Here’s a tiered rollout plan, ranked by _immediate impact + strategic value_:
+
+### 🔥 Phase 1: Visual + Metric Impact
+
+*   ✅ **Grafana** (visual metrics): Confirm system dashboard and usage metrics
+*   ✅ **PostHog**: User analytics + behavior tracking (esp. on custom sites)
+*   ✅ **Portainer**: Show off live container control + real-time dashboards
+*   ✅ **Keycloak**: Confirm multi-realm login flow across components
+
+### 📡 Phase 2: Live Communication Stack
+
+*   ✅ **Jitsi** or **Mattermost**: Self-hosted meetings, team chat, or community comms
+*   ✅ **Mailu**: Setup one live domain for email (testing newsletters + AI replies)
+*   ✅ **VoIP**: Call routing, audio quality testing, client-ready hotline demo
+
+### 🛠️ Phase 3: Business Infrastructure
+
+*   ✅ **ERPNext**: Inventory, finance, CRM, rental module setup
+*   ✅ **Documenso**: Contracts and e-signatures (you’ll love this for the agency)
+*   ✅ [**Cal.com**](http://Cal.com) **+ Listmonk**: Schedule + email automation
+
+### 🧠 Phase 4: AI + Builder Interface
+
+*   ✅ **Ollama**: Local LLM workflows (support agents, contract generation, content)
+*   ✅ [**Builder.io**](http://Builder.io): Connected to Next.js app and database templates
+*   ✅ **Next.js** frontend + Keycloak login: Working demo of SSO + theming
