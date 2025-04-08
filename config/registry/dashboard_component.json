@@ -1,0 +1,27 @@
+{
+  "dashboard": {
+    "name": "AgencyStack Dashboard",
+    "category": "Monitoring & Management",
+    "version": "1.0.0",
+    "integration_status": {
+      "installed": true,
+      "hardened": true,
+      "makefile": true,
+      "sso": false,
+      "dashboard": true,
+      "logs": true,
+      "docs": true,
+      "auditable": true,
+      "traefik_tls": false,
+      "multi_tenant": true
+    },
+    "description": "Real-time status monitor for AgencyStack components",
+    "ports": [],
+    "paths": {
+      "install": "/opt/agency_stack/dashboard",
+      "logs": "/var/log/agency_stack/components/dashboard.log",
+      "executable": "/usr/local/bin/agency-stack-dashboard"
+    },
+    "dependencies": ["prerequisites"]
+  }
+}

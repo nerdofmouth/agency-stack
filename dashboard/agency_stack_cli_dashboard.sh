@@ -25,7 +25,7 @@ LOGS_SYMBOL="📋"
 DASHBOARD_SYMBOL="🖥️"
 
 # Default paths
-REGISTRY_PATH="/config/registry/component_registry.json"
+REGISTRY_PATH="/root/_repos/agency-stack/config/registry/component_registry.json"
 LOGS_DIR="/var/log/agency_stack/components"
 INSTALL_DIR="/opt/agency_stack"
 

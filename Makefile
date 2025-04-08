@@ -435,32 +435,19 @@ setup-roles:
 
 security-audit:
 	@echo "🔐 Running security audit..."
-		sudo bash $(SCRIPTS_DIR)/security/audit_stack.sh --client-id "$(CLIENT_ID)"; \
-	else \
-		sudo bash $(SCRIPTS_DIR)/security/audit_stack.sh; \
-	fi
+		sudo bash $(SCRIPTS_DIR)/security/audit_stack.sh $(if $(VERBOSE),--verbose,) $(if $(REPORT),--report,)
 
 security-fix:
 	@echo "🔧 Fixing security issues..."
-		sudo bash $(SCRIPTS_DIR)/security/audit_stack.sh --fix --client-id "$(CLIENT_ID)"; \
-	else \
-		sudo bash $(SCRIPTS_DIR)/security/audit_stack.sh --fix; \
-	fi
+		sudo bash $(SCRIPTS_DIR)/security/audit_stack.sh --fix $(if $(VERBOSE),--verbose,) $(if $(REPORT),--report,)
 
 rotate-secrets:
 	@echo "🔄 Rotating secrets..."
-		sudo bash $(SCRIPTS_DIR)/security/generate_secrets.sh --rotate --client-id "$(CLIENT_ID)" --service "$(SERVICE)"; \
-		sudo bash $(SCRIPTS_DIR)/security/generate_secrets.sh --rotate --client-id "$(CLIENT_ID)"; \
-	else \
-		sudo bash $(SCRIPTS_DIR)/security/generate_secrets.sh --rotate; \
-	fi
+		sudo bash $(SCRIPTS_DIR)/security/generate_secrets.sh --rotate $(if $(VERBOSE),--verbose,) $(if $(REPORT),--report,)
 
 setup-log-segmentation:
 	@echo "📋 Setting up log segmentation..."
-		sudo bash $(SCRIPTS_DIR)/security/setup_log_segmentation.sh --client-id "$(CLIENT_ID)"; \
-	else \
-		sudo bash $(SCRIPTS_DIR)/security/setup_log_segmentation.sh; \
-	fi
+		sudo bash $(SCRIPTS_DIR)/security/setup_log_segmentation.sh $(if $(VERBOSE),--verbose,) $(if $(REPORT),--report,)
 
 verify-certs:
 	@echo "🔒 Verifying TLS certificates..."
@@ -2169,6 +2156,46 @@ security-restart:
 	else \
 		echo "$(RED)❌ Security audit script not found. Is Security component installed?$(RESET)"; \
 		echo "$(CYAN)Install with: make security$(RESET)"; \
+	fi
+
+# Dashboard Component
+dashboard: validate
+	@echo "$(MAGENTA)$(BOLD)🚀 Installing AgencyStack Dashboard...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_dashboard.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+dashboard-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Dashboard Status...$(RESET)"
+	@if [ -f "/opt/agency_stack/dashboard/.installed_ok" ]; then \
+		echo "$(GREEN)Dashboard is installed and ready$(RESET)"; \
+		if [ -f "/usr/local/bin/agency-stack-dashboard" ]; then \
+			echo "$(GREEN)Dashboard executable is available$(RESET)"; \
+		else \
+			echo "$(RED)Dashboard executable is missing$(RESET)"; \
+		fi \
+	else \
+		echo "$(RED)Dashboard is not installed$(RESET)"; \
+	fi
+
+dashboard-logs:
+	@echo "$(MAGENTA)$(BOLD)📋 Viewing Dashboard Logs...$(RESET)"
+	@if [ -f "/var/log/agency_stack/components/dashboard.log" ]; then \
+		tail -n 50 /var/log/agency_stack/components/dashboard.log; \
+	else \
+		echo "$(RED)No dashboard logs found$(RESET)"; \
+	fi
+
+dashboard-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Dashboard...$(RESET)"
+	@sudo pkill -f "agency-stack-dashboard" || true
+	@echo "$(GREEN)Dashboard service restarted$(RESET)"
+
+dashboard-test:
+	@echo "$(MAGENTA)$(BOLD)🧪 Testing Dashboard...$(RESET)"
+	@if [ -f "/usr/local/bin/agency-stack-dashboard" ]; then \
+		timeout 5 /usr/local/bin/agency-stack-dashboard || true; \
+		echo "$(GREEN)Dashboard test completed$(RESET)"; \
+	else \
+		echo "$(RED)Dashboard executable not found$(RESET)"; \
 	fi
 
 # Demo Core Installation
