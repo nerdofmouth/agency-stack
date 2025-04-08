@@ -228,6 +228,11 @@ setup_first_run_environment() {
   # Ensure all scripts have proper permissions
   ensure_script_permissions
   
+  # Run dependency checker to ensure all required dependencies are installed
+  log "INFO" "Checking and installing dependencies"
+  echo -e "${BLUE}Ensuring all required dependencies are installed...${NC}"
+  bash /opt/agency_stack/repo/scripts/utils/dependency_checker.sh
+  
   # Clone repository if not already present and we're in one-line mode
   if [ "$ONE_LINE_MODE" = true ]; then
     log "INFO" "Cloning AgencyStack repository..."
@@ -353,6 +358,16 @@ setup_first_run_environment() {
       echo -e "${YELLOW}Please check your network connection and try again.${NC}"
       exit 1
     fi
+    
+    # Run permission check script to ensure all component scripts are executable
+    log "INFO" "Running permission check script"
+    echo -e "${BLUE}Ensuring proper permissions for all component scripts...${NC}"
+    bash /opt/agency_stack/repo/scripts/utils/permission_check.sh
+    
+    # Run dependency checker to ensure all required dependencies are installed
+    log "INFO" "Checking and installing dependencies"
+    echo -e "${BLUE}Ensuring all required dependencies are installed...${NC}"
+    bash /opt/agency_stack/repo/scripts/utils/dependency_checker.sh
     
     # Change to the repository directory
     cd /opt/agency_stack/repo || {
