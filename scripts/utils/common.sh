@@ -83,6 +83,15 @@ check_command() {
     return 0
 }
 
+# Ensure scripts are executable
+ensure_executable() {
+    local script_path="$1"
+    if [[ -f "$script_path" && ! -x "$script_path" ]]; then
+        log_warning "Script $script_path is not executable, fixing permissions"
+        chmod +x "$script_path" || log_error "Failed to set executable permission on $script_path"
+    fi
+}
+
 ensure_directory() {
     local dir="$1"
     local permissions="${2:-755}"
