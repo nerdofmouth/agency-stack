@@ -17,6 +17,47 @@ DEFAULT_LOG_DIR="/var/log/agency_stack"
 MAX_LOG_SIZE_MB=10
 MAX_LOG_FILES=5
 
+# General-purpose log function for backwards compatibility
+# This ensures existing component scripts continue to work
+log() {
+    local level="$1"
+    local message="$2"
+    local display="${3:-$message}"
+    
+    case "$level" in
+        "INFO")
+            log_info "$message"
+            if [[ -n "${display}" ]]; then
+                echo -e "${display}"
+            fi
+            ;;
+        "SUCCESS")
+            log_success "$message"
+            if [[ -n "${display}" ]]; then
+                echo -e "${GREEN}✅ ${display}${NC}"
+            fi
+            ;;
+        "WARNING")
+            log_warning "$message"
+            if [[ -n "${display}" ]]; then
+                echo -e "${YELLOW}⚠️ ${display}${NC}"
+            fi
+            ;;
+        "ERROR")
+            log_error "$message"
+            if [[ -n "${display}" ]]; then
+                echo -e "${RED}❌ ${display}${NC}"
+            fi
+            ;;
+        *)
+            log_info "$message"
+            if [[ -n "${display}" ]]; then
+                echo -e "${display}"
+            fi
+            ;;
+    esac
+}
+
 # Rotate a log file when it reaches the maximum size
 rotate_log() {
     local log_file="$1"

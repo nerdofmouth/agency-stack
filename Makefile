@@ -1897,7 +1897,7 @@ smoke-test-all:
 # Backup Strategy
 backup-strategy: validate
 	@echo "$(MAGENTA)$(BOLD)💾 Installing Backup Strategy (Restic)...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/install_backup_strategy.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+	@sudo $(SCRIPTS_DIR)/components/install_backup_strategy.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(TEST_MODE),--test-mode,)
 
 backup-strategy-status:
 	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Backup Strategy Status...$(RESET)"
@@ -1940,7 +1940,7 @@ backup-strategy-restart:
 # Signing Timestamps
 signing-timestamps: validate
 	@echo "$(MAGENTA)$(BOLD)🔏 Installing Signing & Timestamps...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/install_signing_timestamps.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+	@sudo $(SCRIPTS_DIR)/components/install_signing_timestamps.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(TEST_MODE),--test-mode,)
 
 signing-timestamps-status:
 	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Signing & Timestamps Status...$(RESET)"
@@ -1986,7 +1986,7 @@ signing-timestamps-restart:
 # Docker
 docker: validate
 	@echo "$(MAGENTA)$(BOLD)🐳 Installing Docker Container Runtime...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/install_docker.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+	@sudo $(SCRIPTS_DIR)/components/install_docker.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(TEST_MODE),--test-mode,)
 
 docker-status:
 	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Docker Status...$(RESET)"
@@ -2031,7 +2031,7 @@ docker-restart:
 # Docker Compose
 docker-compose: validate
 	@echo "$(MAGENTA)$(BOLD)🐙 Installing Docker Compose...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/install_docker_compose.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+	@sudo $(SCRIPTS_DIR)/components/install_docker_compose.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(TEST_MODE),--test-mode,)
 
 docker-compose-status:
 	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Docker Compose Status...$(RESET)"
@@ -2066,7 +2066,7 @@ docker-compose-restart:
 # Fail2ban
 fail2ban: validate
 	@echo "$(MAGENTA)$(BOLD)🔒 Installing Fail2ban Intrusion Prevention...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/install_fail2ban.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+	@sudo $(SCRIPTS_DIR)/components/install_fail2ban.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(TEST_MODE),--test-mode,)
 
 fail2ban-status:
 	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Fail2ban Status...$(RESET)"
@@ -2112,7 +2112,7 @@ fail2ban-restart:
 # Security
 security: validate
 	@echo "$(MAGENTA)$(BOLD)🔒 Installing Security Hardening...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/install_security.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+	@sudo $(SCRIPTS_DIR)/components/install_security.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(TEST_MODE),--test-mode,)
 
 security-status:
 	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Security Status...$(RESET)"
