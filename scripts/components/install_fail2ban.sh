@@ -236,6 +236,14 @@ fi
 # Configure jail.local
 log "INFO" "Creating Fail2ban jail configuration" "${CYAN}Creating Fail2ban jail configuration...${NC}"
 
+# Check if jail.local already exists
+if [ -f /etc/fail2ban/jail.local ]; then
+  log "INFO" "jail.local already exists, backing up" "${CYAN}jail.local already exists, backing up...${NC}"
+  cp /etc/fail2ban/jail.local "${COMPONENT_CONFIG_DIR}/jail.local.$(date +%Y%m%d%H%M%S)"
+  # Remove existing file to avoid duplicate entries
+  rm /etc/fail2ban/jail.local
+fi
+
 if [ "$TEST_MODE" = true ]; then
   log "WARNING" "Test mode: Using relaxed settings for testing" "${YELLOW}⚠️ Test mode: Using relaxed settings for testing${NC}"
   cat > /etc/fail2ban/jail.local <<EOL
@@ -278,7 +286,12 @@ fi
 
 # Create SSH jail configuration
 log "INFO" "Creating SSH jail configuration" "${CYAN}Creating SSH jail configuration...${NC}"
-cat > /etc/fail2ban/jail.d/sshd.conf <<EOL
+
+# Check if SSH jail already exists
+if [ -f /etc/fail2ban/jail.d/sshd.conf ]; then
+  log "INFO" "SSH jail already exists, skipping" "${CYAN}SSH jail already exists, skipping...${NC}"
+else
+  cat > /etc/fail2ban/jail.d/sshd.conf <<EOL
 [sshd]
 enabled = true
 port = ssh
@@ -286,11 +299,17 @@ filter = sshd
 logpath = /var/log/auth.log
 maxretry = 3
 EOL
+fi
 
 # Check if Traefik is installed and create a jail for it
 if docker ps --format '{{.Names}}' | grep -q "traefik"; then
   log "INFO" "Creating Traefik jail configuration" "${CYAN}Creating Traefik jail configuration...${NC}"
-  cat > /etc/fail2ban/jail.d/traefik.conf <<EOL
+  
+  # Check if Traefik jail already exists
+  if [ -f /etc/fail2ban/jail.d/traefik.conf ]; then
+    log "INFO" "Traefik jail already exists, skipping" "${CYAN}Traefik jail already exists, skipping...${NC}"
+  else
+    cat > /etc/fail2ban/jail.d/traefik.conf <<EOL
 [traefik-auth]
 enabled = true
 port = http,https
@@ -298,19 +317,29 @@ filter = traefik-auth
 logpath = /var/log/traefik/access.log
 maxretry = 5
 EOL
+  fi
 
-  # Create Traefik filter
-  cat > /etc/fail2ban/filter.d/traefik-auth.conf <<EOL
+  # Create Traefik filter if it doesn't exist
+  if [ -f /etc/fail2ban/filter.d/traefik-auth.conf ]; then
+    log "INFO" "Traefik filter already exists, skipping" "${CYAN}Traefik filter already exists, skipping...${NC}"
+  else
+    cat > /etc/fail2ban/filter.d/traefik-auth.conf <<EOL
 [Definition]
 failregex = ^.*"[A-Z]+ .*" (401|403) .*$
 ignoreregex =
 EOL
+  fi
 fi
 
 # Check for Keycloak and add jail if needed
 if docker ps --format '{{.Names}}' | grep -q "keycloak"; then
   log "INFO" "Creating Keycloak jail configuration" "${CYAN}Creating Keycloak jail configuration...${NC}"
-  cat > /etc/fail2ban/jail.d/keycloak.conf <<EOL
+  
+  # Check if Keycloak jail already exists
+  if [ -f /etc/fail2ban/jail.d/keycloak.conf ]; then
+    log "INFO" "Keycloak jail already exists, skipping" "${CYAN}Keycloak jail already exists, skipping...${NC}"
+  else
+    cat > /etc/fail2ban/jail.d/keycloak.conf <<EOL
 [keycloak]
 enabled = true
 port = http,https
@@ -318,13 +347,18 @@ filter = keycloak
 logpath = /opt/agency_stack/clients/${CLIENT_ID}/keycloak/logs/keycloak.log
 maxretry = 5
 EOL
+  fi
 
-  # Create Keycloak filter
-  cat > /etc/fail2ban/filter.d/keycloak.conf <<EOL
+  # Create Keycloak filter if it doesn't exist
+  if [ -f /etc/fail2ban/filter.d/keycloak.conf ]; then
+    log "INFO" "Keycloak filter already exists, skipping" "${CYAN}Keycloak filter already exists, skipping...${NC}"
+  else
+    cat > /etc/fail2ban/filter.d/keycloak.conf <<EOL
 [Definition]
 failregex = ^.*Login failed.*username=.*$
 ignoreregex =
 EOL
+  fi
 fi
 
 # Create a custom status monitoring script
@@ -466,4 +500,6 @@ echo -e "${CYAN}Configuration backup: ${COMPONENT_CONFIG_DIR}/jail.conf.original
 echo
 echo -e "${GREEN}Fail2ban is now protecting your system against brute force attacks.${NC}"
 
+# Mark script as successful to avoid the errant error message
+SCRIPT_SUCCESS=true
 exit 0
