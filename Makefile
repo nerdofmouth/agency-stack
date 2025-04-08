@@ -873,15 +873,12 @@ keycloak-logs:
 		if docker ps | grep -q "keycloak"; then \
 			echo "$(CYAN)Container logs:$(RESET)"; \
 			docker logs keycloak-$(CLIENT_ID) --tail 20; \
-		else \
-			echo "$(RED)Keycloak container not running$(RESET)"; \
 		fi; \
 	fi
 
 keycloak-restart:
 	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Keycloak...$(RESET)"
 	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/keycloak/.installed_ok" ]; then \
-		echo "$(CYAN)Restarting Keycloak container...$(RESET)"; \
 		docker restart keycloak-$(CLIENT_ID); \
 		echo "$(GREEN)✅ Keycloak has been restarted$(RESET)"; \
 		echo "$(CYAN)Check status with: make keycloak-status$(RESET)"; \
@@ -1220,7 +1217,7 @@ langchain-restart:
 langchain-test:
 	@echo "Testing LangChain API..."
 		PORT=$$(grep PORT /opt/agency_stack/docker/langchain/.env | cut -d= -f2); \
-		curl -X POST "http://localhost:$${PORT}/prompt" \
+		curl -X POST http://localhost:$${PORT}/prompt \
 			-H "Content-Type: application/json" \
 			-d '{"template":"Tell me about {topic} in one sentence.","inputs":{"topic":"LangChain"}}'; \
 	else \
@@ -1447,7 +1444,7 @@ tailscale-status:
 
 tailscale-logs:
 	@echo "Viewing Tailscale logs..."
-	@if [ -f "$(LOG_DIR)/components/tailscale.log" ]; then \
+	@if [ -f "/var/log/agency_stack/components/tailscale.log" ]; then \
 		echo "$(CYAN)Recent Tailscale actions:$(RESET)"; \
 		sudo grep "Tailscale" /var/log/syslog | tail -n 20; \
 		echo ""; \
@@ -1851,26 +1848,6 @@ grafana-restart:
 	@echo "TODO: Implement grafana-restart"
 	@exit 1
 
-# Auto-generated target for keycloak
-keycloak:
-	@echo "TODO: Implement keycloak"
-	@exit 1
-
-# Auto-generated target for keycloak
-keycloak-status:
-	@echo "TODO: Implement keycloak-status"
-	@exit 1
-
-# Auto-generated target for keycloak
-keycloak-logs:
-	@echo "TODO: Implement keycloak-logs"
-	@exit 1
-
-# Auto-generated target for keycloak
-keycloak-restart:
-	@echo "TODO: Implement keycloak-restart"
-	@exit 1
-
 # Auto-generated target for killbill
 killbill-status:
 	@echo "TODO: Implement killbill-status"
@@ -1885,7 +1862,6 @@ killbill-logs:
 killbill-restart:
 	@echo "TODO: Implement killbill-restart"
 	@exit 1
-
 	@exit 1
 
 # Auto-generated target for mailu
