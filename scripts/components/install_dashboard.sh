@@ -6,37 +6,34 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
-# Error handling setup (before sourcing common.sh)
+# Set up logging
+LOG_FILE="/var/log/agency_stack/components/dashboard.log"
+mkdir -p "$(dirname "$LOG_FILE")"
+
+# Create our own logging functions
+init_log() {
+  local component="$1"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO] ==========================================="
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO] Starting install_${component}.sh"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO] CLIENT_ID: ${CLIENT_ID:-default}"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO] DOMAIN: ${DOMAIN:-localhost}"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO] ==========================================="
+}
+
 log_error() {
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] $1" >&2
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] $1" | tee -a "$LOG_FILE" >&2
 }
 
 log_info() {
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO] $1"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO] $1" | tee -a "$LOG_FILE"
 }
 
 log_warning() {
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] [WARNING] $1" >&2
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] [WARNING] $1" | tee -a "$LOG_FILE" >&2
 }
 
 log_success() {
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUCCESS] $1"
-}
-
-# Basic validation before attempting to source common.sh
-if [ ! -f "${SCRIPT_DIR}/../utils/common.sh" ]; then
-  log_error "common.sh not found at ${SCRIPT_DIR}/../utils/common.sh"
-  log_error "Current directory: $(pwd)"
-  log_error "Script directory: ${SCRIPT_DIR}"
-  log_error "Please ensure utils/common.sh exists and is accessible"
-  exit 1
-fi
-
-# Source common utilities
-source "${SCRIPT_DIR}/../utils/common.sh" || {
-  log_error "Failed to source common utilities"
-  log_error "Looking for: ${SCRIPT_DIR}/../utils/common.sh"
-  exit 1
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUCCESS] $1" | tee -a "$LOG_FILE"
 }
 
 # Initialize logging
@@ -220,20 +217,15 @@ setup_dashboard_source() {
     log_info "Cloning dashboard repository..."
     
     # For testing, if repository doesn't exist yet, create a basic structure
-    if [[ "$USE_GITHUB" != "true" ]] || ! git clone -b "$DASHBOARD_BRANCH" "$DASHBOARD_REPO" "$DASHBOARD_DIR"; then
+    if [[ "$USE_GITHUB" != "true" ]] || ! git clone -b "$DASHBOARD_BRANCH" "$DASHBOARD_REPO" "$DASHBOARD_DIR" 2>/dev/null; then
       log_warning "Could not clone repository, creating basic structure instead"
-      mkdir -p "${DASHBOARD_DIR}"
-      cp -r "${REPO_ROOT}/dashboard/"* "${DASHBOARD_DIR}/" 2>/dev/null || true
+      mkdir -p "${DASHBOARD_DIR}/pages"
       
-      # Create minimal Next.js structure if it doesn't exist
-      if [[ ! -d "${DASHBOARD_DIR}/pages" ]]; then
-        mkdir -p "${DASHBOARD_DIR}/pages"
-        echo 'export default function Home() { return <h1>AgencyStack Dashboard</h1>; }' > "${DASHBOARD_DIR}/pages/index.js"
-      fi
+      # Create minimal Next.js structure
+      echo 'export default function Home() { return <h1>AgencyStack Dashboard</h1>; }' > "${DASHBOARD_DIR}/pages/index.js"
       
-      # Create package.json if needed
-      if [[ ! -f "${DASHBOARD_DIR}/package.json" ]]; then
-        cat > "${DASHBOARD_DIR}/package.json" <<EOF
+      # Create package.json
+      cat > "${DASHBOARD_DIR}/package.json" <<EOF
 {
   "name": "agency-stack-dashboard",
   "version": "0.1.0",
@@ -250,7 +242,6 @@ setup_dashboard_source() {
   }
 }
 EOF
-      fi
     else
       log_info "Successfully cloned dashboard repository"
     fi
@@ -328,17 +319,23 @@ build_dashboard() {
   cd "$DASHBOARD_DIR" || return 1
   
   log_info "Installing dependencies with pnpm"
-  pnpm install --frozen-lockfile
-  if [[ $? -ne 0 ]]; then
-    log_error "Failed to install dependencies"
-    return 1
+  if ! pnpm install --frozen-lockfile; then
+    log_error "Failed to install dependencies with pnpm, trying npm"
+    npm install
+    if [[ $? -ne 0 ]]; then
+      log_error "Failed to install dependencies"
+      return 1
+    fi
   fi
   
   log_info "Building Next.js application"
-  pnpm build
-  if [[ $? -ne 0 ]]; then
-    log_error "Failed to build application"
-    return 1
+  if ! pnpm build; then
+    log_error "Failed to build with pnpm, trying npm"
+    npm run build
+    if [[ $? -ne 0 ]]; then
+      log_error "Failed to build application"
+      return 1
+    fi
   fi
   
   log_info "Dashboard build completed successfully"
@@ -552,6 +549,7 @@ main() {
   
   log_info "Dashboard installation completed successfully"
   log_info "Dashboard URL: https://${DOMAIN:-proto001.alpha.nerdofmouth.com}/dashboard"
+  log_success "Dashboard installation completed"
   return 0
 }
 
