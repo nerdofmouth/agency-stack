@@ -840,9 +840,58 @@ prometheus-config:
 	read -p "$(YELLOW)Enter client ID (optional):$(RESET) " CLIENT_ID; \
 
 # Keycloak
-install-keycloak: validate
-	@echo "Installing Keycloak identity provider..."
+keycloak: validate
+	@echo "$(MAGENTA)$(BOLD)🔐 Installing Keycloak Identity Provider...$(RESET)"
 	@sudo $(SCRIPTS_DIR)/components/install_keycloak.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+keycloak-status:
+	@echo "$(MAGENTA)$(BOLD)🔍 Checking Keycloak Status...$(RESET)"
+	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/keycloak/.installed_ok" ]; then \
+		echo "$(GREEN)✅ Keycloak is installed$(RESET)"; \
+		if docker ps | grep -q "keycloak"; then \
+			echo "$(GREEN)✅ Keycloak container is running$(RESET)"; \
+			docker ps | grep keycloak; \
+		else \
+			echo "$(RED)❌ Keycloak container is not running$(RESET)"; \
+		fi; \
+	else \
+		echo "$(RED)❌ Keycloak is not installed$(RESET)"; \
+		echo "$(CYAN)To install, run: make keycloak$(RESET)"; \
+		exit 1; \
+	fi
+
+keycloak-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing Keycloak Logs...$(RESET)"
+	@if [ -f "/var/log/agency_stack/components/keycloak.log" ]; then \
+		echo "$(CYAN)Recent Keycloak installation logs:$(RESET)"; \
+		tail -n 20 /var/log/agency_stack/components/keycloak.log; \
+		echo ""; \
+		echo "$(CYAN)For container logs, use:$(RESET)"; \
+		echo "docker logs keycloak-$(CLIENT_ID) --tail 50"; \
+	else \
+		echo "$(YELLOW)Keycloak installation logs not found.$(RESET)"; \
+		if docker ps | grep -q "keycloak"; then \
+			echo "$(CYAN)Container logs:$(RESET)"; \
+			docker logs keycloak-$(CLIENT_ID) --tail 20; \
+		else \
+			echo "$(RED)Keycloak container not running$(RESET)"; \
+		fi; \
+	fi
+
+keycloak-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Keycloak...$(RESET)"
+	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/keycloak/.installed_ok" ]; then \
+		echo "$(CYAN)Restarting Keycloak container...$(RESET)"; \
+		docker restart keycloak-$(CLIENT_ID); \
+		echo "$(GREEN)✅ Keycloak has been restarted$(RESET)"; \
+		echo "$(CYAN)Check status with: make keycloak-status$(RESET)"; \
+	else \
+		echo "$(RED)❌ Keycloak is not installed$(RESET)"; \
+		echo "$(CYAN)To install, run: make keycloak$(RESET)"; \
+	fi
+
+# Alias for backward compatibility
+install-keycloak: keycloak
 
 # Core Infrastructure
 install-infrastructure:
@@ -1523,7 +1572,7 @@ traefik-status:
 		fi; \
 	else \
 		echo "$(RED)❌ Traefik is not installed$(RESET)"; \
-		exit 1; \
+		echo "$(CYAN)Install with: make traefik$(RESET)"; \
 	fi
 
 traefik-logs:
