@@ -2224,17 +2224,56 @@ dashboard-restart:
 				echo "Dashboard service $(GREEN)started with global pm2$(RESET)"; \
 			fi; \
 		else \
-			echo "$(RED)Dashboard installation not found in expected location$(RESET)"; \
-			echo "$(CYAN)Try reinstalling with: make dashboard DOMAIN=$(DOMAIN)$(RESET)"; \
+			echo "$(RED)Dashboard installation not found. Is Dashboard installed?$(RESET)"; \
+			echo "$(CYAN)Install with: make dashboard DOMAIN=$(DOMAIN)$(RESET)"; \
 		fi; \
 	else \
 		echo "$(RED)Dashboard is not installed$(RESET)"; \
 		echo "$(CYAN)Install with: make dashboard DOMAIN=$(DOMAIN)$(RESET)"; \
 	fi
 
-dashboard-test:
-	@echo "$(MAGENTA)$(BOLD)🧪 Testing Dashboard...$(RESET)"
-	@DOMAIN_TO_USE="$${DOMAIN:-proto001.alpha.nerdofmouth.com}"; \
-	timeout 10 curl -sSf -o /dev/null "https://$${DOMAIN_TO_USE}/dashboard" && \
-		echo "$(GREEN)Dashboard endpoint test successful: 200 OK$(RESET)" || \
-		echo "$(RED)Dashboard endpoint test failed$(RESET)"
+dashboard-fix:
+	@echo "$(MAGENTA)$(BOLD)🔧 Running Dashboard & Traefik Fix...$(RESET)"
+	@# Step 1: Verify dashboard installation
+	@if [ ! -d "/opt/agency_stack/apps/dashboard" ]; then \
+		echo "$(YELLOW)⚠️ Dashboard not installed. Installing now...$(RESET)"; \
+		$(SCRIPTS_DIR)/components/install_dashboard.sh $(if $(DOMAIN),--domain "$(DOMAIN)",); \
+	fi
+	@# Step 2: Verify Traefik route configuration
+	@if [ -d "/opt/agency_stack/apps/traefik/conf.d" ]; then \
+		if ! grep -q "dashboard" /opt/agency_stack/apps/traefik/conf.d/*.toml 2>/dev/null; then \
+			echo "$(YELLOW)⚠️ Dashboard Traefik route not configured. Creating configuration...$(RESET)"; \
+			DASHBOARD_DOMAIN="$(if $(DOMAIN),$(DOMAIN),localhost)"; \
+			DASHBOARD_PORT=3000; \
+			mkdir -p "/opt/agency_stack/apps/traefik/conf.d"; \
+			cat > "/opt/agency_stack/apps/traefik/conf.d/dashboard.toml" << EOF \
+[http.routers.dashboard]
+  rule = "Host(\`$${DASHBOARD_DOMAIN}\`) && PathPrefix(\`/dashboard\`)"
+  entryPoints = ["websecure"]
+  service = "dashboard"
+  middlewares = ["dashboard-stripprefix"]
+  [http.routers.dashboard.tls]
+    certResolver = "letsencrypt"
+
+[http.services.dashboard]
+  [http.services.dashboard.loadBalancer]
+    [[http.services.dashboard.loadBalancer.servers]]
+      url = "http://127.0.0.1:$${DASHBOARD_PORT}"
+
+[http.middlewares.dashboard-stripprefix.stripPrefix]
+  prefixes = ["/dashboard"]
+EOF
+			if docker ps | grep -q "traefik"; then \
+				echo "$(CYAN)Reloading Traefik configuration...$(RESET)"; \
+				docker kill --signal=HUP $$(docker ps | grep "traefik" | awk '{print $$1}') 2>/dev/null || true; \
+			fi; \
+		else \
+			echo "$(GREEN)✅ Dashboard Traefik route already configured$(RESET)"; \
+		fi; \
+	else \
+		echo "$(RED)❌ Traefik configuration directory not found. Please ensure Traefik is installed$(RESET)"; \
+	fi
+	@# Step 3: Restart dashboard
+	@echo "$(CYAN)Restarting dashboard...$(RESET)"
+	@make dashboard-restart
+	@echo "$(GREEN)✅ Dashboard fix complete. Dashboard should now be accessible at https://$(if $(DOMAIN),$(DOMAIN),localhost)/dashboard$(RESET)"
