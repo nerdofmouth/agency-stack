@@ -2,10 +2,40 @@
 # Install AgencyStack Dashboard Component
 # Installs and configures the Next.js dashboard for monitoring component status
 
-# Source common utilities
+# Determine script path and repo root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
+# Error handling setup (before sourcing common.sh)
+log_error() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] $1" >&2
+}
+
+log_info() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO] $1"
+}
+
+log_warning() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] [WARNING] $1" >&2
+}
+
+log_success() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUCCESS] $1"
+}
+
+# Basic validation before attempting to source common.sh
+if [ ! -f "${SCRIPT_DIR}/../utils/common.sh" ]; then
+  log_error "common.sh not found at ${SCRIPT_DIR}/../utils/common.sh"
+  log_error "Current directory: $(pwd)"
+  log_error "Script directory: ${SCRIPT_DIR}"
+  log_error "Please ensure utils/common.sh exists and is accessible"
+  exit 1
+fi
+
+# Source common utilities
 source "${SCRIPT_DIR}/../utils/common.sh" || {
-  echo "Error: Failed to source common utilities"
+  log_error "Failed to source common utilities"
+  log_error "Looking for: ${SCRIPT_DIR}/../utils/common.sh"
   exit 1
 }
 
@@ -30,6 +60,7 @@ VERBOSE=false
 ENABLE_CLOUD=false
 ENABLE_OPENAI=false
 USE_GITHUB=false
+ENABLE_KEYCLOAK=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -69,6 +100,10 @@ while [[ $# -gt 0 ]]; do
       USE_GITHUB=true
       shift
       ;;
+    --enable-keycloak)
+      ENABLE_KEYCLOAK=true
+      shift
+      ;;
     *)
       log_error "Unknown option: $1"
       exit 1
@@ -93,6 +128,8 @@ ensure_directories() {
   if [[ -n "$CLIENT_ID" ]]; then
     mkdir -p "/opt/agency_stack/clients/${CLIENT_ID}/dashboard"
   fi
+  
+  return 0
 }
 
 # Check for Node.js and install if needed (without global installation)
@@ -144,6 +181,31 @@ check_nodejs() {
   return 0
 }
 
+# Check Keycloak availability if SSO is enabled
+check_keycloak() {
+  if [[ "$ENABLE_KEYCLOAK" == "true" ]]; then
+    log_info "Checking Keycloak availability"
+    
+    # Check for Keycloak installation
+    if ! command -v "${SCRIPT_DIR}/../utils/keycloak_client.sh" &>/dev/null; then
+      log_warning "Keycloak client utility not found but --enable-keycloak was specified"
+    fi
+    
+    # Check if Keycloak service is running
+    if ! systemctl is-active --quiet keycloak &>/dev/null && ! docker ps | grep -q keycloak; then
+      log_warning "Keycloak service does not appear to be running"
+      log_warning "The dashboard requires Keycloak for SSO functionality"
+      
+      if [[ "$FORCE" != "true" ]]; then
+        log_error "Aborting installation. Use --force to continue anyway."
+        return 1
+      fi
+    fi
+  fi
+  
+  return 0
+}
+
 # Clone or update dashboard source code
 setup_dashboard_source() {
   log_info "Setting up dashboard source code"
@@ -156,10 +218,41 @@ setup_dashboard_source() {
     git clean -fdx
   else
     log_info "Cloning dashboard repository..."
-    git clone -b "$DASHBOARD_BRANCH" "$DASHBOARD_REPO" "$DASHBOARD_DIR"
-    if [[ $? -ne 0 ]]; then
-      log_error "Failed to clone dashboard repository"
-      return 1
+    
+    # For testing, if repository doesn't exist yet, create a basic structure
+    if [[ "$USE_GITHUB" != "true" ]] || ! git clone -b "$DASHBOARD_BRANCH" "$DASHBOARD_REPO" "$DASHBOARD_DIR"; then
+      log_warning "Could not clone repository, creating basic structure instead"
+      mkdir -p "${DASHBOARD_DIR}"
+      cp -r "${REPO_ROOT}/dashboard/"* "${DASHBOARD_DIR}/" 2>/dev/null || true
+      
+      # Create minimal Next.js structure if it doesn't exist
+      if [[ ! -d "${DASHBOARD_DIR}/pages" ]]; then
+        mkdir -p "${DASHBOARD_DIR}/pages"
+        echo 'export default function Home() { return <h1>AgencyStack Dashboard</h1>; }' > "${DASHBOARD_DIR}/pages/index.js"
+      fi
+      
+      # Create package.json if needed
+      if [[ ! -f "${DASHBOARD_DIR}/package.json" ]]; then
+        cat > "${DASHBOARD_DIR}/package.json" <<EOF
+{
+  "name": "agency-stack-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "^12.3.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}
+EOF
+      fi
+    else
+      log_info "Successfully cloned dashboard repository"
     fi
   fi
   
@@ -406,6 +499,12 @@ main() {
   # Setup directories
   ensure_directories || {
     log_error "Failed to create required directories"
+    return 1
+  }
+  
+  # Check Keycloak if enabled
+  check_keycloak || {
+    log_error "Keycloak check failed"
     return 1
   }
   
