@@ -58,7 +58,7 @@ help:
 	@echo "  $(BOLD)make motd$(RESET)             Generate server message of the day"
 	@echo "  $(BOLD)make audit$(RESET)            Audit running components and system status"
 	@echo "  $(BOLD)make integrate-components$(RESET) Integrate AgencyStack components"
-	@echo "  $(BOLD)make dashboard$(RESET)        Open AgencyStack dashboard"
+	@echo "  $(BOLD)make dashboard-legacy$(RESET)        Open AgencyStack dashboard"
 	@echo "  $(BOLD)make dashboard-refresh$(RESET) Refresh AgencyStack dashboard"
 	@echo "  $(BOLD)make dashboard-enable$(RESET) Enable AgencyStack dashboard"
 	@echo "  $(BOLD)make dashboard-update$(RESET) Update AgencyStack dashboard data"
@@ -338,7 +338,7 @@ integrate-data-bridge:
 	@sudo bash $(SCRIPTS_DIR)/integrate_components.sh --type=data-bridge
 
 # Open AgencyStack dashboard
-dashboard:
+dashboard-legacy:
 	@echo "📊 Opening AgencyStack dashboard..."
 	@sudo bash $(SCRIPTS_DIR)/dashboard.sh
 
@@ -2171,8 +2171,8 @@ dashboard-status:
 			echo "$(GREEN)Dashboard service is running (pm2)$(RESET)"; \
 		else \
 			echo "$(RED)Dashboard service is not running$(RESET)"; \
-		fi \
-		echo "$(CYAN)Dashboard URL: https://$(DOMAIN:-proto001.alpha.nerdofmouth.com)/dashboard$(RESET)"; \
+		fi; \
+		echo "$(CYAN)Dashboard URL: https://$(shell echo $(DOMAIN) | sed 's/^$$/proto001.alpha.nerdofmouth.com/')/dashboard$(RESET)"; \
 	else \
 		echo "$(RED)Dashboard is not installed$(RESET)"; \
 	fi
