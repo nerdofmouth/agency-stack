@@ -617,3 +617,35 @@ This ruleset update provides clear guidance on:
 2. The recommended component installation order for testing
 3. When to apply full security hardening
 4. How to balance accessibility with security across different environments
+
+
+---
+
+## 📜 Updated AgencyStack Alpha Rules: SSO & Keycloak Integration
+
+Here’s an instruction set you can paste into `README.md`, `INSTRUCTIONS.md`, or use as Claude input:
+
+````markdown
+## 🔐 Keycloak SSO Integration – Alpha Phase Standards
+
+As of the Alpha testing milestone, AgencyStack supports optional integration with Keycloak for user authentication across selected components.
+
+### ✅ Component Script Requirements (if Keycloak support exists)
+
+If a component supports Keycloak, the install script must:
+
+- Accept the flag `--enable-keycloak`
+- Source Keycloak realm/client information from:
+  - `/opt/agency_stack/secrets/keycloak.env`, OR
+  - `/opt/agency_stack/clients/${CLIENT_ID}/keycloak/config.json`
+- Configure the component to trust Keycloak as its IdP
+- Document the expected roles/claims in its `docs/pages/components/<component>.md`
+- Expose login paths/ports clearly in `ports.md`
+- Add `sso: true` to the component’s `component_registry.json` flags
+
+### 🚫 Components Without SSO Support
+
+If a component does not yet support Keycloak, install scripts must:
+
+- Ignore `--enable-keycloak` without failure
+- Log a warning like:
