@@ -2067,7 +2067,6 @@ fail2ban-status:
 		fi; \
 	else \
 		echo "$(RED)❌ Fail2ban is not running$(RESET)"; \
-		echo "$(CYAN)Install with: make fail2ban$(RESET)"; \
 	fi
 
 fail2ban-logs:
@@ -2166,15 +2165,26 @@ dashboard: validate
 dashboard-status:
 	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Dashboard Status...$(RESET)"
 	@if [ -f "/opt/agency_stack/dashboard/.installed_ok" ]; then \
-		echo "$(GREEN)Dashboard is installed and ready$(RESET)"; \
-		if pm2 list | grep -q "agency-stack-dashboard"; then \
-			echo "$(GREEN)Dashboard service is running (pm2)$(RESET)"; \
+		echo "Dashboard is installed and ready"; \
+		export PATH="/opt/agency_stack/apps/dashboard/node/bin:$$PATH"; \
+		if command -v pm2 >/dev/null 2>&1; then \
+			if pm2 list | grep -q "agency-stack-dashboard"; then \
+				echo "Dashboard service is running"; \
+			else \
+				echo "Dashboard service is not running"; \
+			fi; \
+		elif [ -f "/opt/agency_stack/apps/dashboard/node/bin/pm2" ]; then \
+			if /opt/agency_stack/apps/dashboard/node/bin/pm2 list | grep -q "agency-stack-dashboard"; then \
+				echo "Dashboard service is running"; \
+			else \
+				echo "Dashboard service is not running"; \
+			fi; \
 		else \
-			echo "$(RED)Dashboard service is not running$(RESET)"; \
+			echo "PM2 not found in path or project directory"; \
 		fi; \
-		echo "$(CYAN)Dashboard URL: https://$(shell echo $(DOMAIN) | sed 's/^$$/proto001.alpha.nerdofmouth.com/')/dashboard$(RESET)"; \
+		echo "Dashboard URL: https://$(DOMAIN)/dashboard"; \
 	else \
-		echo "$(RED)Dashboard is not installed$(RESET)"; \
+		echo "Dashboard is not installed"; \
 	fi
 
 dashboard-logs:
@@ -2204,129 +2214,3 @@ dashboard-test:
 	@timeout 10 curl -sSf -o /dev/null "https://$(DOMAIN:-proto001.alpha.nerdofmouth.com)/dashboard" && \
 		echo "$(GREEN)Dashboard endpoint test successful: 200 OK$(RESET)" || \
 		echo "$(RED)Dashboard endpoint test failed$(RESET)"
-
-# Demo Core Installation
-# Installs high-value components suitable for client/investor demos
-demo-core: validate
-	@echo "$(MAGENTA)$(BOLD)🚀 Installing AgencyStack Demo Core Components...$(RESET)"
-	@echo "$(CYAN)This will install a set of high-value components for demonstration purposes.$(RESET)"
-	@echo ""
-	
-	@echo "$(YELLOW)📊 Installing Core Infrastructure...$(RESET)"
-	@$(MAKE) docker docker-status docker_compose traefik_ssl
-	
-	@echo "$(YELLOW)🔐 Installing Security Components...$(RESET)"
-	@$(MAKE) keycloak keycloak-status fail2ban
-	
-	@echo "$(YELLOW)📧 Installing Communication Components...$(RESET)"
-	@$(MAKE) mailu mailu-status chatwoot chatwoot-status voip voip-status
-	
-	@echo "$(YELLOW)📊 Installing Monitoring Components...$(RESET)"
-	@$(MAKE) prometheus prometheus-status grafana grafana-status posthog posthog-status
-	
-	@echo "$(YELLOW)📝 Installing Content & CMS Components...$(RESET)"
-	@$(MAKE) wordpress wordpress-status peertube peertube-status builderio builderio-status
-	
-	@echo "$(YELLOW)🧰 Installing DevOps Components...$(RESET)"
-	@$(MAKE) gitea gitea-status droneci
-	
-	@echo "$(YELLOW)📅 Installing Business Components...$(RESET)"
-	@$(MAKE) calcom calcom-status erpnext documenso focalboard
-	
-	@echo "$(YELLOW)🔄 Integrating Components...$(RESET)"
-	@$(MAKE) integrate-sso
-	@$(MAKE) integrate-monitoring
-	@$(MAKE) dashboard-update
-	
-	# Add the dashboard component to demo-core
-	@echo "$(YELLOW)📊 Installing Dashboard Component...$(RESET)"
-	@$(MAKE) dashboard dashboard-status
-	
-	@echo "$(YELLOW)🧪 Running Validation Checks...$(RESET)"
-	@$(MAKE) alpha-check
-	@if [ -f "$(SCRIPTS_DIR)/smoke_test.sh" ]; then \
-		$(MAKE) smoke-test; \
-	fi
-	
-	@echo "$(GREEN)$(BOLD)✅ Demo Core Components Installed Successfully!$(RESET)"
-	@echo "$(CYAN)Open the AgencyStack dashboard to view your installation:$(RESET)"
-	@echo "$(CYAN)$(MAKE) dashboard-open$(RESET)"
-
-# Demo Core Cleanup
-# Removes the demo core components for a clean slate
-demo-core-clean:
-	@echo "$(MAGENTA)$(BOLD)🧹 Cleaning Up AgencyStack Demo Core Components...$(RESET)"
-	@echo "$(RED)This will remove all demo core components and their data.$(RESET)"
-	@echo ""
-	
-	@echo "$(YELLOW)Stopping and Removing Business Components...$(RESET)"
-	@-$(MAKE) calcom-stop focalboard-stop erpnext-stop documenso-stop 2>/dev/null || true
-	
-	@echo "$(YELLOW)Stopping and Removing DevOps Components...$(RESET)"
-	@-$(MAKE) gitea-stop droneci-stop 2>/dev/null || true
-	
-	@echo "$(YELLOW)Stopping and Removing Content Components...$(RESET)"
-	@-$(MAKE) wordpress-stop peertube-stop builderio-stop 2>/dev/null || true
-	
-	@echo "$(YELLOW)Stopping and Removing Monitoring Components...$(RESET)"
-	@-$(MAKE) prometheus-stop grafana-stop posthog-stop 2>/dev/null || true
-	
-	@echo "$(YELLOW)Stopping and Removing Communication Components...$(RESET)"
-	@-$(MAKE) mailu-stop chatwoot-stop voip-stop 2>/dev/null || true
-	
-	@echo "$(YELLOW)Stopping and Removing Security Components...$(RESET)"
-	@-$(MAKE) keycloak-stop fail2ban-stop 2>/dev/null || true
-	
-	@echo "$(YELLOW)Stopping Dashboard Component...$(RESET)"
-	@-$(MAKE) dashboard-restart 2>/dev/null || true
-	
-	@echo "$(GREEN)$(BOLD)✅ Demo Core Components Cleaned Up Successfully!$(RESET)"
-	@echo "$(CYAN)The system has been returned to a clean state.$(RESET)"
-
-# Demo Core Status
-# Checks the status of all demo core components
-demo-core-status:
-	@echo "$(MAGENTA)$(BOLD)📊 AgencyStack Demo Core Components Status:$(RESET)"
-	@echo ""
-	
-	@echo "$(YELLOW)📊 Core Infrastructure Components:$(RESET)"
-	@-$(MAKE) docker-status docker_compose-status traefik-status 2>/dev/null || true
-	
-	@echo "$(YELLOW)🔐 Security Components:$(RESET)"
-	@-$(MAKE) keycloak-status fail2ban-status 2>/dev/null || true
-	
-	@echo "$(YELLOW)📧 Communication Components:$(RESET)"
-	@-$(MAKE) mailu-status chatwoot-status voip-status 2>/dev/null || true
-	
-	@echo "$(YELLOW)📊 Monitoring Components:$(RESET)"
-	@-$(MAKE) prometheus-status grafana-status posthog-status 2>/dev/null || true
-	
-	@echo "$(YELLOW)📝 Content & CMS Components:$(RESET)"
-	@-$(MAKE) wordpress-status peertube-status builderio-status 2>/dev/null || true
-	
-	@echo "$(YELLOW)🧰 DevOps Components:$(RESET)"
-	@-$(MAKE) gitea-status droneci-status 2>/dev/null || true
-	
-	@echo "$(YELLOW)📅 Business Components:$(RESET)"
-	@-$(MAKE) calcom-status erpnext-status documenso-status focalboard-status 2>/dev/null || true
-	
-	@echo "$(YELLOW)📊 Dashboard Status:$(RESET)"
-	@-$(MAKE) dashboard-status 2>/dev/null || true
-	
-	@echo "$(GREEN)$(BOLD)✅ Status Check Complete!$(RESET)"
-
-# Demo Core Logs
-# Views logs from all demo core components
-demo-core-logs:
-	@echo "$(MAGENTA)$(BOLD)📋 AgencyStack Demo Core Components Logs:$(RESET)"
-	@echo "$(CYAN)Viewing recent logs from all demo components...$(RESET)"
-	@echo ""
-	
-	@for component in docker traefik keycloak fail2ban mailu chatwoot voip prometheus grafana posthog wordpress peertube builderio gitea droneci calcom erpnext documenso focalboard dashboard; do \
-		echo "$(YELLOW)📄 $$component logs:$(RESET)"; \
-		$(MAKE) $$component-logs 2>/dev/null || echo "$(RED)No logs available for $$component$(RESET)"; \
-		echo ""; \
-	done
-	
-	@echo "$(GREEN)$(BOLD)✅ Logs Display Complete!$(RESET)"
-	@echo "$(CYAN)For detailed logs, use 'make <component>-logs' for specific components.$(RESET)"
