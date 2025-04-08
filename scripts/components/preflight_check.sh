@@ -392,35 +392,99 @@ check_dashboard_accessibility() {
       ((WARNINGS++))
     fi
     
+    # Check dashboard installation status
+    DASHBOARD_INSTALLED=false
+    DASHBOARD_DIR=""
+    
+    # Check potential dashboard installation locations
+    for location in "/opt/agency_stack/apps/dashboard" "/opt/agency_stack/clients/default/apps/dashboard"; do
+      if [ -d "$location" ]; then
+        DASHBOARD_DIR="$location"
+        DASHBOARD_INSTALLED=true
+        log_success "Dashboard installation found at $DASHBOARD_DIR"
+        break
+      fi
+    done
+    
+    if [ "$DASHBOARD_INSTALLED" = false ]; then
+      log_warning "Dashboard installation not found. It may need to be installed"
+      echo "❌ Dashboard: Not installed" >> "$REPORT_FILE"
+      ((WARNINGS++))
+    else
+      # Check if dashboard is properly configured and running
+      log_info "Checking dashboard configuration"
+      
+      # Look for environment configuration file
+      if [ -f "$DASHBOARD_DIR/.env" ] || [ -f "$DASHBOARD_DIR/.env.local" ]; then
+        log_success "Dashboard environment configuration found"
+      else
+        log_warning "Dashboard environment configuration not found. Dashboard may not be properly configured"
+        ((WARNINGS++))
+      fi
+      
+      # Check if process is running (either via PM2 or directly)
+      if command -v pm2 &>/dev/null && pm2 list | grep -q 'dashboard'; then
+        log_success "Dashboard is running via PM2"
+      elif pgrep -f "node.*dashboard" > /dev/null; then
+        log_success "Dashboard process is running"
+      else
+        log_warning "Dashboard process doesn't appear to be running"
+        echo "❌ Dashboard: Process not running" >> "$REPORT_FILE"
+        ((WARNINGS++))
+      fi
+      
+      # Check Traefik dashboard route configuration
+      TRAEFIK_CONF_DIRS=(
+        "/opt/agency_stack/apps/traefik/conf.d"
+        "/opt/agency_stack/clients/default/apps/traefik/conf.d"
+      )
+      
+      DASHBOARD_ROUTE_CONFIGURED=false
+      for conf_dir in "${TRAEFIK_CONF_DIRS[@]}"; do
+        if [ -d "$conf_dir" ] && grep -r "dashboard" "$conf_dir"/*.toml 2>/dev/null | grep -q "routers"; then
+          DASHBOARD_ROUTE_CONFIGURED=true
+          log_success "Dashboard route is configured in Traefik ($conf_dir)"
+          break
+        fi
+      done
+      
+      if [ "$DASHBOARD_ROUTE_CONFIGURED" = false ]; then
+        log_warning "Dashboard route configuration not found in Traefik"
+        echo "❌ Dashboard: No Traefik route configuration found" >> "$REPORT_FILE"
+        ((WARNINGS++))
+        
+        # Provide guidance to fix the issue
+        log_info "To fix this, you can run: make dashboard-install"
+        echo "   To fix: Run 'make dashboard-install'" >> "$REPORT_FILE"
+      fi
+    fi
+    
     # Try to get Traefik dashboard status if configured
     if [ -n "$DOMAIN" ]; then
       # Check if dashboard domain is accessible
-      if curl -s -o /dev/null -w "%{http_code}" "https://dashboard.$DOMAIN" &>/dev/null; then
-        log_success "Dashboard domain is accessible at https://dashboard.$DOMAIN"
+      if curl -s -o /dev/null -w "%{http_code}" "https://${DOMAIN}/dashboard" 2>/dev/null | grep -q "2[0-9][0-9]\|3[0-9][0-9]"; then
+        log_success "Dashboard is accessible at https://${DOMAIN}/dashboard"
+        echo "✅ Dashboard: Accessible at https://${DOMAIN}/dashboard" >> "$REPORT_FILE"
       else
-        log_warning "Dashboard domain (https://dashboard.$DOMAIN) is not accessible"
+        log_warning "Dashboard is not accessible at https://${DOMAIN}/dashboard"
+        echo "❌ Dashboard: Not accessible at https://${DOMAIN}/dashboard" >> "$REPORT_FILE"
         ((WARNINGS++))
+        
+        # Check if the domain itself is accessible
+        if curl -s -o /dev/null -w "%{http_code}" "https://${DOMAIN}" 2>/dev/null | grep -q "2[0-9][0-9]\|3[0-9][0-9]"; then
+          log_info "The domain itself is accessible, but the dashboard route is not"
+          log_info "This may indicate an issue with the dashboard route configuration"
+        else
+          log_warning "The domain itself is not accessible"
+          log_info "This may indicate DNS or TLS issues"
+        fi
       fi
     else
       log_info "Domain not specified - skipping dashboard domain accessibility check"
     fi
-    
-    # Check Traefik configuration files
-    if [ -f "/opt/agency_stack/clients/default/traefik/traefik.yml" ]; then
-      log_success "Traefik configuration file exists"
-      
-      # Check if dashboard is enabled in config
-      if grep -q "dashboard: true" "/opt/agency_stack/clients/default/traefik/traefik.yml"; then
-        log_success "Traefik dashboard is enabled in configuration"
-      else
-        log_warning "Traefik dashboard may not be enabled in configuration"
-        ((WARNINGS++))
-      fi
-    else
-      log_info "Traefik configuration file not found - may not be installed yet"
-    fi
   else
     log_info "Traefik is not installed yet - skipping dashboard integration check"
+    echo "⚠️ Traefik: Not installed - required for dashboard access" >> "$REPORT_FILE"
   fi
   
   log_section_end
