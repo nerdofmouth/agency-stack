@@ -711,3 +711,25 @@ Here’s a tiered rollout plan, ranked by _immediate impact + strategic value_:
 *   ✅ **Ollama**: Local LLM workflows (support agents, contract generation, content)
 *   ✅ [**Builder.io**](http://Builder.io): Connected to Next.js app and database templates
 *   ✅ **Next.js** frontend + Keycloak login: Working demo of SSO + theming
+
+## ✅ UI Dashboard Strategic Goals (Reviewed)
+
+You've confirmed the following goals:
+
+| Goal | Confirmed |
+| ---| --- |
+| Real-time component status? | ✅ Yes |
+| Auto-discovery via registry? | ✅ Yes |
+| Hosted at `/dashboard` subpath? | ✅ Yes |
+| Protected by Keycloak? | ✅ Yes |
+| Uses Tailwind + Next.js? | ✅ Yes |
+| Bundled into demo-core? | ✅ Yes |
+| Pulls logs and health? | ✅ Yes |
+| Works in snapshot VMs? | ✅ Yes |
+
+📌 Let’s also ensure:
+
+*   It reads `/component_validation_report.md` if available
+*   It parses `.installed_ok` markers
+*   It highlights failed installs or registry mismatches clearly
+*   It can optionally visualize port mappings (from `ports.json`)

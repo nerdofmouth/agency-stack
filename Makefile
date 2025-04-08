@@ -2160,25 +2160,28 @@ security-restart:
 
 # Dashboard Component
 dashboard: validate
-	@echo "$(MAGENTA)$(BOLD)🚀 Installing AgencyStack Dashboard...$(RESET)"
+	@echo "$(MAGENTA)$(BOLD)🚀 Installing AgencyStack Next.js Dashboard...$(RESET)"
 	@sudo $(SCRIPTS_DIR)/components/install_dashboard.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
 dashboard-status:
 	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Dashboard Status...$(RESET)"
 	@if [ -f "/opt/agency_stack/dashboard/.installed_ok" ]; then \
 		echo "$(GREEN)Dashboard is installed and ready$(RESET)"; \
-		if [ -f "/usr/local/bin/agency-stack-dashboard" ]; then \
-			echo "$(GREEN)Dashboard executable is available$(RESET)"; \
+		if pm2 list | grep -q "agency-stack-dashboard"; then \
+			echo "$(GREEN)Dashboard service is running (pm2)$(RESET)"; \
 		else \
-			echo "$(RED)Dashboard executable is missing$(RESET)"; \
+			echo "$(RED)Dashboard service is not running$(RESET)"; \
 		fi \
+		echo "$(CYAN)Dashboard URL: https://$(DOMAIN:-proto001.alpha.nerdofmouth.com)/dashboard$(RESET)"; \
 	else \
 		echo "$(RED)Dashboard is not installed$(RESET)"; \
 	fi
 
 dashboard-logs:
 	@echo "$(MAGENTA)$(BOLD)📋 Viewing Dashboard Logs...$(RESET)"
-	@if [ -f "/var/log/agency_stack/components/dashboard.log" ]; then \
+	@if [ -f "/var/log/agency_stack/components/dashboard-out.log" ]; then \
+		tail -n 50 /var/log/agency_stack/components/dashboard-out.log; \
+	elif [ -f "/var/log/agency_stack/components/dashboard.log" ]; then \
 		tail -n 50 /var/log/agency_stack/components/dashboard.log; \
 	else \
 		echo "$(RED)No dashboard logs found$(RESET)"; \
@@ -2186,17 +2189,21 @@ dashboard-logs:
 
 dashboard-restart:
 	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Dashboard...$(RESET)"
-	@sudo pkill -f "agency-stack-dashboard" || true
-	@echo "$(GREEN)Dashboard service restarted$(RESET)"
+	@if command -v pm2 &>/dev/null && pm2 list | grep -q "agency-stack-dashboard"; then \
+		pm2 restart agency-stack-dashboard; \
+		echo "$(GREEN)Dashboard service restarted with pm2$(RESET)"; \
+	elif [ -f "/opt/agency_stack/apps/dashboard/ecosystem.config.js" ]; then \
+		cd /opt/agency_stack/apps/dashboard && pm2 start ecosystem.config.js --update-env; \
+		echo "$(GREEN)Dashboard service started with pm2$(RESET)"; \
+	else \
+		echo "$(RED)Dashboard service not found$(RESET)"; \
+	fi
 
 dashboard-test:
 	@echo "$(MAGENTA)$(BOLD)🧪 Testing Dashboard...$(RESET)"
-	@if [ -f "/usr/local/bin/agency-stack-dashboard" ]; then \
-		timeout 5 /usr/local/bin/agency-stack-dashboard || true; \
-		echo "$(GREEN)Dashboard test completed$(RESET)"; \
-	else \
-		echo "$(RED)Dashboard executable not found$(RESET)"; \
-	fi
+	@timeout 10 curl -sSf -o /dev/null "https://$(DOMAIN:-proto001.alpha.nerdofmouth.com)/dashboard" && \
+		echo "$(GREEN)Dashboard endpoint test successful: 200 OK$(RESET)" || \
+		echo "$(RED)Dashboard endpoint test failed$(RESET)"
 
 # Demo Core Installation
 # Installs high-value components suitable for client/investor demos
@@ -2230,6 +2237,10 @@ demo-core: validate
 	@$(MAKE) integrate-sso
 	@$(MAKE) integrate-monitoring
 	@$(MAKE) dashboard-update
+	
+	# Add the dashboard component to demo-core
+	@echo "$(YELLOW)📊 Installing Dashboard Component...$(RESET)"
+	@$(MAKE) dashboard dashboard-status
 	
 	@echo "$(YELLOW)🧪 Running Validation Checks...$(RESET)"
 	@$(MAKE) alpha-check
@@ -2266,6 +2277,9 @@ demo-core-clean:
 	@echo "$(YELLOW)Stopping and Removing Security Components...$(RESET)"
 	@-$(MAKE) keycloak-stop fail2ban-stop 2>/dev/null || true
 	
+	@echo "$(YELLOW)Stopping Dashboard Component...$(RESET)"
+	@-$(MAKE) dashboard-restart 2>/dev/null || true
+	
 	@echo "$(GREEN)$(BOLD)✅ Demo Core Components Cleaned Up Successfully!$(RESET)"
 	@echo "$(CYAN)The system has been returned to a clean state.$(RESET)"
 
@@ -2296,6 +2310,9 @@ demo-core-status:
 	@echo "$(YELLOW)📅 Business Components:$(RESET)"
 	@-$(MAKE) calcom-status erpnext-status documenso-status focalboard-status 2>/dev/null || true
 	
+	@echo "$(YELLOW)📊 Dashboard Status:$(RESET)"
+	@-$(MAKE) dashboard-status 2>/dev/null || true
+	
 	@echo "$(GREEN)$(BOLD)✅ Status Check Complete!$(RESET)"
 
 # Demo Core Logs
@@ -2305,7 +2322,7 @@ demo-core-logs:
 	@echo "$(CYAN)Viewing recent logs from all demo components...$(RESET)"
 	@echo ""
 	
-	@for component in docker traefik keycloak fail2ban mailu chatwoot voip prometheus grafana posthog wordpress peertube builderio gitea droneci calcom erpnext documenso focalboard; do \
+	@for component in docker traefik keycloak fail2ban mailu chatwoot voip prometheus grafana posthog wordpress peertube builderio gitea droneci calcom erpnext documenso focalboard dashboard; do \
 		echo "$(YELLOW)📄 $$component logs:$(RESET)"; \
 		$(MAKE) $$component-logs 2>/dev/null || echo "$(RED)No logs available for $$component$(RESET)"; \
 		echo ""; \
