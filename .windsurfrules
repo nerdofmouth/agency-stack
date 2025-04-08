@@ -756,3 +756,97 @@ This ensures full reproducibility, safety in snapshot-based deployments, and cla
 
 ```bash
 # 🔁 From Zero to Sovereign — No side effects allowed.
+
+
+# 🚀 AgencyStack Development Workflow
+
+## Repository-First Development Philosophy
+
+AgencyStack follows a **repository-first** development approach, adhering to our core principles of sovereignty, portability, and repeatability. This document outlines our workflow to maintain consistency between local development and remote testing.
+
+## 🔄 Development Workflow
+
+### 1. LOCAL DEVELOPMENT (Primary)
+
+All changes must first be made to the repository files:
+
+- **Makefile targets**
+- **Component scripts** (`/scripts/components/*.sh`)
+- **Utility scripts** (`/scripts/utils/*.sh`) 
+- **Documentation** (`/docs/pages/components/*.md`)
+- **Configuration templates**
+
+**NEVER make direct changes to a running VM without tracking them in the repository first.**
+
+### 2. VERSION CONTROL
+
+After making changes locally:
+
+```bash
+# Commit changes with descriptive messages
+git add [changed files]
+git commit -m "feat: Implement demo-core target for full stack deployment"
+
+# Push to the appropriate branch
+git push origin [branch-name]
+```
+
+### 3. REMOTE TESTING
+
+Only after changes are properly committed to the repository:
+
+```bash
+# SSH into your test VM
+ssh root@proto001.alpha.nerdofmouth.com
+
+# Navigate to the repo directory
+cd /opt/agency_stack/repo
+
+# Pull the latest changes from your branch
+git checkout [branch-name]
+git pull
+
+# Run your tests
+make [target] DOMAIN=proto001.alpha.nerdofmouth.com ADMIN_EMAIL=your-email@example.com
+```
+
+## 📋 Validation Process
+
+1. Changes are validated first through local linting/static analysis
+2. Then tested on remote VMs through `git pull` + `make` commands
+3. Feedback from tests is incorporated as new repository changes
+4. The cycle continues until the feature is production-ready
+
+## ⚠️ Common Pitfalls to Avoid
+
+- **NEVER** modify files directly on the VM without tracking changes in git
+- **NEVER** create VM-specific configurations that don't exist in the repository
+- **NEVER** manually edit files in `/opt/agency_stack/` outside the repository
+
+## 🧱 Makefile Editing Tips
+
+When editing Makefiles:
+
+1. Use **literal tab characters** for indentation (not spaces)
+2. Follow the established pattern:
+   ```makefile
+   target-name: dependencies
+   [TAB]@command1
+   [TAB]@command2
+   ```
+3. Use variables consistently (`$(VARIABLE)` not `${VARIABLE}`)
+4. Update `.PHONY` when adding new targets
+
+## 🔍 Testing Syntax
+
+Before pushing:
+
+```bash
+# Verify syntax
+make -n target-name
+
+# Test with dry-run
+make --dry-run target-name
+```
+
+Remember: **Repository integrity is our highest priority.** Every change must be tracked, repeatable, and properly documented in the codebase.
