@@ -328,19 +328,24 @@ setup_first_run_environment() {
     RETRY_DELAY=5
     CLONE_SUCCESS=false
     
-    while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ "$CLONE_SUCCESS" = false ]; do
+    if [ ! -d "/opt/agency_stack/repo" ]; then
       git clone https://github.com/nerdofmouth/agency-stack.git /opt/agency_stack/repo && CLONE_SUCCESS=true
-      
-      if [ "$CLONE_SUCCESS" = false ]; then
-        RETRY_COUNT=$((RETRY_COUNT + 1))
-        if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-          log "WARN" "Failed to clone repository, retrying in $RETRY_DELAY seconds (attempt $RETRY_COUNT of $MAX_RETRIES)"
-          echo -e "${YELLOW}Failed to clone repository, retrying in $RETRY_DELAY seconds (attempt $RETRY_COUNT of $MAX_RETRIES)${NC}"
-          sleep $RETRY_DELAY
-          RETRY_DELAY=$((RETRY_DELAY * 2))
-        fi
+    else
+      cd /opt/agency_stack/repo
+      git pull
+      cd -
+      CLONE_SUCCESS=true
+    fi
+    
+    if [ "$CLONE_SUCCESS" = false ]; then
+      RETRY_COUNT=$((RETRY_COUNT + 1))
+      if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+        log "WARN" "Failed to clone repository, retrying in $RETRY_DELAY seconds (attempt $RETRY_COUNT of $MAX_RETRIES)"
+        echo -e "${YELLOW}Failed to clone repository, retrying in $RETRY_DELAY seconds (attempt $RETRY_COUNT of $MAX_RETRIES)${NC}"
+        sleep $RETRY_DELAY
+        RETRY_DELAY=$((RETRY_DELAY * 2))
       fi
-    done
+    fi
     
     if [ "$CLONE_SUCCESS" = false ]; then
       log "ERROR" "Failed to clone repository after $MAX_RETRIES attempts"
