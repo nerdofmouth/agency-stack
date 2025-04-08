@@ -2182,7 +2182,8 @@ dashboard-status:
 		else \
 			echo "PM2 not found in path or project directory"; \
 		fi; \
-		echo "Dashboard URL: https://$(DOMAIN)/dashboard"; \
+		DOMAIN_TO_USE="$${DOMAIN:-proto001.alpha.nerdofmouth.com}"; \
+		echo "Dashboard URL: https://$${DOMAIN_TO_USE}/dashboard"; \
 	else \
 		echo "Dashboard is not installed"; \
 		echo "Install with: make dashboard DOMAIN=$(DOMAIN)"; \
@@ -2224,6 +2225,7 @@ dashboard-restart:
 
 dashboard-test:
 	@echo "$(MAGENTA)$(BOLD)🧪 Testing Dashboard...$(RESET)"
-	@timeout 10 curl -sSf -o /dev/null "https://$(DOMAIN:-proto001.alpha.nerdofmouth.com)/dashboard" && \
+	@DOMAIN_TO_USE="$${DOMAIN:-proto001.alpha.nerdofmouth.com}"; \
+	timeout 10 curl -sSf -o /dev/null "https://$${DOMAIN_TO_USE}/dashboard" && \
 		echo "$(GREEN)Dashboard endpoint test successful: 200 OK$(RESET)" || \
 		echo "$(RED)Dashboard endpoint test failed$(RESET)"

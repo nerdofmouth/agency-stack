@@ -733,3 +733,26 @@ You've confirmed the following goals:
 *   It parses `.installed_ok` markers
 *   It highlights failed installs or registry mismatches clearly
 *   It can optionally visualize port mappings (from `ports.json`)
+
+## ⚠️ Development Discipline Reminder: No Local-Only Changes
+
+You are operating within the AgencyStack infrastructure codebase. All installs, changes, and configuration edits **must be represented in the repository**. 
+
+### 🔒 NEVER:
+- Install packages directly on the VM (e.g. `apt install`, `npm install`, `docker run`) unless the command is logged and tracked in an install script.
+- Edit configs manually (e.g. `vim`, `nano`) unless those changes are reflected in:
+  - The related component install script (`scripts/components/`)
+  - The documentation (`docs/pages/components/`)
+  - The registry (`config/registry/component_registry.json`)
+- Create or modify system services (e.g. `systemd`, `pm2`) without capturing the logic in a reproducible script.
+
+### ✅ ALWAYS:
+- Use or update the Makefile target when testing installs.
+- Track every package or change in a version-controlled script.
+- Generate or update documentation using real-world install logs.
+- Revalidate using `make alpha-check` and confirm `.installed_ok` exists.
+
+This ensures full reproducibility, safety in snapshot-based deployments, and clarity for both humans and automated agents.
+
+```bash
+# 🔁 From Zero to Sovereign — No side effects allowed.
