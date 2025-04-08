@@ -176,10 +176,12 @@ cleanup() {
     fi
     
     # Log completion
-    if [[ "${SCRIPT_SUCCESS:-false}" == "true" ]]; then
-        log_success "Script completed successfully"
-    else
+    if [[ "${SCRIPT_SUCCESS:-}" == "false" ]]; then
+        # Only log error if script explicitly set SCRIPT_SUCCESS=false
         log_error "Script did not complete successfully"
+    else
+        # Default to success if not explicitly marked as failed
+        log_success "Script completed successfully"
     fi
 }
 
