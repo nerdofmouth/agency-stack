@@ -450,7 +450,10 @@ EOL
 chmod +x "${INSTALL_DIR}/fail2ban-notify.sh"
 
 # Configure Fail2ban to use our notification script
-cat > /etc/fail2ban/action.d/custom-notify.conf <<EOL
+if [ -f /etc/fail2ban/action.d/custom-notify.conf ]; then
+  log "INFO" "Custom notification action already exists, skipping" "${CYAN}Custom notification action already exists, skipping...${NC}"
+else
+  cat > /etc/fail2ban/action.d/custom-notify.conf <<EOL
 [Definition]
 actionstart = 
 actionstop = 
@@ -458,10 +461,24 @@ actioncheck =
 actionban = ${INSTALL_DIR}/fail2ban-notify.sh <name> <ip> <failures>
 actionunban = 
 EOL
+fi
 
-# Add the custom action to the default jail
-echo "action = %(action_)s
+# Add the custom action to the default jail only if it doesn't already exist
+if grep -q "custom-notify" /etc/fail2ban/jail.local; then
+  log "INFO" "Custom notify action already in jail.local, skipping" "${CYAN}Custom notify action already in jail.local, skipping...${NC}"
+else
+  log "INFO" "Adding custom notify action to jail.local" "${CYAN}Adding custom notify action to jail.local...${NC}"
+  # Use sed to modify the existing action line rather than appending a duplicate
+  # This ensures we don't create duplicate 'action' entries
+  if grep -q "action = " /etc/fail2ban/jail.local; then
+    # If an action line exists, append our custom action to it
+    sed -i 's/^action = .*/&\n         custom-notify/' /etc/fail2ban/jail.local
+  else
+    # If no action line exists (unlikely), add it
+    echo "action = %(action_)s
          custom-notify" >> /etc/fail2ban/jail.local
+  fi
+fi
 
 # Copy the main configuration to component directory
 cp -r /etc/fail2ban/jail.d "${COMPONENT_CONFIG_DIR}/"
