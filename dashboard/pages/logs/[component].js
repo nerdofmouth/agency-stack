@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
-import styles from '../styles/ComponentDetail.module.css';
+import styles from '../../styles/ComponentDetail.module.css';
 
 export default function ComponentDetail({ component, logs }) {
   // This page will show the component logs and status
