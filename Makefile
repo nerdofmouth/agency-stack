@@ -119,8 +119,17 @@ help:
 	@echo "  $(BOLD)make peertube-start$(RESET)           Start PeerTube"
 	@echo "  $(BOLD)make peertube-restart$(RESET)         Restart PeerTube"
 
+# Pre-flight installation verification
+preflight-check:
+	@echo "$(MAGENTA)$(BOLD)🔍 Performing pre-installation checklist verification...$(RESET)"
+	@$(SCRIPTS_DIR)/components/preflight_check.sh $(if $(DOMAIN),--domain "$(DOMAIN)",) $(if $(INTERACTIVE),--interactive,) $(if $(SKIP_PORTS),--skip-ports,) $(if $(SKIP_DNS),--skip-dns,) $(if $(SKIP_SYSTEM),--skip-system,) $(if $(SKIP_NETWORK),--skip-network,) $(if $(SKIP_SSH),--skip-ssh,)
+	@if [ -f "$(REPO_ROOT)/pre_installation_report.md" ]; then \
+		echo "$(CYAN)Pre-installation report generated at: $(REPO_ROOT)/pre_installation_report.md$(RESET)"; \
+		grep -A2 "^## Summary" "$(REPO_ROOT)/pre_installation_report.md" | grep -v "^##"; \
+	fi
+
 # Install AgencyStack
-install: validate
+install: preflight-check validate
 	@echo "🔧 Installing AgencyStack..."
 	@sudo $(SCRIPTS_DIR)/install.sh
 
