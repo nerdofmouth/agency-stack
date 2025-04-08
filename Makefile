@@ -1508,24 +1508,47 @@ seafile-restart:
 	@exit 1
 
 # Auto-generated target for traefik
-traefik:
-	@echo "TODO: Implement traefik"
-	@exit 1
+traefik: validate
+	@echo "$(MAGENTA)$(BOLD)🔧 Installing Traefik Reverse Proxy...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_traefik.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
-# Auto-generated target for traefik
 traefik-status:
-	@echo "TODO: Implement traefik-status"
-	@exit 1
+	@echo "$(MAGENTA)$(BOLD)🔍 Checking Traefik Status...$(RESET)"
+	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/traefik/.installed_ok" ]; then \
+		echo "$(GREEN)✅ Traefik is installed$(RESET)"; \
+		if docker ps | grep -q "traefik"; then \
+			echo "$(GREEN)✅ Traefik container is running$(RESET)"; \
+		else \
+			echo "$(RED)❌ Traefik container is not running$(RESET)"; \
+		fi; \
+	else \
+		echo "$(RED)❌ Traefik is not installed$(RESET)"; \
+		exit 1; \
+	fi
 
-# Auto-generated target for traefik
 traefik-logs:
-	@echo "TODO: Implement traefik-logs"
-	@exit 1
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing Traefik Logs...$(RESET)"
+	@if [ -f "/var/log/agency_stack/components/traefik.log" ]; then \
+		echo "$(CYAN)Recent Traefik actions:$(RESET)"; \
+		sudo grep "Traefik" /var/log/syslog | tail -n 20; \
+		echo ""; \
+		echo "$(CYAN)For installation logs, use:$(RESET)"; \
+		echo "cat /var/log/agency_stack/components/traefik.log"; \
+	else \
+		echo "$(YELLOW)Traefik logs not found.$(RESET)"; \
+		journalctl -u traefik 2>/dev/null; \
+	fi
 
-# Auto-generated target for traefik
 traefik-restart:
-	@echo "TODO: Implement traefik-restart"
-	@exit 1
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Traefik...$(RESET)"
+	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/traefik/.installed_ok" ]; then \
+		docker restart traefik-$(CLIENT_ID); \
+		echo "$(GREEN)✅ Traefik has been restarted$(RESET)"; \
+		echo "$(CYAN)Check status with: make traefik-status$(RESET)"; \
+	else \
+		echo "$(RED)❌ Traefik is not installed$(RESET)"; \
+		echo "$(CYAN)Install with: make traefik$(RESET)"; \
+	fi
 
 # Auto-generated target for vault
 vault:
