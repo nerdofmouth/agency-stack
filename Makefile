@@ -977,7 +977,7 @@ droneci-restart:
 droneci-backup:
 	@echo "Backing up Drone CI data..."
 	@mkdir -p $(BACKUP_DIR)/droneci
-	@$(CONFIG_DIR)/clients/$(CLIENT_ID)/droneci_data/scripts/backup.sh $(BACKUP_DIR)/droneci
+	@$(CONFIG_DIR)/clients/$(CLIENT_ID)/droneci_data/scripts/backup.sh "$(BACKUP_DIR)/droneci"
 	@echo "Backup completed: $(BACKUP_DIR)/droneci/"
 
 droneci-config:
@@ -2164,7 +2164,7 @@ dashboard: validate
 
 dashboard-status:
 	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Dashboard Status...$(RESET)"
-	@if [ -f "/opt/agency_stack/dashboard/.installed_ok" ]; then \
+	@if [ -f "/opt/agency_stack/dashboard/.installed_ok" ] || [ -f "/opt/agency_stack/clients/default/dashboard/.installed_ok" ] || [ -f "/opt/agency_stack/clients/${CLIENT_ID}/dashboard/.installed_ok" ]; then \
 		echo "Dashboard is installed and ready"; \
 		export PATH="/opt/agency_stack/apps/dashboard/node/bin:$$PATH"; \
 		if command -v pm2 >/dev/null 2>&1; then \
@@ -2185,6 +2185,7 @@ dashboard-status:
 		echo "Dashboard URL: https://$(DOMAIN)/dashboard"; \
 	else \
 		echo "Dashboard is not installed"; \
+		echo "Install with: make dashboard DOMAIN=$(DOMAIN)"; \
 	fi
 
 dashboard-logs:
@@ -2199,14 +2200,26 @@ dashboard-logs:
 
 dashboard-restart:
 	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Dashboard...$(RESET)"
-	@if command -v pm2 &>/dev/null && pm2 list | grep -q "agency-stack-dashboard"; then \
-		pm2 restart agency-stack-dashboard; \
-		echo "$(GREEN)Dashboard service restarted with pm2$(RESET)"; \
-	elif [ -f "/opt/agency_stack/apps/dashboard/ecosystem.config.js" ]; then \
-		cd /opt/agency_stack/apps/dashboard && pm2 start ecosystem.config.js --update-env; \
-		echo "$(GREEN)Dashboard service started with pm2$(RESET)"; \
+	@if [ -f "/opt/agency_stack/dashboard/.installed_ok" ] || [ -f "/opt/agency_stack/clients/default/dashboard/.installed_ok" ] || [ -f "/opt/agency_stack/clients/${CLIENT_ID}/dashboard/.installed_ok" ]; then \
+		if [ -d "/opt/agency_stack/apps/dashboard/node" ]; then \
+			export PATH="/opt/agency_stack/apps/dashboard/node/bin:$$PATH"; \
+			if [ -f "/opt/agency_stack/apps/dashboard/node/bin/pm2" ]; then \
+				/opt/agency_stack/apps/dashboard/node/bin/pm2 restart agency-stack-dashboard || \
+				/opt/agency_stack/apps/dashboard/node/bin/pm2 start --name agency-stack-dashboard --max-memory-restart 250M --exp-backoff-restart-delay=100 npm -- start; \
+				echo "Dashboard service $(GREEN)started with pm2$(RESET)"; \
+			else \
+				# Try with global pm2 as fallback \
+				pm2 restart agency-stack-dashboard 2>/dev/null || \
+				pm2 start --name agency-stack-dashboard --max-memory-restart 250M --exp-backoff-restart-delay=100 npm -- start; \
+				echo "Dashboard service $(GREEN)started with global pm2$(RESET)"; \
+			fi; \
+		else \
+			echo "$(RED)Dashboard installation not found in expected location$(RESET)"; \
+			echo "$(CYAN)Try reinstalling with: make dashboard DOMAIN=$(DOMAIN)$(RESET)"; \
+		fi; \
 	else \
-		echo "$(RED)Dashboard service not found$(RESET)"; \
+		echo "$(RED)Dashboard is not installed$(RESET)"; \
+		echo "$(CYAN)Install with: make dashboard DOMAIN=$(DOMAIN)$(RESET)"; \
 	fi
 
 dashboard-test:
