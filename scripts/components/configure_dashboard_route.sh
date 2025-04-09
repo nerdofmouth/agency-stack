@@ -68,7 +68,7 @@ http:
     dashboard:
       loadBalancer:
         servers:
-          - url: "http://127.0.0.1:${DASHBOARD_PORT}"
+          - url: "http://host.docker.internal:3000"
 
   middlewares:
     dashboard-strip:
