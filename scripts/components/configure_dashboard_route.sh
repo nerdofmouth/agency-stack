@@ -14,6 +14,28 @@ CLIENT_ID="${CLIENT_ID:-default}"
 DOMAIN="${DOMAIN:-localhost}"
 DASHBOARD_PORT="3000"  # Default Next.js port
 
+# Process command line arguments
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --domain)
+      DOMAIN="$2"
+      shift 2
+      ;;
+    --client-id)
+      CLIENT_ID="$2"
+      shift 2
+      ;;
+    *)
+      log_error "Unknown option: $1"
+      exit 1
+      ;;
+  esac
+done
+
+log_info "Starting configure_dashboard_route.sh"
+log_info "CLIENT_ID: ${CLIENT_ID}"
+log_info "DOMAIN: ${DOMAIN}"
+
 # Paths
 TRAEFIK_CONFIG_DIR="/opt/agency_stack/clients/${CLIENT_ID}/traefik/config/dynamic"
 DASHBOARD_DIR="/opt/agency_stack/clients/${CLIENT_ID}/apps/dashboard"
