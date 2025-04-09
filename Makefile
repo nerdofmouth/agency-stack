@@ -2218,6 +2218,11 @@ security-restart:
 dashboard: validate
 	@echo "$(MAGENTA)$(BOLD)🚀 Installing AgencyStack Next.js Dashboard...$(RESET)"
 	@sudo $(SCRIPTS_DIR)/components/install_dashboard.sh --domain "$(DOMAIN)" --admin-email "$(ADMIN_EMAIL)" $(if $(CLIENT_ID),--client-id "$(CLIENT_ID)",) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+	@$(MAKE) dashboard-configure-route
+
+dashboard-configure-route:
+	@echo "$(MAGENTA)$(BOLD)🔄 Configuring Dashboard Routing with Traefik...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/configure_dashboard_route.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),)
 
 dashboard-status:
 	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Dashboard Status...$(RESET)"
