@@ -221,3 +221,4 @@ For detailed information about each component, including setup and configuration
 | Email & Communication | [Mailu](./components/mailu.md) | v2.0.0 | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Email & Communication | [Listmonk](./components/listmonk.md) | v4.1.0 | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Email & Communication | [jitsi](./components/jitsi.md) | v2.0.6467 | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Database | [pgvector](./components/pgvector.md) | v0.5.1 | ✅ | ✅ | ✅ | ✅ | ✅ |
