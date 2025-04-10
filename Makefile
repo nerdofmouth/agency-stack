@@ -19,7 +19,7 @@ MAGENTA := $(shell tput setaf 5)
 CYAN := $(shell tput setaf 6)
 RESET := $(shell tput sgr0)
 
-.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit integrate-components dashboard dashboard-refresh dashboard-enable dashboard-update dashboard-open integrate-sso integrate-email integrate-monitoring integrate-data-bridge detect-ports remap-ports scan-ports setup-cronjobs view-alerts log-summary create-client setup-roles security-audit security-fix rotate-secrets setup-log-segmentation verify-certs verify-auth multi-tenancy-status install-wordpress install-erpnext install-posthog install-voip install-mailu install-grafana install-loki install-prometheus install-keycloak install-infrastructure install-security-infrastructure install-multi-tenancy validate validate-report peertube peertube-sso peertube-with-deps peertube-reinstall peertube-status peertube-logs peertube-stop peertube-start peertube-restart demo-core demo-core-clean demo-core-status demo-core-logs
+.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit integrate-components dashboard dashboard-refresh dashboard-enable dashboard-update dashboard-open dashboard-direct integrate-sso integrate-email integrate-monitoring integrate-data-bridge detect-ports remap-ports scan-ports setup-cronjobs view-alerts log-summary create-client setup-roles security-audit security-fix rotate-secrets setup-log-segmentation verify-certs verify-auth multi-tenancy-status install-wordpress install-erpnext install-posthog install-voip install-mailu install-grafana install-loki install-prometheus install-keycloak install-infrastructure install-security-infrastructure install-multi-tenancy validate validate-report peertube peertube-sso peertube-with-deps peertube-reinstall peertube-status peertube-logs peertube-stop peertube-start peertube-restart demo-core demo-core-clean demo-core-status demo-core-logs
 
 # Default target
 help:
@@ -58,11 +58,12 @@ help:
 	@echo "  $(BOLD)make motd$(RESET)             Generate server message of the day"
 	@echo "  $(BOLD)make audit$(RESET)            Audit running components and system status"
 	@echo "  $(BOLD)make integrate-components$(RESET) Integrate AgencyStack components"
-	@echo "  $(BOLD)make dashboard$(RESET)        Open AgencyStack dashboard"
+	@echo "  $(BOLD)make dashboard-legacy$(RESET)        Open AgencyStack dashboard"
 	@echo "  $(BOLD)make dashboard-refresh$(RESET) Refresh AgencyStack dashboard"
 	@echo "  $(BOLD)make dashboard-enable$(RESET) Enable AgencyStack dashboard"
 	@echo "  $(BOLD)make dashboard-update$(RESET) Update AgencyStack dashboard data"
 	@echo "  $(BOLD)make dashboard-open$(RESET)   Open AgencyStack dashboard in browser"
+	@echo "  $(BOLD)make dashboard-direct$(RESET) Open AgencyStack dashboard via direct IP address"
 	@echo "  $(BOLD)make integrate-sso$(RESET)    Integrate Single Sign-On for AgencyStack components"
 	@echo "  $(BOLD)make integrate-email$(RESET)  Integrate Email systems for AgencyStack components"
 	@echo "  $(BOLD)make integrate-monitoring$(RESET) Integrate Monitoring for AgencyStack components"
@@ -118,10 +119,18 @@ help:
 	@echo "  $(BOLD)make peertube-stop$(RESET)            Stop PeerTube"
 	@echo "  $(BOLD)make peertube-start$(RESET)           Start PeerTube"
 	@echo "  $(BOLD)make peertube-restart$(RESET)         Restart PeerTube"
-	@echo "  $(BOLD)make peertube-upgrade$(RESET)         Upgrade PeerTube to v7.0"
+
+# Pre-flight installation verification
+preflight-check:
+	@echo "$(MAGENTA)$(BOLD)🔍 Performing pre-installation checklist verification...$(RESET)"
+	@$(SCRIPTS_DIR)/components/preflight_check.sh $(if $(DOMAIN),--domain "$(DOMAIN)",) $(if $(INTERACTIVE),--interactive,) $(if $(SKIP_PORTS),--skip-ports,) $(if $(SKIP_DNS),--skip-dns,) $(if $(SKIP_SYSTEM),--skip-system,) $(if $(SKIP_NETWORK),--skip-network,) $(if $(SKIP_SSH),--skip-ssh,)
+	@if [ -f "$(REPO_ROOT)/pre_installation_report.md" ]; then \
+		echo "$(CYAN)Pre-installation report generated at: $(REPO_ROOT)/pre_installation_report.md$(RESET)"; \
+		grep -A2 "^## Summary" "$(REPO_ROOT)/pre_installation_report.md" | grep -v "^##"; \
+	fi
 
 # Install AgencyStack
-install: validate
+install: preflight-check validate
 	@echo "🔧 Installing AgencyStack..."
 	@sudo $(SCRIPTS_DIR)/install.sh
 
@@ -339,7 +348,7 @@ integrate-data-bridge:
 	@sudo bash $(SCRIPTS_DIR)/integrate_components.sh --type=data-bridge
 
 # Open AgencyStack dashboard
-dashboard:
+dashboard-legacy:
 	@echo "📊 Opening AgencyStack dashboard..."
 	@sudo bash $(SCRIPTS_DIR)/dashboard.sh
 
@@ -358,7 +367,25 @@ dashboard-update:
 	@echo "🔄 Updating AgencyStack dashboard data..."
 	@sudo bash $(SCRIPTS_DIR)/dashboard/update_dashboard_data.sh
 
-# Open dashboard in browser
+# Directly open dashboard via IP address (bypassing DNS)
+dashboard-direct:
+	@echo "$(MAGENTA)$(BOLD)🔌 Opening AgencyStack Dashboard via Direct IP Address...$(RESET)"
+	@if [ -d "/opt/agency_stack/clients/$(CLIENT_ID)/dashboard" ]; then \
+		SERVER_IP=$$(hostname -I | awk '{print $$1}'); \
+		DASHBOARD_PORT=$$(docker ps | grep dashboard | grep -oP '\d+->80' | cut -d'-' -f1 || echo "3001"); \
+		echo "$(GREEN)✅ Dashboard is available at: http://$${SERVER_IP}:$${DASHBOARD_PORT}$(RESET)"; \
+		if command -v xdg-open >/dev/null 2>&1; then \
+			xdg-open "http://$${SERVER_IP}:$${DASHBOARD_PORT}" || echo "$(YELLOW)⚠️ Could not open browser automatically$(RESET)"; \
+		elif command -v open >/dev/null 2>&1; then \
+			open "http://$${SERVER_IP}:$${DASHBOARD_PORT}" || echo "$(YELLOW)⚠️ Could not open browser automatically$(RESET)"; \
+		else \
+			echo "$(YELLOW)⚠️ Could not detect browser. Please open the URL manually.$(RESET)"; \
+		fi; \
+	else \
+		echo "$(RED)❌ Dashboard not installed. Install with: make dashboard$(RESET)"; \
+	fi
+
+# Open AgencyStack dashboard in browser
 dashboard-open:
 	@echo "🌐 Opening AgencyStack dashboard in browser..."
 	@xdg-open http://dashboard.$(shell grep PRIMARY_DOMAIN /opt/agency_stack/config.env 2>/dev/null | cut -d '=' -f2 || echo "localhost")
@@ -436,32 +463,19 @@ setup-roles:
 
 security-audit:
 	@echo "🔐 Running security audit..."
-		sudo bash $(SCRIPTS_DIR)/security/audit_stack.sh --client-id "$(CLIENT_ID)"; \
-	else \
-		sudo bash $(SCRIPTS_DIR)/security/audit_stack.sh; \
-	fi
+		sudo bash $(SCRIPTS_DIR)/security/audit_stack.sh $(if $(VERBOSE),--verbose,) $(if $(REPORT),--report,)
 
 security-fix:
 	@echo "🔧 Fixing security issues..."
-		sudo bash $(SCRIPTS_DIR)/security/audit_stack.sh --fix --client-id "$(CLIENT_ID)"; \
-	else \
-		sudo bash $(SCRIPTS_DIR)/security/audit_stack.sh --fix; \
-	fi
+		sudo bash $(SCRIPTS_DIR)/security/audit_stack.sh --fix $(if $(VERBOSE),--verbose,) $(if $(REPORT),--report,)
 
 rotate-secrets:
 	@echo "🔄 Rotating secrets..."
-		sudo bash $(SCRIPTS_DIR)/security/generate_secrets.sh --rotate --client-id "$(CLIENT_ID)" --service "$(SERVICE)"; \
-		sudo bash $(SCRIPTS_DIR)/security/generate_secrets.sh --rotate --client-id "$(CLIENT_ID)"; \
-	else \
-		sudo bash $(SCRIPTS_DIR)/security/generate_secrets.sh --rotate; \
-	fi
+		sudo bash $(SCRIPTS_DIR)/security/generate_secrets.sh --rotate $(if $(VERBOSE),--verbose,) $(if $(REPORT),--report,)
 
 setup-log-segmentation:
 	@echo "📋 Setting up log segmentation..."
-		sudo bash $(SCRIPTS_DIR)/security/setup_log_segmentation.sh --client-id "$(CLIENT_ID)"; \
-	else \
-		sudo bash $(SCRIPTS_DIR)/security/setup_log_segmentation.sh; \
-	fi
+		sudo bash $(SCRIPTS_DIR)/security/setup_log_segmentation.sh $(if $(VERBOSE),--verbose,) $(if $(REPORT),--report,)
 
 verify-certs:
 	@echo "🔒 Verifying TLS certificates..."
@@ -692,7 +706,7 @@ listmonk-status:
 	@docker ps -a | grep listmonk || echo "Listmonk is not running"
 
 listmonk-logs:
-	@docker logs -f listmonk-app-$(CLIENT_ID) 2>&1 | tee $(LOG_DIR)/components/listmonk.log
+	@docker logs -f listmonk-$(CLIENT_ID) 2>&1 | tee $(LOG_DIR)/components/listmonk.log
 
 listmonk-stop:
 	@docker-compose -f $(DOCKER_DIR)/listmonk/docker-compose.yml down
@@ -701,14 +715,13 @@ listmonk-start:
 	@docker-compose -f $(DOCKER_DIR)/listmonk/docker-compose.yml up -d
 
 listmonk-restart:
-	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Listmonk...$(RESET)"
-	@cd $(DOCKER_DIR)/listmonk && docker-compose restart
+	@docker-compose -f $(DOCKER_DIR)/listmonk/docker-compose.yml restart
 
 listmonk-backup:
 	@echo "Backing up Listmonk data..."
 	@mkdir -p $(BACKUP_DIR)/listmonk
 	@docker exec listmonk-postgres-$(CLIENT_ID) pg_dump -U listmonk listmonk > $(BACKUP_DIR)/listmonk/listmonk_db_$(shell date +%Y%m%d).sql
-	@tar -czf $(BACKUP_DIR)/listmonk/listmonk_storage_$(shell date +%Y%m%d).tar.gz -C $(CONFIG_DIR)/clients/$(CLIENT_ID)/listmonk_data/storage .
+	@tar -czf $(BACKUP_DIR)/listmonk/listmonk_uploads_$(shell date +%Y%m%d).tar.gz -C $(CONFIG_DIR)/clients/$(CLIENT_ID)/listmonk_data/uploads .
 	@echo "Backup completed: $(BACKUP_DIR)/listmonk/"
 
 listmonk-restore:
@@ -716,15 +729,8 @@ listmonk-restore:
 	@echo "Please refer to the documentation for detailed instructions."
 
 listmonk-config:
-	@echo "Opening Listmonk environment configuration..."
-	@$(EDITOR) $(DOCKER_DIR)/listmonk/.env
-
-listmonk-upgrade:
-	@echo "$(MAGENTA)$(BOLD)🔄 Upgrading Listmonk to v4.1.0...$(RESET)"
-	@read -p "$(YELLOW)Enter domain for Listmonk (e.g., mail.yourdomain.com):$(RESET) " DOMAIN; \
-	read -p "$(YELLOW)Enter admin email:$(RESET) " ADMIN_EMAIL; \
-	read -p "$(YELLOW)Enter client ID (optional):$(RESET) " CLIENT_ID; \
-	sudo $(SCRIPTS_DIR)/components/upgrade_listmonk.sh --domain $$DOMAIN --admin-email $$ADMIN_EMAIL $(if $$CLIENT_ID,--client-id $$CLIENT_ID,) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+	@echo "Opening Listmonk configuration..."
+	@$(EDITOR) $(CONFIG_DIR)/clients/$(CLIENT_ID)/listmonk_data/config/config.toml
 
 # Grafana
 install-grafana: validate
@@ -853,9 +859,55 @@ prometheus-config:
 	read -p "$(YELLOW)Enter client ID (optional):$(RESET) " CLIENT_ID; \
 
 # Keycloak
-install-keycloak: validate
-	@echo "Installing Keycloak identity provider..."
+keycloak: validate
+	@echo "$(MAGENTA)$(BOLD)🔐 Installing Keycloak Identity Provider...$(RESET)"
 	@sudo $(SCRIPTS_DIR)/components/install_keycloak.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+keycloak-status:
+	@echo "$(MAGENTA)$(BOLD)🔍 Checking Keycloak Status...$(RESET)"
+	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/keycloak/.installed_ok" ]; then \
+		echo "$(GREEN)✅ Keycloak is installed$(RESET)"; \
+		if docker ps | grep -q "keycloak"; then \
+			echo "$(GREEN)✅ Keycloak container is running$(RESET)"; \
+			docker ps | grep keycloak; \
+		else \
+			echo "$(RED)❌ Keycloak container is not running$(RESET)"; \
+		fi; \
+	else \
+		echo "$(RED)❌ Keycloak is not installed$(RESET)"; \
+		echo "$(CYAN)To install, run: make keycloak$(RESET)"; \
+		exit 1; \
+	fi
+
+keycloak-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing Keycloak Logs...$(RESET)"
+	@if [ -f "/var/log/agency_stack/components/keycloak.log" ]; then \
+		echo "$(CYAN)Recent Keycloak installation logs:$(RESET)"; \
+		tail -n 20 /var/log/agency_stack/components/keycloak.log; \
+		echo ""; \
+		echo "$(CYAN)For container logs, use:$(RESET)"; \
+		echo "docker logs keycloak-$(CLIENT_ID) --tail 50"; \
+	else \
+		echo "$(YELLOW)Keycloak installation logs not found.$(RESET)"; \
+		if docker ps | grep -q "keycloak"; then \
+			echo "$(CYAN)Container logs:$(RESET)"; \
+			docker logs keycloak-$(CLIENT_ID) --tail 20; \
+		fi; \
+	fi
+
+keycloak-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Keycloak...$(RESET)"
+	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/keycloak/.installed_ok" ]; then \
+		docker restart keycloak-$(CLIENT_ID); \
+		echo "$(GREEN)✅ Keycloak has been restarted$(RESET)"; \
+		echo "$(CYAN)Check status with: make keycloak-status$(RESET)"; \
+	else \
+		echo "$(RED)❌ Keycloak is not installed$(RESET)"; \
+		echo "$(CYAN)To install, run: make keycloak$(RESET)"; \
+	fi
+
+# Alias for backward compatibility
+install-keycloak: keycloak
 
 # Core Infrastructure
 install-infrastructure:
@@ -927,13 +979,6 @@ chatwoot-config:
 	@echo "Opening Chatwoot environment configuration..."
 	@$(EDITOR) $(DOCKER_DIR)/chatwoot/.env
 
-chatwoot-upgrade:
-	@echo "$(MAGENTA)$(BOLD)🔄 Upgrading Chatwoot to v4.1.0...$(RESET)"
-	@read -p "$(YELLOW)Enter domain for Chatwoot (e.g., chat.yourdomain.com):$(RESET) " DOMAIN; \
-	read -p "$(YELLOW)Enter admin email:$(RESET) " ADMIN_EMAIL; \
-	read -p "$(YELLOW)Enter client ID (optional):$(RESET) " CLIENT_ID; \
-	sudo $(SCRIPTS_DIR)/components/upgrade_chatwoot.sh --domain $$DOMAIN --admin-email $$ADMIN_EMAIL $(if $$CLIENT_ID,--client-id $$CLIENT_ID,) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
 # Content & Media
 peertube:
 	@echo "$(MAGENTA)$(BOLD)🎞️ Installing PeerTube - Self-hosted Video Platform...$(RESET)"
@@ -955,13 +1000,6 @@ peertube-reinstall:
 	@echo "$(MAGENTA)$(BOLD)🔄 Reinstalling PeerTube...$(RESET)"
 	@read -p "$(YELLOW)Enter domain for PeerTube (e.g., peertube.yourdomain.com):$(RESET) " DOMAIN; \
 	sudo $(SCRIPTS_DIR)/components/install_peertube.sh --domain $$DOMAIN --force
-
-peertube-upgrade:
-	@echo "$(MAGENTA)$(BOLD)🔄 Upgrading PeerTube to v7.0...$(RESET)"
-	@read -p "$(YELLOW)Enter domain for PeerTube (e.g., peertube.yourdomain.com):$(RESET) " DOMAIN; \
-	read -p "$(YELLOW)Enter admin email:$(RESET) " ADMIN_EMAIL; \
-	read -p "$(YELLOW)Enter client ID (optional):$(RESET) " CLIENT_ID; \
-	sudo $(SCRIPTS_DIR)/components/upgrade_peertube.sh --domain $$DOMAIN --admin-email $$ADMIN_EMAIL $(if $$CLIENT_ID,--client-id $$CLIENT_ID,) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
 peertube-status:
 	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking PeerTube status...$(RESET)"
@@ -990,7 +1028,7 @@ peertube-restart:
 # Drone CI - Continuous Integration and Delivery Platform
 droneci:
 	@echo "Installing Drone CI..."
-	@sudo $(SCRIPTS_DIR)/components/install_droneci.sh --domain $(DRONECI_DOMAIN) $(INSTALL_FLAGS)
+	@sudo $(SCRIPTS_DIR)/components/install_droneci.sh --domain $(DOMAIN) $(INSTALL_FLAGS)
 
 droneci-status:
 	@docker ps -a | grep drone || echo "Drone CI is not running"
@@ -1013,19 +1051,12 @@ droneci-restart:
 droneci-backup:
 	@echo "Backing up Drone CI data..."
 	@mkdir -p $(BACKUP_DIR)/droneci
-	@$(CONFIG_DIR)/clients/$(CLIENT_ID)/droneci_data/scripts/backup.sh $(BACKUP_DIR)/droneci
+	@$(CONFIG_DIR)/clients/$(CLIENT_ID)/droneci_data/scripts/backup.sh "$(BACKUP_DIR)/droneci"
 	@echo "Backup completed: $(BACKUP_DIR)/droneci/"
 
 droneci-config:
 	@echo "Opening Drone CI configuration..."
 	@$(EDITOR) $(DOCKER_DIR)/droneci/.env
-
-droneci-upgrade:
-	@echo "$(MAGENTA)$(BOLD)🔄 Upgrading DroneCI to v2.25.0...$(RESET)"
-	@read -p "$(YELLOW)Enter domain for DroneCI (e.g., drone.yourdomain.com):$(RESET) " DOMAIN; \
-	read -p "$(YELLOW)Enter admin email:$(RESET) " ADMIN_EMAIL; \
-	read -p "$(YELLOW)Enter client ID (optional):$(RESET) " CLIENT_ID; \
-	sudo $(SCRIPTS_DIR)/components/upgrade_droneci.sh --domain $$DOMAIN --admin-email $$ADMIN_EMAIL $(if $$CLIENT_ID,--client-id $$CLIENT_ID,) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
 # Collaboration Components
 # ------------------------------------------------------------------------------
@@ -1432,7 +1463,7 @@ tailscale-status:
 
 tailscale-logs:
 	@echo "Viewing Tailscale logs..."
-	@if [ -f "$(LOG_DIR)/components/tailscale.log" ]; then \
+	@if [ -f "/var/log/agency_stack/components/tailscale.log" ]; then \
 		echo "$(CYAN)Recent Tailscale actions:$(RESET)"; \
 		sudo grep "Tailscale" /var/log/syslog | tail -n 20; \
 		echo ""; \
@@ -1542,24 +1573,67 @@ seafile-restart:
 	@exit 1
 
 # Auto-generated target for traefik
-traefik:
-	@echo "TODO: Implement traefik"
-	@exit 1
+traefik: validate
+	@echo "$(MAGENTA)$(BOLD)🔧 Installing Traefik Reverse Proxy...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_traefik.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
-# Auto-generated target for traefik
 traefik-status:
-	@echo "TODO: Implement traefik-status"
-	@exit 1
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Traefik Status...$(RESET)"
+	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/traefik/.installed_ok" ]; then \
+		echo "$(GREEN)✅ Traefik is installed$(RESET)"; \
+		if docker ps | grep -q "traefik"; then \
+			echo "$(GREEN)✅ Traefik container is running$(RESET)"; \
+		else \
+			echo "$(RED)❌ Traefik container is not running$(RESET)"; \
+		fi; \
+	else \
+		echo "$(RED)❌ Traefik is not installed$(RESET)"; \
+		echo "$(CYAN)Install with: make traefik$(RESET)"; \
+	fi
 
-# Auto-generated target for traefik
 traefik-logs:
-	@echo "TODO: Implement traefik-logs"
-	@exit 1
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing Traefik Logs...$(RESET)"
+	@if [ -f "/var/log/agency_stack/components/traefik.log" ]; then \
+		echo "$(CYAN)Recent Traefik actions:$(RESET)"; \
+		sudo grep "Traefik" /var/log/syslog | tail -n 20; \
+		echo ""; \
+		echo "$(CYAN)For installation logs, use:$(RESET)"; \
+		echo "cat /var/log/agency_stack/components/traefik.log"; \
+	else \
+		echo "$(YELLOW)Traefik logs not found.$(RESET)"; \
+		journalctl -u traefik 2>/dev/null; \
+	fi
 
-# Auto-generated target for traefik
 traefik-restart:
-	@echo "TODO: Implement traefik-restart"
-	@exit 1
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Traefik...$(RESET)"
+	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/traefik/.installed_ok" ]; then \
+		docker restart traefik-$(CLIENT_ID); \
+		echo "$(GREEN)✅ Traefik has been restarted$(RESET)"; \
+		echo "$(CYAN)Check status with: make traefik-status$(RESET)"; \
+	else \
+		echo "$(RED)❌ Traefik is not installed$(RESET)"; \
+		echo "$(CYAN)Install with: make traefik$(RESET)"; \
+	fi
+
+traefik-dns-check:
+	@echo "$(MAGENTA)$(BOLD)🔍 Checking Traefik DNS Configuration...$(RESET)"
+	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/traefik/.installed_ok" ]; then \
+		echo "$(CYAN)Verifying DNS configuration for Traefik...$(RESET)"; \
+		scripts/verify_dns.sh --domain $(DOMAIN) --client-id $(CLIENT_ID) --direct-check; \
+		if [ $$? -eq 0 ]; then \
+			echo "$(GREEN)✅ DNS configuration is correct$(RESET)"; \
+		else \
+			echo "$(YELLOW)⚠️ DNS configuration issues detected$(RESET)"; \
+			echo "$(CYAN)For detailed information, check the generated report or logs$(RESET)"; \
+			echo "$(CYAN)For testing, you can directly access:$(RESET)"; \
+			DASHBOARD_PORT=$$(docker ps | grep dashboard | grep -oP '\d+->80' | cut -d'-' -f1 || echo "3001"); \
+			SERVER_IP=$$(hostname -I | awk '{print $$1}'); \
+			echo "  Dashboard: http://$${SERVER_IP}:$${DASHBOARD_PORT}"; \
+		fi; \
+	else \
+		echo "$(RED)❌ Traefik is not installed$(RESET)"; \
+		echo "$(CYAN)Install with: make traefik$(RESET)"; \
+	fi
 
 # Auto-generated target for vault
 vault:
@@ -1710,17 +1784,10 @@ documenso-logs:
 
 # Auto-generated target for documenso
 documenso-restart:
-	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Documenso...$(RESET)"
-	@cd $(DOCKER_DIR)/documenso && docker-compose restart
+	@echo "TODO: Implement documenso-restart"
+	@exit 1
 
-documenso-upgrade:
-	@echo "$(MAGENTA)$(BOLD)🔄 Upgrading Documenso to v1.4.2...$(RESET)"
-	@read -p "$(YELLOW)Enter domain for Documenso (e.g., sign.yourdomain.com):$(RESET) " DOMAIN; \
-	read -p "$(YELLOW)Enter admin email:$(RESET) " ADMIN_EMAIL; \
-	read -p "$(YELLOW)Enter client ID (optional):$(RESET) " CLIENT_ID; \
-	sudo $(SCRIPTS_DIR)/components/upgrade_documenso.sh --domain $$DOMAIN --admin-email $$ADMIN_EMAIL $(if $$CLIENT_ID,--client-id $$CLIENT_ID,) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
-# erpnext
+# Auto-generated target for erpnext
 erpnext:
 	@echo "TODO: Implement erpnext"
 	@exit 1
@@ -1820,26 +1887,6 @@ grafana-restart:
 	@echo "TODO: Implement grafana-restart"
 	@exit 1
 
-# Auto-generated target for keycloak
-keycloak:
-	@echo "TODO: Implement keycloak"
-	@exit 1
-
-# Auto-generated target for keycloak
-keycloak-status:
-	@echo "TODO: Implement keycloak-status"
-	@exit 1
-
-# Auto-generated target for keycloak
-keycloak-logs:
-	@echo "TODO: Implement keycloak-logs"
-	@exit 1
-
-# Auto-generated target for keycloak
-keycloak-restart:
-	@echo "TODO: Implement keycloak-restart"
-	@exit 1
-
 # Auto-generated target for killbill
 killbill-status:
 	@echo "TODO: Implement killbill-status"
@@ -1854,7 +1901,6 @@ killbill-logs:
 killbill-restart:
 	@echo "TODO: Implement killbill-restart"
 	@exit 1
-
 	@exit 1
 
 # Auto-generated target for mailu
@@ -2117,7 +2163,6 @@ fail2ban-status:
 		fi; \
 	else \
 		echo "$(RED)❌ Fail2ban is not running$(RESET)"; \
-		echo "$(CYAN)Install with: make fail2ban$(RESET)"; \
 	fi
 
 fail2ban-logs:
@@ -2130,9 +2175,7 @@ fail2ban-logs:
 		echo "cat /var/log/agency_stack/components/fail2ban.log"; \
 	else \
 		echo "$(YELLOW)Fail2ban logs not found.$(RESET)"; \
-		if [ -f "/var/log/agency_stack/components/fail2ban.log" ]; then \
-			cat /var/log/agency_stack/components/fail2ban.log | tail -n 20; \
-		fi; \
+		journalctl -u fail2ban 2>/dev/null; \
 	fi
 
 fail2ban-restart:
@@ -2208,287 +2251,76 @@ security-restart:
 		echo "$(CYAN)Install with: make security$(RESET)"; \
 	fi
 
-# Demo Core Installation
-# Installs high-value components suitable for client/investor demos
-demo-core: validate
-	@echo "$(MAGENTA)$(BOLD)🚀 Installing AgencyStack Demo Core Components...$(RESET)"
-	@echo "$(CYAN)This will install a set of high-value components for demonstration purposes.$(RESET)"
-	@echo ""
-	
-	@echo "$(YELLOW)📊 Installing Core Infrastructure...$(RESET)"
-	@$(MAKE) docker docker-status docker_compose traefik_ssl
-	
-	@echo "$(YELLOW)🔐 Installing Security Components...$(RESET)"
-	@$(MAKE) keycloak keycloak-status fail2ban
-	
-	@echo "$(YELLOW)📧 Installing Communication Components...$(RESET)"
-	@$(MAKE) mailu mailu-status chatwoot chatwoot-status voip voip-status
-	
-	@echo "$(YELLOW)📊 Installing Monitoring Components...$(RESET)"
-	@$(MAKE) prometheus prometheus-status grafana grafana-status posthog posthog-status
-	
-	@echo "$(YELLOW)📝 Installing Content & CMS Components...$(RESET)"
-	@$(MAKE) wordpress wordpress-status peertube peertube-status builderio builderio-status
-	
-	@echo "$(YELLOW)🧰 Installing DevOps Components...$(RESET)"
-	@$(MAKE) gitea gitea-status droneci
-	
-	@echo "$(YELLOW)📅 Installing Business Components...$(RESET)"
-	@$(MAKE) calcom calcom-status erpnext documenso focalboard
-	
-	@echo "$(YELLOW)🔄 Integrating Components...$(RESET)"
-	@$(MAKE) integrate-sso
-	@$(MAKE) integrate-monitoring
-	@$(MAKE) dashboard-update
-	
-	@echo "$(YELLOW)🧪 Running Validation Checks...$(RESET)"
-	@$(MAKE) alpha-check
-	@if [ -f "$(SCRIPTS_DIR)/smoke_test.sh" ]; then \
-		$(MAKE) smoke-test; \
-	fi
-	
-	@echo "$(GREEN)$(BOLD)✅ Demo Core Components Installed Successfully!$(RESET)"
-	@echo "$(CYAN)Open the AgencyStack dashboard to view your installation:$(RESET)"
-	@echo "$(CYAN)$(MAKE) dashboard-open$(RESET)"
+# Dashboard Component
+dashboard: validate
+	@echo "$(MAGENTA)$(BOLD)🚀 Installing AgencyStack Next.js Dashboard...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_dashboard.sh --domain "$(DOMAIN)" --admin-email "$(ADMIN_EMAIL)" $(if $(CLIENT_ID),--client-id "$(CLIENT_ID)",) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+	@$(MAKE) dashboard-configure-route
 
-# Demo Core Cleanup
-# Removes the demo core components for a clean slate
-demo-core-clean:
-	@echo "$(MAGENTA)$(BOLD)🧹 Cleaning Up AgencyStack Demo Core Components...$(RESET)"
-	@echo "$(RED)This will remove all demo core components and their data.$(RESET)"
-	@echo ""
-	
-	@echo "$(YELLOW)Stopping and Removing Business Components...$(RESET)"
-	@-$(MAKE) calcom-stop focalboard-stop erpnext-stop documenso-stop 2>/dev/null || true
-	
-	@echo "$(YELLOW)Stopping and Removing DevOps Components...$(RESET)"
-	@-$(MAKE) gitea-stop droneci-stop 2>/dev/null || true
-	
-	@echo "$(YELLOW)Stopping and Removing Content Components...$(RESET)"
-	@-$(MAKE) wordpress-stop peertube-stop builderio-stop 2>/dev/null || true
-	
-	@echo "$(YELLOW)Stopping and Removing Monitoring Components...$(RESET)"
-	@-$(MAKE) prometheus-stop grafana-stop posthog-stop 2>/dev/null || true
-	
-	@echo "$(YELLOW)Stopping and Removing Communication Components...$(RESET)"
-	@-$(MAKE) mailu-stop chatwoot-stop voip-stop 2>/dev/null || true
-	
-	@echo "$(YELLOW)Stopping and Removing Security Components...$(RESET)"
-	@-$(MAKE) keycloak-stop fail2ban-stop 2>/dev/null || true
-	
-	@echo "$(GREEN)$(BOLD)✅ Demo Core Components Cleaned Up Successfully!$(RESET)"
-	@echo "$(CYAN)The system has been returned to a clean state.$(RESET)"
+dashboard-configure-route:
+	@echo "$(MAGENTA)$(BOLD)🔄 Configuring Dashboard Routing with Traefik...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/configure_dashboard_route.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),)
 
-# Demo Core Status
-# Checks the status of all demo core components
-demo-core-status:
-	@echo "$(MAGENTA)$(BOLD)📊 AgencyStack Demo Core Components Status:$(RESET)"
-	@echo ""
-	
-	@echo "$(YELLOW)📊 Core Infrastructure Components:$(RESET)"
-	@-$(MAKE) docker-status docker_compose-status traefik-status 2>/dev/null || true
-	
-	@echo "$(YELLOW)🔐 Security Components:$(RESET)"
-	@-$(MAKE) keycloak-status fail2ban-status 2>/dev/null || true
-	
-	@echo "$(YELLOW)📧 Communication Components:$(RESET)"
-	@-$(MAKE) mailu-status chatwoot-status voip-status 2>/dev/null || true
-	
-	@echo "$(YELLOW)📊 Monitoring Components:$(RESET)"
-	@-$(MAKE) prometheus-status grafana-status posthog-status 2>/dev/null || true
-	
-	@echo "$(YELLOW)📝 Content & CMS Components:$(RESET)"
-	@-$(MAKE) wordpress-status peertube-status builderio-status 2>/dev/null || true
-	
-	@echo "$(YELLOW)🧰 DevOps Components:$(RESET)"
-	@-$(MAKE) gitea-status droneci-status 2>/dev/null || true
-	
-	@echo "$(YELLOW)📅 Business Components:$(RESET)"
-	@-$(MAKE) calcom-status erpnext-status documenso-status focalboard-status 2>/dev/null || true
-	
-	@echo "$(GREEN)$(BOLD)✅ Status Check Complete!$(RESET)"
-
-# Demo Core Logs
-# Views logs from all demo core components
-demo-core-logs:
-	@echo "$(MAGENTA)$(BOLD)📋 AgencyStack Demo Core Components Logs:$(RESET)"
-	@echo "$(CYAN)Viewing recent logs from all demo components...$(RESET)"
-	@echo ""
-	
-	@for component in docker traefik keycloak fail2ban mailu chatwoot voip prometheus grafana posthog wordpress peertube builderio gitea droneci calcom erpnext documenso focalboard; do \
-		echo "$(YELLOW)📄 $$component logs:$(RESET)"; \
-		$(MAKE) $$component-logs 2>/dev/null || echo "$(RED)No logs available for $$component$(RESET)"; \
-		echo ""; \
-	done
-	
-	@echo "$(GREEN)$(BOLD)✅ Logs Display Complete!$(RESET)"
-	@echo "$(CYAN)For detailed logs, use 'make <component>-logs' for specific components.$(RESET)"
-
-# Bolt DIY
-bolt-diy: validate
-	@echo "⚡ Installing Bolt DIY..."
-	@sudo $(SCRIPTS_DIR)/components/install_bolt_diy.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
-bolt-diy-status:
-	@echo "ℹ️ Checking Bolt DIY Status..."
-	@if [ -n "$(CLIENT_ID)" ]; then \
-		BOLT_CONTAINER="$(CLIENT_ID)_bolt_diy"; \
-	else \
-		BOLT_CONTAINER="bolt_diy"; \
-	fi; \
-	if docker ps -f name=$$BOLT_CONTAINER | grep -q $$BOLT_CONTAINER; then \
-		echo "$(GREEN)Bolt DIY is running$(RESET)"; \
-	else \
-		echo "$(RED)Bolt DIY is not running$(RESET)"; \
-	fi
-
-bolt-diy-logs:
-	@echo "📜 Viewing Bolt DIY Logs..."
-	@if [ -f "/var/log/agency_stack/components/bolt_diy.log" ]; then \
-		tail -n 50 "/var/log/agency_stack/components/bolt_diy.log"; \
-	else \
-		echo "$(YELLOW)No Bolt DIY logs found$(RESET)"; \
-	fi
-
-bolt-diy-restart:
-	@echo "🔄 Restarting Bolt DIY..."
-	@if [ -f "$(SCRIPTS_DIR)/components/restart_bolt_diy.sh" ]; then \
-		$(SCRIPTS_DIR)/components/restart_bolt_diy.sh; \
-	else \
-		echo "Restart script not found. Trying standard methods..."; \
-		if [ -n "$(CLIENT_ID)" ]; then \
-			systemctl restart $(CLIENT_ID)-bolt-diy; \
+dashboard-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Dashboard Status...$(RESET)"
+	@if [ -f "/opt/agency_stack/dashboard/.installed_ok" ] || [ -f "/opt/agency_stack/clients/default/dashboard/.installed_ok" ] || [ -f "/opt/agency_stack/clients/${CLIENT_ID}/dashboard/.installed_ok" ]; then \
+		echo "Dashboard is installed and ready"; \
+		export PATH="/opt/agency_stack/apps/dashboard/node/bin:$$PATH"; \
+		if command -v pm2 >/dev/null 2>&1; then \
+			if pm2 list | grep -q "agency-stack-dashboard"; then \
+				echo "Dashboard service is running"; \
+			else \
+				echo "Dashboard service is not running"; \
+			fi; \
+		elif [ -f "/opt/agency_stack/apps/dashboard/node/bin/pm2" ]; then \
+			if /opt/agency_stack/apps/dashboard/node/bin/pm2 list | grep -q "agency-stack-dashboard"; then \
+				echo "Dashboard service is running"; \
+			else \
+				echo "Dashboard service is not running"; \
+			fi; \
 		else \
-			systemctl restart bolt-diy; \
+			echo "PM2 not found in path or project directory"; \
 		fi; \
+		DOMAIN_TO_USE="$${DOMAIN:-proto001.alpha.nerdofmouth.com}"; \
+		echo "Dashboard URL: https://$${DOMAIN_TO_USE}/dashboard"; \
+	else \
+		echo "Dashboard is not installed"; \
+		echo "Install with: make dashboard DOMAIN=$(DOMAIN)"; \
 	fi
 
-# Archon
-archon: validate
-	@echo "🧠 Installing Archon..."
-	@sudo $(SCRIPTS_DIR)/components/install_archon.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
-archon-status:
-	@echo "ℹ️ Checking Archon Status..."
-	@if [ -n "$(CLIENT_ID)" ]; then \
-		ARCHON_CONTAINER="$(CLIENT_ID)_archon"; \
+dashboard-logs:
+	@echo "$(MAGENTA)$(BOLD)📋 Viewing Dashboard Logs...$(RESET)"
+	@if [ -f "/var/log/agency_stack/components/dashboard-out.log" ]; then \
+		tail -n 50 /var/log/agency_stack/components/dashboard-out.log; \
+	elif [ -f "/var/log/agency_stack/components/dashboard.log" ]; then \
+		tail -n 50 /var/log/agency_stack/components/dashboard.log; \
 	else \
-		ARCHON_CONTAINER="archon"; \
-	fi; \
-	if docker ps -f name=$$ARCHON_CONTAINER | grep -q $$ARCHON_CONTAINER; then \
-		echo "$(GREEN)Archon is running$(RESET)"; \
-	else \
-		echo "$(RED)Archon is not running$(RESET)"; \
+		echo "$(RED)No dashboard logs found$(RESET)"; \
 	fi
 
-archon-logs:
-	@echo "📜 Viewing Archon Logs..."
-	@if [ -f "/var/log/agency_stack/components/archon.log" ]; then \
-		tail -n 50 "/var/log/agency_stack/components/archon.log"; \
-	else \
-		echo "$(YELLOW)No Archon logs found$(RESET)"; \
-	fi
-
-archon-restart:
-	@echo "🔄 Restarting Archon..."
-	@if [ -f "$(SCRIPTS_DIR)/components/restart_archon.sh" ]; then \
-		$(SCRIPTS_DIR)/components/restart_archon.sh; \
-	else \
-		echo "Restart script not found. Trying standard methods..."; \
-		docker-compose -f "/opt/agency_stack/clients/$(CLIENT_ID)/archon/docker-compose.yml" restart; \
-	fi
-
-# Database Components
-# ------------------------------------------------------------------------------
-
-pgvector:
-	@echo "$(MAGENTA)$(BOLD)🔍 Installing pgvector...$(RESET)"
-	@read -p "$(YELLOW)Enter domain:$(RESET) " DOMAIN; \
-	read -p "$(YELLOW)Enter admin email:$(RESET) " ADMIN_EMAIL; \
-	read -p "$(YELLOW)Enter client ID (optional):$(RESET) " CLIENT_ID; \
-	sudo $(SCRIPTS_DIR)/components/install_pgvector.sh --domain $$DOMAIN --admin-email $$ADMIN_EMAIL $(if $$CLIENT_ID,--client-id $$CLIENT_ID,) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
-pgvector-status:
-	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking pgvector status...$(RESET)"
-	@CLIENT_ID=$${CLIENT_ID:-default}; \
-	INSTALL_DIR="/opt/agency_stack/clients/$${CLIENT_ID}/pgvector"; \
-	if [ -f "$${INSTALL_DIR}/.installed" ]; then \
-		echo "✅ pgvector is installed for client $${CLIENT_ID}"; \
-		VERSION=$$(cat "$${INSTALL_DIR}/.version" 2>/dev/null || echo "unknown"); \
-		echo "📊 Version: $${VERSION}"; \
-		docker exec postgres-$${CLIENT_ID} psql -U postgres -c "SELECT extversion FROM pg_extension WHERE extname='vector'" || echo "⚠️ Extension not installed or error occurred"; \
-	else \
-		echo "❌ pgvector is not installed for client $${CLIENT_ID}"; \
-	fi
-
-pgvector-logs:
-	@echo "$(MAGENTA)$(BOLD)📜 Viewing pgvector logs...$(RESET)"
-	@CLIENT_ID=$${CLIENT_ID:-default}; \
-	sudo cat /var/log/agency_stack/components/pgvector.log || echo "No logs found"
-
-pgvector-restart:
-	@echo "$(MAGENTA)$(BOLD)🔄 Restarting pgvector...$(RESET)"
-	@CLIENT_ID=$${CLIENT_ID:-default}; \
-	echo "⚠️ pgvector is an extension of PostgreSQL. Restarting database..."; \
-	docker restart postgres-$${CLIENT_ID} || echo "Failed to restart PostgreSQL for client $${CLIENT_ID}"
-
-pgvector-test:
-	@echo "$(MAGENTA)$(BOLD)🧪 Testing pgvector functionality...$(RESET)"
-	@CLIENT_ID=$${CLIENT_ID:-default}; \
-	INSTALL_DIR="/opt/agency_stack/clients/$${CLIENT_ID}/pgvector"; \
-	if [ -d "$${INSTALL_DIR}/samples" ]; then \
-		read -p "$(YELLOW)This will install Python dependencies. Continue? [y/N]$(RESET) " CONFIRM; \
-		if [[ $$CONFIRM =~ ^[Yy] ]]; then \
-			cd "$${INSTALL_DIR}/samples" && ./run_example.sh; \
+dashboard-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Dashboard...$(RESET)"
+	@if [ -f "/opt/agency_stack/dashboard/.installed_ok" ] || [ -f "/opt/agency_stack/clients/default/dashboard/.installed_ok" ] || [ -f "/opt/agency_stack/clients/${CLIENT_ID}/dashboard/.installed_ok" ]; then \
+		if [ -d "/opt/agency_stack/apps/dashboard/node" ]; then \
+			export PATH="/opt/agency_stack/apps/dashboard/node/bin:$$PATH"; \
+			if [ -f "/opt/agency_stack/apps/dashboard/node/bin/pm2" ]; then \
+				/opt/agency_stack/apps/dashboard/node/bin/pm2 restart agency-stack-dashboard || \
+				/opt/agency_stack/apps/dashboard/node/bin/pm2 start --name agency-stack-dashboard --max-memory-restart 250M --exp-backoff-restart-delay=100 npm -- start; \
+				echo "Dashboard service $(GREEN)started with pm2$(RESET)"; \
+			else \
+				# Try with global pm2 as fallback \
+				pm2 restart agency-stack-dashboard 2>/dev/null || \
+				pm2 start --name agency-stack-dashboard --max-memory-restart 250M --exp-backoff-restart-delay=100 npm -- start; \
+				echo "Dashboard service $(GREEN)started with global pm2$(RESET)"; \
+			fi; \
 		else \
-			echo "Test cancelled"; \
-		fi \
+			echo "$(RED)Dashboard installation not found. Is Dashboard installed?$(RESET)"; \
+			echo "$(CYAN)Install with: make dashboard DOMAIN=$(DOMAIN)$(RESET)"; \
+		fi; \
 	else \
-		echo "❌ Sample code not found. Check installation."; \
+		echo "$(RED)Dashboard is not installed$(RESET)"; \
+		echo "$(CYAN)Install with: make dashboard DOMAIN=$(DOMAIN)$(RESET)"; \
 	fi
 
-pgvector-test:
-	@echo "$(MAGENTA)$(BOLD)🧪 Testing pgvector functionality...$(RESET)"
-	@CLIENT_ID=$${CLIENT_ID:-default}; \
-	INSTALL_DIR="/opt/agency_stack/clients/$${CLIENT_ID}/pgvector"; \
-	if [ -f "$${INSTALL_DIR}/.installed" ]; then \
-		echo "🔍 Testing pgvector extension in PostgreSQL..."; \
-		docker exec postgres-$${CLIENT_ID} psql -U postgres -d vectordb -c "CREATE TABLE IF NOT EXISTS vector_test_simple (id serial PRIMARY KEY, embedding vector(3)); INSERT INTO vector_test_simple (embedding) VALUES ('[1,2,3]'), ('[4,5,6]'); SELECT * FROM vector_test_simple; SELECT 'Test successful: Vector operations working correctly' AS status;" || { echo "❌ Test failed"; exit 1; }; \
-		echo "✅ Test completed successfully"; \
-	else \
-		echo "❌ pgvector is not installed. Please run 'make pgvector' first."; \
-		exit 1; \
-	fi
-
-dashboard-direct:
-	@echo "$(MAGENTA)$(BOLD)🔗 Opening dashboard via direct access...$(RESET)"
-	@SERVER_IP=$$(hostname -I | awk '{print $$1}'); \
-	echo "$(CYAN)Dashboard Direct Access URLs:$(RESET)"; \
-	echo "$(GREEN)Main:       http://$${SERVER_IP}:3001$(RESET)"; \
-	echo "$(GREEN)Fallback:   http://$${SERVER_IP}:8080$(RESET)"; \
-	echo "$(GREEN)Guaranteed: http://$${SERVER_IP}:8888$(RESET)"; \
-	xdg-open "http://$${SERVER_IP}:8888" 2>/dev/null || echo "$(YELLOW)No browser available. Access manually using the URLs above.$(RESET)"
-
-dashboard-access:
-	@echo "$(MAGENTA)$(BOLD)🔧 Installing comprehensive dashboard access...$(RESET)"
-	@read -p "$(YELLOW)Enter domain (default: $${DOMAIN:-proto001.alpha.nerdofmouth.com}):$(RESET) " DOMAIN_INPUT; \
-	DOMAIN="$${DOMAIN_INPUT:-$${DOMAIN:-proto001.alpha.nerdofmouth.com}}"; \
-	read -p "$(YELLOW)Enter client ID (default: default):$(RESET) " CLIENT_ID_INPUT; \
-	CLIENT_ID="$${CLIENT_ID_INPUT:-default}"; \
-	sudo $(SCRIPTS_DIR)/components/install_dashboard_access.sh --domain "$${DOMAIN}" --client-id "$${CLIENT_ID}" $(if $(FORCE),--force,)
-
-dashboard-check:
-	@echo "$(MAGENTA)$(BOLD)🔍 Checking dashboard access methods...$(RESET)"
-	@read -p "$(YELLOW)Enter domain (default: $${DOMAIN:-proto001.alpha.nerdofmouth.com}):$(RESET) " DOMAIN_INPUT; \
-	DOMAIN="$${DOMAIN_INPUT:-$${DOMAIN:-proto001.alpha.nerdofmouth.com}}"; \
-	read -p "$(YELLOW)Enter client ID (default: default):$(RESET) " CLIENT_ID_INPUT; \
-	CLIENT_ID="$${CLIENT_ID_INPUT:-default}"; \
-	sudo $(SCRIPTS_DIR)/utils/dashboard_dns_helper.sh --domain "$${DOMAIN}" --client-id "$${CLIENT_ID}" $(if $(VERBOSE),--verbose,)
-
-dashboard-fix:
-	@echo "$(MAGENTA)$(BOLD)🛠️ Fixing dashboard access issues...$(RESET)"
-	@read -p "$(YELLOW)Enter domain (default: $${DOMAIN:-proto001.alpha.nerdofmouth.com}):$(RESET) " DOMAIN_INPUT; \
-	DOMAIN="$${DOMAIN_INPUT:-$${DOMAIN:-proto001.alpha.nerdofmouth.com}}"; \
-	read -p "$(YELLOW)Enter client ID (default: default):$(RESET) " CLIENT_ID_INPUT; \
-	CLIENT_ID="$${CLIENT_ID_INPUT:-default}"; \
-	sudo $(SCRIPTS_DIR)/utils/dashboard_dns_helper.sh --domain "$${DOMAIN}" --client-id "$${CLIENT_ID}" --fix $(if $(VERBOSE),--verbose,)
+# Including demo-core targets
+include demo-core-targets.mk
