@@ -891,7 +891,7 @@ keycloak-logs:
 	@echo "$(MAGENTA)$(BOLD)📜 Viewing Keycloak Logs...$(RESET)"
 	@if [ -f "/var/log/agency_stack/components/keycloak.log" ]; then \
 		echo "$(CYAN)Recent Keycloak installation logs:$(RESET)"; \
-		tail -n 20 /var/log/agency_stack/components/keycloak.log; \
+		sudo grep "Keycloak" /var/log/syslog | tail -n 20; \
 		echo ""; \
 		echo "$(CYAN)For container logs, use:$(RESET)"; \
 		echo "docker logs keycloak-$(CLIENT_ID) --tail 50"; \
@@ -2594,3 +2594,61 @@ traefik-check-ports:
 	read -p "$(YELLOW)Enter client ID (default: default):$(RESET) " CLIENT_ID_INPUT; \
 	CLIENT_ID="$${CLIENT_ID_INPUT:-default}"; \
 	sudo $(SCRIPTS_DIR)/components/fix_traefik_ports.sh --domain "$${DOMAIN}" --client-id "$${CLIENT_ID}" --check-only $(if $(VERBOSE),--verbose,)
+
+dashboard-fix:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Dashboard FQDN access is now integrated into the core installation$(RESET)"
+	@echo "$(YELLOW)This target is maintained for backward compatibility$(RESET)"
+	@echo "$(CYAN)To properly configure dashboard access, run:$(RESET)"
+	@echo "  make dashboard DOMAIN=yourdomain.com"
+	@echo ""
+	@echo "$(YELLOW)Running diagnostics to verify current configuration...$(RESET)"
+	@read -p "Enter domain [$(DOMAIN)]: " DOMAIN_INPUT; \
+	DOMAIN="$${DOMAIN_INPUT:-$(DOMAIN)}"; \
+	read -p "Enter client ID [default]: " CLIENT_ID_INPUT; \
+	CLIENT_ID="$${CLIENT_ID_INPUT:-default}"; \
+	echo ""; \
+	echo "$(MAGENTA)$(BOLD)🔍 Checking dashboard access configuration...$(RESET)"; \
+	# Check if Traefik routes exist
+	TRAEFIK_DIR="/opt/agency_stack/clients/$${CLIENT_ID}/traefik"; \
+	DASHBOARD_ROUTE="$${TRAEFIK_DIR}/config/dynamic/dashboard-route.yml"; \
+	if [ -f "$${DASHBOARD_ROUTE}" ]; then \
+		echo "$(GREEN)✅ Dashboard routes are configured in Traefik$(RESET)"; \
+		echo "$(CYAN)Route file: $${DASHBOARD_ROUTE}$(RESET)"; \
+	else \
+		echo "$(RED)❌ Dashboard routes not found in Traefik configuration$(RESET)"; \
+		echo "$(YELLOW)Would you like to configure dashboard access now? [y/N]$(RESET)"; \
+		read -p "" CONFIGURE; \
+		if [[ $$CONFIGURE =~ ^[Yy] ]]; then \
+			sudo $(SCRIPTS_DIR)/components/install_dashboard.sh --domain "$${DOMAIN}" --client-id "$${CLIENT_ID}" --configure-only; \
+		fi; \
+	fi; \
+	# Check if dashboard is accessible
+	SERVER_IP=$$(hostname -I | awk '{print $$1}'); \
+	echo ""; \
+	echo "$(MAGENTA)$(BOLD)Dashboard access URLs:$(RESET)"; \
+	echo "$(CYAN)1. HTTP FQDN (Root):       http://$${DOMAIN}$(RESET)"; \
+	echo "$(CYAN)2. HTTP FQDN (Path):       http://$${DOMAIN}/dashboard$(RESET)"; \
+	echo "$(CYAN)3. Direct IP:              http://$${SERVER_IP}:3001$(RESET)"
+
+traefik-fix-ports:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Traefik port configuration is now integrated into the core installation$(RESET)"
+	@echo "$(YELLOW)This target is maintained for backward compatibility$(RESET)"
+	@echo "$(CYAN)To properly configure Traefik with ports 80/443, run:$(RESET)"
+	@echo "  make traefik DOMAIN=yourdomain.com ADMIN_EMAIL=admin@example.com"
+	@echo ""
+	@echo "$(YELLOW)Running diagnostics to verify current configuration...$(RESET)"
+	@read -p "Enter domain [$(DOMAIN)]: " DOMAIN_INPUT; \
+	DOMAIN="$${DOMAIN_INPUT:-$(DOMAIN)}"; \
+	read -p "Enter client ID [default]: " CLIENT_ID_INPUT; \
+	CLIENT_ID="$${CLIENT_ID_INPUT:-default}"; \
+	echo ""; \
+	sudo $(SCRIPTS_DIR)/components/install_traefik.sh --domain "$${DOMAIN}" --client-id "$${CLIENT_ID}" --check-ports-only --diag-level verbose
+
+traefik-check-ports:
+	@echo "$(MAGENTA)$(BOLD)🔍 Checking Traefik port configuration...$(RESET)"
+	@read -p "Enter domain [$(DOMAIN)]: " DOMAIN_INPUT; \
+	DOMAIN="$${DOMAIN_INPUT:-$(DOMAIN)}"; \
+	read -p "Enter client ID [default]: " CLIENT_ID_INPUT; \
+	CLIENT_ID="$${CLIENT_ID_INPUT:-default}"; \
+	echo ""; \
+	sudo $(SCRIPTS_DIR)/components/install_traefik.sh --domain "$${DOMAIN}" --client-id "$${CLIENT_ID}" --check-ports-only --diag-level verbose

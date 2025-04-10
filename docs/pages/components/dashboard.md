@@ -16,7 +16,7 @@ The dashboard component fulfills these core functions:
 
 ```bash
 # Install the dashboard component
-make dashboard
+make dashboard DOMAIN=yourdomain.com
 
 # Check dashboard status
 make dashboard-status
@@ -25,14 +25,29 @@ make dashboard-status
 make dashboard-logs
 ```
 
+### FQDN Access Configuration
+
+The dashboard installation now automatically configures Traefik routes to ensure proper FQDN access. This includes:
+
+- Proper HTTP and HTTPS routes for root domain and /dashboard path
+- DNS resolution verification
+- Port accessibility checks
+- Automatic Traefik configuration
+
+After installation, the dashboard will be accessible via:
+- http://yourdomain.com
+- http://yourdomain.com/dashboard
+- https://yourdomain.com (if TLS is configured)
+- https://yourdomain.com/dashboard (if TLS is configured)
+
 ## Paths
 
 | Purpose | Path |
 |---------|------|
-| Installation | `/opt/agency_stack/dashboard/` |
+| Installation | `/opt/agency_stack/apps/dashboard/` |
 | Client-specific | `/opt/agency_stack/clients/${CLIENT_ID}/dashboard/` |
 | Logs | `/var/log/agency_stack/components/dashboard.log` |
-| Executable | `/usr/local/bin/agency-stack-dashboard` |
+| Traefik Route | `/opt/agency_stack/clients/${CLIENT_ID}/traefik/config/dynamic/dashboard-route.yml` |
 | Source Files | `/root/_repos/agency-stack/dashboard/` |
 
 ## Configuration
@@ -43,6 +58,65 @@ The dashboard automatically pulls configuration from:
 - Component-specific `.installed_ok` markers
 
 No additional configuration is required for basic functionality.
+
+## Access Methods
+
+### Direct Access
+
+The dashboard is accessible directly at:
+```
+http://SERVER_IP:3001
+```
+
+### FQDN Access
+
+When properly configured with Traefik, the dashboard is accessible via:
+```
+http://yourdomain.com
+http://yourdomain.com/dashboard
+https://yourdomain.com (if TLS is configured)
+```
+
+## Troubleshooting
+
+### Common Issues
+
+#### Dashboard not accessible via FQDN
+
+**Check DNS resolution:**
+```bash
+dig +short yourdomain.com
+```
+This should return your server's IP address.
+
+**Check Traefik configuration:**
+```bash
+make traefik-status
+```
+
+**Ensure ports 80/443 are accessible:**
+```bash
+# Check if ports are in use
+sudo lsof -i:80
+sudo lsof -i:443
+```
+
+**Verify Traefik routes:**
+```bash
+cat /opt/agency_stack/clients/${CLIENT_ID}/traefik/config/dynamic/dashboard-route.yml
+```
+
+#### Dashboard shows errors or blank screen
+
+**Check dashboard logs:**
+```bash
+make dashboard-logs
+```
+
+**Restart the dashboard:**
+```bash
+make dashboard-restart
+```
 
 ## Usage
 
@@ -90,22 +164,6 @@ make dashboard-restart
 pkill -f "agency-stack-dashboard"
 agency-stack-dashboard &
 ```
-
-## Troubleshooting
-
-Common issues:
-
-1. **Dashboard shows incorrect status:**
-   - Ensure component registry is up-to-date
-   - Verify `.installed_ok` markers exist
-   - Check component-specific status commands
-
-2. **Missing components:**
-   - Ensure components are properly registered in component registry
-   - Verify installation paths
-
-3. **jq dependency missing:**
-   - Run `make dashboard` to install all dependencies properly
 
 ## Integration with Other Components
 

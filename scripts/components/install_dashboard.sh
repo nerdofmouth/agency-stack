@@ -46,6 +46,7 @@ KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-dashboard}
 DASHBOARD_LOGS_DIR="/var/log/agency_stack/components"
 DASHBOARD_REPO="https://github.com/nerdofmouth/agency-stack-dashboard.git"
 DASHBOARD_BRANCH="main"
+CONFIGURE_ONLY=false
 
 # Parse command-line arguments
 ADMIN_EMAIL=""
@@ -98,6 +99,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --enable-keycloak)
       ENABLE_KEYCLOAK=true
+      shift
+      ;;
+    --configure-only)
+      CONFIGURE_ONLY=true
       shift
       ;;
     *)
@@ -391,13 +396,199 @@ EOF
   return 0
 }
 
+# Create Traefik route configuration for the dashboard
+configure_traefik_routes() {
+  log_info "Configuring Traefik routes for dashboard access..."
+  
+  # Determine Traefik dynamic configuration directory
+  local traefik_dir="/opt/agency_stack/clients/${CLIENT_ID}/traefik"
+  local dynamic_dir="${traefik_dir}/config/dynamic"
+  
+  if [[ ! -d "${dynamic_dir}" ]]; then
+    log_warning "Traefik dynamic config directory not found at ${dynamic_dir}"
+    log_warning "Make sure Traefik is installed properly"
+    return 1
+  fi
+  
+  # Create dashboard route configuration
+  local dashboard_route="${dynamic_dir}/dashboard-route.yml"
+  
+  log_info "Creating dashboard route configuration at ${dashboard_route}"
+  
+  # Backup existing configuration if it exists
+  if [[ -f "${dashboard_route}" ]]; then
+    cp "${dashboard_route}" "${dashboard_route}.bak.$(date +%Y%m%d%H%M%S)"
+  fi
+  
+  # Create comprehensive route configuration for HTTP and HTTPS access
+  cat > "${dashboard_route}" <<EOL
+http:
+  routers:
+    # HTTP - Root domain router
+    dashboard-root-http:
+      rule: "Host(\`${DOMAIN}\`)"
+      entrypoints:
+        - "web"
+      service: "dashboard-service"
+      priority: 10000
+    
+    # HTTP - Dashboard path router
+    dashboard-path-http:
+      rule: "Host(\`${DOMAIN}\`) && PathPrefix(\`/dashboard\`)"
+      entrypoints:
+        - "web"
+      service: "dashboard-service"
+      middlewares:
+        - "dashboard-strip"
+      priority: 10100
+    
+    # HTTPS - Root domain router
+    dashboard-root-https:
+      rule: "Host(\`${DOMAIN}\`)"
+      entrypoints:
+        - "websecure"
+      service: "dashboard-service"
+      priority: 10000
+      tls: {}
+    
+    # HTTPS - Dashboard path router
+    dashboard-path-https:
+      rule: "Host(\`${DOMAIN}\`) && PathPrefix(\`/dashboard\`)"
+      entrypoints:
+        - "websecure"
+      service: "dashboard-service"
+      middlewares:
+        - "dashboard-strip"
+      priority: 10100
+      tls: {}
+  
+  # Define the dashboard service and middleware
+  services:
+    dashboard-service:
+      loadBalancer:
+        servers:
+          - url: "http://localhost:${DASHBOARD_PORT}"
+  
+  middlewares:
+    dashboard-strip:
+      stripPrefix:
+        prefixes:
+          - "/dashboard"
+EOL
+  
+  # Restart Traefik to apply configuration changes
+  log_info "Restarting Traefik to apply new configuration..."
+  if [[ -f "${traefik_dir}/docker-compose.yml" ]]; then
+    (cd "${traefik_dir}" && docker-compose restart) || log_warning "Failed to restart Traefik"
+  else
+    log_warning "Traefik docker-compose.yml not found at ${traefik_dir}"
+  fi
+  
+  log_success "Dashboard routes configured successfully"
+}
+
+# Check DNS resolution for the dashboard domain
+check_dns_resolution() {
+  log_info "Checking DNS resolution for ${DOMAIN}..."
+  
+  # Get server IP
+  local server_ip=$(hostname -I | awk '{print $1}')
+  log_info "Server IP: ${server_ip}"
+  
+  # Check DNS resolution using multiple resolvers
+  local dns_servers=("8.8.8.8" "1.1.1.1" "9.9.9.9")
+  local resolved=false
+  local resolved_ip=""
+  
+  for dns in "${dns_servers[@]}"; do
+    log_info "Checking resolution using DNS server ${dns}..."
+    if resolved_ip=$(dig +short @"${dns}" "${DOMAIN}" A 2>/dev/null); then
+      if [[ -n "${resolved_ip}" ]]; then
+        log_success "Domain ${DOMAIN} resolves to ${resolved_ip} using DNS server ${dns}"
+        resolved=true
+        break
+      fi
+    fi
+  done
+  
+  if [[ "${resolved}" == "false" ]]; then
+    log_warning "Domain ${DOMAIN} does not resolve to any IP address"
+    log_info "For FQDN access, make sure DNS is properly configured to point to ${server_ip}"
+    
+    # Check if domain is in hosts file
+    if grep -q "${DOMAIN}" /etc/hosts; then
+      log_info "Found ${DOMAIN} in /etc/hosts file"
+    else
+      log_warning "Consider adding ${DOMAIN} to /etc/hosts file if DNS is not yet propagated"
+      log_info "You can add it manually with: echo \"${server_ip} ${DOMAIN}\" | sudo tee -a /etc/hosts"
+    fi
+  elif [[ "${resolved_ip}" != "${server_ip}" ]]; then
+    log_warning "Domain ${DOMAIN} resolves to ${resolved_ip}, but server IP is ${server_ip}"
+    log_warning "For proper FQDN access, these should match"
+  else
+    log_success "DNS resolution is correct for ${DOMAIN}"
+  fi
+}
+
+# Verify dashboard accessibility
+verify_dashboard_access() {
+  log_info "Verifying dashboard accessibility..."
+  
+  # Get server IP
+  local server_ip=$(hostname -I | awk '{print $1}')
+  
+  # Check direct access
+  log_info "Checking direct dashboard access on port ${DASHBOARD_PORT}..."
+  if timeout 5 bash -c "echo > /dev/tcp/127.0.0.1/${DASHBOARD_PORT}" &>/dev/null; then
+    log_success "Dashboard is directly accessible on port ${DASHBOARD_PORT}"
+  else
+    log_warning "Dashboard is not directly accessible on port ${DASHBOARD_PORT}"
+  fi
+  
+  # Check HTTP/HTTPS ports
+  log_info "Checking HTTP/HTTPS ports for Traefik..."
+  timeout 5 bash -c "echo > /dev/tcp/127.0.0.1/80" &>/dev/null && \
+    log_success "HTTP port 80 is accessible" || \
+    log_warning "HTTP port 80 is not accessible"
+  
+  timeout 5 bash -c "echo > /dev/tcp/127.0.0.1/443" &>/dev/null && \
+    log_success "HTTPS port 443 is accessible" || \
+    log_warning "HTTPS port 443 is not accessible"
+  
+  # Output access URLs
+  log_info "===========================================================
+DASHBOARD ACCESS URLS:
+1. HTTP FQDN (Root):       http://${DOMAIN}
+2. HTTP FQDN (Path):       http://${DOMAIN}/dashboard
+3. Direct IP (Main):       http://${server_ip}:${DASHBOARD_PORT}
+4. Direct IP (Fallback):   http://${server_ip}:8080
+==========================================================="
+}
+
 # Main installation process
 main() {
   init_log "dashboard"
   
-  log_info "Starting Next.js dashboard component installation"
-  log_info "Using domain: ${DOMAIN}"
-  log_info "Client-specific installation: ${CLIENT_ID}"
+  log_info "Installing AgencyStack Dashboard"
+  log_info "DOMAIN: ${DOMAIN}"
+  log_info "CLIENT_ID: ${CLIENT_ID}"
+  
+  # If configure-only, skip to route configuration
+  if [[ "${CONFIGURE_ONLY}" == "true" ]]; then
+    log_info "Running in configure-only mode"
+    
+    # Configure Traefik routes for dashboard access
+    configure_traefik_routes
+    
+    # Check DNS resolution
+    check_dns_resolution
+    
+    # Verify dashboard accessibility
+    verify_dashboard_access
+    
+    log_success "Dashboard access configuration complete"
+    return 0
+  fi
   
   # Check if dashboard is already installed and skip if --force is not specified
   if [[ -f "/opt/agency_stack/clients/${CLIENT_ID}/dashboard/.installed_ok" && "$FORCE" != "true" ]]; then
@@ -407,7 +598,7 @@ main() {
   
   log_info "Starting Next.js dashboard installation"
   
-  # Ensure required directories exist
+  # Ensure directories exist
   ensure_directories || {
     log_error "Failed to create required directories"
     return 1
@@ -443,6 +634,15 @@ main() {
     log_error "Failed to setup dashboard container"
     return 1
   }
+  
+  # Configure Traefik routes for dashboard access
+  configure_traefik_routes
+  
+  # Check DNS resolution
+  check_dns_resolution
+  
+  # Verify dashboard accessibility
+  verify_dashboard_access
   
   # Create installation marker
   create_installed_marker || {
