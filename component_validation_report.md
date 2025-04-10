@@ -1,5 +1,5 @@
 # AgencyStack Component Validation Report
-Generated: 2025-04-10 09:05:51
+Generated: 2025-04-10 10:04:01
 
 ## Summary
 
@@ -105,7 +105,7 @@ Generated: 2025-04-10 09:05:51
 ✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `docker.md`
-⚠️ Documentation missing sections: Usage
+✅ Documentation contains all recommended sections
 #### Makefile Targets
 ✅ Target `docker` exists
 ✅ Target `docker-status` exists
@@ -114,7 +114,7 @@ Generated: 2025-04-10 09:05:51
 ✅ All Makefile targets present for docker
 #### Registry Entry
 ✅ Component registered in component_registry.json
-⚠️ docker had issues, some remain unfixed
+✅ docker passed all validation checks
 ## docker_compose
 #### Component Script
 ✅ Component script exists: `install_docker_compose.sh`
@@ -152,7 +152,7 @@ Generated: 2025-04-10 09:05:51
 ✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `droneci.md`
-⚠️ Documentation missing sections: Usage
+✅ Documentation contains all recommended sections
 #### Makefile Targets
 ✅ Target `droneci` exists
 ✅ Target `droneci-status` exists
@@ -161,14 +161,14 @@ Generated: 2025-04-10 09:05:51
 ✅ All Makefile targets present for droneci
 #### Registry Entry
 ✅ Component registered in component_registry.json
-⚠️ droneci had issues, some remain unfixed
+✅ droneci passed all validation checks
 ## droneci
 #### Component Script
 ✅ Component script exists: `install_droneci.sh`
 ✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `droneci.md`
-⚠️ Documentation missing sections: Usage
+✅ Documentation contains all recommended sections
 #### Makefile Targets
 ✅ Target `droneci` exists
 ✅ Target `droneci-status` exists
@@ -177,14 +177,14 @@ Generated: 2025-04-10 09:05:51
 ✅ All Makefile targets present for droneci
 #### Registry Entry
 ✅ Component registered in component_registry.json
-⚠️ droneci had issues, some remain unfixed
+✅ droneci passed all validation checks
 ## erpnext
 #### Component Script
 ✅ Component script exists: `install_erpnext.sh`
 ✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `erpnext.md`
-⚠️ Documentation missing sections: Usage
+✅ Documentation contains all recommended sections
 #### Makefile Targets
 ✅ Target `erpnext` exists
 ✅ Target `erpnext-status` exists
@@ -193,7 +193,7 @@ Generated: 2025-04-10 09:05:51
 ✅ All Makefile targets present for erpnext
 #### Registry Entry
 ✅ Component registered in component_registry.json
-⚠️ erpnext had issues, some remain unfixed
+✅ erpnext passed all validation checks
 ## etebase
 #### Component Script
 ✅ Component script exists: `install_etebase.sh`
@@ -579,5 +579,5 @@ Generated: 2025-04-10 09:05:51
 ⚠️ wordpress had issues, some remain unfixed
 ## Summary
 - **Total components**: 41
-- **Passed validation**: 14
-- **Failed validation**: 27
+- **Passed validation**: 18
+- **Failed validation**: 23
