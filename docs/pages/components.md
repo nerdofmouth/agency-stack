@@ -213,3 +213,11 @@ For client-specific configurations, these are located in:
 | Full Stack | 8 GB | 16 GB+ | 60 GB+ |
 
 For detailed information about each component, including setup and configuration instructions, visit their respective documentation pages.
+
+## Components Index
+
+| Category | Component | Version | Core | Business | Content | Team | Marketing |
+|----------|-----------|---------|------|----------|---------|------|-----------|
+| Email & Communication | [Mailu](./components/mailu.md) | v2.0.0 | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Email & Communication | [Listmonk](./components/listmonk.md) | v4.1.0 | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Email & Communication | [jitsi](./components/jitsi.md) | v2.0.6467 | ✅ | ✅ | ✅ | ✅ | ✅ |
