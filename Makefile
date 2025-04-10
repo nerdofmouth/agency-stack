@@ -692,7 +692,7 @@ listmonk-status:
 	@docker ps -a | grep listmonk || echo "Listmonk is not running"
 
 listmonk-logs:
-	@docker logs -f listmonk-$(CLIENT_ID) 2>&1 | tee $(LOG_DIR)/components/listmonk.log
+	@docker logs -f listmonk-app-$(CLIENT_ID) 2>&1 | tee $(LOG_DIR)/components/listmonk.log
 
 listmonk-stop:
 	@docker-compose -f $(DOCKER_DIR)/listmonk/docker-compose.yml down
@@ -701,13 +701,14 @@ listmonk-start:
 	@docker-compose -f $(DOCKER_DIR)/listmonk/docker-compose.yml up -d
 
 listmonk-restart:
-	@docker-compose -f $(DOCKER_DIR)/listmonk/docker-compose.yml restart
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Listmonk...$(RESET)"
+	@cd $(DOCKER_DIR)/listmonk && docker-compose restart
 
 listmonk-backup:
 	@echo "Backing up Listmonk data..."
 	@mkdir -p $(BACKUP_DIR)/listmonk
 	@docker exec listmonk-postgres-$(CLIENT_ID) pg_dump -U listmonk listmonk > $(BACKUP_DIR)/listmonk/listmonk_db_$(shell date +%Y%m%d).sql
-	@tar -czf $(BACKUP_DIR)/listmonk/listmonk_uploads_$(shell date +%Y%m%d).tar.gz -C $(CONFIG_DIR)/clients/$(CLIENT_ID)/listmonk_data/uploads .
+	@tar -czf $(BACKUP_DIR)/listmonk/listmonk_storage_$(shell date +%Y%m%d).tar.gz -C $(CONFIG_DIR)/clients/$(CLIENT_ID)/listmonk_data/storage .
 	@echo "Backup completed: $(BACKUP_DIR)/listmonk/"
 
 listmonk-restore:
@@ -715,8 +716,15 @@ listmonk-restore:
 	@echo "Please refer to the documentation for detailed instructions."
 
 listmonk-config:
-	@echo "Opening Listmonk configuration..."
-	@$(EDITOR) $(CONFIG_DIR)/clients/$(CLIENT_ID)/listmonk_data/config/config.toml
+	@echo "Opening Listmonk environment configuration..."
+	@$(EDITOR) $(DOCKER_DIR)/listmonk/.env
+
+listmonk-upgrade:
+	@echo "$(MAGENTA)$(BOLD)🔄 Upgrading Listmonk to v4.1.0...$(RESET)"
+	@read -p "$(YELLOW)Enter domain for Listmonk (e.g., mail.yourdomain.com):$(RESET) " DOMAIN; \
+	read -p "$(YELLOW)Enter admin email:$(RESET) " ADMIN_EMAIL; \
+	read -p "$(YELLOW)Enter client ID (optional):$(RESET) " CLIENT_ID; \
+	sudo $(SCRIPTS_DIR)/components/upgrade_listmonk.sh --domain $$DOMAIN --admin-email $$ADMIN_EMAIL $(if $$CLIENT_ID,--client-id $$CLIENT_ID,) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
 # Grafana
 install-grafana: validate
@@ -1688,10 +1696,17 @@ documenso-logs:
 
 # Auto-generated target for documenso
 documenso-restart:
-	@echo "TODO: Implement documenso-restart"
-	@exit 1
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Documenso...$(RESET)"
+	@cd $(DOCKER_DIR)/documenso && docker-compose restart
 
-# Auto-generated target for erpnext
+documenso-upgrade:
+	@echo "$(MAGENTA)$(BOLD)🔄 Upgrading Documenso to v1.4.2...$(RESET)"
+	@read -p "$(YELLOW)Enter domain for Documenso (e.g., sign.yourdomain.com):$(RESET) " DOMAIN; \
+	read -p "$(YELLOW)Enter admin email:$(RESET) " ADMIN_EMAIL; \
+	read -p "$(YELLOW)Enter client ID (optional):$(RESET) " CLIENT_ID; \
+	sudo $(SCRIPTS_DIR)/components/upgrade_documenso.sh --domain $$DOMAIN --admin-email $$ADMIN_EMAIL $(if $$CLIENT_ID,--client-id $$CLIENT_ID,) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+# erpnext
 erpnext:
 	@echo "TODO: Implement erpnext"
 	@exit 1

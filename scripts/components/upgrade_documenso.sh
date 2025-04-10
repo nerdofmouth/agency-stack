@@ -1,6 +1,6 @@
 #!/bin/bash
-# Listmonk Upgrade Script v4.1.0
-# AgencyStack Component: listmonk
+# Documenso Upgrade Script v1.4.2
+# AgencyStack Component: documenso
 
 set -euo pipefail
 
@@ -8,9 +8,8 @@ set -euo pipefail
 source "$(dirname "$0")/../utils/common.sh"
 
 # Component configuration
-COMPONENT_NAME="listmonk"
+COMPONENT_NAME="documenso"
 LOG_FILE="/var/log/agency_stack/components/${COMPONENT_NAME}.log"
-INSTALL_DIR="/opt/agency_stack/clients/${CLIENT_ID:-default}/${COMPONENT_NAME}"
 
 # Default parameters
 DOMAIN=""
@@ -23,7 +22,7 @@ WITH_DEPS=false
 VERBOSE=false
 
 # Initialize logging
-log_start "${LOG_FILE}" "Listmonk upgrade to v4.1.0 started"
+log_start "${LOG_FILE}" "Documenso upgrade to v1.4.2 started"
 
 # Process command line arguments
 while [[ $# -gt 0 ]]; do
@@ -78,28 +77,28 @@ if [ -z "$DOMAIN" ] || [ -z "$ADMIN_EMAIL" ]; then
   exit 1
 fi
 
-# Update install directory with client ID
+# Set installation directory
 INSTALL_DIR="/opt/agency_stack/clients/${CLIENT_ID}/${COMPONENT_NAME}"
 
 # Verify current installation
 if [ ! -f "${INSTALL_DIR}/.installed" ]; then
-    log_error "${LOG_FILE}" "Listmonk not installed, cannot upgrade"
+    log_error "${LOG_FILE}" "Documenso not installed, cannot upgrade"
     exit 1
 fi
 
 # Check current version
-CURRENT_VERSION=$(docker inspect --format='{{.Config.Image}}' listmonk-app-${CLIENT_ID} 2>/dev/null | grep -o 'v[0-9.]*' || echo "unknown")
-if [ "$CURRENT_VERSION" == "v4.1.0" ] && [ "$FORCE" != "true" ]; then
-    log_info "${LOG_FILE}" "Listmonk already at v4.1.0, skipping upgrade"
+CURRENT_VERSION=$(grep -o '"version": ".*"' "${INSTALL_DIR}/package.json" 2>/dev/null | cut -d'"' -f4 || echo "unknown")
+if [ "$CURRENT_VERSION" == "1.4.2" ] && [ "$FORCE" != "true" ]; then
+    log_info "${LOG_FILE}" "Documenso already at v1.4.2, skipping upgrade"
     exit 0
 fi
 
-log_info "${LOG_FILE}" "Upgrading Listmonk from ${CURRENT_VERSION} to v4.1.0"
+log_info "${LOG_FILE}" "Upgrading Documenso from ${CURRENT_VERSION} to v1.4.2"
 
 # Stop existing service
-log_info "${LOG_FILE}" "Stopping Listmonk service"
+log_info "${LOG_FILE}" "Stopping Documenso service"
 cd "${INSTALL_DIR}"
-docker-compose down
+docker-compose down || log_warning "${LOG_FILE}" "Service may not be running"
 
 # Backup current data
 log_info "${LOG_FILE}" "Creating backup"
@@ -107,30 +106,23 @@ BACKUP_DIR="${INSTALL_DIR}_backup_$(date +%Y%m%d%H%M%S)"
 mkdir -p "${BACKUP_DIR}"
 cp -r "${INSTALL_DIR}"/* "${BACKUP_DIR}"/
 
-# Update docker-compose file
-log_info "${LOG_FILE}" "Updating configuration files"
-sed -i 's|listmonk/listmonk:.*|listmonk/listmonk:v4.1.0|g' docker-compose.yml
+# Update to the latest version
+log_info "${LOG_FILE}" "Updating to v1.4.2"
+git checkout main
+git pull
+git checkout tags/v1.4.2
 
-# Update config for v4.1.0 compatibility
-if [ -f "${INSTALL_DIR}/config.toml" ]; then
-    log_info "${LOG_FILE}" "Updating configuration for v4.1.0"
-    # Add new config options for v4.1.0
-    if ! grep -q "\[privacy\]" "${INSTALL_DIR}/config.toml"; then
-        cat << EOF >> "${INSTALL_DIR}/config.toml"
+# Update dependencies
+log_info "${LOG_FILE}" "Updating dependencies"
+npm ci
 
-# New privacy settings in v4.1.0
-[privacy]
-    individual_tracking = false
-    allow_blocklist = true
-    allow_export = true
-    allow_wipe = true
-EOF
-    fi
-fi
+# Run database migrations
+log_info "${LOG_FILE}" "Running database migrations"
+npx prisma migrate deploy
 
-# Pull new image
-log_info "${LOG_FILE}" "Pulling new image"
-docker-compose pull
+# Rebuild the application
+log_info "${LOG_FILE}" "Rebuilding application"
+npm run build
 
 # Keycloak integration if enabled
 if [ "$ENABLE_KEYCLOAK" == "true" ]; then
@@ -142,47 +134,46 @@ if [ "$ENABLE_KEYCLOAK" == "true" ]; then
         log_warning "${LOG_FILE}" "Keycloak service not active. SSO integration may not work correctly."
     fi
     
-    # Update SSO configuration for v4.1.0
-    sed -i '/auth.provider/s/none/oidc/' "${INSTALL_DIR}/config.toml"
+    # Update Keycloak configuration in .env
+    log_info "${LOG_FILE}" "Updating SSO configuration"
+    sed -i 's/^NEXTAUTH_PROVIDER=.*/NEXTAUTH_PROVIDER=keycloak/' .env
     
-    # Add or update OIDC configuration
-    if ! grep -q "\[auth.oidc\]" "${INSTALL_DIR}/config.toml"; then
-        cat << EOF >> "${INSTALL_DIR}/config.toml"
+    # Add or update Keycloak config if not present
+    if ! grep -q "^KEYCLOAK_CLIENT_ID" .env; then
+        cat << EOF >> .env
 
-[auth.oidc]
-    name = "Keycloak"
-    discover_url = "https://keycloak.${DOMAIN}/realms/${CLIENT_ID}/protocol/openid-connect/auth"
-    client_id = "listmonk"
-    client_secret = "listmonk-secret"  # Replace with actual secret from Keycloak
-    scope = ["openid", "profile", "email"]
-    email_claim = "email"
-    name_claim = "name"
+# Keycloak SSO Configuration
+KEYCLOAK_CLIENT_ID=documenso
+KEYCLOAK_CLIENT_SECRET=documenso-secret
+KEYCLOAK_ISSUER=https://keycloak.${DOMAIN}/realms/${CLIENT_ID}
 EOF
     fi
 fi
 
-# Start upgraded service
+# Update connection strings for multi-tenant support
+if grep -q "multi_tenant: true" "/home/revelationx/CascadeProjects/foss-server-stack/config/registry/component_registry.json"; then
+    log_info "${LOG_FILE}" "Configuring multi-tenant support"
+    sed -i "s/^DATABASE_URL=.*/DATABASE_URL=postgresql:\/\/documenso:documenso@postgres-${CLIENT_ID}:5432\/documenso-${CLIENT_ID}/" .env
+fi
+
+# Restart the application
 log_info "${LOG_FILE}" "Starting upgraded service"
 docker-compose up -d
 
-# Run database migration
-log_info "${LOG_FILE}" "Running database migration"
-sleep 10 # Wait for container to stabilize
-docker-compose exec -T listmonk ./listmonk --upgrade
-
 # Verify upgrade
-CONTAINER_STATUS=$(docker ps -a --filter "name=listmonk-app-${CLIENT_ID}" --format "{{.Status}}" | grep -i "up" || echo "")
+sleep 10 # Wait for services to stabilize
+CONTAINER_STATUS=$(docker ps -a --filter "name=documenso-app-${CLIENT_ID}" --format "{{.Status}}" | grep -i "up" || echo "")
 if [ -n "$CONTAINER_STATUS" ]; then
     # Update version marker
-    echo "4.1.0" > "${INSTALL_DIR}/.version"
+    echo "1.4.2" > "${INSTALL_DIR}/.version"
     
     # Update component registry
     log_info "${LOG_FILE}" "Updating component registry"
     COMPONENT_REGISTRY="/home/revelationx/CascadeProjects/foss-server-stack/config/registry/component_registry.json"
-    jq '.components.communication.listmonk.version = "4.1.0"' "$COMPONENT_REGISTRY" > "${COMPONENT_REGISTRY}.tmp" && \
+    jq '.components.business.documenso.version = "1.4.2"' "$COMPONENT_REGISTRY" > "${COMPONENT_REGISTRY}.tmp" && \
     mv "${COMPONENT_REGISTRY}.tmp" "$COMPONENT_REGISTRY"
     
-    log_success "${LOG_FILE}" "Listmonk upgraded successfully to v4.1.0"
+    log_success "${LOG_FILE}" "Documenso upgraded successfully to v1.4.2"
 else
     log_error "${LOG_FILE}" "Upgrade failed: container is not running"
     log_info "${LOG_FILE}" "Attempting rollback from backup..."

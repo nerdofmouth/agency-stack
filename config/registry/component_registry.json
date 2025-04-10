@@ -170,7 +170,7 @@
       "documenso": {
         "name": "Documenso",
         "category": "Business Applications",
-        "version": "1.3.0",
+        "version": "1.4.2",
         "integration_status": {
           "installed": true,
           "hardened": true,
