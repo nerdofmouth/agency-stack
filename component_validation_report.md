@@ -1,5 +1,5 @@
 # AgencyStack Component Validation Report
-Generated: 2025-04-07 15:50:36
+Generated: 2025-04-10 10:04:01
 
 ## Summary
 
@@ -9,7 +9,7 @@ Generated: 2025-04-07 15:50:36
 ✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `backup_strategy.md`
-⚠️ Documentation missing sections: Usage
+✅ Documentation contains all recommended sections
 #### Makefile Targets
 ✅ Target `backup-strategy` exists
 ✅ Target `backup-strategy-status` exists
@@ -18,14 +18,14 @@ Generated: 2025-04-07 15:50:36
 ✅ All Makefile targets present for backup_strategy
 #### Registry Entry
 ✅ Component registered in component_registry.json
-⚠️ backup_strategy had issues, some remain unfixed
+✅ backup_strategy passed all validation checks
 ## builderio
 #### Component Script
 ✅ Component script exists: `install_builderio.sh`
-⚠️ Script may not implement proper idempotence
+✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `builderio.md`
-⚠️ Documentation missing sections: Usage
+✅ Documentation contains all recommended sections
 #### Makefile Targets
 ✅ Target `builderio` exists
 ✅ Target `builderio-status` exists
@@ -34,14 +34,14 @@ Generated: 2025-04-07 15:50:36
 ✅ All Makefile targets present for builderio
 #### Registry Entry
 ✅ Component registered in component_registry.json
-⚠️ builderio had issues, some remain unfixed
+✅ builderio passed all validation checks
 ## calcom
 #### Component Script
 ✅ Component script exists: `install_calcom.sh`
-⚠️ Script may not implement proper idempotence
+✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `calcom.md`
-⚠️ Documentation missing sections: Usage
+✅ Documentation contains all recommended sections
 #### Makefile Targets
 ✅ Target `calcom` exists
 ✅ Target `calcom-status` exists
@@ -50,14 +50,14 @@ Generated: 2025-04-07 15:50:36
 ✅ All Makefile targets present for calcom
 #### Registry Entry
 ✅ Component registered in component_registry.json
-⚠️ calcom had issues, some remain unfixed
+✅ calcom passed all validation checks
 ## chatwoot
 #### Component Script
 ✅ Component script exists: `install_chatwoot.sh`
 ✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `chatwoot.md`
-⚠️ Documentation missing sections: Usage
+✅ Documentation contains all recommended sections
 #### Makefile Targets
 ✅ Target `chatwoot` exists
 ✅ Target `chatwoot-status` exists
@@ -66,14 +66,14 @@ Generated: 2025-04-07 15:50:36
 ✅ All Makefile targets present for chatwoot
 #### Registry Entry
 ✅ Component registered in component_registry.json
-⚠️ chatwoot had issues, some remain unfixed
+✅ chatwoot passed all validation checks
 ## crowdsec
 #### Component Script
 ✅ Component script exists: `install_crowdsec.sh`
-⚠️ Script may not implement proper idempotence
+✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `crowdsec.md`
-⚠️ Documentation missing sections: Usage
+✅ Documentation contains all recommended sections
 #### Makefile Targets
 ✅ Target `crowdsec` exists
 ✅ Target `crowdsec-status` exists
@@ -82,7 +82,7 @@ Generated: 2025-04-07 15:50:36
 ✅ All Makefile targets present for crowdsec
 #### Registry Entry
 ✅ Component registered in component_registry.json
-⚠️ crowdsec had issues, some remain unfixed
+✅ crowdsec passed all validation checks
 ## cryptosync
 #### Component Script
 ✅ Component script exists: `install_cryptosync.sh`
@@ -105,7 +105,7 @@ Generated: 2025-04-07 15:50:36
 ✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `docker.md`
-⚠️ Documentation missing sections: Usage
+✅ Documentation contains all recommended sections
 #### Makefile Targets
 ✅ Target `docker` exists
 ✅ Target `docker-status` exists
@@ -114,7 +114,7 @@ Generated: 2025-04-07 15:50:36
 ✅ All Makefile targets present for docker
 #### Registry Entry
 ✅ Component registered in component_registry.json
-⚠️ docker had issues, some remain unfixed
+✅ docker passed all validation checks
 ## docker_compose
 #### Component Script
 ✅ Component script exists: `install_docker_compose.sh`
@@ -136,7 +136,7 @@ Generated: 2025-04-07 15:50:36
 ⚠️ Script may not implement proper idempotence
 #### Documentation
 ✅ Documentation exists: `documenso.md`
-⚠️ Documentation missing sections: Usage
+✅ Documentation contains all recommended sections
 #### Makefile Targets
 ✅ Target `documenso` exists
 ✅ Target `documenso-status` exists
@@ -152,7 +152,7 @@ Generated: 2025-04-07 15:50:36
 ✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `droneci.md`
-⚠️ Documentation missing sections: Usage
+✅ Documentation contains all recommended sections
 #### Makefile Targets
 ✅ Target `droneci` exists
 ✅ Target `droneci-status` exists
@@ -161,14 +161,14 @@ Generated: 2025-04-07 15:50:36
 ✅ All Makefile targets present for droneci
 #### Registry Entry
 ✅ Component registered in component_registry.json
-⚠️ droneci had issues, some remain unfixed
+✅ droneci passed all validation checks
 ## droneci
 #### Component Script
 ✅ Component script exists: `install_droneci.sh`
 ✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `droneci.md`
-⚠️ Documentation missing sections: Usage
+✅ Documentation contains all recommended sections
 #### Makefile Targets
 ✅ Target `droneci` exists
 ✅ Target `droneci-status` exists
@@ -177,14 +177,14 @@ Generated: 2025-04-07 15:50:36
 ✅ All Makefile targets present for droneci
 #### Registry Entry
 ✅ Component registered in component_registry.json
-⚠️ droneci had issues, some remain unfixed
+✅ droneci passed all validation checks
 ## erpnext
 #### Component Script
 ✅ Component script exists: `install_erpnext.sh`
 ✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `erpnext.md`
-⚠️ Documentation missing sections: Usage
+✅ Documentation contains all recommended sections
 #### Makefile Targets
 ✅ Target `erpnext` exists
 ✅ Target `erpnext-status` exists
@@ -193,7 +193,7 @@ Generated: 2025-04-07 15:50:36
 ✅ All Makefile targets present for erpnext
 #### Registry Entry
 ✅ Component registered in component_registry.json
-⚠️ erpnext had issues, some remain unfixed
+✅ erpnext passed all validation checks
 ## etebase
 #### Component Script
 ✅ Component script exists: `install_etebase.sh`
@@ -280,7 +280,7 @@ Generated: 2025-04-07 15:50:36
 ✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `grafana.md`
-⚠️ Documentation missing sections: Usage
+✅ Documentation contains all recommended sections
 #### Makefile Targets
 ✅ Target `grafana` exists
 ✅ Target `grafana-status` exists
@@ -289,7 +289,7 @@ Generated: 2025-04-07 15:50:36
 ✅ All Makefile targets present for grafana
 #### Registry Entry
 ✅ Component registered in component_registry.json
-⚠️ grafana had issues, some remain unfixed
+✅ grafana passed all validation checks
 ## keycloak
 #### Component Script
 ✅ Component script exists: `install_keycloak.sh`
@@ -408,7 +408,7 @@ Generated: 2025-04-07 15:50:36
 ✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `peertube.md`
-⚠️ Documentation missing sections: Configuration Usage
+⚠️ Documentation missing sections: Configuration
 #### Makefile Targets
 ✅ Target `peertube` exists
 ✅ Target `peertube-status` exists
@@ -424,7 +424,7 @@ Generated: 2025-04-07 15:50:36
 ⚠️ Script may not implement proper idempotence
 #### Documentation
 ✅ Documentation exists: `portainer.md`
-⚠️ Documentation missing sections: Usage
+✅ Documentation contains all recommended sections
 #### Makefile Targets
 ✅ Target `portainer` exists
 ✅ Target `portainer-status` exists
@@ -579,5 +579,5 @@ Generated: 2025-04-07 15:50:36
 ⚠️ wordpress had issues, some remain unfixed
 ## Summary
 - **Total components**: 41
-- **Passed validation**: 8
-- **Failed validation**: 33
+- **Passed validation**: 18
+- **Failed validation**: 23

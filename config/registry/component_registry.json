@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "last_updated": "2025-04-07T15:29:23-05:00",
+  "last_updated": "2025-04-10T12:35:00-05:00",
   "components": {
     "infrastructure": {
       "preflight": {
@@ -38,6 +38,24 @@
           "multi_tenant": true
         },
         "description": "Core system packages and configurations needed for all other components"
+      },
+      "pgvector": {
+        "name": "pgvector",
+        "category": "Database",
+        "version": "0.5.1",
+        "integration_status": {
+          "installed": false,
+          "hardened": true,
+          "makefile": true,
+          "sso": false,
+          "dashboard": false,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": false,
+          "multi_tenant": true
+        },
+        "description": "Vector database extension for PostgreSQL enabling AI-powered semantic search capabilities"
       },
       "traefik": {
         "name": "Traefik",
@@ -78,7 +96,7 @@
       "droneci": {
         "name": "DroneCI",
         "category": "Core Infrastructure",
-        "version": "2.16.0",
+        "version": "2.25.0",
         "integration_status": {
           "installed": true,
           "hardened": true,
@@ -188,7 +206,7 @@
       "documenso": {
         "name": "Documenso",
         "category": "Business Applications",
-        "version": "1.3.0",
+        "version": "1.4.2",
         "integration_status": {
           "installed": true,
           "hardened": true,
@@ -283,7 +301,7 @@
       "peertube": {
         "name": "PeerTube",
         "category": "Content Management",
-        "version": "5.1.0",
+        "version": "7.0.0",
         "integration_status": {
           "installed": true,
           "hardened": true,
@@ -555,12 +573,12 @@
       "listmonk": {
         "name": "Listmonk",
         "category": "Email & Communication",
-        "version": "v2.5.1",
+        "version": "4.1.0",
         "integration_status": {
           "installed": true,
           "hardened": true,
           "makefile": true,
-          "sso": false,
+          "sso": true,
           "dashboard": true,
           "logs": true,
           "docs": true,
