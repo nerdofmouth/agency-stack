@@ -1013,6 +1013,13 @@ droneci-config:
 	@echo "Opening Drone CI configuration..."
 	@$(EDITOR) $(DOCKER_DIR)/droneci/.env
 
+droneci-upgrade:
+	@echo "$(MAGENTA)$(BOLD)🔄 Upgrading DroneCI to v2.25.0...$(RESET)"
+	@read -p "$(YELLOW)Enter domain for DroneCI (e.g., drone.yourdomain.com):$(RESET) " DOMAIN; \
+	read -p "$(YELLOW)Enter admin email:$(RESET) " ADMIN_EMAIL; \
+	read -p "$(YELLOW)Enter client ID (optional):$(RESET) " CLIENT_ID; \
+	sudo $(SCRIPTS_DIR)/components/upgrade_droneci.sh --domain $$DOMAIN --admin-email $$ADMIN_EMAIL $(if $$CLIENT_ID,--client-id $$CLIENT_ID,) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
 # Collaboration Components
 # ------------------------------------------------------------------------------
 

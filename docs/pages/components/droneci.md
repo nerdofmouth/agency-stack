@@ -13,7 +13,7 @@ Drone CI is a self-service Continuous Integration platform built on container te
 
 Drone CI provides modern continuous integration and continuous delivery (CI/CD) through a powerful pipeline engine. This integration in AgencyStack offers a fully-featured CI/CD platform with multi-tenancy support, Gitea integration, and hardened security settings.
 
-* **Version**: 2.16.0 (Server) / 1.8.0 (Runner)
+* **Version**: 2.25.0 (Server) / 2.0.0 (Runner)
 * **Category**: DevOps
 * **Website**: [https://drone.io](https://drone.io)
 * **Github**: [https://github.com/harness/drone](https://github.com/harness/drone)
@@ -249,6 +249,97 @@ Restoring from a backup requires manual steps:
    ```bash
    make droneci-start
    ```
+
+## Upgrading to v2.25.0
+
+Drone CI v2.25.0 brings several improvements to the CI/CD platform, including better Starlark support, enhanced plugin validation, and improved compatibility with Gitea and Keycloak.
+
+### Prerequisites
+
+- Backup your database and configuration
+- Ensure all existing builds have completed
+- Make sure you have at least 500MB free disk space
+
+### Upgrade Process
+
+The simplest way to upgrade is via the Makefile target:
+
+```bash
+# Standard upgrade
+make droneci-upgrade
+
+# Force upgrade (if needed)
+make droneci-upgrade FORCE=true
+```
+
+### Key Changes in v2.25.0
+
+1. **Starlark Support**: Enhanced Starlark integration for dynamic pipeline generation
+2. **Runner Update**: Runner version updated to 2.0.0 with improved networking and security
+3. **Plugin System**: More flexible plugin validation configuration
+4. **Keycloak Integration**: Enhanced OIDC support
+
+### Manual Upgrade Steps (Advanced)
+
+If you need more control over the upgrade process:
+
+```bash
+# Stop services
+cd /opt/agency_stack/clients/{CLIENT_ID}/droneci
+docker-compose down
+
+# Backup files
+cp -r . ../droneci_backup_$(date +%Y%m%d)
+
+# Update version numbers in .env
+sed -i 's/DRONE_VERSION=.*/DRONE_VERSION="2.25.0"/' .env
+sed -i 's/DRONE_RUNNER_VERSION=.*/DRONE_RUNNER_VERSION="2.0.0"/' .env
+
+# Add new configuration options
+echo "DRONE_STARLARK_ENABLED=true" >> .env
+echo "DRONE_VALIDATE_PLUGIN_SKIP=true" >> .env
+
+# Pull new images and restart
+docker-compose pull
+docker-compose up -d
+```
+
+### Post-Upgrade Checks
+
+After upgrading, verify that:
+
+1. The Drone UI is accessible and loads without errors
+2. Repository synchronization works correctly
+3. Run a simple build to confirm pipeline execution
+
+You can check logs for any issues:
+
+```bash
+make droneci-logs
+```
+
+### Troubleshooting
+
+If you encounter problems after upgrading:
+
+1. **UI Not Loading**: Check for JavaScript console errors and verify Keycloak integration
+2. **Build Failures**: Ensure runner compatibility with pipeline steps
+3. **Repository Missing**: Re-sync repositories from the Drone UI
+
+### Rollback Procedure
+
+If you need to revert to the previous version:
+
+```bash
+# Stop the upgraded service
+make droneci-stop
+
+# Restore from backup
+cp -r /opt/agency_stack/clients/{CLIENT_ID}/droneci_backup_*/* /opt/agency_stack/clients/{CLIENT_ID}/droneci/
+
+# Start the previous version
+make droneci-start
+```
 
 ## Adding Additional Runners
 
