@@ -188,6 +188,45 @@ Restoring from a backup requires manual steps:
    make listmonk-start
    ```
 
+## Upgrading to v4.1.0
+
+### Prerequisites
+- Backup your database and configuration
+- Ensure you have at least 2GB free disk space
+
+### Upgrade Process
+```bash
+# Standard upgrade
+make listmonk-upgrade
+
+# Force upgrade (if needed)
+make listmonk-upgrade FORCE=true
+```
+
+### Post-Upgrade Checks
+1. Verify subscribers and campaigns:
+```bash
+make listmonk-status
+```
+2. Check migration logs:
+```bash
+make listmonk-logs | grep -i migration
+```
+3. Test SMTP functionality
+
+### Rollback Procedure
+If issues occur:
+```bash
+# Stop service
+make listmonk-stop
+
+# Restore from backup
+cp -r /opt/agency_stack/clients/{CLIENT_ID}/listmonk_backup_*/* /opt/agency_stack/clients/{CLIENT_ID}/listmonk/
+
+# Restart previous version
+make listmonk-start
+```
+
 ## Uninstallation
 
 To completely remove Listmonk:

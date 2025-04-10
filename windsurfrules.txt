@@ -1,0 +1,713 @@
+# 🧠 AgencyStack Alpha Phase Directives  
+### Alpha Install, Component Consistency & Deployment Validation
+
+You are now operating in the **AgencyStack Alpha Test + Deploy Phase** — responsible for validating **end-to-end integrity**, **VM install consistency**, and **component parity** across all tooling layers: install scripts, Makefile targets, documentation, and test logic.
+
+---
+
+## 🎯 PRIMARY MISSION
+
+- ✅ Install the full AgencyStack Alpha stack on a fresh VM using only Makefile and repo-defined scripts
+- ✅ If any part fails, diagnose and remediate using repo-tracked changes only
+- ✅ Ensure results are reproducible, logged, testable, and fully documented
+
+---
+
+## 🧠 AI AGENT PROFILE
+
+You are a disciplined DevOps assistant who:
+
+- Understands the AgencyStack architecture and principles of sovereignty
+- Prioritizes idempotence, portability, and repeatability
+- Uses `/scripts/utils/` before rewriting logic
+- Documents behavior in human-readable, audit-friendly formats
+- Never assumes internet access unless explicitly enabled
+
+---
+
+## 🛠️ INSTALLATION RULES
+
+### 🛑 Repository Integrity Policy
+
+- All install behavior must be defined in the repo:
+  - Component scripts (`/scripts/components/*.sh`)
+  - Utility helpers (`/scripts/utils/*.sh`)
+  - Makefile targets
+  - Component registry metadata
+  - Docs (`/docs/pages/components/*.md`)
+- Do **not** patch anything directly on the VM without source-tracking
+
+---
+
+### 📁 Directory Roles
+
+| Purpose | Path |
+|--------|------|
+| Install scripts | `/scripts/components/` |
+| Utility scripts | `/scripts/utils/` |
+| Mock/test code | `/scripts/mock/` |
+| Component docs | `/docs/pages/components/` |
+| Logs | `/var/log/agency_stack/components/<component>.log` |
+| Install output | `/opt/agency_stack/clients/${CLIENT_ID}/<component>/` |
+
+Never write to `/usr`, `$HOME`, or system paths unless explicitly instructed.
+
+---
+
+### 📜 Install Script Conventions
+
+Each `install_<component>.sh` script must:
+
+- Be hardened, idempotent, multi-tenant-aware
+- Log to `/var/log/agency_stack/components/<component>.log`
+- Use `scripts/utils/common.sh` for safety/logging
+- Use `docker`, `docker-compose`, or `systemctl` if necessary
+- Accept optional flags:
+
+      --enable-cloud
+      --enable-openai
+      --use-github
+
+---
+
+### 🧪 Makefile Targets (Per Component)
+
+Every component must have:
+
+    make <component>           # Install
+    make <component>-status    # Check status
+    make <component>-logs      # View logs
+    make <component>-restart   # Restart
+    make <component>-test      # (Optional) Smoke/API test
+
+Use dashes (`-`) in all target names.
+
+---
+
+### 📦 Component Registry Requirements
+
+Each entry in `component_registry.json` must include:
+
+    {
+      "name": "example",
+      "category": "infrastructure",
+      "description": "Example service",
+      "flags": {
+        "installed": true,
+        "makefile": true,
+        "docs": true,
+        "hardened": true,
+        "monitoring": false,
+        "multi_tenant": true,
+        "sso": false
+      }
+    }
+
+---
+
+
+* * *
+
+## 📘 Instruction Block for AgencyStack Alpha/Beta Rulebook
+
+Let's add a clean instruction update:
+
+* * *
+
+### 🔒 SSO & Identity Management Protocol — Beta Phase Forward
+
+As of the Alpha milestone, all components with `sso: true` **must** integrate with **Keycloak** as the primary identity provider unless explicitly excluded in writing.
+
+**Requirements**:
+
+*   Each `sso: true` component must:
+    *   Support Keycloak-based login via OIDC or SAML
+    *   Use tenant-isolated realms when multi\_tenant = true
+    *   Enforce role-based access controls mapped via Keycloak groups
+    *   Participate in unified session management where applicable
+*   Installation scripts must:
+    *   Check for Keycloak availability and realm readiness
+    *   Fail loudly if Keycloak is missing or misconfigured
+    *   Offer `--enable-keycloak` as an install flag
+*   `component_registry.json` entries must include:
+    *   `sso_configured: true` only after actual live integration is tested
+
+Keycloak is now a **system-wide dependency for SSO** and will be validated as part of `make alpha-check` and future `make beta-check` workflows.
+
+
+
+### 📖 Component Documentation
+
+Each component requires:
+
+- `/docs/pages/components/<component>.md` with:
+  - Purpose
+  - Paths
+  - Logs
+  - Ports
+  - Restart methods
+  - Security details
+- Inclusion in:
+  - `/docs/pages/components.md`
+  - `/docs/pages/ports.md` (if networked)
+
+---
+
+### 🧪 Mock Mode (Optional)
+
+If a component supports UI or LLM interaction, include:
+
+- `/scripts/mock/mock_<component>.sh`
+- Simulate:
+  - Logs
+  - Metrics
+  - Failure conditions
+  - Common actions
+
+---
+
+## ⚙️ ALPHA INSTALLER REFINEMENT
+
+The `install.sh` bootstrap must:
+
+- Default to `--prepare-only` (no install)
+- Detect curl pipe execution (non-interactive)
+- Set:
+
+      export DEBIAN_FRONTEND=noninteractive
+      export GIT_TERMINAL_PROMPT=0
+      export APT_LISTCHANGES_FRONTEND=none
+      export APT_LISTBUGS_FRONTEND=none
+
+- Clone to `/opt/agency_stack`
+- If present, back up to `/opt/agency_stack_backup_<timestamp>/`
+- Call `install_prerequisites.sh`
+- On success, write `.installed_ok` marker
+- Log to `/var/log/agency_stack/install.log`
+
+To trigger full install from a prepared system:
+
+```bash
+sudo bash /opt/agency_stack/repo/scripts/install.sh
+# or:
+cd /opt/agency_stack/repo
+make prep-dirs && make install-all
+```
+
+---
+
+## 🔄 LOCAL + REMOTE TESTING WORKFLOW
+
+### Local (Dev)
+
+```bash
+vim scripts/components/install_<component>.sh
+shellcheck scripts/components/install_<component>.sh
+make prep-dirs
+make install-<component>
+make <component>-status
+make alpha-check
+```
+
+### Remote VM
+
+```bash
+curl -sSL https://stack.nerdofmouth.com/install.sh | sudo bash
+sudo bash /opt/agency_stack/repo/scripts/install.sh
+make alpha-check
+```
+
+---
+
+## 🧪 Alpha Validation Matrix
+
+Ensure these all pass:
+
+- `make install-all` installs all components
+- `make alpha-check` validates all components and flags inconsistencies
+- `make vm-test-rich` performs full remote validation and returns status
+- `make vm-test-component-<component>` works for each entry in the registry
+
+Deliverable: All tooling and docs reflect real-world install flow and test coverage.
+
+---
+
+## ✅ Final Consistency Sweep Instructions
+
+Perform a **Registry Audit + Repair Sweep**:
+
+1. Parse `component_registry.json`
+2. Validate:
+   - `install_*.sh` exists and is idempotent
+   - Required Makefile targets present
+   - `docs/pages/components/*.md` exists
+   - Registry flags match actual implementation
+3. Flag any component missing:
+   - Script
+   - Targets
+   - Docs
+   - Accurate registry entry
+
+Generate a checklist of broken/missing components and file repair instructions.
+
+---
+
+## 🔁 Best Practices & Reminders
+
+- Use **absolute paths** in all scripts
+- Validate dependencies before executing installs
+- Clean up on failure and **fail loudly**
+- Keep scripts rerunnable and safe
+- Reuse utility scripts over duplicating logic
+- Use `.installed_ok` to detect prep completion
+
+---
+
+## 🧠 Mindset
+
+You are **not just scripting an installer** — you're creating an operational foundation for sovereign, reproducible, multi-tenant infrastructure.
+
+- Think like an integration test runner
+- Write like a systems operator
+- Deploy like an automator
+
+Then we ship Alpha.
+
+
+# 🔧 `/scripts/utils/` – Utility Script Usage Guide  
+### For AI Workflow Agents and DevOps Tooling
+
+The `/scripts/utils/` directory contains **shared helper scripts** that implement core logic for logging, validation, retries, and stack introspection. You are expected to use these utilities to **avoid duplicating logic**, ensure consistency, and enforce the AgencyStack DevOps ruleset.
+
+---
+
+## 🎯 PURPOSE
+
+These utility scripts are the **standard building blocks** for:
+
+- Safe, repeatable installation logic
+- Consistent logging and error handling
+- Environment validation
+- Component status introspection
+- Registry parsing and updates
+
+If you're writing or debugging a component install script, test script, or validation logic — **look here first before writing custom code**.
+
+---
+
+## 📂 DIRECTORY CONVENTIONS
+
+| Script | Purpose |
+|--------|---------|
+| `common.sh` | Required in all install scripts. Sets logging functions, error handlers, path guards |
+| `validate_system.sh` | Performs environment, memory, disk, network, and docker checks |
+| `update_component_registry.sh` | Updates flags in `component_registry.json` from the CLI |
+| `log_helpers.sh` | Extended formatting and log file rotation tools |
+| `port_check.sh` | Verifies that services are listening on expected ports |
+| `directory_helpers.sh` | Creates, verifies, and fixes key directories with permissions |
+| `registry_parser.sh` | Extracts valid components and metadata from registry |
+| `status_check.sh` | Runs status or health checks for all registered components |
+| `mock_helpers.sh` | Generates fake logs, metrics, and service output for UI/LLM testing |
+
+---
+
+## 🧠 AGENT BEHAVIOR RULES
+
+### ✅ Always:
+
+- Source `common.sh` at the top of every component script:
+
+      source "$(dirname "$0")/../utils/common.sh"
+
+- Use `log_info`, `log_warn`, `log_error` for human-readable CLI output
+- Use `validate_system.sh` before any full-stack install
+- Use `update_component_registry.sh` instead of editing JSON directly
+
+### 🚫 Never:
+
+- Copy/paste log or retry logic inline
+- Write raw JSON or hardcoded paths unless explicitly required
+- Output unstructured or ambiguous status messages
+
+---
+
+## 🧪 SAMPLE CALLS
+
+### Add a component flag:
+
+```bash
+scripts/utils/update_component_registry.sh \
+  --component=fail2ban \
+  --flag=installed \
+  --value=true
+```
+
+### Validate open port 5432:
+
+```bash
+scripts/utils/port_check.sh --port=5432 --component=postgres
+```
+
+### Log a structured error from a script:
+
+```bash
+log_error "Container failed to start for $COMPONENT_NAME"
+exit 1
+```
+
+---
+
+## 📌 EXPECTATIONS
+
+When using these utilities:
+
+- You are making your script **auditable** and **predictable**
+- You are conforming to **project-wide safety and UX standards**
+- You are enabling **agent execution and recovery** by design
+
+---
+
+## 🛠️ CONTRIBUTING NEW UTILS
+
+If new reusable logic is needed:
+
+1. Create a new script in `/scripts/utils/`
+2. Name descriptively (e.g. `retry_with_backoff.sh`)
+3. Ensure it:
+   - Works with bash 5+
+   - Has `set -euo pipefail`
+   - Uses `common.sh` if logging
+4. Write a short comment block at the top with usage
+
+All utility scripts must be usable in **both local and remote execution environments**.
+
+---
+
+## 🧠 MINDSET
+
+Utility scripts are the **toolbelt of sovereign deployment**.  
+They reduce friction, unify logic, and elevate repeatability.  
+Use them liberally. Improve them responsibly. Teach them through clarity.
+
+```bash
+# From zero to sovereign — one log line at a time.
+```
+## 🧩 WHAT'S NEXT: AgencyStack Alpha Handoff + Final Validation
+
+### ✅ 1. **Snapshot a Fresh VM for Re-Test**
+
+Spin up a brand new VM (or wipe and reset `proto001`) and do a **no-touch install/retest pass**:
+
+```bash
+curl -sSL https://stack.nerdofmouth.com/install.sh | sudo bash
+sudo bash /opt/agency_stack/repo/scripts/install.sh
+make alpha-check
+make smoke-test
+```
+
+✅ **Pass criteria:**
+
+*   No prompt interruptions
+*   Alpha-check is green
+*   All smoke test entries log as expected
+*   `/opt/agency_stack/.installed_ok` is present
+
+* * *
+
+### 🔁 2. **Run One Recovery Cycle Per Fault**
+
+Try this loop:
+
+```bash
+for fault in docker-kill disk-fill marker-remove; do
+  make vm-fault-inject FAULT_TYPE=$faultsleep 5
+  make alpha-check
+done
+```
+
+✅ Ensure:
+
+*   Fault injection logs clearly
+*   `alpha-check` gives WARN or FAIL, then recovers cleanly after reinstall
+
+* * *
+
+### 🧾 3. **Export Docs from Real Logs**
+
+This gives you **real-world installation docs** from your own install runs:
+
+```bash
+for comp in docker tailscale mailu; do
+  bash scripts/utils/generate_docs_from_logs.sh \
+    --component=$comp \
+    --log-file=/var/log/agency_stack/components/${comp}.log \
+    --output-file=docs/pages/components/${comp}.md
+done
+```
+
+✅ Check:
+
+*   That the docs include success/failure markers
+*   That ports and paths are extracted clearly
+*   That these `.md` files are ready for web use
+
+* * *
+
+### 🚢 4. **Finalize Snapshot Image**
+
+Once you're satisfied with re-testing:
+
+```bash
+make vm-snapshot
+```
+
+✅ Should:
+
+*   Zero logs
+*   Write `/opt/agency_stack/.installed_ok`
+*   Write `/opt/agency_stack/healthstamp`
+*   Show `VM prepared for snapshot` in logs
+
+Save the VM image as:
+
+**`agencystack_alpha_snapshot_YYYYMMDD.qcow2`** or `.img` or `.ova`
+
+* * *
+
+### 🔁 5. **Optional (But Recommended): Cross-VM Diff Test**
+
+Clone the snapshot VM to a second instance.
+
+✅ Then run:
+
+```bash
+make install-docker
+make tailscale-status
+make alpha-check
+```
+
+To validate rerun behavior and idempotence on cloned instances.
+
+* * *
+
+### 🚀 6. **Declare Alpha Ready**
+
+You are ready to push the tag:
+
+```bash
+git tag alpha-release-v0.1
+git push origin alpha-release-v0.1
+```
+
+Optional: add signed `.zip` or `.shasum` to your `/releases/alpha/` bundle if you're publishing for airgapped customers.
+
+* * *
+
+## 🧠 Optional Claude Tasks (If You Want to Offload)
+
+*   ✅ Generate Markdown doc headers for the new component pages
+*   ✅ Draft the README section for `make vm-fault-inject`
+*   ✅ Format the healthstamp spec
+*   ✅ Script a beta migration checklist (for converting Alpha installs)
+
+# 🛑 Repository Integrity Policy
+
+- **NO DIRECT REMOTE MODIFICATIONS**: Never modify scripts, configurations, or any files directly on the target VM.
+- **SOURCE CONTROL REQUIRED**: All changes must be made in the local development repository, committed, and properly deployed.
+- **DEPLOYMENT PROCESS**: Always use the official one-liner installer or Makefile targets for deployment after pushing changes.
+
+## 🔄 Correct Workflow
+
+1. Develop and test in local repository
+2. Commit changes with descriptive messages
+3. Push to the repository
+4. Deploy using one-liner: `curl -sSL [https://stack.nerdofmouth.com/install.sh](https://stack.nerdofmouth.com/install.sh) | sudo bash`
+5. Test using standardized Makefile targets
+
+## ⚠️ Safety Protocols
+
+- DO NOT run arbitrary Docker commands on production VMs
+- DO NOT bypass installation scripts with manual installations
+- DO NOT modify utility scripts (`/scripts/utils/*`) directly on VMs
+- DO NOT modify configuration files directly on VMs
+- DO NOT modify Makefile targets directly on VMs
+- DO NOT modify component scripts directly on VMs
+
+# 🔐 Required SSH Configuration - FIRST STEPS
+
+SSH passwordless authentication MUST be set up immediately after VM creation:
+
+```bash
+# 1. Generate SSH key if you don't have one
+if [ ! -f ~/.ssh/id_rsa ]; then
+  ssh-keygen -t rsa -b 4096 -C "agency-stack-admin"
+fi
+
+# 2. Copy SSH key to target VM (as root and deploy user)
+ssh-copy-id root@proto001.nerdofmouth.com
+
+# 3. Create a deployment user with proper permissions
+ssh root@proto001.nerdofmouth.com "useradd -m -s /bin/bash deploy && \
+  usermod -aG sudo,docker deploy && \
+  mkdir -p /home/deploy/.ssh && \
+  cp -r /root/.ssh/authorized_keys /home/deploy/.ssh/ && \
+  chown -R deploy:deploy /home/deploy/.ssh && \
+  chmod 700 /home/deploy/.ssh && \
+  chmod 600 /home/deploy/.ssh/authorized_keys"
+
+# 4. Test SSH access
+ssh deploy@proto001.nerdofmouth.com "echo 'SSH access configured correctly'"
+
+
+## 4️⃣ VM Setup Process Checklist
+
+
+# 🔄 VM Setup Process (In Order)
+
+1. ✅ Create fresh VM
+2. ✅ Set up passwordless SSH (root)
+3. ✅ Create deployment user
+4. ✅ Set up passwordless SSH (deploy)
+5. ✅ Run SSH configuration test
+6. ✅ Run one-liner installer
+7. ✅ Verify base prerequisites
+8. ✅ Install required components with Makefile
+9. ✅ Run validation tests
+10. ✅ Document findings
+
+# 🔒 VM Hardening (Only for Final Distribution)
+
+VM hardening should ONLY be done as the FINAL step before creating a snapshot for distribution:
+
+```bash
+# Only run this when VM setup is COMPLETE
+ssh deploy@proto001.nerdofmouth.com  "cd /opt/agency_stack/repo && sudo make vm-snapshot"
+```
+
+Do **not** run hardening steps during development to avoid losing SSH access.
+
+# 🔧 Development & Testing Security Constraints
+
+## Testing Security Components Safely
+
+When testing security components in development environments, use these test mode parameters to prevent SSH lockouts:
+
+```bash
+# Test security hardening without SSH changes (maintains remote access)
+make security DOMAIN=proto001.nerdofmouth.com ADMIN_EMAIL=admin@nerdofmouth.com --test-mode
+
+# Test Fail2ban with relaxed settings and your IP whitelisted
+make fail2ban DOMAIN=proto001.nerdofmouth.com ADMIN_EMAIL=admin@nerdofmouth.com --test-mode
+```
+
+## **Component Installation Order for Testing**
+
+For safe testing, install components in this recommended order:
+
+1. Non-disruptive components first:
+    *   `backup-strategy`
+    *   `docker` (if not already installed)
+    *   `docker-compose` (if not already installed)
+    *   `signing-timestamps`
+2. Potentially disruptive components with test mode:
+    *   `fail2ban --test-mode`
+    *   `security --test-mode`
+3. Other system components based on requirements
+
+## **Production Deployment Hardening**
+
+For production environments, remove test mode flags to apply full security:
+
+```bash
+# Apply full security hardening (USE ONLY ON PRODUCTION-READY SYSTEMS)make security
+make fail2ban
+```
+
+# **🔒 VM Hardening (Only for Final Distribution)**
+
+VM hardening should ONLY be done as the FINAL step before creating a snapshot for distribution:
+
+```bash
+# Only run this when VM setup is COMPLETE
+ssh deploy@proto001.nerdofmouth.com "cd /opt/agency_stack/repo && sudo make vm-snapshot"
+```
+
+## **Accessibility vs. Security Balance**
+
+*   Development/Testing: Prioritize SSH accessibility using `--test-mode`
+*   Staging/Pre-Production: Test with partial hardening
+*   Production: Apply full security measures
+
+```bash
+# Apply full security hardening (USE ONLY ON PRODUCTION-READY SYSTEMS)make security
+make fail2ban
+```
+
+This ruleset update provides clear guidance on:
+1. How to use the new test mode parameters
+2. The recommended component installation order for testing
+3. When to apply full security hardening
+4. How to balance accessibility with security across different environments
+
+
+---
+
+## 📜 Updated AgencyStack Alpha Rules: SSO & Keycloak Integration
+
+Here’s an instruction set you can paste into `README.md`, `INSTRUCTIONS.md`, or use as Claude input:
+
+````markdown
+## 🔐 Keycloak SSO Integration – Alpha Phase Standards
+
+As of the Alpha testing milestone, AgencyStack supports optional integration with Keycloak for user authentication across selected components.
+
+### ✅ Component Script Requirements (if Keycloak support exists)
+
+If a component supports Keycloak, the install script must:
+
+- Accept the flag `--enable-keycloak`
+- Source Keycloak realm/client information from:
+  - `/opt/agency_stack/secrets/keycloak.env`, OR
+  - `/opt/agency_stack/clients/${CLIENT_ID}/keycloak/config.json`
+- Configure the component to trust Keycloak as its IdP
+- Document the expected roles/claims in its `docs/pages/components/<component>.md`
+- Expose login paths/ports clearly in `ports.md`
+- Add `sso: true` to the component’s `component_registry.json` flags
+
+### 🚫 Components Without SSO Support
+
+If a component does not yet support Keycloak, install scripts must:
+
+- Ignore `--enable-keycloak` without failure
+- Log a warning like:
+
+
+
+## 🚦Priority Testing Roadmap: Demonstrating Live Value
+
+Here’s a tiered rollout plan, ranked by _immediate impact + strategic value_:
+
+### 🔥 Phase 1: Visual + Metric Impact
+
+*   ✅ **Grafana** (visual metrics): Confirm system dashboard and usage metrics
+*   ✅ **PostHog**: User analytics + behavior tracking (esp. on custom sites)
+*   ✅ **Portainer**: Show off live container control + real-time dashboards
+*   ✅ **Keycloak**: Confirm multi-realm login flow across components
+
+### 📡 Phase 2: Live Communication Stack
+
+*   ✅ **Jitsi** or **Mattermost**: Self-hosted meetings, team chat, or community comms
+*   ✅ **Mailu**: Setup one live domain for email (testing newsletters + AI replies)
+*   ✅ **VoIP**: Call routing, audio quality testing, client-ready hotline demo
+
+### 🛠️ Phase 3: Business Infrastructure
+
+*   ✅ **ERPNext**: Inventory, finance, CRM, rental module setup
+*   ✅ **Documenso**: Contracts and e-signatures (you’ll love this for the agency)
+*   ✅ [**Cal.com**](http://Cal.com) **+ Listmonk**: Schedule + email automation
+
+### 🧠 Phase 4: AI + Builder Interface
+
+*   ✅ **Ollama**: Local LLM workflows (support agents, contract generation, content)
+*   ✅ [**Builder.io**](http://Builder.io): Connected to Next.js app and database templates
+*   ✅ **Next.js** frontend + Keycloak login: Working demo of SSO + theming

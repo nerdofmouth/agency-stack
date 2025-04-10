@@ -116,6 +116,99 @@ After installation, you'll need to configure the Keycloak client as described in
 /opt/agency_stack/clients/{CLIENT_ID}/chatwoot_data/config/sso/keycloak-setup-instructions.txt
 ```
 
+## Usage
+
+### Getting Started with Chatwoot
+
+After installation, access Chatwoot to set up your customer service platform:
+
+```bash
+# Access Chatwoot interface
+open https://chat.yourdomain.com
+
+# Login with the administrator account created during installation
+```
+
+### Setting Up Support Inboxes
+
+Create and configure inboxes for different support channels:
+
+```bash
+# Website Chat Widget
+# Go to Inboxes → Add Inbox → Website
+# Configure widget appearance and copy installation code
+
+# Email Inbox
+# Go to Inboxes → Add Inbox → Email
+# Connect IMAP/SMTP details for email support
+
+# Social Channels
+# Go to Inboxes → Add Inbox → [Select Channel]
+# Available channels: Twitter, Facebook, WhatsApp, etc.
+```
+
+### Managing Teams and Agents
+
+Organize your support staff:
+
+```bash
+# Create Teams
+# Settings → Teams → Add Team
+# Assign agents to specific teams
+
+# Add Agents
+# Settings → Agents → Invite Agents
+# Set permissions and team assignments
+```
+
+### Automating Customer Support
+
+Implement automation to improve efficiency:
+
+```bash
+# Set Up Canned Responses
+# Settings → Canned Responses → Create New Response
+# Define shortcuts and message templates
+
+# Create Automation Rules
+# Settings → Automation → Add Rule
+# Define conditions and actions for automatic handling
+```
+
+### Integrating with Other Platforms
+
+Connect Chatwoot with other systems:
+
+```bash
+# Keycloak SSO Integration
+# Already configured during installation
+# Test by logging in via the SSO option
+
+# API Webhooks
+# Settings → Integrations → Webhooks
+# Configure to send events to external services
+```
+
+### Mobile App Access
+
+Enable mobile access for support agents:
+
+```bash
+# iOS and Android apps available
+# Settings → Profile → API Tokens → Create
+# Use token to log in to mobile apps
+```
+
+### Multi-tenant Configuration
+
+For organizations with multiple clients:
+
+```bash
+# Each client gets isolated inbox and team structure
+# Accounts → Account Settings → Add Account (Super Admin)
+# Assign agents across accounts as needed
+```
+
 ## Management Commands
 
 AgencyStack provides several commands to manage your Chatwoot installation:
