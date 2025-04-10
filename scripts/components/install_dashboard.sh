@@ -37,7 +37,7 @@ log_success() {
 }
 
 # Default values
-DASHBOARD_PORT=3000
+DASHBOARD_PORT=3001
 DASHBOARD_DIR="/opt/agency_stack/apps/dashboard"
 CLIENT_ID=${CLIENT_ID:-default}
 DOMAIN=${DOMAIN:-localhost}
