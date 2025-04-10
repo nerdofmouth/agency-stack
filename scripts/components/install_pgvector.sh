@@ -13,7 +13,8 @@
 set -euo pipefail
 
 # Source common utilities
-source "$(dirname "$0")/../utils/common.sh"
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+source "${SCRIPT_DIR}/../utils/common.sh"
 
 # Variables
 COMPONENT_NAME="pgvector"
@@ -34,7 +35,7 @@ INSTALL_DIR="/opt/agency_stack/clients/${CLIENT_ID}/${COMPONENT_NAME}"
 POSTGRES_SERVICE="postgres-${CLIENT_ID}"
 
 # Initialize logging
-log_start "${LOG_FILE}" "pgvector installation started"
+log_info "${LOG_FILE}" "pgvector installation started"
 
 # Show usage information
 show_help() {
@@ -129,11 +130,11 @@ check_postgres() {
   
   # Verify if PostgreSQL service exists and is running
   if ! docker ps | grep -q "${POSTGRES_SERVICE}"; then
-    log_error "${LOG_FILE}" "PostgreSQL service ${POSTGRES_SERVICE} not found"
+    log_warning "${LOG_FILE}" "PostgreSQL service ${POSTGRES_SERVICE} not found"
     
     if [ "${WITH_DEPS}" == "true" ]; then
       log_info "${LOG_FILE}" "Installing PostgreSQL as it was not found"
-      bash "$(dirname "$0")/install_postgres.sh" --client-id "${CLIENT_ID}" \
+      bash "${SCRIPT_DIR}/install_postgres.sh" --client-id "${CLIENT_ID}" \
         --domain "${DOMAIN}" --admin-email "${ADMIN_EMAIL}"
       
       if ! docker ps | grep -q "${POSTGRES_SERVICE}"; then
@@ -152,6 +153,18 @@ check_postgres() {
 # Install pgvector
 install_pgvector() {
   log_info "${LOG_FILE}" "Installing pgvector extension"
+  
+  # Pull the PostgreSQL image if not exists
+  if ! docker image inspect postgres:${POSTGRES_VERSION} &>/dev/null; then
+    log_info "${LOG_FILE}" "Pulling PostgreSQL ${POSTGRES_VERSION} image"
+    docker pull postgres:${POSTGRES_VERSION}
+  fi
+  
+  # Create network if it doesn't exist
+  if ! docker network inspect agency_stack_network &>/dev/null; then
+    log_info "${LOG_FILE}" "Creating agency_stack_network Docker network"
+    docker network create agency_stack_network
+  fi
   
   # Create SQL script to install pgvector
   cat > "${INSTALL_DIR}/scripts/install_pgvector.sql" << EOF
@@ -200,15 +213,39 @@ GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ${PGVECTOR_DB_USER};
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO ${PGVECTOR_DB_USER};
 EOF
 
-  # Run the SQL script in the PostgreSQL container
-  docker exec -i "${POSTGRES_SERVICE}" psql -U postgres -f - < "${INSTALL_DIR}/scripts/install_pgvector.sql"
-  
-  if [ $? -ne 0 ]; then
-    log_error "${LOG_FILE}" "Failed to install pgvector extension"
-    exit 1
+  # Install pgvector in the PostgreSQL container
+  log_info "${LOG_FILE}" "Building and installing pgvector in PostgreSQL container"
+  # Check if we need to install pgvector in the container
+  if ! docker exec ${POSTGRES_SERVICE} psql -U postgres -c "SELECT 1 FROM pg_available_extensions WHERE name = 'vector'" 2>/dev/null | grep -q "1"; then
+    log_info "${LOG_FILE}" "pgvector extension not found, installing..."
+    
+    # Install pgvector from source
+    docker exec ${POSTGRES_SERVICE} bash -c "apt-get update && \
+      apt-get install -y build-essential git postgresql-server-dev-${POSTGRES_VERSION} && \
+      git clone --branch v${PGVECTOR_VERSION} https://github.com/pgvector/pgvector.git && \
+      cd pgvector && \
+      make && \
+      make install"
+      
+    log_success "${LOG_FILE}" "pgvector extension built and installed successfully"
+  else
+    log_info "${LOG_FILE}" "pgvector extension already available"
   fi
   
-  log_success "${LOG_FILE}" "pgvector extension installed successfully"
+  # Run the SQL script to set up pgvector
+  log_info "${LOG_FILE}" "Configuring pgvector databases and permissions"
+  docker exec -i ${POSTGRES_SERVICE} psql -U postgres < "${INSTALL_DIR}/scripts/install_pgvector.sql"
+  
+  # Verify installation
+  log_info "${LOG_FILE}" "Verifying pgvector installation"
+  local PGVECTOR_VERSION_INSTALLED=$(docker exec ${POSTGRES_SERVICE} psql -U postgres -d ${PGVECTOR_DB_NAME} -c "SELECT extversion FROM pg_extension WHERE extname = 'vector'" -t | tr -d ' ')
+  
+  if [ -n "${PGVECTOR_VERSION_INSTALLED}" ]; then
+    log_success "${LOG_FILE}" "pgvector ${PGVECTOR_VERSION_INSTALLED} installed successfully"
+  else
+    log_error "${LOG_FILE}" "pgvector installation verification failed"
+    exit 1
+  fi
 }
 
 # Create sample code for integrating with pgvector
@@ -418,7 +455,7 @@ register_component() {
 }
 
 # Main installation function
-install_pgvector() {
+main_install() {
   log_info "${LOG_FILE}" "Starting pgvector installation"
   
   # Check for existing installation
@@ -450,4 +487,4 @@ install_pgvector() {
 }
 
 # Execute the installation
-install_pgvector
+main_install

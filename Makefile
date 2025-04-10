@@ -1205,7 +1205,7 @@ langchain-restart:
 langchain-test:
 	@echo "Testing LangChain API..."
 		PORT=$$(grep PORT /opt/agency_stack/docker/langchain/.env | cut -d= -f2); \
-		curl -X POST "http://localhost:$${PORT}/prompt" \
+		curl -X POST http://localhost:$${PORT}/prompt \
 			-H "Content-Type: application/json" \
 			-d '{"template":"Tell me about {topic} in one sentence.","inputs":{"topic":"LangChain"}}'; \
 	else \
@@ -2445,4 +2445,17 @@ pgvector-test:
 		fi \
 	else \
 		echo "❌ Sample code not found. Check installation."; \
+	fi
+
+pgvector-test:
+	@echo "$(MAGENTA)$(BOLD)🧪 Testing pgvector functionality...$(RESET)"
+	@CLIENT_ID=$${CLIENT_ID:-default}; \
+	INSTALL_DIR="/opt/agency_stack/clients/$${CLIENT_ID}/pgvector"; \
+	if [ -f "$${INSTALL_DIR}/.installed" ]; then \
+		echo "🔍 Testing pgvector extension in PostgreSQL..."; \
+		docker exec postgres-$${CLIENT_ID} psql -U postgres -d vectordb -c "CREATE TABLE IF NOT EXISTS vector_test_simple (id serial PRIMARY KEY, embedding vector(3)); INSERT INTO vector_test_simple (embedding) VALUES ('[1,2,3]'), ('[4,5,6]'); SELECT * FROM vector_test_simple; SELECT 'Test successful: Vector operations working correctly' AS status;" || { echo "❌ Test failed"; exit 1; }; \
+		echo "✅ Test completed successfully"; \
+	else \
+		echo "❌ pgvector is not installed. Please run 'make pgvector' first."; \
+		exit 1; \
 	fi

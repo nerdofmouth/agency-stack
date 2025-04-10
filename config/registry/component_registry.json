@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "last_updated": "2025-04-07T15:29:23-05:00",
+  "last_updated": "2025-04-10T12:35:00-05:00",
   "components": {
     "infrastructure": {
       "prerequisites": {
@@ -20,6 +20,24 @@
           "multi_tenant": true
         },
         "description": "Core system packages and configurations needed for all other components"
+      },
+      "pgvector": {
+        "name": "pgvector",
+        "category": "Database",
+        "version": "0.5.1",
+        "integration_status": {
+          "installed": false,
+          "hardened": true,
+          "makefile": true,
+          "sso": false,
+          "dashboard": false,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": false,
+          "multi_tenant": true
+        },
+        "description": "Vector database extension for PostgreSQL enabling AI-powered semantic search capabilities"
       },
       "traefik": {
         "name": "Traefik",
