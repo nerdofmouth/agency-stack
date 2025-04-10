@@ -1,16 +1,14 @@
 # Traefik
 
 ## Overview
-Edge router and reverse proxy for AgencyStack. Traefik handles all incoming HTTP/HTTPS traffic, routing requests to the appropriate backend services based on domain names and path prefixes.
+Traefik is a modern HTTP reverse proxy and load balancer for microservices. It integrates with existing infrastructure components and configures itself automatically and dynamically. Within AgencyStack, Traefik serves as the central entry point for all web traffic, providing TLS termination, automatic SSL certificate management, and routing of requests to the appropriate services.
 
 ## Installation
 
 ### Prerequisites
-- Docker and Docker Compose
-- Network connectivity on ports 80 and 443
-- **DNS Configuration**: Domain names properly configured to point to the server IP
-  - Default: `<hostname>.<domain>` and `*.<hostname>.<domain>`
-  - For multi-tenant setups: `<client_id>.<hostname>.<domain>`
+- Docker and Docker Compose must be installed
+- Port 80 and 443 must be available and not blocked by firewalls
+- Domain name must be properly configured with DNS pointing to the server
 
 ### Installation Process
 The installation is handled by the `install_traefik.sh` script, which can be executed using:
@@ -19,73 +17,85 @@ The installation is handled by the `install_traefik.sh` script, which can be exe
 make traefik
 ```
 
-For client-specific installations:
-```bash
-make traefik CLIENT_ID=your_client_id
-```
+This will:
+1. Create required directories and network
+2. Generate configuration files
+3. Set up Let's Encrypt integration
+4. Start Traefik as a Docker container
 
 ## Configuration
 
 ### Default Configuration
+Traefik is configured with the following defaults:
 - Automatic HTTP to HTTPS redirection
-- Let's Encrypt SSL certificate provisioning
-- Docker provider enabled (auto-discovery of containers)
-- Dashboard access protected with basic authentication
-- Standard network: `agency_stack` (used by all components)
+- Let's Encrypt certificate generation
+- Docker provider for automatic service discovery
+- Dashboard protected with basic authentication (username: admin, default password)
+- Network isolation using the agency_stack Docker network
 
 ### Customization
-- Custom domain: `make traefik DOMAIN=your-domain.com`
-- Admin email: `make traefik ADMIN_EMAIL=admin@example.com`
-- Custom authentication: Modify `/opt/agency_stack/clients/<client_id>/traefik/config/dynamic/dashboard.yml`
+Configuration can be customized by editing:
+- `/opt/agency_stack/clients/${CLIENT_ID}/traefik/config/traefik.yml` - Main configuration
+- `/opt/agency_stack/clients/${CLIENT_ID}/traefik/config/dynamic/` - Dynamic configuration files
+
+## Paths & Directories
+
+| Path | Description |
+|------|-------------|
+| `/opt/agency_stack/clients/${CLIENT_ID}/traefik/` | Main installation directory |
+| `/opt/agency_stack/clients/${CLIENT_ID}/traefik/config/` | Configuration files |
+| `/opt/agency_stack/clients/${CLIENT_ID}/traefik/config/acme/` | Let's Encrypt certificates |
+| `/opt/agency_stack/clients/${CLIENT_ID}/traefik/config/logs/` | Traefik internal logs |
+| `/var/log/agency_stack/components/traefik.log` | Installation and operation logs |
 
 ## Ports & Endpoints
 
 | Service | Port | Protocol | Description |
 |---------|------|----------|-------------|
-| HTTP    | 80   | HTTP     | Redirects to HTTPS |
-| HTTPS   | 443  | HTTPS    | Secure web traffic |
-| Dashboard | 443 | HTTPS   | Traefik dashboard at `traefik.<domain>` |
+| HTTP    | 80   | HTTP     | Automatically redirects to HTTPS |
+| HTTPS   | 443  | HTTPS    | Main entry point for secure web traffic |
+| Dashboard | 8080 | HTTPS  | Admin dashboard (accessible only via traefik.${DOMAIN}) |
 
 ## Logs & Monitoring
 
 ### Log Files
-- `/var/log/agency_stack/components/traefik.log` - Installation log
-- `/opt/agency_stack/clients/<client_id>/traefik/config/logs/traefik.log` - Runtime logs
+- `/var/log/agency_stack/components/traefik.log` - Installation and operation logs
+- `/opt/agency_stack/clients/${CLIENT_ID}/traefik/config/logs/traefik.log` - Traefik internal logs
+- System logs can be viewed with: `journalctl -u traefik` or `docker logs traefik_${CLIENT_ID}`
 
 ### Monitoring
-- Dashboard: Access via `https://traefik.<domain>/dashboard/`
-- Health check: `https://<domain>/ping`
+- Access the dashboard at `https://traefik.${DOMAIN}` for real-time metrics
+- Health check endpoint: `https://traefik.${DOMAIN}/ping`
+- Prometheus metrics available at `https://traefik.${DOMAIN}/metrics`
+
+## Security
+
+### Authentication
+- Dashboard is protected with basic authentication
+- Default credentials: username `admin`, password configured during installation
+
+### TLS/SSL
+- Automatic certificate management via Let's Encrypt
+- Modern TLS protocols and ciphers configured
+- HSTS enabled for improved security
+
+### Hardening
+- No access logs containing sensitive information
+- Docker socket mounted read-only
+- Non-root user in container
 
 ## Troubleshooting
 
 ### Common Issues
+- **Certificate generation fails**: Ensure ports 80/443 are accessible from the internet for Let's Encrypt verification
+- **Services not appearing**: Check if services have the correct Traefik labels
+- **Dashboard inaccessible**: Verify DNS configuration for traefik.${DOMAIN}
 
-#### DNS Resolution Problems
-- **Symptom**: "This site can't be reached" or "DNS address could not be found"
-- **Resolution**:
-  1. Verify DNS settings: `nslookup <hostname>.<domain>`
-  2. For testing, add an entry to your local hosts file:
-     ```
-     <server_ip> <hostname>.<domain>
-     ```
-  3. Check connection: `curl -v https://<hostname>.<domain>/ping`
-
-#### Network Configuration Issues
-- **Symptom**: Dashboard shows 504 Gateway Timeout errors
-- **Resolution**:
-  1. Verify containers are on the same network: `docker network inspect agency_stack`
-  2. Check traefik is using the correct network:
-     ```bash
-     grep -r "network:" /opt/agency_stack/clients/<client_id>/traefik/
-     ```
-  3. Restart traefik: `make traefik-restart`
-
-#### Certificate Issues
-- **Symptom**: SSL certificate warnings
-- **Resolution**:
-  1. Check ACME status: `cat /opt/agency_stack/clients/<client_id>/traefik/config/acme/acme.json`
-  2. Verify domain resolution: `host <hostname>.<domain>`
-  3. Check Let's Encrypt rate limits: [https://letsencrypt.org/docs/rate-limits/](https://letsencrypt.org/docs/rate-limits/)
+### Recovery
+If Traefik fails, you can restart it with:
+```bash
+make traefik-restart
+```
 
 ## Makefile Targets
 
@@ -94,13 +104,5 @@ make traefik CLIENT_ID=your_client_id
 | `make traefik` | Install traefik |
 | `make traefik-status` | Check status of traefik |
 | `make traefik-logs` | View traefik logs |
-| `make traefik-restart` | Restart traefik services |
-| `make traefik-dns-check` | Verify DNS resolution for configured domains |
-
-## Direct Access for Troubleshooting
-
-When troubleshooting, specific components can be accessed directly via their exposed ports:
-- Dashboard: `http://<server_ip>:3001`
-- Other components: See `docker ps` for port mappings
-
-This direct access method bypasses Traefik and can help isolate network/routing issues from component functionality.
+| `make traefik-restart` | Restart traefik |
+| `make traefik-dns-check` | Verify DNS configuration |
