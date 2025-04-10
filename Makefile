@@ -19,7 +19,7 @@ MAGENTA := $(shell tput setaf 5)
 CYAN := $(shell tput setaf 6)
 RESET := $(shell tput sgr0)
 
-.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit integrate-components dashboard dashboard-refresh dashboard-enable dashboard-update dashboard-open integrate-sso integrate-email integrate-monitoring integrate-data-bridge detect-ports remap-ports scan-ports setup-cronjobs view-alerts log-summary create-client setup-roles security-audit security-fix rotate-secrets setup-log-segmentation verify-certs verify-auth multi-tenancy-status install-wordpress install-erpnext install-posthog install-voip install-mailu install-grafana install-loki install-prometheus install-keycloak install-infrastructure install-security-infrastructure install-multi-tenancy validate validate-report peertube peertube-sso peertube-with-deps peertube-reinstall peertube-status peertube-logs peertube-stop peertube-start peertube-restart demo-core demo-core-clean demo-core-status demo-core-logs
+.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit integrate-components dashboard dashboard-refresh dashboard-enable dashboard-update dashboard-open dashboard-direct integrate-sso integrate-email integrate-monitoring integrate-data-bridge detect-ports remap-ports scan-ports setup-cronjobs view-alerts log-summary create-client setup-roles security-audit security-fix rotate-secrets setup-log-segmentation verify-certs verify-auth multi-tenancy-status install-wordpress install-erpnext install-posthog install-voip install-mailu install-grafana install-loki install-prometheus install-keycloak install-infrastructure install-security-infrastructure install-multi-tenancy validate validate-report peertube peertube-sso peertube-with-deps peertube-reinstall peertube-status peertube-logs peertube-stop peertube-start peertube-restart demo-core demo-core-clean demo-core-status demo-core-logs
 
 # Default target
 help:
@@ -63,6 +63,7 @@ help:
 	@echo "  $(BOLD)make dashboard-enable$(RESET) Enable AgencyStack dashboard"
 	@echo "  $(BOLD)make dashboard-update$(RESET) Update AgencyStack dashboard data"
 	@echo "  $(BOLD)make dashboard-open$(RESET)   Open AgencyStack dashboard in browser"
+	@echo "  $(BOLD)make dashboard-direct$(RESET) Open AgencyStack dashboard via direct IP address"
 	@echo "  $(BOLD)make integrate-sso$(RESET)    Integrate Single Sign-On for AgencyStack components"
 	@echo "  $(BOLD)make integrate-email$(RESET)  Integrate Email systems for AgencyStack components"
 	@echo "  $(BOLD)make integrate-monitoring$(RESET) Integrate Monitoring for AgencyStack components"
@@ -366,7 +367,25 @@ dashboard-update:
 	@echo "🔄 Updating AgencyStack dashboard data..."
 	@sudo bash $(SCRIPTS_DIR)/dashboard/update_dashboard_data.sh
 
-# Open dashboard in browser
+# Directly open dashboard via IP address (bypassing DNS)
+dashboard-direct:
+	@echo "$(MAGENTA)$(BOLD)🔌 Opening AgencyStack Dashboard via Direct IP Address...$(RESET)"
+	@if [ -d "/opt/agency_stack/clients/$(CLIENT_ID)/dashboard" ]; then \
+		SERVER_IP=$$(hostname -I | awk '{print $$1}'); \
+		DASHBOARD_PORT=$$(docker ps | grep dashboard | grep -oP '\d+->80' | cut -d'-' -f1 || echo "3001"); \
+		echo "$(GREEN)✅ Dashboard is available at: http://$${SERVER_IP}:$${DASHBOARD_PORT}$(RESET)"; \
+		if command -v xdg-open >/dev/null 2>&1; then \
+			xdg-open "http://$${SERVER_IP}:$${DASHBOARD_PORT}" || echo "$(YELLOW)⚠️ Could not open browser automatically$(RESET)"; \
+		elif command -v open >/dev/null 2>&1; then \
+			open "http://$${SERVER_IP}:$${DASHBOARD_PORT}" || echo "$(YELLOW)⚠️ Could not open browser automatically$(RESET)"; \
+		else \
+			echo "$(YELLOW)⚠️ Could not detect browser. Please open the URL manually.$(RESET)"; \
+		fi; \
+	else \
+		echo "$(RED)❌ Dashboard not installed. Install with: make dashboard$(RESET)"; \
+	fi
+
+# Open AgencyStack dashboard in browser
 dashboard-open:
 	@echo "🌐 Opening AgencyStack dashboard in browser..."
 	@xdg-open http://dashboard.$(shell grep PRIMARY_DOMAIN /opt/agency_stack/config.env 2>/dev/null | cut -d '=' -f2 || echo "localhost")
@@ -1559,7 +1578,7 @@ traefik: validate
 	@sudo $(SCRIPTS_DIR)/components/install_traefik.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
 traefik-status:
-	@echo "$(MAGENTA)$(BOLD)🔍 Checking Traefik Status...$(RESET)"
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Traefik Status...$(RESET)"
 	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/traefik/.installed_ok" ]; then \
 		echo "$(GREEN)✅ Traefik is installed$(RESET)"; \
 		if docker ps | grep -q "traefik"; then \
@@ -1591,6 +1610,26 @@ traefik-restart:
 		docker restart traefik-$(CLIENT_ID); \
 		echo "$(GREEN)✅ Traefik has been restarted$(RESET)"; \
 		echo "$(CYAN)Check status with: make traefik-status$(RESET)"; \
+	else \
+		echo "$(RED)❌ Traefik is not installed$(RESET)"; \
+		echo "$(CYAN)Install with: make traefik$(RESET)"; \
+	fi
+
+traefik-dns-check:
+	@echo "$(MAGENTA)$(BOLD)🔍 Checking Traefik DNS Configuration...$(RESET)"
+	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/traefik/.installed_ok" ]; then \
+		echo "$(CYAN)Verifying DNS configuration for Traefik...$(RESET)"; \
+		scripts/verify_dns.sh --domain $(DOMAIN) --client-id $(CLIENT_ID) --direct-check; \
+		if [ $$? -eq 0 ]; then \
+			echo "$(GREEN)✅ DNS configuration is correct$(RESET)"; \
+		else \
+			echo "$(YELLOW)⚠️ DNS configuration issues detected$(RESET)"; \
+			echo "$(CYAN)For detailed information, check the generated report or logs$(RESET)"; \
+			echo "$(CYAN)For testing, you can directly access:$(RESET)"; \
+			DASHBOARD_PORT=$$(docker ps | grep dashboard | grep -oP '\d+->80' | cut -d'-' -f1 || echo "3001"); \
+			SERVER_IP=$$(hostname -I | awk '{print $$1}'); \
+			echo "  Dashboard: http://$${SERVER_IP}:$${DASHBOARD_PORT}"; \
+		fi; \
 	else \
 		echo "$(RED)❌ Traefik is not installed$(RESET)"; \
 		echo "$(CYAN)Install with: make traefik$(RESET)"; \
@@ -2136,9 +2175,7 @@ fail2ban-logs:
 		echo "cat /var/log/agency_stack/components/fail2ban.log"; \
 	else \
 		echo "$(YELLOW)Fail2ban logs not found.$(RESET)"; \
-		if [ -f "/var/log/agency_stack/components/fail2ban.log" ]; then \
-			cat /var/log/agency_stack/components/fail2ban.log | tail -n 20; \
-		fi; \
+		journalctl -u fail2ban 2>/dev/null; \
 	fi
 
 fail2ban-restart:

@@ -26,7 +26,7 @@ DATA_DIR="${INSTALL_DIR}/data"
 LOG_DIR="/var/log/agency_stack/components"
 LOG_FILE="${LOG_DIR}/traefik.log"
 DOCKER_COMPOSE_FILE="${INSTALL_DIR}/docker-compose.yml"
-TRAEFIK_NETWORK_NAME="${CLIENT_ID}_network"
+TRAEFIK_NETWORK_NAME="agency_stack"
 
 # Parse command-line arguments
 FORCE=false
