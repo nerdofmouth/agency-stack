@@ -1,5 +1,5 @@
 # AgencyStack Component Validation Report
-Generated: 2025-04-10 08:29:04
+Generated: 2025-04-10 09:05:51
 
 ## Summary
 
@@ -22,7 +22,7 @@ Generated: 2025-04-10 08:29:04
 ## builderio
 #### Component Script
 ✅ Component script exists: `install_builderio.sh`
-⚠️ Script may not implement proper idempotence
+✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `builderio.md`
 ✅ Documentation contains all recommended sections
@@ -34,11 +34,11 @@ Generated: 2025-04-10 08:29:04
 ✅ All Makefile targets present for builderio
 #### Registry Entry
 ✅ Component registered in component_registry.json
-⚠️ builderio had issues, some remain unfixed
+✅ builderio passed all validation checks
 ## calcom
 #### Component Script
 ✅ Component script exists: `install_calcom.sh`
-⚠️ Script may not implement proper idempotence
+✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `calcom.md`
 ✅ Documentation contains all recommended sections
@@ -50,7 +50,7 @@ Generated: 2025-04-10 08:29:04
 ✅ All Makefile targets present for calcom
 #### Registry Entry
 ✅ Component registered in component_registry.json
-⚠️ calcom had issues, some remain unfixed
+✅ calcom passed all validation checks
 ## chatwoot
 #### Component Script
 ✅ Component script exists: `install_chatwoot.sh`
@@ -70,7 +70,7 @@ Generated: 2025-04-10 08:29:04
 ## crowdsec
 #### Component Script
 ✅ Component script exists: `install_crowdsec.sh`
-⚠️ Script may not implement proper idempotence
+✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `crowdsec.md`
 ✅ Documentation contains all recommended sections
@@ -82,7 +82,7 @@ Generated: 2025-04-10 08:29:04
 ✅ All Makefile targets present for crowdsec
 #### Registry Entry
 ✅ Component registered in component_registry.json
-⚠️ crowdsec had issues, some remain unfixed
+✅ crowdsec passed all validation checks
 ## cryptosync
 #### Component Script
 ✅ Component script exists: `install_cryptosync.sh`
@@ -579,5 +579,5 @@ Generated: 2025-04-10 08:29:04
 ⚠️ wordpress had issues, some remain unfixed
 ## Summary
 - **Total components**: 41
-- **Passed validation**: 11
-- **Failed validation**: 30
+- **Passed validation**: 14
+- **Failed validation**: 27

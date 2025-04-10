@@ -129,17 +129,41 @@ is_port_in_use_by_system() {
 
 # Parse ports.json file
 parse_ports_json() {
-  log "${BLUE}Parsing ports.json...${NC}"
-  
   # Ensure ports.json exists
   create_empty_ports_json
   
   # Parse the ports in use
-  local ports_in_use=$(jq -r '.ports_in_use | keys[]' "$PORTS_FILE" 2>/dev/null || echo "")
-  log "${BLUE}Found $(echo "$ports_in_use" | wc -w) ports registered in ports.json${NC}"
+  if [ ! -s "$PORTS_FILE" ]; then
+    log "${YELLOW}Warning: Empty ports.json file. No ports to check.${NC}"
+    return 0
+  fi
+  
+  # Check if the file contains valid JSON
+  if ! jq empty "$PORTS_FILE" 2>/dev/null; then
+    log "${RED}Error: Invalid JSON in $PORTS_FILE. Creating a new empty file.${NC}"
+    create_empty_ports_json
+    return 0
+  fi
+  
+  # Extract port numbers only and ensure they are all numeric
+  local ports_in_use=$(jq -r '.ports_in_use | keys[]' "$PORTS_FILE" 2>/dev/null)
+  local numeric_ports=""
+  
+  # Validate each port is numeric
+  if [ -n "$ports_in_use" ]; then
+    for port in $ports_in_use; do
+      if [[ "$port" =~ ^[0-9]+$ ]]; then
+        numeric_ports="$numeric_ports $port"
+      else
+        log "${YELLOW}Warning: Non-numeric port '$port' found in ports.json. Skipping.${NC}"
+      fi
+    done
+  fi
+  
+  log "${BLUE}Found $(echo "$numeric_ports" | wc -w) valid ports registered in ports.json${NC}"
   
   # Return the ports as space-separated list
-  echo "$ports_in_use"
+  echo "$numeric_ports"
 }
 
 # Scan Docker containers for port mappings
