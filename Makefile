@@ -716,8 +716,7 @@ listmonk-start:
 	@docker-compose -f $(DOCKER_DIR)/listmonk/docker-compose.yml up -d
 
 listmonk-restart:
-	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Listmonk...$(RESET)"
-	@cd $(DOCKER_DIR)/listmonk && docker-compose restart
+	@docker-compose -f $(DOCKER_DIR)/listmonk/docker-compose.yml restart
 
 listmonk-backup:
 	@echo "Backing up Listmonk data..."
@@ -1778,24 +1777,58 @@ component-restart:
 	@exit 1
 
 # Auto-generated target for crowdsec
-crowdsec:
-	@echo "TODO: Implement crowdsec"
-	@exit 1
+crowdsec: validate
+	@echo "$(MAGENTA)$(BOLD)🔒 Installing CrowdSec security automation...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_crowdsec.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
-# Auto-generated target for crowdsec
 crowdsec-status:
-	@echo "TODO: Implement crowdsec-status"
-	@exit 1
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking CrowdSec Status...$(RESET)"
+	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/crowdsec/.installed" ]; then \
+		echo "$(GREEN)✅ CrowdSec is installed$(RESET)"; \
+		if docker ps | grep -q "crowdsec_$(CLIENT_ID)"; then \
+			echo "$(GREEN)✅ CrowdSec container is running$(RESET)"; \
+		else \
+			echo "$(RED)❌ CrowdSec container is not running$(RESET)"; \
+		fi; \
+		if docker ps | grep -q "crowdsec-traefik-bouncer_$(CLIENT_ID)"; then \
+			echo "$(GREEN)✅ CrowdSec Traefik bouncer is running$(RESET)"; \
+		else \
+			echo "$(RED)❌ CrowdSec Traefik bouncer is not running$(RESET)"; \
+		fi; \
+		if docker ps | grep -q "crowdsec-dashboard_$(CLIENT_ID)"; then \
+			echo "$(GREEN)✅ CrowdSec dashboard is running$(RESET)"; \
+		else \
+			echo "$(RED)❌ CrowdSec dashboard is not running$(RESET)"; \
+		fi; \
+	else \
+		echo "$(RED)❌ CrowdSec is not installed$(RESET)"; \
+		echo "$(CYAN)Install with: make crowdsec$(RESET)"; \
+	fi
 
-# Auto-generated target for crowdsec
 crowdsec-logs:
-	@echo "TODO: Implement crowdsec-logs"
-	@exit 1
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing CrowdSec Logs...$(RESET)"
+	@if [ -f "/var/log/agency_stack/components/crowdsec.log" ]; then \
+		echo "$(CYAN)Recent CrowdSec installation logs:$(RESET)"; \
+		sudo tail -n 30 /var/log/agency_stack/components/crowdsec.log; \
+		echo ""; \
+		echo "$(CYAN)For container logs, use:$(RESET)"; \
+		echo "docker logs crowdsec_$(CLIENT_ID)"; \
+		echo "docker logs crowdsec-traefik-bouncer_$(CLIENT_ID)"; \
+	else \
+		echo "$(YELLOW)CrowdSec logs not found.$(RESET)"; \
+		docker logs crowdsec_$(CLIENT_ID) 2>/dev/null || echo "$(RED)CrowdSec container logs not available.$(RESET)"; \
+	fi
 
-# Auto-generated target for crowdsec
 crowdsec-restart:
-	@echo "TODO: Implement crowdsec-restart"
-	@exit 1
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting CrowdSec...$(RESET)"
+	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/crowdsec/.installed" ]; then \
+		cd /opt/agency_stack/clients/$(CLIENT_ID)/crowdsec && sudo docker-compose restart; \
+		echo "$(GREEN)✅ CrowdSec has been restarted$(RESET)"; \
+		echo "$(CYAN)Check status with: make crowdsec-status$(RESET)"; \
+	else \
+		echo "$(RED)❌ CrowdSec is not installed$(RESET)"; \
+		echo "$(CYAN)Install with: make crowdsec$(RESET)"; \
+	fi
 
 # Auto-generated target for cryptosync
 cryptosync-restart:
