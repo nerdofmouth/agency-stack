@@ -1,5 +1,5 @@
 # AgencyStack Component Validation Report
-Generated: 2025-04-07 15:50:36
+Generated: 2025-04-10 03:07:14
 
 ## Summary
 
@@ -408,7 +408,7 @@ Generated: 2025-04-07 15:50:36
 ✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `peertube.md`
-⚠️ Documentation missing sections: Configuration Usage
+⚠️ Documentation missing sections: Configuration
 #### Makefile Targets
 ✅ Target `peertube` exists
 ✅ Target `peertube-status` exists

@@ -121,6 +121,63 @@ The AgencyStack PeerTube implementation includes several security enhancements:
 - Container isolation
 - Database credential security
 
+## Broadcasting Scenarios for nerdofmouth.com
+
+### 1. Live Streaming Setup
+
+**Requirements:**
+- OBS Studio or similar broadcasting software
+- RTMP credentials (from PeerTube admin panel)
+
+**Configuration:**
+```
+Streaming Service: Custom
+Server: rtmp://peertube.nerdofmouth.com/live
+Stream Key: [your-stream-key]
+```
+
+**Best Practices:**
+- Use 720p or 1080p resolution
+- Bitrate between 2500-6000 kbps
+- Keyframe interval: 2 seconds
+- Audio codec: AAC at 128kbps
+- Video codec: H.264 (x264)
+
+### 2. Scheduled Broadcasts
+
+1. Create a scheduled video in PeerTube admin
+2. Configure OBS to auto-start at scheduled time
+3. Use `--scheduled-time` parameter when starting stream
+
+### 3. Multi-stream Setup
+
+```bash
+# Primary stream
+rtmp://peertube.nerdofmouth.com/live/primary
+
+# Backup stream (failover)
+rtmp://peertube.nerdofmouth.com/live/backup
+```
+
+### 4. Recording and Archiving
+
+- All streams automatically archived
+- Find recordings in `/opt/agency_stack/clients/{CLIENT_ID}/peertube/recordings`
+- Auto-published based on admin settings
+
+### 5. Monitoring Stream Health
+
+```bash
+# Check stream status
+make peertube-status
+
+# View recent logs
+make peertube-logs | grep -i rtmp
+
+# Check bandwidth usage
+vnstat -i eth0 -l
+```
+
 ## Troubleshooting
 
 **Check Logs:**
