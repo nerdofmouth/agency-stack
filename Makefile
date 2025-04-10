@@ -927,6 +927,13 @@ chatwoot-config:
 	@echo "Opening Chatwoot environment configuration..."
 	@$(EDITOR) $(DOCKER_DIR)/chatwoot/.env
 
+chatwoot-upgrade:
+	@echo "$(MAGENTA)$(BOLD)🔄 Upgrading Chatwoot to v4.1.0...$(RESET)"
+	@read -p "$(YELLOW)Enter domain for Chatwoot (e.g., chat.yourdomain.com):$(RESET) " DOMAIN; \
+	read -p "$(YELLOW)Enter admin email:$(RESET) " ADMIN_EMAIL; \
+	read -p "$(YELLOW)Enter client ID (optional):$(RESET) " CLIENT_ID; \
+	sudo $(SCRIPTS_DIR)/components/upgrade_chatwoot.sh --domain $$DOMAIN --admin-email $$ADMIN_EMAIL $(if $$CLIENT_ID,--client-id $$CLIENT_ID,) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
 # Content & Media
 peertube:
 	@echo "$(MAGENTA)$(BOLD)🎞️ Installing PeerTube - Self-hosted Video Platform...$(RESET)"
@@ -2389,4 +2396,53 @@ archon-restart:
 	else \
 		echo "Restart script not found. Trying standard methods..."; \
 		docker-compose -f "/opt/agency_stack/clients/$(CLIENT_ID)/archon/docker-compose.yml" restart; \
+	fi
+
+# Database Components
+# ------------------------------------------------------------------------------
+
+pgvector:
+	@echo "$(MAGENTA)$(BOLD)🔍 Installing pgvector...$(RESET)"
+	@read -p "$(YELLOW)Enter domain:$(RESET) " DOMAIN; \
+	read -p "$(YELLOW)Enter admin email:$(RESET) " ADMIN_EMAIL; \
+	read -p "$(YELLOW)Enter client ID (optional):$(RESET) " CLIENT_ID; \
+	sudo $(SCRIPTS_DIR)/components/install_pgvector.sh --domain $$DOMAIN --admin-email $$ADMIN_EMAIL $(if $$CLIENT_ID,--client-id $$CLIENT_ID,) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+pgvector-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking pgvector status...$(RESET)"
+	@CLIENT_ID=$${CLIENT_ID:-default}; \
+	INSTALL_DIR="/opt/agency_stack/clients/$${CLIENT_ID}/pgvector"; \
+	if [ -f "$${INSTALL_DIR}/.installed" ]; then \
+		echo "✅ pgvector is installed for client $${CLIENT_ID}"; \
+		VERSION=$$(cat "$${INSTALL_DIR}/.version" 2>/dev/null || echo "unknown"); \
+		echo "📊 Version: $${VERSION}"; \
+		docker exec postgres-$${CLIENT_ID} psql -U postgres -c "SELECT extversion FROM pg_extension WHERE extname='vector'" || echo "⚠️ Extension not installed or error occurred"; \
+	else \
+		echo "❌ pgvector is not installed for client $${CLIENT_ID}"; \
+	fi
+
+pgvector-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing pgvector logs...$(RESET)"
+	@CLIENT_ID=$${CLIENT_ID:-default}; \
+	sudo cat /var/log/agency_stack/components/pgvector.log || echo "No logs found"
+
+pgvector-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting pgvector...$(RESET)"
+	@CLIENT_ID=$${CLIENT_ID:-default}; \
+	echo "⚠️ pgvector is an extension of PostgreSQL. Restarting database..."; \
+	docker restart postgres-$${CLIENT_ID} || echo "Failed to restart PostgreSQL for client $${CLIENT_ID}"
+
+pgvector-test:
+	@echo "$(MAGENTA)$(BOLD)🧪 Testing pgvector functionality...$(RESET)"
+	@CLIENT_ID=$${CLIENT_ID:-default}; \
+	INSTALL_DIR="/opt/agency_stack/clients/$${CLIENT_ID}/pgvector"; \
+	if [ -d "$${INSTALL_DIR}/samples" ]; then \
+		read -p "$(YELLOW)This will install Python dependencies. Continue? [y/N]$(RESET) " CONFIRM; \
+		if [[ $$CONFIRM =~ ^[Yy] ]]; then \
+			cd "$${INSTALL_DIR}/samples" && ./run_example.sh; \
+		else \
+			echo "Test cancelled"; \
+		fi \
+	else \
+		echo "❌ Sample code not found. Check installation."; \
 	fi
