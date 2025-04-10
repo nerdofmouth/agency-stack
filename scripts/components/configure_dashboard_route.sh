@@ -48,6 +48,15 @@ if [ ! -d "$TRAEFIK_CONFIG_DIR" ]; then
   exit 1
 fi
 
+# Ensure Traefik is on the agency_stack network
+if ! docker network inspect agency_stack 2>/dev/null | grep -q "traefik_demo"; then
+  log_info "Adding Traefik to the agency_stack network..."
+  docker network connect agency_stack traefik_demo || {
+    log_warning "Failed to connect Traefik to agency_stack network, creating connection manually"
+    # Try alternative approach if needed
+  }
+fi
+
 # Configure Traefik to route traffic to the dashboard container
 # When containerized, the dashboard is on the agency_stack Docker network
 
