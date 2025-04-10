@@ -204,6 +204,16 @@ update_sso_configured_flag() {
   return 0
 }
 
+# Check for prerequisites before proceeding
+log_info "Checking prerequisites for SSO integration..."
+
+# Validate Keycloak is properly installed
+if [ ! -d "/opt/agency_stack/keycloak" ]; then
+  log_error "Keycloak installation directory not found. Please install Keycloak first."
+  log_info "You can install Keycloak with: make keycloak DOMAIN=$DOMAIN ADMIN_EMAIL=$ADMIN_EMAIL"
+  exit 1
+fi
+
 # Check if component is SSO-enabled
 if ! is_sso_enabled "$COMPONENT"; then
   log_error "Component $COMPONENT is not marked as SSO-enabled in the component registry. Set 'sso: true' in the registry first."
@@ -215,6 +225,12 @@ log_info "Checking if Keycloak is available for domain $DOMAIN..."
 if ! keycloak_is_available "$DOMAIN"; then
   log_error "Keycloak is not available for domain $DOMAIN. Please install and start Keycloak first."
   log_info "You can install Keycloak with: make keycloak DOMAIN=$DOMAIN ADMIN_EMAIL=$ADMIN_EMAIL"
+  exit 1
+fi
+
+# Check for required dependencies
+if ! check_dependencies; then
+  log_error "Missing required dependencies for Keycloak SSO integration."
   exit 1
 fi
 
