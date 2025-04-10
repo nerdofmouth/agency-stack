@@ -11,6 +11,10 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
+# Create required directories and ensure files exist
+RUN mkdir -p public
+RUN touch next.config.js
+
 # Copy application code
 COPY . .
 
@@ -26,15 +30,18 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
+# Create required directories
+RUN mkdir -p public
+
 # Copy production dependencies
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/package-lock.json ./package-lock.json
 RUN npm ci --only=production
 
 # Copy built application
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/next.config.js ./next.config.js
+COPY --from=builder /app/.next ./.next/
+COPY --from=builder /app/public ./public/
+COPY --from=builder /app/next.config.js ./
 
 # User and permissions
 RUN addgroup --system --gid 1001 nodejs && \
