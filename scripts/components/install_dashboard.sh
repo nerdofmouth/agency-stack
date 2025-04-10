@@ -267,150 +267,85 @@ EOF
   log_success "Environment configuration generated."
 }
 
-# Build the dashboard application
-build_dashboard() {
-  log_info "Building dashboard application..."
-  
-  cd "${DASHBOARD_DIR}" || return 1
-  
-  # Ensure npm dependencies are installed
-  log_info "Installing npm dependencies..."
-  npm install --quiet || {
-    log_error "Failed to install npm dependencies"
-    return 1
-  }
-  
-  # Build the Next.js application
-  log_info "Building Next.js application..."
-  npm run build || {
-    log_error "Failed to build Next.js application"
-    return 1
-  }
-  
-  log_success "Dashboard application built successfully"
-  return 0
-}
-
-# Setup process manager (pm2) for the dashboard
+# Setup process manager (Docker) for the dashboard
 setup_process_manager() {
-  log_info "Setting up process manager for dashboard..."
-  
-  # Check if pm2 is installed
-  if ! command -v pm2 &>/dev/null; then
-    log_info "Installing pm2 process manager..."
-    npm install -g pm2 || {
-      log_error "Failed to install pm2"
+  log_info "Setting up process manager for the dashboard..."
+
+  # Stop the existing Docker container if it's running
+  if docker ps -q --filter "name=dashboard_${CLIENT_ID}" | grep -q .; then
+    log_info "Stopping existing dashboard container..."
+    docker stop "dashboard_${CLIENT_ID}" >/dev/null 2>&1 || true
+    docker rm "dashboard_${CLIENT_ID}" >/dev/null 2>&1 || true
+  fi
+
+  # Check if dashboard Docker network exists, create if not
+  if ! docker network ls | grep -q agency_stack; then
+    log_info "Creating Docker network for the dashboard..."
+    docker network create agency_stack || log_error "Failed to create Docker network" 
+  fi
+
+  INSTALL_DIR="/opt/agency_stack/clients/${CLIENT_ID}/dashboard"
+  mkdir -p "${INSTALL_DIR}/logs"
+
+  # Determine if we need to rebuild the Docker image
+  REBUILD=false
+  if [[ ! -f "${INSTALL_DIR}/.image_built" ]] || [[ "$FORCE" == "true" ]]; then
+    REBUILD=true
+  fi
+
+  if [[ "$REBUILD" == "true" ]]; then
+    log_info "Building dashboard Docker image..."
+    
+    # Copy Dockerfile if it doesn't exist in the dashboard directory
+    if [[ ! -f "${DASHBOARD_DIR}/Dockerfile" ]]; then
+      cp "${REPO_ROOT}/dashboard/Dockerfile" "${DASHBOARD_DIR}/"
+    fi
+    
+    # Build the Docker image
+    (cd "${DASHBOARD_DIR}" && \
+      docker build -t "agency_stack/dashboard:latest" . \
+    ) || {
+      log_error "Failed to build dashboard Docker image"
       return 1
     }
+    
+    touch "${INSTALL_DIR}/.image_built"
+    log_success "Dashboard Docker image built successfully"
+  else
+    log_info "Using existing dashboard Docker image"
   fi
-  
-  # Create the ecosystem.config.js file for pm2
-  log_info "Creating pm2 ecosystem configuration..."
-  cat > "${DASHBOARD_DIR}/ecosystem.config.js" <<EOF
-module.exports = {
-  apps: [{
-    name: 'agencystack-dashboard',
-    script: 'npm',
-    args: 'start',
-    instances: 1,
-    autorestart: true,
-    watch: false,
-    max_memory_restart: '500M',
-    env: {
-      NODE_ENV: 'production',
-      PORT: ${DASHBOARD_PORT}
+
+  # Create container with proper networking
+  log_info "Starting dashboard container..."
+  docker run -d \
+    --name "dashboard_${CLIENT_ID}" \
+    --restart unless-stopped \
+    --network agency_stack \
+    -p "${DASHBOARD_PORT}:3000" \
+    -v "${INSTALL_DIR}/logs:/app/logs" \
+    -v "${DASHBOARD_DIR}/.env.local:/app/.env.local:ro" \
+    -e "NODE_ENV=production" \
+    -e "CLIENT_ID=${CLIENT_ID}" \
+    -e "DOMAIN=${DOMAIN}" \
+    -l "traefik.enable=true" \
+    -l "traefik.http.routers.dashboard.rule=Host(\`${DOMAIN}\`) && PathPrefix(\`/dashboard\`)" \
+    -l "traefik.http.routers.dashboard.entrypoints=websecure" \
+    -l "traefik.http.routers.dashboard.tls=true" \
+    -l "traefik.http.middlewares.dashboard-strip.stripprefix.prefixes=/dashboard" \
+    -l "traefik.http.routers.dashboard.middlewares=dashboard-strip" \
+    "agency_stack/dashboard:latest" || {
+      log_error "Failed to start dashboard container"
+      return 1
     }
-  }]
-};
-EOF
-  
-  # Stop any existing dashboard process
-  if pm2 list | grep -q "agencystack-dashboard"; then
-    log_info "Stopping existing dashboard process..."
-    pm2 stop agencystack-dashboard || true
-    pm2 delete agencystack-dashboard || true
-  fi
-  
-  # Start the dashboard process
-  log_info "Starting dashboard process with pm2..."
-  cd "${DASHBOARD_DIR}" || return 1
-  pm2 start ecosystem.config.js || {
-    log_error "Failed to start dashboard process"
-    return 1
-  }
-  
-  # Save the pm2 process list so it survives reboots
-  log_info "Saving pm2 process list..."
-  pm2 save || {
-    log_warning "Failed to save pm2 process list, dashboard may not auto-start after reboot"
-  }
-  
-  # Set up pm2 to start on boot
-  log_info "Setting up pm2 to start on boot..."
-  pm2 startup || {
-    log_warning "Failed to set up pm2 startup, dashboard may not auto-start after reboot"
-  }
-  
-  log_success "Process manager setup complete"
-  return 0
+
+  log_success "Dashboard container started successfully"
+  log_info "Dashboard will be available at: https://${DOMAIN}/dashboard"
 }
 
 # Configure reverse proxy with Traefik
 configure_reverse_proxy() {
-  log_info "Configuring reverse proxy"
-  
-  # Check if Traefik is installed
-  if [[ -d "/opt/agency_stack/apps/traefik" ]]; then
-    local traefik_dir="/opt/agency_stack/apps/traefik"
-  elif [[ -n "$CLIENT_ID" && -d "/opt/agency_stack/clients/${CLIENT_ID}/apps/traefik" ]]; then
-    local traefik_dir="/opt/agency_stack/clients/${CLIENT_ID}/apps/traefik"
-  else
-    # Try to create the directory if it doesn't exist
-    local traefik_dir="/opt/agency_stack/apps/traefik"
-    sudo mkdir -p "${traefik_dir}/conf.d"
-    if [[ ! -d "${traefik_dir}/conf.d" ]]; then
-      log_warning "Could not create Traefik config directory, skipping reverse proxy configuration"
-      log_info "You may need to manually configure your reverse proxy to forward traffic to the dashboard"
-      log_info "The dashboard is running on port ${DASHBOARD_PORT}"
-      return 0
-    fi
-  fi
-  
-  # Create dashboard.toml file for Traefik
-  local dashboard_domain="${DOMAIN}"
-  
-  mkdir -p "${traefik_dir}/conf.d"
-  cat > "${traefik_dir}/conf.d/dashboard.toml" <<EOF
-[http.routers.dashboard]
-  rule = "Host(\`${dashboard_domain}\`) && PathPrefix(\`/dashboard\`)"
-  entryPoints = ["websecure"]
-  service = "dashboard"
-  middlewares = ["dashboard-stripprefix"]
-  [http.routers.dashboard.tls]
-    certResolver = "letsencrypt"
-
-[http.services.dashboard]
-  [http.services.dashboard.loadBalancer]
-    [[http.services.dashboard.loadBalancer.servers]]
-      url = "http://127.0.0.1:${DASHBOARD_PORT}"
-
-[http.middlewares.dashboard-stripprefix.stripPrefix]
-  prefixes = ["/dashboard"]
-EOF
-
-  # Check if the Traefik service is running and reload if it is
-  if docker ps | grep -q "traefik"; then
-    log_info "Reloading Traefik configuration"
-    docker kill --signal=HUP $(docker ps | grep "traefik" | awk '{print $1}') 2>/dev/null || true
-  fi
-  
-  # Alternatively, if Traefik is running as a systemd service
-  if systemctl is-active --quiet traefik.service; then
-    log_info "Reloading Traefik service"
-    systemctl reload traefik.service 2>/dev/null || true
-  fi
-  
-  log_info "Reverse proxy configuration complete"
+  log_info "Dashboard is now directly configured with Traefik via Docker labels"
+  log_success "Reverse proxy configuration completed"
   return 0
 }
 
@@ -481,12 +416,6 @@ main() {
   # Generate environment config
   generate_env_config || {
     log_error "Failed to generate environment configuration"
-    return 1
-  }
-  
-  # Build dashboard
-  build_dashboard || {
-    log_error "Failed to build dashboard application"
     return 1
   }
   
