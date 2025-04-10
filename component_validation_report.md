@@ -1,5 +1,5 @@
 # AgencyStack Component Validation Report
-Generated: 2025-04-10 03:07:14
+Generated: 2025-04-10 08:29:04
 
 ## Summary
 
@@ -9,7 +9,7 @@ Generated: 2025-04-10 03:07:14
 ✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `backup_strategy.md`
-⚠️ Documentation missing sections: Usage
+✅ Documentation contains all recommended sections
 #### Makefile Targets
 ✅ Target `backup-strategy` exists
 ✅ Target `backup-strategy-status` exists
@@ -18,14 +18,14 @@ Generated: 2025-04-10 03:07:14
 ✅ All Makefile targets present for backup_strategy
 #### Registry Entry
 ✅ Component registered in component_registry.json
-⚠️ backup_strategy had issues, some remain unfixed
+✅ backup_strategy passed all validation checks
 ## builderio
 #### Component Script
 ✅ Component script exists: `install_builderio.sh`
 ⚠️ Script may not implement proper idempotence
 #### Documentation
 ✅ Documentation exists: `builderio.md`
-⚠️ Documentation missing sections: Usage
+✅ Documentation contains all recommended sections
 #### Makefile Targets
 ✅ Target `builderio` exists
 ✅ Target `builderio-status` exists
@@ -41,7 +41,7 @@ Generated: 2025-04-10 03:07:14
 ⚠️ Script may not implement proper idempotence
 #### Documentation
 ✅ Documentation exists: `calcom.md`
-⚠️ Documentation missing sections: Usage
+✅ Documentation contains all recommended sections
 #### Makefile Targets
 ✅ Target `calcom` exists
 ✅ Target `calcom-status` exists
@@ -57,7 +57,7 @@ Generated: 2025-04-10 03:07:14
 ✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `chatwoot.md`
-⚠️ Documentation missing sections: Usage
+✅ Documentation contains all recommended sections
 #### Makefile Targets
 ✅ Target `chatwoot` exists
 ✅ Target `chatwoot-status` exists
@@ -66,14 +66,14 @@ Generated: 2025-04-10 03:07:14
 ✅ All Makefile targets present for chatwoot
 #### Registry Entry
 ✅ Component registered in component_registry.json
-⚠️ chatwoot had issues, some remain unfixed
+✅ chatwoot passed all validation checks
 ## crowdsec
 #### Component Script
 ✅ Component script exists: `install_crowdsec.sh`
 ⚠️ Script may not implement proper idempotence
 #### Documentation
 ✅ Documentation exists: `crowdsec.md`
-⚠️ Documentation missing sections: Usage
+✅ Documentation contains all recommended sections
 #### Makefile Targets
 ✅ Target `crowdsec` exists
 ✅ Target `crowdsec-status` exists
@@ -136,7 +136,7 @@ Generated: 2025-04-10 03:07:14
 ⚠️ Script may not implement proper idempotence
 #### Documentation
 ✅ Documentation exists: `documenso.md`
-⚠️ Documentation missing sections: Usage
+✅ Documentation contains all recommended sections
 #### Makefile Targets
 ✅ Target `documenso` exists
 ✅ Target `documenso-status` exists
@@ -280,7 +280,7 @@ Generated: 2025-04-10 03:07:14
 ✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `grafana.md`
-⚠️ Documentation missing sections: Usage
+✅ Documentation contains all recommended sections
 #### Makefile Targets
 ✅ Target `grafana` exists
 ✅ Target `grafana-status` exists
@@ -289,7 +289,7 @@ Generated: 2025-04-10 03:07:14
 ✅ All Makefile targets present for grafana
 #### Registry Entry
 ✅ Component registered in component_registry.json
-⚠️ grafana had issues, some remain unfixed
+✅ grafana passed all validation checks
 ## keycloak
 #### Component Script
 ✅ Component script exists: `install_keycloak.sh`
@@ -424,7 +424,7 @@ Generated: 2025-04-10 03:07:14
 ⚠️ Script may not implement proper idempotence
 #### Documentation
 ✅ Documentation exists: `portainer.md`
-⚠️ Documentation missing sections: Usage
+✅ Documentation contains all recommended sections
 #### Makefile Targets
 ✅ Target `portainer` exists
 ✅ Target `portainer-status` exists
@@ -579,5 +579,5 @@ Generated: 2025-04-10 03:07:14
 ⚠️ wordpress had issues, some remain unfixed
 ## Summary
 - **Total components**: 41
-- **Passed validation**: 8
-- **Failed validation**: 33
+- **Passed validation**: 11
+- **Failed validation**: 30
