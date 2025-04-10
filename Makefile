@@ -2543,3 +2543,74 @@ traefik-check-ports:
 	read -p "$(YELLOW)Enter client ID (default: default):$(RESET) " CLIENT_ID_INPUT; \
 	CLIENT_ID="$${CLIENT_ID_INPUT:-default}"; \
 	sudo $(SCRIPTS_DIR)/components/fix_traefik_ports.sh --domain "$${DOMAIN}" --client-id "$${CLIENT_ID}" --check-only $(if $(VERBOSE),--verbose,)
+
+# Auto-generated target for keycloak
+keycloak:
+	@echo "🔑 Installing Keycloak SSO & Identity provider..."
+	@sudo $(SCRIPTS_DIR)/components/install_keycloak.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+# Auto-generated target for keycloak
+keycloak-status:
+	@echo "🔍 Checking Keycloak status..."
+	@sudo docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep -E "keycloak|postgres"
+
+# Auto-generated target for keycloak
+keycloak-logs:
+	@echo "📋 Viewing Keycloak logs..."
+	@sudo docker logs --tail=100 -f keycloak_$(subst .,_,$(DOMAIN))
+
+# Auto-generated target for keycloak
+keycloak-restart:
+	@echo "🔄 Restarting Keycloak services..."
+	@cd /opt/agency_stack/keycloak/$(DOMAIN) && sudo docker-compose restart
+
+# SSO Integration targets
+sso-integrate:
+	@echo "🔒 Integrating component with Keycloak SSO..."
+	@if [ -z "$(COMPONENT)" ]; then \
+		echo "Error: COMPONENT parameter is required. Usage: make sso-integrate COMPONENT=name FRAMEWORK=nodejs COMPONENT_URL=https://example.com"; \
+		exit 1; \
+	fi
+	@if [ -z "$(FRAMEWORK)" ]; then \
+		echo "Error: FRAMEWORK parameter is required. Valid options: nodejs, python, docker"; \
+		exit 1; \
+	fi
+	@if [ -z "$(COMPONENT_URL)" ]; then \
+		echo "Error: COMPONENT_URL parameter is required."; \
+		exit 1; \
+	fi
+	@sudo $(SCRIPTS_DIR)/components/implement_sso_integration.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) --client-id $(CLIENT_ID) --component $(COMPONENT) --framework $(FRAMEWORK) --component-url $(COMPONENT_URL) $(if $(FORCE),--force,) $(if $(VERBOSE),--verbose,)
+
+sso-status:
+	@echo "🔍 Checking SSO integration status for components..."
+	@echo "Components with SSO enabled:"
+	@grep -B 5 -A 3 '"sso": true' $(CONFIG_DIR)/registry/component_registry.json | grep '"name":' | awk -F'"' '{print $$4}' | sort | uniq
+	@echo ""
+	@echo "Components with SSO configured:"
+	@grep -B 10 -A 3 '"sso_configured": true' $(CONFIG_DIR)/registry/component_registry.json 2>/dev/null | grep '"name":' | awk -F'"' '{print $$4}' | sort | uniq || echo "None configured yet"
+
+# Add SSO integration for specific components
+%-sso:
+	@echo "🔒 Integrating $(subst -sso,,$@) with Keycloak SSO..."
+	@component=$(subst -sso,,$@); \
+	if grep -q "\"name\": \"$$component\"" $(CONFIG_DIR)/registry/component_registry.json && grep -q -A 20 "\"name\": \"$$component\"" $(CONFIG_DIR)/registry/component_registry.json | grep -q "\"sso\": true"; then \
+		framework="docker"; \
+		if [ "$$component" = "peertube" ] || [ "$$component" = "gitea" ] || [ "$$component" = "n8n" ]; then framework="nodejs"; fi; \
+		if [ "$$component" = "django" ] || [ "$$component" = "grafana" ]; then framework="python"; fi; \
+		$(MAKE) sso-integrate COMPONENT=$$component FRAMEWORK=$$framework COMPONENT_URL=https://$$component.$(DOMAIN); \
+	else \
+		echo "Component $$component does not exist or is not SSO-enabled in the registry"; \
+		exit 1; \
+	fi
+
+# Implement SSO for all components marked with sso: true
+sso-integrate-all:
+	@echo "🔒 Integrating all SSO-enabled components with Keycloak..."
+	@for component in $$(grep -B 5 -A 3 '"sso": true' $(CONFIG_DIR)/registry/component_registry.json | grep '"name":' | awk -F'"' '{print $$4}' | sort | uniq); do \
+		echo "Integrating $$component..."; \
+		framework="docker"; \
+		if [ "$$component" = "peertube" ] || [ "$$component" = "gitea" ] || [ "$$component" = "n8n" ]; then framework="nodejs"; fi; \
+		if [ "$$component" = "django" ] || [ "$$component" = "grafana" ]; then framework="python"; fi; \
+		$(MAKE) sso-integrate COMPONENT=$$component FRAMEWORK=$$framework COMPONENT_URL=https://$$component.$(DOMAIN) || true; \
+		echo ""; \
+	done
