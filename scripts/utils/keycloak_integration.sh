@@ -21,6 +21,39 @@ KEYCLOAK_INTEGRATION_LOG="${KEYCLOAK_LOG_DIR}/keycloak_integration.log"
 # Ensure the log directory exists
 mkdir -p "${KEYCLOAK_LOG_DIR}" 2>/dev/null || true
 
+# Check for required dependencies
+check_dependencies() {
+  log_info "Checking for required dependencies..."
+  
+  # Check for jq (required for JSON processing)
+  if ! command -v jq &>/dev/null; then
+    log_error "jq is not installed. Installing jq..."
+    apt-get update && apt-get install -y jq || {
+      log_error "Failed to install jq. Please install it manually with: sudo apt-get install jq"
+      return 1
+    }
+  fi
+  
+  # Check for curl (required for API calls)
+  if ! command -v curl &>/dev/null; then
+    log_error "curl is not installed. Installing curl..."
+    apt-get update && apt-get install -y curl || {
+      log_error "Failed to install curl. Please install it manually with: sudo apt-get install curl"
+      return 1
+    }
+  fi
+  
+  # Check for docker (required for Keycloak container)
+  if ! command -v docker &>/dev/null; then
+    log_error "Docker is not installed. Please install Docker first."
+    log_info "You can install Docker with: sudo make docker"
+    return 1
+  fi
+  
+  log_success "All required dependencies are installed"
+  return 0
+}
+
 # Check if Keycloak is installed and available
 keycloak_is_available() {
   local domain="$1"
@@ -463,6 +496,12 @@ integrate_with_keycloak() {
     return 1
   fi
   
+  # Check for required dependencies
+  if ! check_dependencies; then
+    log_error "Missing required dependencies. Please install them first."
+    return 1
+  fi
+  
   # Create a realm for this client if needed
   local realm="${component}"
   local display_name="${component^}"
@@ -507,3 +546,4 @@ export -f keycloak_register_client
 export -f store_keycloak_credentials
 export -f generate_keycloak_integration_code
 export -f integrate_with_keycloak
+export -f check_dependencies
