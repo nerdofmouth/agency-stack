@@ -272,6 +272,14 @@ setup_dashboard_container() {
     docker rm "dashboard_${CLIENT_ID}" >/dev/null 2>&1 || true
   fi
 
+  # Stop any existing PM2 dashboard process to free up port 3000
+  if command -v pm2 &>/dev/null && pm2 list | grep -q "agencystack-dashboard"; then
+    log_info "Stopping existing PM2 dashboard process..."
+    pm2 stop agencystack-dashboard >/dev/null 2>&1 || true
+    pm2 delete agencystack-dashboard >/dev/null 2>&1 || true
+    sleep 2
+  fi
+
   # Create a simple nginx container to serve the Next.js dashboard
   log_info "Creating dashboard container with Nginx..."
   
