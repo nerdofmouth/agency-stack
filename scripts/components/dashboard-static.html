@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>AgencyStack Dashboard</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      line-height: 1.6;
+      color: #333;
+      background-color: #f9f9f9;
+    }
+    h1 {
+      color: #2c3e50;
+      border-bottom: 2px solid #3498db;
+      padding-bottom: 10px;
+    }
+    .status-card {
+      background: #fff;
+      border-left: 4px solid #4CAF50;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 4px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .running {
+      border-left-color: #4CAF50;
+    }
+    .error {
+      border-left-color: #F44336;
+    }
+    .stopped {
+      border-left-color: #FFC107;
+    }
+    .access-methods {
+      background: #eef7fa;
+      padding: 15px;
+      border-radius: 5px;
+      margin-top: 30px;
+    }
+    .logo {
+      max-width: 200px;
+      margin-bottom: 20px;
+    }
+    .timestamp {
+      font-size: 0.8em;
+      color: #7f8c8d;
+      margin-top: 40px;
+    }
+  </style>
+</head>
+<body>
+  <h1>AgencyStack Dashboard</h1>
+  <p><strong>Agency Stack Alpha Test Environment</strong></p>
+  <p>Current domain: proto001.alpha.nerdofmouth.com</p>
+  <p>Client ID: default</p>
+  
+  <div class="status-card running">
+    <h3>Traefik</h3>
+    <p>Status: Running</p>
+    <p>Ports: 80, 443</p>
+  </div>
+  
+  <div class="status-card running">
+    <h3>Keycloak</h3>
+    <p>Status: Running</p>
+    <p>SSO Provider Ready</p>
+  </div>
+  
+  <div class="status-card running">
+    <h3>Dashboard</h3>
+    <p>Status: Running</p>
+    <p>UI Version: Alpha 0.1</p>
+  </div>
+
+  <div class="access-methods">
+    <h3>Access Methods</h3>
+    <p>This dashboard can be accessed via:</p>
+    <ul>
+      <li>FQDN Root: <a href="http://proto001.alpha.nerdofmouth.com">http://proto001.alpha.nerdofmouth.com</a></li>
+      <li>FQDN Path: <a href="http://proto001.alpha.nerdofmouth.com/dashboard">http://proto001.alpha.nerdofmouth.com/dashboard</a></li>
+      <li>Direct IP: <a href="http://192.64.72.162:3001">http://192.64.72.162:3001</a></li>
+    </ul>
+  </div>
+  
+  <p class="timestamp">Generated: April 10, 2025 at 12:30 PM</p>
+</body>
+</html>
