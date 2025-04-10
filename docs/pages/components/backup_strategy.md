@@ -70,6 +70,66 @@ EXCLUDE_PATTERNS=**/.git,**/node_modules,**/tmp,**/temp,**/cache
 NOTIFICATION_EMAIL=admin@example.com
 ```
 
+## Usage
+
+### Performing Manual Backups
+
+To manually initiate a backup of all components:
+
+```bash
+# Full system backup
+make backup-all
+
+# Backup specific component
+make <component>-backup
+```
+
+### Scheduling Regular Backups
+
+Backups are scheduled via the system crontab and run automatically according to the configured schedule.
+
+To view or modify the backup schedule:
+
+```bash
+# View current backup schedule
+sudo crontab -l | grep backup
+
+# Edit backup schedule (expert mode)
+sudo crontab -e
+```
+
+### Restore from Backup
+
+To restore a component from backup:
+
+```bash
+# List available backups
+make backup-list
+
+# Restore a specific backup
+make <component>-restore BACKUP_DATE=YYYYMMDD
+```
+
+### Backup Verification
+
+Verify the integrity of backups:
+
+```bash
+# Verify all backups
+make backup-verify
+
+# Verify specific component backup
+make <component>-backup-verify
+```
+
+### Backup Rotation
+
+Backup rotation is handled automatically according to the retention policy:
+- Daily backups: retained for 7 days
+- Weekly backups: retained for 4 weeks
+- Monthly backups: retained for 12 months
+- Yearly backups: retained indefinitely
+
 ## Logs
 
 Logs are stored in two locations:
