@@ -207,7 +207,13 @@ setup_repository() {
 prepare_directories() {
     log "INFO" "Preparing required directories..."
     
-    execute_cmd "cd ${INSTALL_DIR}/repo && make prep-dirs" "Creating required directories"
+    # Use the repository's utilities instead of non-existent targets
+    execute_cmd "sudo mkdir -p /opt/agency_stack/clients/${CLIENT_ID}" "Creating client directory"
+    execute_cmd "sudo mkdir -p /var/log/agency_stack/components" "Creating log directory"
+    
+    # Set permissions
+    execute_cmd "sudo chown -R $(id -u):$(id -g) /opt/agency_stack/clients/${CLIENT_ID}" "Setting directory permissions"
+    execute_cmd "sudo chown -R $(id -u):$(id -g) /var/log/agency_stack/components" "Setting log directory permissions"
     
     log "SUCCESS" "Directory preparation completed"
 }
