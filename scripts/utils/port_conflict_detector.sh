@@ -148,6 +148,7 @@ parse_ports_json() {
   # Extract port numbers only and ensure they are all numeric
   local ports_in_use=$(jq -r '.ports_in_use | keys[]' "$PORTS_FILE" 2>/dev/null)
   local numeric_ports=""
+  local non_numeric_count=0
   
   # Validate each port is numeric
   if [ -n "$ports_in_use" ]; then
@@ -155,11 +156,16 @@ parse_ports_json() {
       if [[ "$port" =~ ^[0-9]+$ ]]; then
         numeric_ports="$numeric_ports $port"
       else
+        non_numeric_count=$((non_numeric_count + 1))
         log "${YELLOW}Warning: Non-numeric port '$port' found in ports.json. Skipping.${NC}"
       fi
     done
   fi
   
+  # Report validation results
+  if [ "$non_numeric_count" -gt 0 ]; then
+    log "${YELLOW}Found and skipped $non_numeric_count non-numeric port entries in ports.json${NC}"
+  fi
   log "${BLUE}Found $(echo "$numeric_ports" | wc -w) valid ports registered in ports.json${NC}"
   
   # Return the ports as space-separated list
@@ -287,30 +293,33 @@ detect_port_conflicts() {
   # Check system ports
   local conflicts_found=false
   for port in $registered_ports; do
-    # Skip checking system ports if they're above the reserved threshold
-    if [ "$port" -gt "$RESERVED_PORTS_MIN" ]; then
-      if is_port_in_use_by_system "$port"; then
-        local service="${port_usage[$port]}"
-        log "${RED}❌ CONFLICT: Port $port used by service $service is also in use by the system${NC}"
-        conflicts_found=true
-        
-        # Suggest alternative port
-        if [ "$AUTO_FIX" = true ] || [ "$DRY_RUN" = false ]; then
-          local new_port=$(find_next_available_port 8000 9000 "$registered_ports")
-          if [ -n "$new_port" ]; then
-            log "${GREEN}✅ SOLUTION: Reassign service $service from port $port to port $new_port${NC}"
-            
-            if [ "$DRY_RUN" = false ] && [ "$AUTO_FIX" = true ]; then
-              reassign_port "$service" "$port" "$new_port" "System conflict"
-            elif [ "$DRY_RUN" = false ]; then
-              log "${YELLOW}Would you like to apply this port reassignment? (y/n)${NC}"
-              read -r apply_reassignment
-              if [[ "$apply_reassignment" =~ ^[Yy]$ ]]; then
+    # Validate port is numeric before comparisons
+    if [[ "$port" =~ ^[0-9]+$ ]]; then
+      # Skip checking system ports if they're above the reserved threshold
+      if [ "$port" -gt "$RESERVED_PORTS_MIN" ]; then
+        if is_port_in_use_by_system "$port"; then
+          local service="${port_usage[$port]}"
+          log "${RED}❌ CONFLICT: Port $port used by service $service is also in use by the system${NC}"
+          conflicts_found=true
+          
+          # Suggest alternative port
+          if [ "$AUTO_FIX" = true ] || [ "$DRY_RUN" = false ]; then
+            local new_port=$(find_next_available_port 8000 9000 "$registered_ports")
+            if [ -n "$new_port" ]; then
+              log "${GREEN}✅ SOLUTION: Reassign service $service from port $port to port $new_port${NC}"
+              
+              if [ "$DRY_RUN" = false ] && [ "$AUTO_FIX" = true ]; then
                 reassign_port "$service" "$port" "$new_port" "System conflict"
+              elif [ "$DRY_RUN" = false ]; then
+                log "${YELLOW}Would you like to apply this port reassignment? (y/n)${NC}"
+                read -r apply_reassignment
+                if [[ "$apply_reassignment" =~ ^[Yy]$ ]]; then
+                  reassign_port "$service" "$port" "$new_port" "System conflict"
+                fi
               fi
+            else
+              log "${RED}❌ ERROR: Could not find an available port for reassignment${NC}"
             fi
-          else
-            log "${RED}❌ ERROR: Could not find an available port for reassignment${NC}"
           fi
         fi
       fi
@@ -321,58 +330,69 @@ detect_port_conflicts() {
   local docker_ports=$(docker ps --format '{{.Ports}}' | grep -o '0.0.0.0:[0-9]*' | sed 's/0.0.0.0://' | sort -n | uniq)
   
   for port in $docker_ports; do
-    local count=$(docker ps --format '{{.Ports}}' | grep -o "0.0.0.0:$port" | wc -l)
-    if [ "$count" -gt 1 ]; then
-      log "${RED}❌ CONFLICT: Port $port is mapped to $count different containers${NC}"
-      conflicts_found=true
-      
-      # Get container names using this port
-      local containers=$(docker ps --format '{{.Names}}\t{{.Ports}}' | grep "0.0.0.0:$port" | cut -f1)
-      log "${YELLOW}⚠️ Containers using port $port:${NC}"
-      for container in $containers; do
-        log "   - $container"
-      done
-      
-      # If fixing conflicts, reassign all but the first container
-      if [ "$AUTO_FIX" = true ] || [ "$DRY_RUN" = false ]; then
-        # Get first container (we'll keep this one)
-        local first_container=$(echo "$containers" | head -n1)
-        log "${GREEN}✅ Keeping port $port for container $first_container${NC}"
+    # Validate port is numeric before comparisons
+    if [[ "$port" =~ ^[0-9]+$ ]]; then
+      local count=$(docker ps --format '{{.Ports}}' | grep -o "0.0.0.0:$port" | wc -l)
+      if [ "$count" -gt 1 ]; then
+        log "${RED}❌ CONFLICT: Port $port is mapped to $count different containers${NC}"
+        conflicts_found=true
         
-        # Reassign the rest
-        local remaining_containers=$(echo "$containers" | tail -n +2)
-        for container in $remaining_containers; do
-          # Get service name from container
-          local service=$(echo "$container" | sed 's/agency_stack_//' | sed 's/-/_/g')
-          
-          # Find an available port
-          local new_port=$(find_next_available_port 8000 9000 "$registered_ports")
-          
-          if [ -n "$new_port" ]; then
-            log "${GREEN}✅ SOLUTION: Reassign service $service from port $port to port $new_port${NC}"
-            
-            if [ "$DRY_RUN" = false ] && [ "$AUTO_FIX" = true ]; then
-              reassign_port "$service" "$port" "$new_port" "Container port collision"
-            elif [ "$DRY_RUN" = false ]; then
-              log "${YELLOW}Would you like to apply this port reassignment? (y/n)${NC}"
-              read -r apply_reassignment
-              if [[ "$apply_reassignment" =~ ^[Yy]$ ]]; then
-                reassign_port "$service" "$port" "$new_port" "Container port collision"
-              fi
-            fi
-          else
-            log "${RED}❌ ERROR: Could not find an available port for reassignment${NC}"
-          fi
+        # Get container names using this port
+        local containers=$(docker ps --format '{{.Names}}\t{{.Ports}}' | grep "0.0.0.0:$port" | cut -f1)
+        log "${YELLOW}⚠️ Containers using port $port:${NC}"
+        for container in $containers; do
+          log "   - $container"
         done
+        
+        # If fixing conflicts, reassign all but the first container
+        if [ "$AUTO_FIX" = true ] || [ "$DRY_RUN" = false ]; then
+          # Get first container (we'll keep this one)
+          local first_container=$(echo "$containers" | head -n1)
+          log "${GREEN}✅ Keeping port $port for container $first_container${NC}"
+          
+          # Reassign the rest
+          local remaining_containers=$(echo "$containers" | tail -n +2)
+          for container in $remaining_containers; do
+            # Get service name from container
+            local service=$(echo "$container" | sed 's/agency_stack_//' | sed 's/-/_/g')
+            
+            # Find an available port
+            local new_port=$(find_next_available_port 8000 9000 "$registered_ports")
+            
+            if [ -n "$new_port" ]; then
+              log "${GREEN}✅ SOLUTION: Reassign service $service from port $port to port $new_port${NC}"
+              
+              if [ "$DRY_RUN" = false ] && [ "$AUTO_FIX" = true ]; then
+                reassign_port "$service" "$port" "$new_port" "Container port collision"
+              elif [ "$DRY_RUN" = false ]; then
+                log "${YELLOW}Would you like to apply this port reassignment? (y/n)${NC}"
+                read -r apply_reassignment
+                if [[ "$apply_reassignment" =~ ^[Yy]$ ]]; then
+                  reassign_port "$service" "$port" "$new_port" "Container port collision"
+                fi
+              fi
+            else
+              log "${RED}❌ ERROR: Could not find an available port for reassignment${NC}"
+            fi
+          done
+        fi
       fi
     fi
   done
   
   if [ "$conflicts_found" = false ]; then
     log "${GREEN}✅ No port conflicts detected${NC}"
+  else
+    log "${YELLOW}⚠️ Port conflicts were found and addressed${NC}"
+    log "${YELLOW}⚠️ Review the suggested changes and run with --auto-fix to apply automatically${NC}"
   fi
   
-  return 0
+  # Return status
+  if [ "$conflicts_found" = true ]; then
+    return 1
+  else
+    return 0
+  fi
 }
 
 # Reassign a port
