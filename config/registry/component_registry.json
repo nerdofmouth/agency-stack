@@ -60,7 +60,7 @@
       "droneci": {
         "name": "DroneCI",
         "category": "Core Infrastructure",
-        "version": "2.16.0",
+        "version": "2.25.0",
         "integration_status": {
           "installed": true,
           "hardened": true,
