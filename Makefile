@@ -118,6 +118,7 @@ help:
 	@echo "  $(BOLD)make peertube-stop$(RESET)            Stop PeerTube"
 	@echo "  $(BOLD)make peertube-start$(RESET)           Start PeerTube"
 	@echo "  $(BOLD)make peertube-restart$(RESET)         Restart PeerTube"
+	@echo "  $(BOLD)make peertube-upgrade$(RESET)         Upgrade PeerTube to v7.0"
 
 # Install AgencyStack
 install: validate
@@ -939,6 +940,13 @@ peertube-reinstall:
 	@echo "$(MAGENTA)$(BOLD)🔄 Reinstalling PeerTube...$(RESET)"
 	@read -p "$(YELLOW)Enter domain for PeerTube (e.g., peertube.yourdomain.com):$(RESET) " DOMAIN; \
 	sudo $(SCRIPTS_DIR)/components/install_peertube.sh --domain $$DOMAIN --force
+
+peertube-upgrade:
+	@echo "$(MAGENTA)$(BOLD)🔄 Upgrading PeerTube to v7.0...$(RESET)"
+	@read -p "$(YELLOW)Enter domain for PeerTube (e.g., peertube.yourdomain.com):$(RESET) " DOMAIN; \
+	read -p "$(YELLOW)Enter admin email:$(RESET) " ADMIN_EMAIL; \
+	read -p "$(YELLOW)Enter client ID (optional):$(RESET) " CLIENT_ID; \
+	sudo $(SCRIPTS_DIR)/components/upgrade_peertube.sh --domain $$DOMAIN --admin-email $$ADMIN_EMAIL $(if $$CLIENT_ID,--client-id $$CLIENT_ID,) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
 peertube-status:
 	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking PeerTube status...$(RESET)"
@@ -2286,3 +2294,77 @@ demo-core-logs:
 	
 	@echo "$(GREEN)$(BOLD)✅ Logs Display Complete!$(RESET)"
 	@echo "$(CYAN)For detailed logs, use 'make <component>-logs' for specific components.$(RESET)"
+
+# Bolt DIY
+bolt-diy: validate
+	@echo "⚡ Installing Bolt DIY..."
+	@sudo $(SCRIPTS_DIR)/components/install_bolt_diy.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+bolt-diy-status:
+	@echo "ℹ️ Checking Bolt DIY Status..."
+	@if [ -n "$(CLIENT_ID)" ]; then \
+		BOLT_CONTAINER="$(CLIENT_ID)_bolt_diy"; \
+	else \
+		BOLT_CONTAINER="bolt_diy"; \
+	fi; \
+	if docker ps -f name=$$BOLT_CONTAINER | grep -q $$BOLT_CONTAINER; then \
+		echo "$(GREEN)Bolt DIY is running$(RESET)"; \
+	else \
+		echo "$(RED)Bolt DIY is not running$(RESET)"; \
+	fi
+
+bolt-diy-logs:
+	@echo "📜 Viewing Bolt DIY Logs..."
+	@if [ -f "/var/log/agency_stack/components/bolt_diy.log" ]; then \
+		tail -n 50 "/var/log/agency_stack/components/bolt_diy.log"; \
+	else \
+		echo "$(YELLOW)No Bolt DIY logs found$(RESET)"; \
+	fi
+
+bolt-diy-restart:
+	@echo "🔄 Restarting Bolt DIY..."
+	@if [ -f "$(SCRIPTS_DIR)/components/restart_bolt_diy.sh" ]; then \
+		$(SCRIPTS_DIR)/components/restart_bolt_diy.sh; \
+	else \
+		echo "Restart script not found. Trying standard methods..."; \
+		if [ -n "$(CLIENT_ID)" ]; then \
+			systemctl restart $(CLIENT_ID)-bolt-diy; \
+		else \
+			systemctl restart bolt-diy; \
+		fi; \
+	fi
+
+# Archon
+archon: validate
+	@echo "🧠 Installing Archon..."
+	@sudo $(SCRIPTS_DIR)/components/install_archon.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+archon-status:
+	@echo "ℹ️ Checking Archon Status..."
+	@if [ -n "$(CLIENT_ID)" ]; then \
+		ARCHON_CONTAINER="$(CLIENT_ID)_archon"; \
+	else \
+		ARCHON_CONTAINER="archon"; \
+	fi; \
+	if docker ps -f name=$$ARCHON_CONTAINER | grep -q $$ARCHON_CONTAINER; then \
+		echo "$(GREEN)Archon is running$(RESET)"; \
+	else \
+		echo "$(RED)Archon is not running$(RESET)"; \
+	fi
+
+archon-logs:
+	@echo "📜 Viewing Archon Logs..."
+	@if [ -f "/var/log/agency_stack/components/archon.log" ]; then \
+		tail -n 50 "/var/log/agency_stack/components/archon.log"; \
+	else \
+		echo "$(YELLOW)No Archon logs found$(RESET)"; \
+	fi
+
+archon-restart:
+	@echo "🔄 Restarting Archon..."
+	@if [ -f "$(SCRIPTS_DIR)/components/restart_archon.sh" ]; then \
+		$(SCRIPTS_DIR)/components/restart_archon.sh; \
+	else \
+		echo "Restart script not found. Trying standard methods..."; \
+		docker-compose -f "/opt/agency_stack/clients/$(CLIENT_ID)/archon/docker-compose.yml" restart; \
+	fi

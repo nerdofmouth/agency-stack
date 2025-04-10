@@ -54,6 +54,11 @@ For detailed Builder.io integration instructions, see our [Builder.io Integratio
 | **PostHog** | Open-source product analytics | https://analytics.yourdomain.com |
 | **WebPush** | Web push notification service | https://push.yourdomain.com |
 
+## AI Tools
+
+- [Bolt DIY](./components/bolt_diy.md) - DIY AI workflow automation platform
+- [Archon](./components/archon.md) - AI agent orchestration platform
+
 ## Integration
 
 | Component | Description | Default URL |

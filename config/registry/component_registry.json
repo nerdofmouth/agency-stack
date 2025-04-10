@@ -265,7 +265,7 @@
       "peertube": {
         "name": "PeerTube",
         "category": "Content Management",
-        "version": "5.1.0",
+        "version": "7.0.0",
         "integration_status": {
           "installed": true,
           "hardened": true,
@@ -537,12 +537,12 @@
       "listmonk": {
         "name": "Listmonk",
         "category": "Email & Communication",
-        "version": "v2.5.1",
+        "version": "4.1.0",
         "integration_status": {
           "installed": true,
           "hardened": true,
           "makefile": true,
-          "sso": false,
+          "sso": true,
           "dashboard": true,
           "logs": true,
           "docs": true,
