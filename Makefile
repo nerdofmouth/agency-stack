@@ -2459,3 +2459,36 @@ pgvector-test:
 		echo "❌ pgvector is not installed. Please run 'make pgvector' first."; \
 		exit 1; \
 	fi
+
+dashboard-direct:
+	@echo "$(MAGENTA)$(BOLD)🔗 Opening dashboard via direct access...$(RESET)"
+	@SERVER_IP=$$(hostname -I | awk '{print $$1}'); \
+	echo "$(CYAN)Dashboard Direct Access URLs:$(RESET)"; \
+	echo "$(GREEN)Main:       http://$${SERVER_IP}:3001$(RESET)"; \
+	echo "$(GREEN)Fallback:   http://$${SERVER_IP}:8080$(RESET)"; \
+	echo "$(GREEN)Guaranteed: http://$${SERVER_IP}:8888$(RESET)"; \
+	xdg-open "http://$${SERVER_IP}:8888" 2>/dev/null || echo "$(YELLOW)No browser available. Access manually using the URLs above.$(RESET)"
+
+dashboard-access:
+	@echo "$(MAGENTA)$(BOLD)🔧 Installing comprehensive dashboard access...$(RESET)"
+	@read -p "$(YELLOW)Enter domain (default: $${DOMAIN:-proto001.alpha.nerdofmouth.com}):$(RESET) " DOMAIN_INPUT; \
+	DOMAIN="$${DOMAIN_INPUT:-$${DOMAIN:-proto001.alpha.nerdofmouth.com}}"; \
+	read -p "$(YELLOW)Enter client ID (default: default):$(RESET) " CLIENT_ID_INPUT; \
+	CLIENT_ID="$${CLIENT_ID_INPUT:-default}"; \
+	sudo $(SCRIPTS_DIR)/components/install_dashboard_access.sh --domain "$${DOMAIN}" --client-id "$${CLIENT_ID}" $(if $(FORCE),--force,)
+
+dashboard-check:
+	@echo "$(MAGENTA)$(BOLD)🔍 Checking dashboard access methods...$(RESET)"
+	@read -p "$(YELLOW)Enter domain (default: $${DOMAIN:-proto001.alpha.nerdofmouth.com}):$(RESET) " DOMAIN_INPUT; \
+	DOMAIN="$${DOMAIN_INPUT:-$${DOMAIN:-proto001.alpha.nerdofmouth.com}}"; \
+	read -p "$(YELLOW)Enter client ID (default: default):$(RESET) " CLIENT_ID_INPUT; \
+	CLIENT_ID="$${CLIENT_ID_INPUT:-default}"; \
+	sudo $(SCRIPTS_DIR)/utils/dashboard_dns_helper.sh --domain "$${DOMAIN}" --client-id "$${CLIENT_ID}" $(if $(VERBOSE),--verbose,)
+
+dashboard-fix:
+	@echo "$(MAGENTA)$(BOLD)🛠️ Fixing dashboard access issues...$(RESET)"
+	@read -p "$(YELLOW)Enter domain (default: $${DOMAIN:-proto001.alpha.nerdofmouth.com}):$(RESET) " DOMAIN_INPUT; \
+	DOMAIN="$${DOMAIN_INPUT:-$${DOMAIN:-proto001.alpha.nerdofmouth.com}}"; \
+	read -p "$(YELLOW)Enter client ID (default: default):$(RESET) " CLIENT_ID_INPUT; \
+	CLIENT_ID="$${CLIENT_ID_INPUT:-default}"; \
+	sudo $(SCRIPTS_DIR)/utils/dashboard_dns_helper.sh --domain "$${DOMAIN}" --client-id "$${CLIENT_ID}" --fix $(if $(VERBOSE),--verbose,)
