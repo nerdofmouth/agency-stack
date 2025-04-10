@@ -850,3 +850,14 @@ make --dry-run target-name
 ```
 
 Remember: **Repository integrity is our highest priority.** Every change must be tracked, repeatable, and properly documented in the codebase.
+
+
+### 📌 Next Milestones to Track
+
+| Task | Status |
+| ---| --- |
+| `make demo-core` working on real VM | ✅ |
+| Keycloak + Traefik + HTTPS + Dashboard up | ✅ |
+| Dashboard status not yet live/updating | ⚠️ |
+| PostHog install issue | 🛠️ Queued |
+| Snapshot, doc export, and pilot testing prep | 🔜 |
