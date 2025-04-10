@@ -1,4 +1,7 @@
 #!/bin/bash
+# Source common utilities
+source "$(dirname "$0")/../utils/common.sh"
+        
 # install_prometheus.sh - Install and configure Prometheus monitoring for AgencyStack
 # [https://stack.nerdofmouth.com](https://stack.nerdofmouth.com)
 #
@@ -285,6 +288,9 @@ integration_log() {
 }
 
 # Success log
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
 log_success() {
   log "INFO" "$1" "${GREEN}$1${NC}"
 }
@@ -376,6 +382,9 @@ check_dependencies() {
     TRAEFIK_INSTALLED=true
   fi
   
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
   log_success "All dependencies are installed."
 }
 
@@ -401,6 +410,9 @@ create_directories() {
   chown -R root:root "$CONFIG_DIR"
   chmod -R 755 "$CONFIG_DIR"
   
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
   log_success "Directories created successfully."
 }
 
@@ -413,6 +425,9 @@ check_existing_installation() {
     if [ "$RESTART_SERVICES" = true ]; then
       log_info "Restarting Prometheus services..."
       cd "${COMPOSE_DIR}" && docker-compose -f docker-compose.prometheus.yml restart
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
       log_success "Prometheus services restarted successfully."
       exit 0
     else
@@ -436,6 +451,9 @@ generate_basic_auth() {
     docker run --rm -v "${auth_dir}:/auth" httpd:alpine htpasswd -bBc /auth/prometheus.htpasswd "$PROMETHEUS_USERNAME" "$PROMETHEUS_PASSWORD"
   fi
   
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
   log_success "Basic auth credentials generated."
   
   if [ "$GENERATED_PASSWORD" = true ]; then
@@ -599,6 +617,9 @@ groups:
       description: "{{ \$labels.instance }} of job {{ \$labels.job }} has been down for more than 5 minutes."
 EOF
 
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
   log_success "Prometheus configuration generated successfully."
 }
 
@@ -718,6 +739,9 @@ receivers:
 EOF
   fi
 
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
   log_success "AlertManager configuration generated successfully."
 }
 
@@ -886,6 +910,9 @@ networks:
 EOF
   fi
 
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
   log_success "Docker Compose configuration generated successfully."
 }
 
@@ -924,9 +951,15 @@ EOF
     chmod 600 "${PROMETHEUS_CONFIG_DIR}/ssl/prometheus.key"
     chmod 644 "${PROMETHEUS_CONFIG_DIR}/ssl/prometheus.crt"
     
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
     log_success "SSL certificate generated successfully."
   fi
   
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
   log_success "Web configuration generated successfully."
 }
 
@@ -977,6 +1010,9 @@ datasources:
   isDefault: true
   editable: false
 EOF
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
       log_success "Grafana datasource configuration created."
     else
       log_warning "Grafana provisioning directory not found. Manual datasource configuration will be needed."
@@ -995,6 +1031,9 @@ EOF
           "http://admin:admin@${GRAFANA_DOMAIN}/api/datasources" > /dev/null 2>&1
         
         if [ $? -eq 0 ]; then
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
           log_success "Grafana datasource configured via API."
         else
           log_warning "Failed to configure Grafana datasource via API. Manual configuration required."
@@ -1066,6 +1105,9 @@ prometheus-update: ## Update Prometheus to the latest version
 
 EOF
   
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
   log_success "Makefile targets added successfully."
 }
 
@@ -1086,6 +1128,9 @@ update_system_config() {
       ufw allow 9091/tcp comment "Prometheus Pushgateway"
     fi
     
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
     log_success "Firewall rules updated."
   fi
   
@@ -1119,6 +1164,9 @@ EOF
         
         # Restart Docker to apply changes
         systemctl restart docker
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
         log_success "Docker metrics enabled. Docker restarted."
       fi
     else
@@ -1131,6 +1179,9 @@ EOF
 }
 EOF
       systemctl restart docker
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
       log_success "Docker metrics configuration created. Docker restarted."
     fi
   fi
@@ -1179,6 +1230,9 @@ main() {
     
     # Check if services started successfully
     if docker ps | grep -q "${COMPOSE_PROJECT_NAME}_prometheus"; then
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
       log_success "Prometheus services started successfully."
     else
       log_error "Failed to start Prometheus services. Check logs for details."
@@ -1190,34 +1244,79 @@ main() {
   fi
   
   # Show access information
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
   log_success "======================================================"
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
   log_success "AgencyStack Prometheus Installation Completed"
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
   log_success "======================================================"
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
   log_success "Access Prometheus:      https://${DOMAIN}"
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
   log_success "Access AlertManager:    https://alerts.${DOMAIN}"
   
   if [ "$INCLUDE_PUSHGATEWAY" = true ]; then
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
     log_success "Access Pushgateway:     https://push.${DOMAIN}"
   fi
   
   if [ "$INSTALL_GRAFANA" = true ] || [ -n "$GRAFANA_DOMAIN" ]; then
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
     log_success "Access Grafana:         https://${GRAFANA_DOMAIN:-grafana.$DOMAIN}"
   fi
   
   if [ "$SECURE_MODE" = true ]; then
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
     log_success "Username:               ${PROMETHEUS_USERNAME}"
     
     if [ "$GENERATED_PASSWORD" = true ]; then
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
       log_success "Password:               ${PROMETHEUS_PASSWORD}"
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
       log_success "Password saved to:      ${PROMETHEUS_CONFIG_DIR}/auth/prometheus.password"
     else
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
       log_success "Password:               <as provided>"
     fi
   fi
   
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
   log_success "Configuration:          ${PROMETHEUS_CONFIG_DIR}"
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
   log_success "Data Directory:         ${PROMETHEUS_DATA_DIR}"
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
   log_success "Docker Compose File:    ${COMPOSE_DIR}/docker-compose.prometheus.yml"
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
   log_success "======================================================"
   
   # Register component with AgencyStack
@@ -1230,6 +1329,9 @@ main() {
       --version "${PROMETHEUS_VERSION}" \
       --install-date "$(date +%Y-%m-%d)"
     
+    # Mark component as installed
+    mark_installed "prometheus" "${COMPONENT_DIR}"
+        
     log_success "Prometheus registered with AgencyStack."
   fi
   

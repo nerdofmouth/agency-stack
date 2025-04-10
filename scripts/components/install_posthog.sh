@@ -1,4 +1,7 @@
 #!/bin/bash
+# Source common utilities
+source "$(dirname "$0")/../utils/common.sh"
+        
 # install_posthog.sh - Install and configure PostHog analytics for AgencyStack
 # https://stack.nerdofmouth.com
 #

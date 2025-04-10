@@ -1,4 +1,7 @@
 #!/bin/bash
+# Source common utilities
+source "$(dirname "$0")/../utils/common.sh"
+        
 # install_voip.sh - Install and configure VoIP for AgencyStack
 # https://stack.nerdofmouth.com
 #

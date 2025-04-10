@@ -33,4 +33,7 @@ mkdir -p "${LOG_DIR}"
 # Installation logic
 # [COMPONENT-SPECIFIC INSTALLATION STEPS GO HERE]
 
+    # Mark component as installed
+    mark_installed "calcom" "${COMPONENT_DIR}"
+        
 log_success "calcom installation completed successfully!"
