@@ -221,10 +221,38 @@ install_prerequisites() {
     log "SUCCESS" "Prerequisites installation completed"
 }
 
+# Function to ensure Makefile target naming consistency
+check_makefile_targets() {
+    log "INFO" "Verifying Makefile target naming consistency..."
+    
+    # Check for key Makefile targets used by demo-core
+    local makefile_path="${INSTALL_DIR}/repo/Makefile"
+    local demo_targets_path="${INSTALL_DIR}/repo/demo-core-targets.mk"
+    
+    # Ensure all targets use dash-based naming, not underscores
+    execute_cmd "cd ${INSTALL_DIR}/repo && grep -l 'docker_compose' --include=\"*.mk\" --include=\"Makefile\" . | xargs -r sed -i 's/docker_compose/docker-compose/g'" "Fixing docker_compose target names" false
+    execute_cmd "cd ${INSTALL_DIR}/repo && grep -l 'traefik_ssl' --include=\"*.mk\" --include=\"Makefile\" . | xargs -r sed -i 's/traefik_ssl/traefik/g'" "Fixing traefik_ssl target names" false
+    
+    # Verify demo-core target is correctly defined
+    if ! grep -q "^demo-core:" "$demo_targets_path" 2>/dev/null; then
+        log "ERROR" "demo-core target not defined in $demo_targets_path"
+        return 1
+    fi
+    
+    log "SUCCESS" "Makefile target naming consistency verified"
+}
+
 # Function to install core components
 install_core_components() {
     log "INFO" "Installing core components..."
     
+    # First check makefile target naming consistency
+    check_makefile_targets
+    
+    # Create Docker network if it doesn't exist
+    execute_cmd "docker network ls | grep -q agency_stack_network || docker network create agency_stack_network" "Creating Docker network" false
+    
+    # Run demo-core target with appropriate parameters
     execute_cmd "cd ${INSTALL_DIR}/repo && sudo make demo-core DOMAIN=$DOMAIN ADMIN_EMAIL=$ADMIN_EMAIL CLIENT_ID=$CLIENT_ID" "Installing demo-core components"
     
     log "SUCCESS" "Core components installation completed"
