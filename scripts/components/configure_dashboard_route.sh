@@ -73,7 +73,7 @@ http:
     dashboard:
       loadBalancer:
         servers:
-          - url: "http://dashboard_${CLIENT_ID}:3000"
+          - url: "http://dashboard_${CLIENT_ID}:80"
 
   middlewares:
     dashboard-strip:
