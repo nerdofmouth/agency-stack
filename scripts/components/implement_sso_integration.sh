@@ -147,21 +147,30 @@ fi
 # Helper function to check if component is SSO-enabled
 is_sso_enabled() {
   local component="$1"
-  local registry_file="${ROOT_DIR}/config/registry/component_registry.json"
+  local registry_file="/opt/agency_stack/repo/config/registry/component_registry.json"
   
   if [ ! -f "$registry_file" ]; then
     log_error "Component registry file not found: $registry_file"
     return 1
   fi
   
-  # Search for the component and check if sso is true
-  local sso_enabled=$(grep -A 20 "\"name\": \"$component\"" "$registry_file" | grep -A 3 "\"flags\"" | grep "\"sso\": true" | wc -l)
+  # Get the section for this component - looking for both array and object formats
+  # The component registry has evolved and may have either format
+  local component_section=$(grep -A 30 "\"$component\"" "$registry_file" | grep -A 30 -B 5 "integration_status\|flags")
   
-  if [ "$sso_enabled" -eq 0 ]; then
+  if [ -z "$component_section" ]; then
+    log_error "Component $component not found in registry"
     return 1
   fi
   
-  return 0
+  # Check if SSO is enabled in this component
+  if echo "$component_section" | grep -q "\"sso\": *true"; then
+    log_info "Component $component is SSO-enabled"
+    return 0
+  else
+    log_error "Component $component is not SSO-enabled in registry"
+    return 1
+  fi
 }
 
 # Helper function to update component registry to set sso_configured flag
