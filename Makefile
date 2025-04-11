@@ -2748,52 +2748,77 @@ traefik-restart:
 
 # Dashboard Component - installation & management
 # -------------------------------------------------------------------------------
-install-dashboard: validate
-	@echo "$(MAGENTA)$(BOLD)📊 Installing AgencyStack Dashboard...$(RESET)"
+dashboard: validate
+	@echo "$(MAGENTA)$(BOLD)🖥️  Installing Dashboard...$(RESET)"
+	@read -p "$(YELLOW)Use host network mode? (true/false, default: true):$(RESET) " USE_HOST_NETWORK; \
+	USE_HOST_NETWORK="$${USE_HOST_NETWORK:-true}"; \
+	read -p "$(YELLOW)Enable Keycloak SSO integration? (true/false, default: false):$(RESET) " ENABLE_KEYCLOAK; \
+	ENABLE_KEYCLOAK="$${ENABLE_KEYCLOAK:-false}"; \
+	read -p "$(YELLOW)Enforce HTTPS? (true/false, default: false):$(RESET) " ENFORCE_HTTPS; \
+	ENFORCE_HTTPS="$${ENFORCE_HTTPS:-false}"; \
+	echo "$(CYAN)Using network mode: $${USE_HOST_NETWORK}$(RESET)"; \
+	echo "$(CYAN)Keycloak SSO integration: $${ENABLE_KEYCLOAK}$(RESET)"; \
+	echo "$(CYAN)HTTPS enforcement: $${ENFORCE_HTTPS}$(RESET)"; \
+	EXTRA_ARGS=""; \
+	if [ "$${ENABLE_KEYCLOAK}" = "true" ]; then EXTRA_ARGS="$${EXTRA_ARGS} --enable-keycloak"; fi; \
+	if [ "$${ENFORCE_HTTPS}" = "true" ]; then EXTRA_ARGS="$${EXTRA_ARGS} --enforce-https"; fi; \
+	sudo $(SCRIPTS_DIR)/components/install_dashboard.sh --domain $(DOMAIN) --use-host-network=$${USE_HOST_NETWORK} $${EXTRA_ARGS} $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+# Dashboard with SSO integration
+dashboard-sso: validate
+	@echo "$(MAGENTA)$(BOLD)🖥️  Installing Dashboard with Keycloak SSO integration...$(RESET)"
 	@read -p "$(YELLOW)Use host network mode? (true/false, default: true):$(RESET) " USE_HOST_NETWORK; \
 	USE_HOST_NETWORK="$${USE_HOST_NETWORK:-true}"; \
 	echo "$(CYAN)Using network mode: $${USE_HOST_NETWORK}$(RESET)"; \
-	sudo $(SCRIPTS_DIR)/components/install_dashboard.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) --use-host-network=$${USE_HOST_NETWORK} $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(ENABLE_KEYCLOAK),--enable-keycloak,)
+	echo "$(CYAN)Keycloak SSO integration: enabled$(RESET)"; \
+	echo "$(CYAN)HTTPS enforcement: enabled$(RESET)"; \
+	sudo $(SCRIPTS_DIR)/components/install_dashboard.sh --domain $(DOMAIN) --use-host-network=$${USE_HOST_NETWORK} --enable-keycloak --enforce-https $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
-install-dashboard-status:
+# Auto-generated target for dashboard
+dashboard-status:
 	@echo "$(MAGENTA)$(BOLD)🔍 Checking Dashboard Status...$(RESET)"
 	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/apps/dashboard/.installed_ok" ]; then \
 		echo "$(GREEN)✅ Dashboard is installed$(RESET)"; \
-		if pm2 list | grep -q "dashboard"; then \
-			echo "$(GREEN)✅ Dashboard service is running$(RESET)"; \
-			pm2 info dashboard; \
+		ps aux | grep -v grep | grep -q "dashboard" && echo "$(GREEN)✅ Dashboard process is running$(RESET)" || echo "$(RED)❌ Dashboard process is not running$(RESET)"; \
+		echo ""; \
+		echo "$(CYAN)SSO Status:$(RESET)"; \
+		if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/apps/dashboard/sso/.sso_configured" ]; then \
+			echo "$(GREEN)✅ SSO is configured$(RESET)"; \
 		else \
-			echo "$(RED)❌ Dashboard service is not running$(RESET)"; \
+			echo "$(YELLOW)⚠️ SSO is not configured$(RESET)"; \
+			echo "$(CYAN)To enable SSO, run: make dashboard-sso DOMAIN=$(DOMAIN)$(RESET)"; \
 		fi; \
 	else \
 		echo "$(RED)❌ Dashboard is not installed$(RESET)"; \
-		echo "$(CYAN)To install, run: make install-dashboard DOMAIN=$(DOMAIN)$(RESET)"; \
+		echo "$(CYAN)To install, run: make dashboard DOMAIN=$(DOMAIN)$(RESET)"; \
 		exit 1; \
 	fi
 
-install-dashboard-logs:
+# Auto-generated target for dashboard
+dashboard-logs:
 	@echo "$(MAGENTA)$(BOLD)📜 Viewing Dashboard Logs...$(RESET)"
-	@if [ -f "/var/log/agency_stack/components/dashboard.log" ]; then \
+	@if [ -f "/var/log/agency_stack/components/dashboard/dashboard.log" ]; then \
 		echo "$(CYAN)Installation logs:$(RESET)"; \
-		tail -n 20 /var/log/agency_stack/components/dashboard.log; \
+		tail -n 20 /var/log/agency_stack/components/dashboard/dashboard.log; \
 		echo ""; \
-		echo "$(CYAN)Service logs:$(RESET)"; \
-		if pm2 list | grep -q "dashboard"; then \
-			pm2 logs dashboard --lines 20; \
-		else \
-			echo "$(RED)Dashboard service is not running$(RESET)"; \
-		fi; \
+		echo "$(CYAN)Application logs:$(RESET)"; \
+		tail -n 20 /var/log/agency_stack/components/dashboard/app.log 2>/dev/null || echo "$(YELLOW)No application logs found.$(RESET)"; \
 	else \
 		echo "$(YELLOW)Dashboard logs not found.$(RESET)"; \
 	fi
 
-install-dashboard-restart:
+# Auto-generated target for dashboard
+dashboard-restart:
 	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Dashboard...$(RESET)"
-	@if pm2 list | grep -q "dashboard"; then \
-		pm2 restart dashboard; \
-		echo "$(GREEN)✅ Dashboard service has been restarted$(RESET)"; \
+	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/apps/dashboard/.installed_ok" ]; then \
+		echo "$(CYAN)Stopping dashboard process...$(RESET)"; \
+		pkill -f "node.*dashboard" || echo "$(YELLOW)No dashboard process found.$(RESET)"; \
+		sleep 2; \
+		echo "$(CYAN)Starting dashboard process...$(RESET)"; \
+		cd /opt/agency_stack/apps/dashboard && nohup npm start > /var/log/agency_stack/components/dashboard/app.log 2>&1 & \
+		echo "$(GREEN)✅ Dashboard has been restarted$(RESET)"; \
 	else \
-		echo "$(RED)❌ Dashboard service is not running$(RESET)"; \
-		echo "$(CYAN)To install, run: make install-dashboard DOMAIN=$(DOMAIN)$(RESET)"; \
+		echo "$(RED)❌ Dashboard is not installed$(RESET)"; \
+		echo "$(CYAN)To install, run: make dashboard DOMAIN=$(DOMAIN)$(RESET)"; \
 		exit 1; \
 	fi
