@@ -40,18 +40,28 @@ PeerTube enables your organization to host videos on your own infrastructure, pr
 - Docker and Docker Compose
 - Traefik configured with Let's Encrypt
 - Domain name properly configured in DNS
-- (Optional) Keycloak for SSO integration
+- **Keycloak** for SSO integration (required for complete functionality)
 
 ### Installation Commands
 
 **Basic Installation:**
 ```bash
-make peertube
+make peertube DOMAIN=yourdomain.com ADMIN_EMAIL=admin@yourdomain.com
 ```
 
 **With SSO Integration:**
 ```bash
-make peertube-sso
+# First, ensure Keycloak is installed and running
+make install-keycloak DOMAIN=yourdomain.com ADMIN_EMAIL=admin@yourdomain.com
+
+# Then, install PeerTube
+make peertube DOMAIN=yourdomain.com ADMIN_EMAIL=admin@yourdomain.com
+
+# Configure SSO integration
+make peertube-sso-configure DOMAIN=yourdomain.com
+
+# Test the integration
+make peertube-sso-test DOMAIN=yourdomain.com
 ```
 
 **With Dependencies:**
@@ -73,6 +83,60 @@ The installation script (`install_peertube.sh`) supports the following options:
 - `--with-deps`: Install dependencies (PostgreSQL, Redis, ffmpeg, etc.)
 - `--force`: Force installation even if already installed
 - `--help`: Show help message and exit
+
+## SSO Integration with Keycloak
+
+PeerTube can be integrated with Keycloak to provide Single Sign-On (SSO) capabilities, allowing users to use a centralized identity provider for authentication.
+
+### Configuration
+
+The SSO integration is automatically configured when you run:
+
+```bash
+make peertube-sso-configure DOMAIN=yourdomain.com
+```
+
+This will:
+1. Create a PeerTube client in Keycloak
+2. Configure proper redirect URIs
+3. Set up role mappings
+4. Update PeerTube's configuration
+
+### OAuth Configuration
+
+The integration uses OpenID Connect (OIDC) to communicate with Keycloak. The configuration is stored in:
+
+```
+/opt/agency_stack/clients/{CLIENT_ID}/peertube_data/config/production.yaml.d/oauth.yaml
+```
+
+### Roles and Permissions
+
+The following roles are automatically mapped from Keycloak to PeerTube:
+
+| Keycloak Role | PeerTube Role | Permissions |
+|---------------|---------------|-------------|
+| admin         | Administrator | Full administrative access |
+| moderator     | Moderator     | Content moderation capabilities |
+| user          | User          | Regular user capabilities |
+
+### Testing SSO Integration
+
+To verify the SSO integration is working correctly:
+
+```bash
+make peertube-sso-test DOMAIN=yourdomain.com
+```
+
+### Troubleshooting SSO
+
+If you encounter issues with the SSO integration:
+
+1. Verify Keycloak is running: `make keycloak-status DOMAIN=yourdomain.com`
+2. Check the OpenID configuration URL is accessible
+3. Verify the PeerTube client exists in Keycloak
+4. Check PeerTube's OAuth configuration file
+5. Restart PeerTube after configuration changes: `make peertube-restart`
 
 ## Management
 
