@@ -407,9 +407,9 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.wordpress_${SITE_NAME}.rule=Host(\`${DOMAIN}\`)"
       - "traefik.http.routers.wordpress_${SITE_NAME}.entrypoints=websecure"
-      - "traefik.http.routers.wordpress_${SITE_NAME}.tls.certresolver=myresolver"
+      - "traefik.http.routers.wordpress_${SITE_NAME}.tls.certresolver=letsencrypt"
       - "traefik.http.routers.wordpress_${SITE_NAME}.middlewares=secure-headers@file"
-      - "traefik.http.services.wordpress_${SITE_NAME}.loadbalancer.server.port=80"
+      - "traefik.http.services.wordpress_${SITE_NAME}.loadbalancer.server.port=9000"
       - "traefik.docker.network=${NETWORK_NAME}"
     logging:
       driver: "json-file"
@@ -429,13 +429,15 @@ services:
       - ${WP_DIR}/${DOMAIN}/html:/var/www/html:ro
       - ${WP_DIR}/${DOMAIN}/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ${WP_DIR}/${DOMAIN}/logs:/var/log/nginx
+    ports:
+      - "8080:80"
     networks:
       - ${NETWORK_NAME}
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.wordpress_${SITE_NAME}.rule=Host(\`${DOMAIN}\`)"
       - "traefik.http.routers.wordpress_${SITE_NAME}.entrypoints=websecure"
-      - "traefik.http.routers.wordpress_${SITE_NAME}.tls.certresolver=myresolver"
+      - "traefik.http.routers.wordpress_${SITE_NAME}.tls.certresolver=letsencrypt"
       - "traefik.http.routers.wordpress_${SITE_NAME}.middlewares=secure-headers@file"
       - "traefik.http.services.wordpress_${SITE_NAME}.loadbalancer.server.port=80"
       - "traefik.docker.network=${NETWORK_NAME}"
