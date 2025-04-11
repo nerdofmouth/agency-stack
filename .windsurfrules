@@ -1,4 +1,29 @@
 # 🧠 AgencyStack Alpha Phase Directives  
+
+# CRITICAL REMINDERS FOR AGENCY STACK DEVELOPMENT
+
+## Repository Integrity Policy
+- NEVER modify files directly on remote VMs without source tracking
+- ALL changes MUST be made to the local repository first
+- Use proper git workflow: commit locally → push → deploy/pull on remote
+
+## Proper Change Workflow
+1. Make changes ONLY to local repository
+2. Test locally where possible
+3. Commit changes with descriptive messages
+4. Transfer changes to remote VMs ONLY through proper deployment channels:
+   - Git pull from authorized repositories
+   - Official installation scripts
+   - Makefile targets
+
+## When Debugging Remote Issues
+- Extract configurations/files FROM the VM for inspection
+- Make fixes in LOCAL repository
+- Document the issue and fix in commit messages
+- Deploy fixed code using PROPER deployment methods
+
+REMEMBER: The repository is the single source of truth. VM state should always be reproducible from repository contents.
+
 ### Alpha Install, Component Consistency & Deployment Validation
 
 You are now operating in the **AgencyStack Alpha Test + Deploy Phase** — responsible for validating **end-to-end integrity**, **VM install consistency**, and **component parity** across all tooling layers: install scripts, Makefile targets, documentation, and test logic.
@@ -310,6 +335,30 @@ If you're writing or debugging a component install script, test script, or valid
 | `mock_helpers.sh` | Generates fake logs, metrics, and service output for UI/LLM testing |
 
 ---
+
+# CRITICAL REMINDERS FOR AGENCY STACK DEVELOPMENT
+
+## Repository Integrity Policy
+- NEVER modify files directly on remote VMs without source tracking
+- ALL changes MUST be made to the local repository first
+- Use proper git workflow: commit locally → push → deploy/pull on remote
+
+## Proper Change Workflow
+1. Make changes ONLY to local repository
+2. Test locally where possible
+3. Commit changes with descriptive messages
+4. Transfer changes to remote VMs ONLY through proper deployment channels:
+   - Git pull from authorized repositories
+   - Official installation scripts
+   - Makefile targets
+
+## When Debugging Remote Issues
+- Extract configurations/files FROM the VM for inspection
+- Make fixes in LOCAL repository
+- Document the issue and fix in commit messages
+- Deploy fixed code using PROPER deployment methods
+
+REMEMBER: The repository is the single source of truth. VM state should always be reproducible from repository contents.
 
 ## 🧠 AGENT BEHAVIOR RULES
 
@@ -711,3 +760,27 @@ Here’s a tiered rollout plan, ranked by _immediate impact + strategic value_:
 *   ✅ **Ollama**: Local LLM workflows (support agents, contract generation, content)
 *   ✅ [**Builder.io**](http://Builder.io): Connected to Next.js app and database templates
 *   ✅ **Next.js** frontend + Keycloak login: Working demo of SSO + theming
+
+# CRITICAL REMINDERS FOR AGENCY STACK DEVELOPMENT
+
+## Repository Integrity Policy
+- NEVER modify files directly on remote VMs without source tracking
+- ALL changes MUST be made to the local repository first
+- Use proper git workflow: commit locally → push → deploy/pull on remote
+
+## Proper Change Workflow
+1. Make changes ONLY to local repository
+2. Test locally where possible
+3. Commit changes with descriptive messages
+4. Transfer changes to remote VMs ONLY through proper deployment channels:
+   - Git pull from authorized repositories
+   - Official installation scripts
+   - Makefile targets
+
+## When Debugging Remote Issues
+- Extract configurations/files FROM the VM for inspection
+- Make fixes in LOCAL repository
+- Document the issue and fix in commit messages
+- Deploy fixed code using PROPER deployment methods
+
+REMEMBER: The repository is the single source of truth. VM state should always be reproducible from repository contents.
