@@ -550,30 +550,40 @@ fi
 
 # Configure WordPress using WP-CLI
 log "INFO: Configuring WordPress site" "${CYAN}Configuring WordPress site...${NC}"
-docker exec -it wordpress wp core install --url="${DOMAIN}" --title="AgencyStack WordPress" --admin_user="${WP_ADMIN_USER}" --admin_password="${WP_ADMIN_PASSWORD}" --admin_email="${ADMIN_EMAIL}" --path="/var/www/html" --skip-email
+
+# Wait for WordPress to be ready
+sleep 10
+
+# Run WP-CLI
+docker exec ${WORDPRESS_CONTAINER_NAME} wp --allow-root --path=/var/www/html core install \
+  --url="https://${DOMAIN}" \
+  --title="WordPress on AgencyStack" \
+  --admin_user="${WP_ADMIN_USER}" \
+  --admin_password="${WP_ADMIN_PASSWORD}" \
+  --admin_email="${ADMIN_EMAIL}"
 
 if [ $? -ne 0 ]; then
   log "WARNING: WordPress may need manual configuration" "${YELLOW}WordPress may need manual configuration. Please visit https://${DOMAIN}/ to complete setup.${NC}"
 else
   # Install and activate essential plugins
   log "INFO: Installing essential plugins" "${CYAN}Installing essential plugins...${NC}"
-  docker exec -it wordpress wp plugin install redis-cache wordfence sucuri-scanner wordpress-seo duplicate-post --activate --path="/var/www/html"
+  docker exec ${WORDPRESS_CONTAINER_NAME} wp plugin install redis-cache wordfence sucuri-scanner wordpress-seo duplicate-post --activate --path="/var/www/html"
   
   # Enable Redis Object Cache
-  docker exec -it wordpress wp redis enable --path="/var/www/html"
+  docker exec ${WORDPRESS_CONTAINER_NAME} wp redis enable --path="/var/www/html"
   
   # Update permalink structure
-  docker exec -it wordpress wp rewrite structure '/%postname%/' --path="/var/www/html"
+  docker exec ${WORDPRESS_CONTAINER_NAME} wp rewrite structure '/%postname%/' --path="/var/www/html"
   
   # Configure security settings
-  docker exec -it wordpress wp option update blog_public 0 --path="/var/www/html"  # Discourage search engines until site is ready
+  docker exec ${WORDPRESS_CONTAINER_NAME} wp option update blog_public 0 --path="/var/www/html"  # Discourage search engines until site is ready
   
   # Create a sample page
-  docker exec -it wordpress wp post create --post_type=page --post_title='Welcome to AgencyStack WordPress' --post_content='This WordPress site is powered by AgencyStack.' --post_status=publish --path="/var/www/html"
+  docker exec ${WORDPRESS_CONTAINER_NAME} wp post create --post_type=page --post_title='Welcome to AgencyStack WordPress' --post_content='This WordPress site is powered by AgencyStack.' --post_status=publish --path="/var/www/html"
   
   # Set as homepage
-  docker exec -it wordpress wp option update show_on_front 'page' --path="/var/www/html"
-  docker exec -it wordpress wp option update page_on_front 2 --path="/var/www/html"
+  docker exec ${WORDPRESS_CONTAINER_NAME} wp option update show_on_front 'page' --path="/var/www/html"
+  docker exec ${WORDPRESS_CONTAINER_NAME} wp option update page_on_front 2 --path="/var/www/html"
 fi
 
 # Store credentials in a secure location
@@ -637,7 +647,7 @@ if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
       
       # Install and configure the OpenID Connect plugin
       log "INFO: Installing OpenID Connect plugin for WordPress" "${CYAN}Installing OpenID Connect plugin for WordPress...${NC}"
-      docker exec -it wordpress wp plugin install openid-connect-generic --activate
+      docker exec ${WORDPRESS_CONTAINER_NAME} wp plugin install openid-connect-generic --activate
       
       # Get client credentials from the SSO configuration
       if [ -f "${WP_DIR}/${DOMAIN}/sso/credentials" ]; then
@@ -645,7 +655,7 @@ if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
         
         # Configure the OpenID Connect plugin
         log "INFO: Configuring OpenID Connect plugin" "${CYAN}Configuring OpenID Connect plugin...${NC}"
-        docker exec -it wordpress wp option update openid_connect_generic_settings '{
+        docker exec ${WORDPRESS_CONTAINER_NAME} wp option update openid_connect_generic_settings '{
           "login_type":"auto",
           "client_id":"'"${KEYCLOAK_CLIENT_ID}"'",
           "client_secret":"'"${KEYCLOAK_CLIENT_SECRET}"'",
