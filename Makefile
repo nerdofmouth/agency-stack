@@ -657,358 +657,32 @@ install-voip: validate
 voip: install-voip
 
 voip-status:
-	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking VoIP System Status...$(RESET)"
-	@cd /opt/agency_stack/voip/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose ps
-	@echo "$(CYAN)Logs can be viewed with: make voip-logs$(RESET)"
-
-voip-logs:
-	@echo "$(MAGENTA)$(BOLD)📜 Viewing VoIP Logs...$(RESET)"
-	@cd /opt/agency_stack/voip/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose logs -f
-
-voip-restart:
-	@echo "$(MAGENTA)$(BOLD)🔄 Restarting VoIP Services...$(RESET)"
-	@cd /opt/agency_stack/voip/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose restart
-
-voip-stop:
-	@echo "$(MAGENTA)$(BOLD)🛑 Stopping VoIP Services...$(RESET)"
-	@cd /opt/agency_stack/voip/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose stop
-
-voip-start:
-	@echo "$(MAGENTA)$(BOLD)▶️ Starting VoIP Services...$(RESET)"
-	@cd /opt/agency_stack/voip/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose start
-
-voip-config:
-	@echo "$(MAGENTA)$(BOLD)⚙️ Configuring VoIP System...$(RESET)"
-	@read -p "$(YELLOW)Enter domain for VoIP (e.g., voip.yourdomain.com):$(RESET) " DOMAIN; \
-	read -p "$(YELLOW)Enter admin email:$(RESET) " ADMIN_EMAIL; \
-	read -p "$(YELLOW)Enter client ID (optional):$(RESET) " CLIENT_ID; \
-
-# Mailu Email Server
-install-mailu: validate
-	@echo "Installing Mailu email server..."
-	@sudo $(SCRIPTS_DIR)/components/install_mailu.sh --domain mail.$(DOMAIN) --email-domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
-# Listmonk - Newsletter & Mailing Lists
-listmonk:
-	@echo "Installing Listmonk..."
-	@sudo $(SCRIPTS_DIR)/components/install_listmonk.sh --domain $(LISTMONK_DOMAIN) $(INSTALL_FLAGS)
-
-listmonk-status:
-	@docker ps -a | grep listmonk || echo "Listmonk is not running"
-
-listmonk-logs:
-	@docker logs -f listmonk-app-$(CLIENT_ID) 2>&1 | tee $(LOG_DIR)/components/listmonk.log
-
-listmonk-stop:
-	@docker-compose -f $(DOCKER_DIR)/listmonk/docker-compose.yml down
-
-listmonk-start:
-	@docker-compose -f $(DOCKER_DIR)/listmonk/docker-compose.yml up -d
-
-listmonk-restart:
-	@docker-compose -f $(DOCKER_DIR)/listmonk/docker-compose.yml restart
-
-listmonk-backup:
-	@echo "Backing up Listmonk data..."
-	@mkdir -p $(BACKUP_DIR)/listmonk
-	@docker exec listmonk-postgres-$(CLIENT_ID) pg_dump -U listmonk listmonk > $(BACKUP_DIR)/listmonk/listmonk_db_$(shell date +%Y%m%d).sql
-	@tar -czf $(BACKUP_DIR)/listmonk/listmonk_storage_$(shell date +%Y%m%d).tar.gz -C $(CONFIG_DIR)/clients/$(CLIENT_ID)/listmonk_data/storage .
-	@echo "Backup completed: $(BACKUP_DIR)/listmonk/"
-
-listmonk-restore:
-	@echo "Restoring Listmonk from backup is a manual process."
-	@echo "Please refer to the documentation for detailed instructions."
-
-listmonk-config:
-	@echo "Opening Listmonk environment configuration..."
-	@$(EDITOR) $(DOCKER_DIR)/listmonk/.env
-
-listmonk-upgrade:
-	@echo "$(MAGENTA)$(BOLD)🔄 Upgrading Listmonk to v4.1.0...$(RESET)"
-	@read -p "$(YELLOW)Enter domain for Listmonk (e.g., mail.yourdomain.com):$(RESET) " DOMAIN; \
-	read -p "$(YELLOW)Enter admin email:$(RESET) " ADMIN_EMAIL; \
-	read -p "$(YELLOW)Enter client ID (optional):$(RESET) " CLIENT_ID; \
-	sudo $(SCRIPTS_DIR)/components/upgrade_listmonk.sh --domain $$DOMAIN --admin-email $$ADMIN_EMAIL $(if $$CLIENT_ID,--client-id $$CLIENT_ID,) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
-# Grafana
-install-grafana: validate
-	@echo "Installing Grafana monitoring..."
-	@sudo $(SCRIPTS_DIR)/components/install_grafana.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
-# Loki
-install-loki: validate
-	@echo "Installing Loki log aggregation..."
-	@sudo $(SCRIPTS_DIR)/components/install_loki.sh --domain logs.$(DOMAIN) $(if $(GRAFANA_DOMAIN),--grafana-domain $(GRAFANA_DOMAIN),--grafana-domain grafana.$(DOMAIN)) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
-loki: validate
-	@echo "$(MAGENTA)$(BOLD)📊 Installing Loki - Log Aggregation System...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/install_loki.sh --domain logs.$(DOMAIN) $(if $(GRAFANA_DOMAIN),--grafana-domain $(GRAFANA_DOMAIN),--grafana-domain grafana.$(DOMAIN)) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
-loki-status:
-	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Loki Status...$(RESET)"
-	@if [ -n "$(CLIENT_ID)" ]; then \
-		LOKI_CONTAINER="$(CLIENT_ID)_loki"; \
-	else \
-		SITE_NAME=$$(echo "$(DOMAIN)" | sed 's/\./_/g'); \
-		LOKI_CONTAINER="loki_$${SITE_NAME}"; \
-	fi; \
-	if docker ps --format '{{.Names}}' | grep -q "$$LOKI_CONTAINER"; then \
-		echo "$(GREEN)✅ Loki is running$(RESET)"; \
-		docker ps --filter "name=$$LOKI_CONTAINER" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"; \
-		echo ""; \
-		if docker ps --format '{{.Names}}' | grep -q "$(CLIENT_ID)_promtail" || docker ps --format '{{.Names}}' | grep -q "promtail_$${SITE_NAME}"; then \
-			echo "$(GREEN)✅ Promtail log collector is running$(RESET)"; \
-			docker ps --filter "name=promtail" --format "table {{.Names}}\t{{.Status}}"; \
-		else \
-			echo "$(YELLOW)⚠️ Promtail log collector is not running$(RESET)"; \
-		fi; \
-	else \
-		echo "$(RED)❌ Loki is not running$(RESET)"; \
-		echo "$(CYAN)Install with: make loki DOMAIN=yourdomain.com$(RESET)"; \
-	fi; \
-	if [ -d "/opt/agency_stack/loki/$(DOMAIN)" ]; then \
-		echo ""; \
-		echo "$(CYAN)Configuration directory: /opt/agency_stack/loki/$(DOMAIN)$(RESET)"; \
-	fi
-
-loki-logs:
-	@echo "$(MAGENTA)$(BOLD)📜 Viewing Loki Logs...$(RESET)"
-	@if [ -n "$(CLIENT_ID)" ]; then \
-		LOKI_CONTAINER="$(CLIENT_ID)_loki"; \
-		PROMTAIL_CONTAINER="$(CLIENT_ID)_promtail"; \
-	else \
-		SITE_NAME=$$(echo "$(DOMAIN)" | sed 's/\./_/g'); \
-		LOKI_CONTAINER="loki_$${SITE_NAME}"; \
-		PROMTAIL_CONTAINER="promtail_$${SITE_NAME}"; \
-	fi; \
-	if docker ps --format '{{.Names}}' | grep -q "$$LOKI_CONTAINER"; then \
-		echo "$(CYAN)====== Loki Server Logs ======$(RESET)"; \
-		docker logs --tail 50 "$$LOKI_CONTAINER"; \
-		echo ""; \
-		if docker ps --format '{{.Names}}' | grep -q "$$PROMTAIL_CONTAINER"; then \
-			echo "$(CYAN)====== Promtail Collector Logs ======$(RESET)"; \
-			docker logs --tail 20 "$$PROMTAIL_CONTAINER"; \
-		fi; \
-	else \
-		echo "$(RED)❌ Loki container is not running$(RESET)"; \
-		if [ -f "/var/log/agency_stack/components/loki.log" ]; then \
-			echo "$(CYAN)Installation logs:$(RESET)"; \
-			tail -n 30 /var/log/agency_stack/components/loki.log; \
-		fi; \
-	fi
-
-loki-restart:
-	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Loki...$(RESET)"
-	@if [ -n "$(CLIENT_ID)" ]; then \
-		LOKI_DIR="/opt/agency_stack/loki/$(DOMAIN)"; \
-	else \
-		LOKI_DIR="/opt/agency_stack/loki/$(DOMAIN)"; \
-	fi; \
-	if [ -d "$$LOKI_DIR" ] && [ -f "$$LOKI_DIR/docker-compose.yml" ]; then \
-		echo "$(CYAN)Restarting Loki containers...$(RESET)"; \
-		cd "$$LOKI_DIR" && docker-compose restart; \
-		echo "$(GREEN)✅ Loki has been restarted$(RESET)"; \
-		echo "$(CYAN)Check status with: make loki-status$(RESET)"; \
-	else \
-		echo "$(RED)❌ Loki configuration not found at $$LOKI_DIR$(RESET)"; \
-		echo "$(CYAN)Install with: make loki DOMAIN=yourdomain.com$(RESET)"; \
-	fi
-
-# Prometheus
-install-prometheus: validate
-	@echo "$(MAGENTA)$(BOLD)📊 Installing Prometheus Monitoring...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/install_prometheus.sh --domain metrics.$(DOMAIN) $(if $(GRAFANA_DOMAIN),--grafana-domain $(GRAFANA_DOMAIN),--grafana-domain grafana.$(DOMAIN)) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
-prometheus: install-prometheus
-
-prometheus-status:
-	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Prometheus Status...$(RESET)"
-	@cd /opt/agency_stack/prometheus/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose ps
-	@echo "$(CYAN)Logs can be viewed with: make prometheus-logs$(RESET)"
-
-prometheus-logs:
-	@echo "$(MAGENTA)$(BOLD)📜 Viewing Prometheus Logs...$(RESET)"
-	@cd /opt/agency_stack/prometheus/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose logs -f
-
-prometheus-restart:
-	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Prometheus Services...$(RESET)"
-	@cd /opt/agency_stack/prometheus/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose restart
-
-prometheus-stop:
-	@echo "$(MAGENTA)$(BOLD)🛑 Stopping Prometheus Services...$(RESET)"
-	@cd /opt/agency_stack/prometheus/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose stop
-
-prometheus-start:
-	@echo "$(MAGENTA)$(BOLD)▶️ Starting Prometheus Services...$(RESET)"
-	@cd /opt/agency_stack/prometheus/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose start
-
-prometheus-reload:
-	@echo "$(MAGENTA)$(BOLD)🔄 Reloading Prometheus Configuration...$(RESET)"
-	@curl -X POST http://localhost:9090/-/reload || echo "$(RED)Failed to reload Prometheus. Is it running?$(RESET)"
-
-prometheus-alerts:
-	@echo "$(MAGENTA)$(BOLD)🔔 Viewing Prometheus Alerts...$(RESET)"
-	@curl -s http://localhost:9090/api/v1/alerts | jq . || echo "$(RED)Failed to fetch alerts. Is Prometheus running?$(RESET)"
-
-prometheus-config:
-	@echo "$(MAGENTA)$(BOLD)⚙️ Configuring Prometheus...$(RESET)"
-	@read -p "$(YELLOW)Enter domain for Prometheus (e.g., metrics.yourdomain.com):$(RESET) " DOMAIN; \
-	read -p "$(YELLOW)Enter Grafana domain (e.g., grafana.yourdomain.com):$(RESET) " GRAFANA_DOMAIN; \
-	read -p "$(YELLOW)Enter client ID (optional):$(RESET) " CLIENT_ID; \
-
-# Keycloak
-install-keycloak: validate
-	@echo "Installing Keycloak identity provider..."
-	@sudo $(SCRIPTS_DIR)/components/install_keycloak.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
-keycloak: validate
-	@echo "$(MAGENTA)$(BOLD)🔐 Installing Keycloak SSO & Identity provider...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/install_keycloak.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
-keycloak-status:
-	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Keycloak Status...$(RESET)"
-	@if [ -n "$(CLIENT_ID)" ]; then \
-		KEYCLOAK_CONTAINER="$(CLIENT_ID)_keycloak"; \
-	else \
-		KEYCLOAK_CONTAINER="keycloak_$(subst .,_,$(DOMAIN))"; \
-	fi; \
-	if docker ps --format '{{.Names}}' | grep -q "$$KEYCLOAK_CONTAINER"; then \
-		echo "$(GREEN)✅ Keycloak is running$(RESET)"; \
-		docker ps --filter "name=$$KEYCLOAK_CONTAINER" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"; \
-		echo ""; \
-		echo "$(CYAN)Admin URL: https://$(DOMAIN)/admin/$(RESET)"; \
-		echo "$(CYAN)Realm: $(DOMAIN)$(RESET)"; \
-		echo "$(CYAN)Username: admin$(RESET)"; \
-		echo "$(CYAN)Password: $(shell grep KEYCLOAK_ADMIN_PASSWORD /opt/agency_stack/config.env | cut -d '=' -f2)$(RESET)"; \
-	else \
-		echo "$(RED)❌ Keycloak is not running$(RESET)"; \
-		echo "$(CYAN)Install with: make keycloak$(RESET)"; \
-	fi
-
-keycloak-logs:
-	@echo "$(MAGENTA)$(BOLD)📜 Viewing Keycloak Logs...$(RESET)"
-	@if [ -n "$(CLIENT_ID)" ]; then \
-		KEYCLOAK_CONTAINER="$(CLIENT_ID)_keycloak"; \
-	else \
-		KEYCLOAK_CONTAINER="keycloak_$(subst .,_,$(DOMAIN))"; \
-	fi; \
-	if [ -f "/var/log/agency_stack/components/keycloak.log" ]; then \
-		echo "$(CYAN)Recent Keycloak installation logs:$(RESET)"; \
-		sudo tail -n 30 /var/log/agency_stack/components/keycloak.log; \
-		echo ""; \
-		echo "$(CYAN)For container logs, use:$(RESET)"; \
-		echo "docker logs $$KEYCLOAK_CONTAINER"; \
-	else \
-		echo "$(YELLOW)Keycloak logs not found.$(RESET)"; \
-		docker logs $$KEYCLOAK_CONTAINER 2>/dev/null || echo "$(RED)Keycloak container logs not available.$(RESET)"; \
-	fi
-
-keycloak-restart:
-	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Keycloak Services...$(RESET)"
-	@if [ -n "$(CLIENT_ID)" ]; then \
-		KEYCLOAK_CONTAINER="$(CLIENT_ID)_keycloak"; \
-	else \
-		KEYCLOAK_CONTAINER="keycloak_$(subst .,_,$(DOMAIN))"; \
-	fi; \
-	if docker ps --format '{{.Names}}' | grep -q "$$KEYCLOAK_CONTAINER"; then \
-		docker restart $$KEYCLOAK_CONTAINER; \
-		echo "$(GREEN)✅ Keycloak has been restarted$(RESET)"; \
-		echo "$(CYAN)Check status with: make keycloak-status$(RESET)"; \
-	else \
-		echo "$(RED)❌ Keycloak is not running$(RESET)"; \
-		echo "$(CYAN)Install with: make keycloak$(RESET)"; \
-	fi
-
-keycloak-test:
-	@echo "$(MAGENTA)$(BOLD)🧪 Testing Keycloak functionality...$(RESET)"
-	@if [ -n "$(CLIENT_ID)" ]; then \
-		KEYCLOAK_CONTAINER="$(CLIENT_ID)_keycloak"; \
-	else \
-		KEYCLOAK_CONTAINER="keycloak_$(subst .,_,$(DOMAIN))"; \
-	fi; \
-	if docker ps --format '{{.Names}}' | grep -q "$$KEYCLOAK_CONTAINER"; then \
-		echo "$(GREEN)✅ Keycloak is running$(RESET)"; \
-		echo "$(CYAN)Admin URL: https://$(DOMAIN)/admin/$(RESET)"; \
-		echo "$(CYAN)Realm: $(DOMAIN)$(RESET)"; \
-		echo "$(CYAN)Username: admin$(RESET)"; \
-		echo "$(CYAN)Password: $(shell grep KEYCLOAK_ADMIN_PASSWORD /opt/agency_stack/config.env | cut -d '=' -f2)$(RESET)"; \
-		echo "$(CYAN)Test Keycloak with: make keycloak-test$(RESET)"; \
-	else \
-		echo "$(RED)❌ Keycloak is not running$(RESET)"; \
-		echo "$(CYAN)Install with: make keycloak$(RESET)"; \
-	fi
-
-# Core Infrastructure
-install-infrastructure:
-	@echo "Installing core infrastructure..."
-	@sudo $(SCRIPTS_DIR)/core/install_infrastructure.sh $(if $(VERBOSE),--verbose,)
-
-# Security Infrastructure
-install-security-infrastructure:
-	@echo "Installing security infrastructure..."
-	@sudo $(SCRIPTS_DIR)/core/install_security_infrastructure.sh --domain $(DOMAIN) --email $(ADMIN_EMAIL) $(if $(VERBOSE),--verbose,)
-
-# Multi-tenancy Infrastructure
-install-multi-tenancy:
-	@echo "Setting up multi-tenancy infrastructure..."
-	@sudo $(SCRIPTS_DIR)/multi-tenancy/install_multi_tenancy.sh $(if $(VERBOSE),--verbose,)
-
-# Business Applications
-business: erp cal killbill documenso chatwoot
-	@echo "Business Applications installed"
-
-# ERPNext - Enterprise Resource Planning
-erp:
-	@echo "Installing ERPNext..."
-	@sudo $(SCRIPTS_DIR)/components/install_erpnext.sh --domain $(ERP_DOMAIN) $(INSTALL_FLAGS)
-
-# Cal.com - Scheduling
-cal:
-	@echo "Installing Cal.com..."
-	@sudo $(SCRIPTS_DIR)/components/install_cal.sh --domain $(CAL_DOMAIN) $(INSTALL_FLAGS)
-
-# Documenso - Document signing
-documenso:
-	@echo "Installing Documenso..."
-	@sudo $(SCRIPTS_DIR)/components/install_documenso.sh --domain $(DOCUMENSO_DOMAIN) $(INSTALL_FLAGS)
-
-# KillBill - Billing
-killbill:
-	@echo "Installing KillBill..."
-	@sudo $(SCRIPTS_DIR)/components/install_killbill.sh --domain $(KILLBILL_DOMAIN) $(INSTALL_FLAGS)
-
-# Chatwoot - Customer Service Platform
-chatwoot:
-	@echo "Installing Chatwoot..."
-	@sudo $(SCRIPTS_DIR)/components/install_chatwoot.sh --domain $(CHATWOOT_DOMAIN) $(INSTALL_FLAGS)
-
-chatwoot-status:
 	@docker ps -a | grep chatwoot || echo "Chatwoot is not running"
 
-chatwoot-logs:
+voip-logs:
 	@docker logs -f chatwoot-app-$(CLIENT_ID) 2>&1 | tee $(LOG_DIR)/components/chatwoot.log
 
-chatwoot-stop:
+voip-stop:
 	@docker-compose -f $(DOCKER_DIR)/chatwoot/docker-compose.yml down
 
-chatwoot-start:
+voip-start:
 	@docker-compose -f $(DOCKER_DIR)/chatwoot/docker-compose.yml up -d
 
-chatwoot-restart:
+voip-restart:
 	@docker-compose -f $(DOCKER_DIR)/chatwoot/docker-compose.yml restart
 
-chatwoot-backup:
+voip-backup:
 	@echo "Backing up Chatwoot data..."
 	@mkdir -p $(BACKUP_DIR)/chatwoot
 	@docker exec chatwoot-postgres-$(CLIENT_ID) pg_dump -U chatwoot chatwoot > $(BACKUP_DIR)/chatwoot/chatwoot_db_$(shell date +%Y%m%d).sql
 	@tar -czf $(BACKUP_DIR)/chatwoot/chatwoot_storage_$(shell date +%Y%m%d).tar.gz -C $(CONFIG_DIR)/clients/$(CLIENT_ID)/chatwoot_data/storage .
 	@echo "Backup completed: $(BACKUP_DIR)/chatwoot/"
 
-chatwoot-config:
+voip-config:
 	@echo "Opening Chatwoot environment configuration..."
 	@$(EDITOR) $(DOCKER_DIR)/chatwoot/.env
 
-chatwoot-upgrade:
+voip-upgrade:
 	@echo "$(MAGENTA)$(BOLD)🔄 Upgrading Chatwoot to v4.1.0...$(RESET)"
 	@read -p "$(YELLOW)Enter domain for Chatwoot (e.g., chat.yourdomain.com):$(RESET) " DOMAIN; \
 	read -p "$(YELLOW)Enter admin email:$(RESET) " ADMIN_EMAIL; \
@@ -1754,897 +1428,128 @@ component-restart:
 	@echo "TODO: Implement /home/revelationx/CascadeProjects/foss-server-stack/config/registry/component-registry.json-restart"
 	@exit 1
 
+# WordPress
+install-wordpress: validate
+	@echo "$(MAGENTA)$(BOLD)🌐 Installing WordPress...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+# WordPress with SSO integration (convenience target)
+wordpress-sso: validate
+	@echo "$(MAGENTA)$(BOLD)🌐 Installing WordPress with Keycloak SSO integration...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) --enable-keycloak $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
 # Crowdsec
 crowdsec: validate
 	@echo "$(MAGENTA)$(BOLD)🔒 Installing CrowdSec security automation...$(RESET)"
 	@sudo $(SCRIPTS_DIR)/components/install_crowdsec.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
-crowdsec-status:
-	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking CrowdSec Status...$(RESET)"
-	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/crowdsec/.installed" ]; then \
-		echo "$(GREEN)✅ CrowdSec is installed$(RESET)"; \
-		if docker ps | grep -q "crowdsec_$(CLIENT_ID)"; then \
-			echo "$(GREEN)✅ CrowdSec container is running$(RESET)"; \
-		else \
-			echo "$(RED)❌ CrowdSec container is not running$(RESET)"; \
-		fi; \
-		if docker ps | grep -q "crowdsec-traefik-bouncer_$(CLIENT_ID)"; then \
-			echo "$(GREEN)✅ CrowdSec Traefik bouncer is running$(RESET)"; \
-		else \
-			echo "$(RED)❌ CrowdSec Traefik bouncer is not running$(RESET)"; \
-		fi; \
-		if docker ps | grep -q "crowdsec-dashboard_$(CLIENT_ID)"; then \
-			echo "$(GREEN)✅ CrowdSec dashboard is running$(RESET)"; \
-		else \
-			echo "$(RED)❌ CrowdSec dashboard is not running$(RESET)"; \
-		fi; \
+# Configure PeerTube Keycloak SSO integration
+peertube-sso-configure: validate
+	@echo "$(MAGENTA)$(BOLD)🔑 Configuring PeerTube SSO Integration...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/keycloak/configure_peertube_client.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(VERBOSE),--verbose,)
+
+# Test PeerTube-Keycloak SSO integration
+peertube-sso-test: validate
+	@echo "$(MAGENTA)$(BOLD)🧪 Testing PeerTube SSO Integration...$(RESET)"
+	@if [ -n "$(CLIENT_ID)" ]; then \
+		PEERTUBE_CONTAINER="$(CLIENT_ID)_peertube"; \
 	else \
-		echo "$(RED)❌ CrowdSec is not installed$(RESET)"; \
-		echo "$(CYAN)Install with: make crowdsec$(RESET)"; \
-	fi
-
-crowdsec-logs:
-	@echo "$(MAGENTA)$(BOLD)📜 Viewing CrowdSec Logs...$(RESET)"
-	@if [ -f "/var/log/agency_stack/components/crowdsec.log" ]; then \
-		echo "$(CYAN)Recent CrowdSec installation logs:$(RESET)"; \
-		sudo tail -n 30 /var/log/agency_stack/components/crowdsec.log; \
-		echo ""; \
-		echo "$(CYAN)For container logs, use:$(RESET)"; \
-		echo "docker logs crowdsec_$(CLIENT_ID)"; \
-		echo "docker logs crowdsec-traefik-bouncer_$(CLIENT_ID)"; \
-	else \
-		echo "$(YELLOW)CrowdSec logs not found.$(RESET)"; \
-		docker logs crowdsec_$(CLIENT_ID) 2>/dev/null || echo "$(RED)CrowdSec container logs not available.$(RESET)"; \
-	fi
-
-crowdsec-restart:
-	@echo "$(MAGENTA)$(BOLD)🔄 Restarting CrowdSec...$(RESET)"
-	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/crowdsec/.installed" ]; then \
-		cd /opt/agency_stack/clients/$(CLIENT_ID)/crowdsec && sudo docker-compose restart; \
-		echo "$(GREEN)✅ CrowdSec has been restarted$(RESET)"; \
-		echo "$(CYAN)Check status with: make crowdsec-status$(RESET)"; \
-	else \
-		echo "$(RED)❌ CrowdSec is not installed$(RESET)"; \
-		echo "$(CYAN)Install with: make crowdsec$(RESET)"; \
-	fi
-
-# Auto-generated target for cryptosync
-cryptosync-restart:
-	@echo "TODO: Implement cryptosync-restart"
-	@exit 1
-
-# Auto-generated target for documenso
-documenso-status:
-	@echo "TODO: Implement documenso-status"
-	@exit 1
-
-# Auto-generated target for documenso
-documenso-logs:
-	@echo "TODO: Implement documenso-logs"
-	@exit 1
-
-# Auto-generated target for documenso
-documenso-restart:
-	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Documenso...$(RESET)"
-	@cd $(DOCKER_DIR)/documenso && docker-compose restart
-
-documenso-upgrade:
-	@echo "$(MAGENTA)$(BOLD)🔄 Upgrading Documenso to v1.4.2...$(RESET)"
-	@read -p "$(YELLOW)Enter domain for Documenso (e.g., sign.yourdomain.com):$(RESET) " DOMAIN; \
-	read -p "$(YELLOW)Enter admin email:$(RESET) " ADMIN_EMAIL; \
-	read -p "$(YELLOW)Enter client ID (optional):$(RESET) " CLIENT_ID; \
-	sudo $(SCRIPTS_DIR)/components/upgrade_documenso.sh --domain $$DOMAIN --admin-email $$ADMIN_EMAIL $(if $$CLIENT_ID,--client-id $$CLIENT_ID,) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
-# erpnext
-erpnext:
-	@echo "TODO: Implement erpnext"
-	@exit 1
-
-# Auto-generated target for erpnext
-erpnext-status:
-	@echo "TODO: Implement erpnext-status"
-	@exit 1
-
-# Auto-generated target for erpnext
-erpnext-logs:
-	@echo "TODO: Implement erpnext-logs"
-	@exit 1
-
-# Auto-generated target for erpnext
-erpnext-restart:
-	@echo "TODO: Implement erpnext-restart"
-	@exit 1
-
-# Auto-generated target for focalboard
-focalboard:
-	@echo "TODO: Implement focalboard"
-	@exit 1
-
-# Auto-generated target for focalboard
-focalboard-status:
-	@echo "TODO: Implement focalboard-status"
-	@exit 1
-
-# Auto-generated target for focalboard
-focalboard-logs:
-	@echo "TODO: Implement focalboard-logs"
-	@exit 1
-
-# Auto-generated target for focalboard
-focalboard-restart:
-	@echo "TODO: Implement focalboard-restart"
-	@exit 1
-
-# Auto-generated target for ghost
-ghost:
-	@echo "TODO: Implement ghost"
-	@exit 1
-
-# Auto-generated target for ghost
-ghost-status:
-	@echo "TODO: Implement ghost-status"
-	@exit 1
-
-# Auto-generated target for ghost
-ghost-logs:
-	@echo "TODO: Implement ghost-logs"
-	@exit 1
-
-# Auto-generated target for ghost
-ghost-restart:
-	@echo "TODO: Implement ghost-restart"
-	@exit 1
-
-# Auto-generated target for gitea
-gitea:
-	@echo "TODO: Implement gitea"
-	@exit 1
-
-# Auto-generated target for gitea
-gitea-status:
-	@echo "TODO: Implement gitea-status"
-	@exit 1
-
-# Auto-generated target for gitea
-gitea-logs:
-	@echo "TODO: Implement gitea-logs"
-	@exit 1
-
-# Auto-generated target for gitea
-gitea-restart:
-	@echo "TODO: Implement gitea-restart"
-	@exit 1
-
-# Auto-generated target for grafana
-grafana:
-	@echo "TODO: Implement grafana"
-	@exit 1
-
-# Auto-generated target for grafana
-grafana-status:
-	@echo "TODO: Implement grafana-status"
-	@exit 1
-
-# Auto-generated target for grafana
-grafana-logs:
-	@echo "TODO: Implement grafana-logs"
-	@exit 1
-
-# Auto-generated target for grafana
-grafana-restart:
-	@echo "TODO: Implement grafana-restart"
-	@exit 1
-
-# Auto-generated target for keycloak
-keycloak:
-	@echo "TODO: Implement keycloak"
-	@exit 1
-
-# Auto-generated target for keycloak
-keycloak-status:
-	@echo "TODO: Implement keycloak-status"
-	@exit 1
-
-# Auto-generated target for keycloak
-keycloak-logs:
-	@echo "TODO: Implement keycloak-logs"
-	@exit 1
-
-# Auto-generated target for keycloak
-keycloak-restart:
-	@echo "TODO: Implement keycloak-restart"
-	@exit 1
-
-# Auto-generated target for killbill
-killbill-status:
-	@echo "TODO: Implement killbill-status"
-	@exit 1
-
-# Auto-generated target for killbill
-killbill-logs:
-	@echo "TODO: Implement killbill-logs"
-	@exit 1
-
-# Auto-generated target for killbill
-killbill-restart:
-	@echo "TODO: Implement killbill-restart"
-	@exit 1
-
-	@exit 1
-
-# Auto-generated target for mailu
-mailu:
-	@echo "TODO: Implement mailu"
-	@exit 1
-
-# Auto-generated target for mailu
-mailu-status:
-	@echo "TODO: Implement mailu-status"
-	@exit 1
-
-# Auto-generated target for mailu
-mailu-logs:
-	@echo "TODO: Implement mailu-logs"
-	@exit 1
-
-# Auto-generated target for mailu
-mailu-restart:
-	@echo "TODO: Implement mailu-restart"
-	@exit 1
-
-# Auto-generated target for mattermost
-mattermost:
-	@echo "TODO: Implement mattermost"
-	@exit 1
-
-# Auto-generated target for mattermost
-mattermost-status:
-	@echo "TODO: Implement mattermost-status"
-	@exit 1
-
-# Auto-generated target for mattermost
-mattermost-logs:
-	@echo "TODO: Implement mattermost-logs"
-	@exit 1
-
-# Auto-generated target for mattermost
-mattermost-restart:
-	@echo "TODO: Implement mattermost-restart"
-	@exit 1
-
-# Auto-generated target for portainer
-portainer:
-	@echo "TODO: Implement portainer"
-	@exit 1
-
-# Auto-generated target for portainer
-portainer-status:
-	@echo "TODO: Implement portainer-status"
-	@exit 1
-
-vm-fault-inject:
-	@echo "Injecting fault into VM for recovery testing..."
-	@scripts/utils/fault_inject.sh $(FAULT_TYPE)
-
-vm-snapshot:
-	@echo "Preparing VM for snapshot..."
-	@sudo scripts/release/prepare_vm_snapshot.sh
-
-# Target to run smoke tests for high-risk components
-smoke-test:
-	@echo "Running smoke tests for high-risk components..."
-	@scripts/smoke/smoke_test_high_risk.sh || { \
-		echo "Note: Some components failed validation. Full details in /var/log/agency_stack/smoke_test.log"; \
-		echo "To test ALL components including Mailu and Tailscale, use: make smoke-test-all"; \
-		echo "To test a specific component: make smoke-test COMPONENT=<component>"; \
-	}
-
-# Target to run ALL smoke tests including optional components
-smoke-test-all:
-	@echo "Running ALL smoke tests including optional components..."
-	@scripts/smoke/smoke_test_high_risk.sh --test-all || { \
-		echo "Some components failed validation. See /var/log/agency_stack/smoke_test.log for details."; \
-	}
-
-# Backup Strategy
-backup-strategy: validate
-	@echo "$(MAGENTA)$(BOLD)💾 Installing Backup Strategy (Restic)...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/install_backup_strategy.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(TEST_MODE),--test-mode,)
-
-backup-strategy-status:
-	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Backup Strategy Status...$(RESET)"
-	@if [ -f "/opt/agency_stack/backup_strategy/.installed_ok" ]; then \
-		echo "$(GREEN)✅ Backup Strategy is installed$(RESET)"; \
-		if [ -f "/etc/cron.d/agency-stack-backup-$(CLIENT_ID)" ]; then \
-			echo "$(GREEN)✅ Backup cron job is configured$(RESET)"; \
-		else \
-			echo "$(RED)❌ Backup cron job is not configured$(RESET)"; \
-		fi; \
-	else \
-		echo "$(RED)❌ Backup Strategy is not installed$(RESET)"; \
-	fi
-	@echo "$(CYAN)Logs can be viewed with: make backup-strategy-logs$(RESET)"
-
-backup-strategy-logs:
-	@echo "$(MAGENTA)$(BOLD)📜 Viewing Backup Strategy Logs...$(RESET)"
-	@if [ -d "/opt/agency_stack/clients/$(CLIENT_ID)/backup_strategy/logs" ]; then \
-		ls -lat /opt/agency_stack/clients/$(CLIENT_ID)/backup_strategy/logs/ | head -n 5; \
-		echo ""; \
-		if [ -n "$$(ls -A /opt/agency_stack/clients/$(CLIENT_ID)/backup_strategy/logs/ 2>/dev/null)" ]; then \
-			echo "$(CYAN)Latest log:$(RESET)"; \
-			cat "$$(ls -t /opt/agency_stack/clients/$(CLIENT_ID)/backup_strategy/logs/* | head -n 1)"; \
-		else \
-			echo "$(YELLOW)No backup logs found yet.$(RESET)"; \
-		fi \
-	else \
-		cat /var/log/agency_stack/components/backup_strategy.log | tail -n 20; \
-	fi
-
-backup-strategy-restart:
-	@echo "$(MAGENTA)$(BOLD)🔄 Running Backup Strategy...$(RESET)"
-	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/backup_strategy/scripts/backup.sh" ]; then \
-		sudo /opt/agency_stack/clients/$(CLIENT_ID)/backup_strategy/scripts/backup.sh; \
-	else \
-		echo "$(RED)Backup script not found. Is Backup Strategy installed?$(RESET)"; \
-		echo "$(CYAN)Install with: make backup-strategy$(RESET)"; \
-	fi
-
-# Signing Timestamps
-signing-timestamps: validate
-	@echo "$(MAGENTA)$(BOLD)🔏 Installing Signing & Timestamps...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/install_signing_timestamps.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(TEST_MODE),--test-mode,)
-
-signing-timestamps-status:
-	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Signing & Timestamps Status...$(RESET)"
-	@if [ -f "/opt/agency_stack/signing_timestamps/.installed_ok" ]; then \
-		echo "$(GREEN)✅ Signing & Timestamps is installed$(RESET)"; \
-		if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/signing_timestamps/server-public-key.asc" ]; then \
-			echo "$(GREEN)✅ Server signing key is configured$(RESET)"; \
-			echo "$(CYAN)Key fingerprint:$(RESET)"; \
-			cat /opt/agency_stack/clients/$(CLIENT_ID)/signing_timestamps/server-key-fingerprint.txt | grep -A 1 "Key fingerprint"; \
-		else \
-			echo "$(YELLOW)⚠️ Server signing key is not yet generated$(RESET)"; \
-			echo "$(CYAN)Run: sudo /opt/agency_stack/clients/$(CLIENT_ID)/signing_timestamps/scripts/generate-server-key.sh$(RESET)"; \
-		fi; \
-	else \
-		echo "$(RED)❌ Signing & Timestamps is not installed$(RESET)"; \
-	fi
-	@echo "$(CYAN)Logs can be viewed with: make signing-timestamps-logs$(RESET)"
-
-signing-timestamps-logs:
-	@echo "$(MAGENTA)$(BOLD)📜 Viewing Signing & Timestamps Logs...$(RESET)"
-	@if [ -d "/opt/agency_stack/clients/$(CLIENT_ID)/signing_timestamps/logs" ]; then \
-		ls -lat /opt/agency_stack/clients/$(CLIENT_ID)/signing_timestamps/logs/ | head -n 5; \
-		echo ""; \
-		if [ -n "$$(ls -A /opt/agency_stack/clients/$(CLIENT_ID)/signing_timestamps/logs/ 2>/dev/null)" ]; then \
-			echo "$(CYAN)Latest log:$(RESET)"; \
-			cat "$$(ls -t /opt/agency_stack/clients/$(CLIENT_ID)/signing_timestamps/logs/* | head -n 1)"; \
-		else \
-			echo "$(YELLOW)No signing logs found yet.$(RESET)"; \
-		fi \
-	else \
-		cat /var/log/agency_stack/components/signing_timestamps.log | tail -n 20; \
-	fi
-
-signing-timestamps-restart:
-	@echo "$(MAGENTA)$(BOLD)🔄 Regenerating Signing Keys...$(RESET)"
-	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/signing_timestamps/scripts/generate-server-key.sh" ]; then \
-		sudo /opt/agency_stack/clients/$(CLIENT_ID)/signing_timestamps/scripts/generate-server-key.sh; \
-	else \
-		echo "$(RED)Scripts not found. Is Signing & Timestamps installed?$(RESET)"; \
-		echo "$(CYAN)Install with: make signing-timestamps$(RESET)"; \
-	fi
-
-# Docker
-docker: validate
-	@echo "$(MAGENTA)$(BOLD)🐳 Installing Docker Container Runtime...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/install_docker.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(TEST_MODE),--test-mode,)
-
-docker-status:
-	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Docker Status...$(RESET)"
-	@if command -v docker &> /dev/null; then \
-		echo "$(GREEN)✅ Docker is installed$(RESET)"; \
-		echo "$(CYAN)Version: $(shell docker --version)$(RESET)"; \
-		echo "$(CYAN)Running containers: $(shell docker ps --format '{{.Names}}' | wc -l)$(RESET)"; \
-		if docker network inspect agency_stack_network &> /dev/null; then \
-			echo "$(GREEN)✅ AgencyStack Docker network is configured$(RESET)"; \
-		else \
-			echo "$(RED)❌ AgencyStack Docker network is missing$(RESET)"; \
-			echo "$(CYAN)Create with: docker network create agency_stack_network$(RESET)"; \
-		fi; \
-	else \
-		echo "$(RED)❌ Docker is not installed$(RESET)"; \
-		echo "$(CYAN)Install with: make docker$(RESET)"; \
-	fi
-
-docker-logs:
-	@echo "$(MAGENTA)$(BOLD)📜 Viewing Docker Logs...$(RESET)"
-	@if [ -f "/var/log/agency_stack/components/docker.log" ]; then \
-		cat /var/log/agency_stack/components/docker.log | tail -n 30; \
-	else \
-		echo "$(YELLOW)Docker installation logs not found.$(RESET)"; \
-		if command -v docker &> /dev/null; then \
-			echo "$(CYAN)Docker system logs:$(RESET)"; \
-			journalctl -u docker --no-pager | tail -n 20; \
-		fi; \
-	fi
-
-docker-restart:
-	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Docker Service...$(RESET)"
-	@if systemctl is-active docker &> /dev/null; then \
-		sudo systemctl restart docker; \
-		echo "$(GREEN)✅ Docker service restarted$(RESET)"; \
-	else \
-		echo "$(RED)❌ Docker service is not running$(RESET)"; \
-		sudo systemctl start docker; \
-		echo "$(GREEN)✅ Docker service started$(RESET)"; \
-	fi
-
-# Docker Compose
-docker-compose: validate
-	@echo "$(MAGENTA)$(BOLD)🐙 Installing Docker Compose...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/install_docker_compose.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(TEST_MODE),--test-mode,)
-
-docker-compose-status:
-	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Docker Compose Status...$(RESET)"
-	@if command -v docker-compose &> /dev/null; then \
-		echo "$(GREEN)✅ Docker Compose is installed$(RESET)"; \
-		echo "$(CYAN)Version: $(shell docker-compose --version)$(RESET)"; \
-		if [ -f "/opt/agency_stack/docker_compose/version.txt" ]; then \
-			echo "$(CYAN)Installed version: $(shell cat /opt/agency_stack/docker_compose/version.txt)$(RESET)"; \
-		fi; \
-	else \
-		echo "$(RED)❌ Docker Compose is not installed$(RESET)"; \
-		echo "$(CYAN)Install with: make docker-compose$(RESET)"; \
-	fi
-
-docker-compose-logs:
-	@echo "$(MAGENTA)$(BOLD)📜 Viewing Docker Compose Logs...$(RESET)"
-	@if [ -f "/var/log/agency_stack/components/docker_compose.log" ]; then \
-		cat /var/log/agency_stack/components/docker_compose.log | tail -n 30; \
-	else \
-		echo "$(YELLOW)Docker Compose installation logs not found.$(RESET)"; \
-	fi
-
-docker-compose-restart:
-	@echo "$(MAGENTA)$(BOLD)🧪 Testing Docker Compose...$(RESET)"
-	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/docker_compose/test-docker-compose.sh" ]; then \
-		sudo /opt/agency_stack/clients/$(CLIENT_ID)/docker_compose/test-docker-compose.sh; \
-	else \
-		echo "$(RED)❌ Test script not found. Is Docker Compose installed?$(RESET)"; \
-		echo "$(CYAN)Install with: make docker-compose$(RESET)"; \
-	fi
-
-# Fail2ban
-fail2ban: validate
-	@echo "🔒 Installing Fail2ban Intrusion Prevention...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/install_fail2ban.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(TEST_MODE),--test-mode,)
-
-fail2ban-status:
-	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Fail2ban Status...$(RESET)"
-	@if command -v fail2ban-server &> /dev/null && systemctl is-active --quiet fail2ban; then \
-		echo "$(GREEN)✅ Fail2ban is installed and running$(RESET)"; \
-		if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/fail2ban/fail2ban-status.sh" ]; then \
-			sudo /opt/agency_stack/clients/$(CLIENT_ID)/fail2ban/fail2ban-status.sh; \
-		else \
-			echo "$(CYAN)Active jails:$(RESET)"; \
-			sudo fail2ban-client status | grep -v "Status:" | grep ALLOW; \
-		fi; \
-	else \
-		echo "$(RED)❌ Fail2ban is not running$(RESET)"; \
-		echo "$(CYAN)Install with: make fail2ban$(RESET)"; \
-	fi
-
-fail2ban-logs:
-	@echo "$(MAGENTA)$(BOLD)📜 Viewing Fail2ban Logs...$(RESET)"
-	@if [ -f "/var/log/fail2ban.log" ]; then \
-		echo "$(CYAN)Recent Fail2ban actions:$(RESET)"; \
-		sudo grep "Ban\|Unban" /var/log/fail2ban.log | tail -n 20; \
-		echo ""; \
-		echo "$(CYAN)For installation logs, use:$(RESET)"; \
-		echo "cat /var/log/agency_stack/components/fail2ban.log"; \
-	else \
-		echo "$(YELLOW)Fail2ban logs not found.$(RESET)"; \
-		if [ -f "/var/log/agency_stack/components/fail2ban.log" ]; then \
-			cat /var/log/agency_stack/components/fail2ban.log | tail -n 20; \
-		fi; \
-	fi
-
-fail2ban-restart:
-	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Fail2ban Service...$(RESET)"
-	@if systemctl is-active fail2ban &> /dev/null; then \
-		sudo systemctl restart fail2ban; \
-		echo "$(GREEN)✅ Fail2ban service restarted$(RESET)"; \
-	else \
-		echo "$(RED)❌ Fail2ban service is not running$(RESET)"; \
-		sudo systemctl start fail2ban; \
-		echo "$(GREEN)✅ Fail2ban service started$(RESET)"; \
-	fi
-
-# Security
-security: validate
-	@echo "🔒 Installing Security Hardening...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/install_security.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(TEST_MODE),--test-mode,)
-
-security-status:
-	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Security Status...$(RESET)"
-	@if [ -f "/opt/agency_stack/security/.installed_ok" ]; then \
-		echo "$(GREEN)✅ Security hardening is installed$(RESET)"; \
-		if command -v ufw &> /dev/null && ufw status | grep -q "Status: active"; then \
-			echo "$(GREEN)✅ Firewall (UFW) is active$(RESET)"; \
-			echo "$(CYAN)Allowed ports:$(RESET)"; \
-			ufw status | grep -v "Status:" | grep ALLOW; \
-		else \
-			echo "$(RED)❌ Firewall (UFW) is not active$(RESET)"; \
-		fi; \
-		if [ -f "/etc/ssh/sshd_config.d/00-hardened.conf" ]; then \
-			echo "$(GREEN)✅ SSH hardening is applied$(RESET)"; \
-		else \
-			echo "$(YELLOW)⚠️ SSH hardening is not applied$(RESET)"; \
-		fi; \
-		if [ -f "/etc/apt/apt.conf.d/50unattended-upgrades" ]; then \
-			echo "$(GREEN)✅ Automatic security updates are configured$(RESET)"; \
-		else \
-			echo "$(YELLOW)⚠️ Automatic security updates are not configured$(RESET)"; \
-		fi; \
-	else \
-		echo "$(RED)❌ Security hardening is not installed$(RESET)"; \
-		echo "$(CYAN)Install with: make security$(RESET)"; \
-	fi
-
-security-logs:
-	@echo "$(MAGENTA)$(BOLD)📜 Viewing Security Logs...$(RESET)"
-	@if [ -f "/var/log/agency_stack/components/security.log" ]; then \
-		cat /var/log/agency_stack/components/security.log | tail -n 30; \
-		echo ""; \
-		echo "$(CYAN)For security audit logs, use:$(RESET)"; \
-		if [ -d "/opt/agency_stack/clients/$(CLIENT_ID)/security/audit" ]; then \
-			echo "$(CYAN)Available audit logs:$(RESET)"; \
-			ls -lt /opt/agency_stack/clients/$(CLIENT_ID)/security/audit/ | head -n 5; \
+		PEERTUBE_CONTAINER="peertube"; \
+	fi; \
+	if docker ps --format '{{.Names}}' | grep -q "$$PEERTUBE_CONTAINER"; then \
+		echo "$(GREEN)✅ PeerTube is running$(RESET)"; \
+		echo "$(CYAN)Testing OAuth configuration...$(RESET)"; \
+		OAUTH_CONFIG="/opt/agency_stack/clients/$(or $(CLIENT_ID),default)/peertube_data/config/production.yaml.d/oauth.yaml"; \
+		if [ -f "$$OAUTH_CONFIG" ]; then \
+			echo "$(GREEN)✅ OAuth configuration exists:$(RESET)"; \
+			cat "$$OAUTH_CONFIG"; \
 			echo ""; \
-			if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/security/audit/latest-audit.log" ]; then \
-				echo "$(CYAN)Latest audit summary:$(RESET)"; \
-				head -n 20 /opt/agency_stack/clients/$(CLIENT_ID)/security/audit/latest-audit.log; \
-				echo "..."; \
+			echo "$(CYAN)Testing Keycloak connection...$(RESET)"; \
+			OPENID_URL=$$(grep "open_id_configuration_url" "$$OAUTH_CONFIG" | awk -F"'" '{print $$2}'); \
+			if [ -n "$$OPENID_URL" ]; then \
+				echo "$(CYAN)Checking OpenID configuration at: $$OPENID_URL$(RESET)"; \
+				curl -s "$$OPENID_URL" | grep -q "issuer" && echo "$(GREEN)✅ Keycloak OpenID configuration is accessible$(RESET)" || echo "$(RED)❌ Keycloak OpenID configuration is not accessible$(RESET)"; \
+			else \
+				echo "$(RED)❌ Could not determine OpenID configuration URL$(RESET)"; \
 			fi; \
+		else \
+			echo "$(RED)❌ OAuth configuration not found$(RESET)"; \
+			echo "$(CYAN)Run: make peertube-sso-configure DOMAIN=$(DOMAIN)$(RESET)"; \
 		fi; \
 	else \
-		echo "$(YELLOW)Security installation logs not found.$(RESET)"; \
+		echo "$(RED)❌ PeerTube is not running$(RESET)"; \
+		echo "$(CYAN)Start PeerTube with: make peertube-restart$(RESET)"; \
 	fi
 
-security-restart:
-	@echo "$(MAGENTA)$(BOLD)🔄 Running Security Audit...$(RESET)"
-	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/security/security-audit.sh" ]; then \
-		sudo /opt/agency_stack/clients/$(CLIENT_ID)/security/security-audit.sh; \
-		echo "$(GREEN)✅ Security audit completed$(RESET)"; \
-		echo "$(CYAN)View the full report at: /opt/agency_stack/clients/$(CLIENT_ID)/security/audit/latest-audit.log$(RESET)"; \
-	else \
-		echo "$(RED)❌ Security audit script not found. Is Security component installed?$(RESET)"; \
-		echo "$(CYAN)Install with: make security$(RESET)"; \
-	fi
-
-# Demo Core Installation
-# Installs high-value components suitable for client/investor demos
-demo-core: validate
-	@echo "$(MAGENTA)$(BOLD)🚀 Installing AgencyStack Demo Core Components...$(RESET)"
-	@echo "$(CYAN)This will install a set of high-value components for demonstration purposes.$(RESET)"
-	@echo ""
-	
-	@echo "$(YELLOW)📊 Installing Core Infrastructure...$(RESET)"
-	@$(MAKE) docker docker-status docker_compose traefik_ssl
-	
-	@echo "$(YELLOW)🔐 Installing Security Components...$(RESET)"
-	@$(MAKE) keycloak keycloak-status fail2ban
-	
-	@echo "$(YELLOW)📧 Installing Communication Components...$(RESET)"
-	@$(MAKE) mailu mailu-status chatwoot chatwoot-status voip voip-status
-	
-	@echo "$(YELLOW)📊 Installing Monitoring Components...$(RESET)"
-	@$(MAKE) prometheus prometheus-status grafana grafana-status posthog posthog-status
-	
-	@echo "$(YELLOW)📝 Installing Content & CMS Components...$(RESET)"
-	@$(MAKE) wordpress wordpress-status peertube peertube-status builderio builderio-status
-	
-	@echo "$(YELLOW)🧰 Installing DevOps Components...$(RESET)"
-	@$(MAKE) gitea gitea-status droneci
-	
-	@echo "$(YELLOW)📅 Installing Business Components...$(RESET)"
-	@$(MAKE) calcom calcom-status erpnext documenso focalboard
-	
-	@echo "$(YELLOW)🔄 Integrating Components...$(RESET)"
-	@$(MAKE) integrate-sso
-	@$(MAKE) integrate-monitoring
-	@$(MAKE) dashboard-update
-	
-	@echo "$(YELLOW)🧪 Running Validation Checks...$(RESET)"
-	@$(MAKE) alpha-check
-	@if [ -f "$(SCRIPTS_DIR)/smoke_test.sh" ]; then \
-		$(MAKE) smoke-test; \
-	fi
-	
-	@echo "$(GREEN)$(BOLD)✅ Demo Core Components Installed Successfully!$(RESET)"
-	@echo "$(CYAN)Open the AgencyStack dashboard to view your installation:$(RESET)"
-	@echo "$(CYAN)$(MAKE) dashboard-open$(RESET)"
-
-# Demo Core Cleanup
-# Removes the demo core components for a clean slate
-demo-core-clean:
-	@echo "$(MAGENTA)$(BOLD)🧹 Cleaning Up AgencyStack Demo Core Components...$(RESET)"
-	@echo "$(RED)This will remove all demo core components and their data.$(RESET)"
-	@echo ""
-	
-	@echo "$(YELLOW)Stopping and Removing Business Components...$(RESET)"
-	@-$(MAKE) calcom-stop focalboard-stop erpnext-stop documenso-stop 2>/dev/null || true
-	
-	@echo "$(YELLOW)Stopping and Removing DevOps Components...$(RESET)"
-	@-$(MAKE) gitea-stop droneci-stop 2>/dev/null || true
-	
-	@echo "$(YELLOW)Stopping and Removing Content Components...$(RESET)"
-	@-$(MAKE) wordpress-stop peertube-stop builderio-stop 2>/dev/null || true
-	
-	@echo "$(YELLOW)Stopping and Removing Monitoring Components...$(RESET)"
-	@-$(MAKE) prometheus-stop grafana-stop posthog-stop 2>/dev/null || true
-	
-	@echo "$(YELLOW)Stopping and Removing Communication Components...$(RESET)"
-	@-$(MAKE) mailu-stop chatwoot-stop voip-stop 2>/dev/null || true
-	
-	@echo "$(YELLOW)Stopping and Removing Security Components...$(RESET)"
-	@-$(MAKE) keycloak-stop fail2ban-stop 2>/dev/null || true
-	
-	@echo "$(GREEN)$(BOLD)✅ Demo Core Components Cleaned Up Successfully!$(RESET)"
-	@echo "$(CYAN)The system has been returned to a clean state.$(RESET)"
-
-# Demo Core Status
-# Checks the status of all demo core components
-demo-core-status:
-	@echo "$(MAGENTA)$(BOLD)📊 AgencyStack Demo Core Components Status:$(RESET)"
-	@echo ""
-	
-	@echo "$(YELLOW)📊 Core Infrastructure Components:$(RESET)"
-	@-$(MAKE) docker-status docker_compose-status traefik-status 2>/dev/null || true
-	
-	@echo "$(YELLOW)🔐 Security Components:$(RESET)"
-	@-$(MAKE) keycloak-status fail2ban-status 2>/dev/null || true
-	
-	@echo "$(YELLOW)📧 Communication Components:$(RESET)"
-	@-$(MAKE) mailu-status chatwoot-status voip-status 2>/dev/null || true
-	
-	@echo "$(YELLOW)📊 Monitoring Components:$(RESET)"
-	@-$(MAKE) prometheus-status grafana-status posthog-status 2>/dev/null || true
-	
-	@echo "$(YELLOW)📝 Content & CMS Components:$(RESET)"
-	@-$(MAKE) wordpress-status peertube-status builderio-status 2>/dev/null || true
-	
-	@echo "$(YELLOW)🧰 DevOps Components:$(RESET)"
-	@-$(MAKE) gitea-status droneci-status 2>/dev/null || true
-	
-	@echo "$(YELLOW)📅 Business Components:$(RESET)"
-	@-$(MAKE) calcom-status erpnext-status documenso-status focalboard-status 2>/dev/null || true
-	
-	@echo "$(GREEN)$(BOLD)✅ Status Check Complete!$(RESET)"
-
-# Demo Core Logs
-# Views logs from all demo core components
-demo-core-logs:
-	@echo "$(MAGENTA)$(BOLD)📋 AgencyStack Demo Core Components Logs:$(RESET)"
-	@echo "$(CYAN)Viewing recent logs from all demo components...$(RESET)"
-	@echo ""
-	
-	@for component in docker traefik keycloak fail2ban mailu chatwoot voip prometheus grafana posthog wordpress peertube builderio gitea droneci calcom erpnext documenso focalboard; do \
-		echo "$(YELLOW)📄 $$component logs:$(RESET)"; \
-		$(MAKE) $$component-logs 2>/dev/null || echo "$(RED)No logs available for $$component$(RESET)"; \
-		echo ""; \
-	done
-	
-	@echo "$(GREEN)$(BOLD)✅ Logs Display Complete!$(RESET)"
-	@echo "$(CYAN)For detailed logs, use 'make <component>-logs' for specific components.$(RESET)"
-
-# Bolt DIY
-bolt-diy: validate
-	@echo "Installing Bolt DIY..."
-	@sudo $(SCRIPTS_DIR)/components/install_bolt_diy.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
-bolt-diy-status:
-	@echo "Checking Bolt DIY Status..."
-	@if [ -n "$(CLIENT_ID)" ]; then \
-		BOLT_CONTAINER="$(CLIENT_ID)_bolt_diy"; \
-	else \
-		BOLT_CONTAINER="bolt_diy"; \
-	fi; \
-	if docker ps -f name=$$BOLT_CONTAINER | grep -q $$BOLT_CONTAINER; then \
-		echo "$(GREEN)Bolt DIY is running$(RESET)"; \
-	else \
-		echo "$(RED)Bolt DIY is not running$(RESET)"; \
-	fi
-
-bolt-diy-logs:
-	@echo "Viewing Bolt DIY Logs..."
-	@if [ -f "/var/log/agency_stack/components/bolt_diy.log" ]; then \
-		tail -n 50 "/var/log/agency_stack/components/bolt_diy.log"; \
-	else \
-		echo "$(YELLOW)No Bolt DIY logs found$(RESET)"; \
-	fi
-
-bolt-diy-restart:
-	@echo "Restarting Bolt DIY..."
-	@if [ -f "$(SCRIPTS_DIR)/components/restart_bolt_diy.sh" ]; then \
-		$(SCRIPTS_DIR)/components/restart_bolt_diy.sh; \
-	else \
-		echo "Restart script not found. Trying standard methods..."; \
-		if [ -n "$(CLIENT_ID)" ]; then \
-			systemctl restart $(CLIENT_ID)-bolt-diy; \
-		else \
-			systemctl restart bolt-diy; \
-		fi; \
-	fi
-
-# Archon
-archon: validate
-	@echo "Installing Archon..."
-	@sudo $(SCRIPTS_DIR)/components/install_archon.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
-archon-status:
-	@echo "Checking Archon Status..."
-	@if [ -n "$(CLIENT_ID)" ]; then \
-		ARCHON_CONTAINER="$(CLIENT_ID)_archon"; \
-	else \
-		ARCHON_CONTAINER="archon"; \
-	fi; \
-	if docker ps -f name=$$ARCHON_CONTAINER | grep -q $$ARCHON_CONTAINER; then \
-		echo "$(GREEN)Archon is running$(RESET)"; \
-	else \
-		echo "$(RED)Archon is not running$(RESET)"; \
-	fi
-
-archon-logs:
-	@echo "Viewing Archon Logs..."
-	@if [ -f "/var/log/agency_stack/components/archon.log" ]; then \
-		tail -n 50 "/var/log/agency_stack/components/archon.log"; \
-	else \
-		echo "$(YELLOW)No Archon logs found$(RESET)"; \
-	fi
-
-archon-restart:
-	@echo "Restarting Archon..."
-	@if [ -f "$(SCRIPTS_DIR)/components/restart_archon.sh" ]; then \
-		$(SCRIPTS_DIR)/components/restart_archon.sh; \
-	else \
-		echo "Restart script not found. Trying standard methods..."; \
-		docker-compose -f "/opt/agency_stack/clients/$(CLIENT_ID)/archon/docker-compose.yml" restart; \
-	fi
-
-# Database Components
-# ------------------------------------------------------------------------------
-
-pgvector:
-	@echo "$(MAGENTA)$(BOLD)🔍 Installing pgvector...$(RESET)"
-	@read -p "$(YELLOW)Enter domain:$(RESET) " DOMAIN; \
-	read -p "$(YELLOW)Enter admin email:$(RESET) " ADMIN_EMAIL; \
-	read -p "$(YELLOW)Enter client ID (optional):$(RESET) " CLIENT_ID; \
-	sudo $(SCRIPTS_DIR)/components/install_pgvector.sh --domain $$DOMAIN --admin-email $$ADMIN_EMAIL $(if $$CLIENT_ID,--client-id $$CLIENT_ID,) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
-pgvector-status:
-	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking pgvector status...$(RESET)"
-	@CLIENT_ID=$${CLIENT_ID:-default}; \
-	INSTALL_DIR="/opt/agency_stack/clients/$${CLIENT_ID}/pgvector"; \
-	if [ -f "$${INSTALL_DIR}/.installed" ]; then \
-		echo "✅ pgvector is installed for client $${CLIENT_ID}"; \
-		VERSION=$$(cat "$${INSTALL_DIR}/.version" 2>/dev/null || echo "unknown"); \
-		echo "📊 Version: $${VERSION}"; \
-		docker exec postgres-$${CLIENT_ID} psql -U postgres -c "SELECT extversion FROM pg_extension WHERE extname='vector'" || echo "⚠️ Extension not installed or error occurred"; \
-	else \
-		echo "❌ pgvector is not installed for client $${CLIENT_ID}"; \
-	fi
-
-pgvector-logs:
-	@echo "$(MAGENTA)$(BOLD)📜 Viewing pgvector logs...$(RESET)"
-	@CLIENT_ID=$${CLIENT_ID:-default}; \
-	sudo cat /var/log/agency_stack/components/pgvector.log || echo "No logs found"
-
-pgvector-restart:
-	@echo "$(MAGENTA)$(BOLD)🔄 Restarting pgvector...$(RESET)"
-	@CLIENT_ID=$${CLIENT_ID:-default}; \
-	echo "⚠️ pgvector is an extension of PostgreSQL. Restarting database..."; \
-	docker restart postgres-$${CLIENT_ID} || echo "Failed to restart PostgreSQL for client $${CLIENT_ID}"
-
-pgvector-test:
-	@echo "$(MAGENTA)$(BOLD)🧪 Testing pgvector functionality...$(RESET)"
-	@CLIENT_ID=$${CLIENT_ID:-default}; \
-	INSTALL_DIR="/opt/agency_stack/clients/$${CLIENT_ID}/pgvector"; \
-	if [ -d "$${INSTALL_DIR}/samples" ]; then \
-		read -p "$(YELLOW)This will install Python dependencies. Continue? [y/N]$(RESET) " CONFIRM; \
-		if [[ $$CONFIRM =~ ^[Yy] ]]; then \
-			cd "$${INSTALL_DIR}/samples" && ./run_example.sh; \
-		else \
-			echo "Test cancelled"; \
-		fi \
-	else \
-		echo "❌ Sample code not found. Check installation."; \
-	fi
-
-pgvector-test:
-	@echo "$(MAGENTA)$(BOLD)🧪 Testing pgvector functionality...$(RESET)"
-	@CLIENT_ID=$${CLIENT_ID:-default}; \
-	INSTALL_DIR="/opt/agency_stack/clients/$${CLIENT_ID}/pgvector"; \
-	if [ -f "$${INSTALL_DIR}/.installed" ]; then \
-		echo "🔍 Testing pgvector extension in PostgreSQL..."; \
-		docker exec postgres-$${CLIENT_ID} psql -U postgres -d vectordb -c "CREATE TABLE IF NOT EXISTS vector_test_simple (id serial PRIMARY KEY, embedding vector(3)); INSERT INTO vector_test_simple (embedding) VALUES ('[1,2,3]'), ('[4,5,6]'); SELECT * FROM vector_test_simple; SELECT 'Test successful: Vector operations working correctly' AS status;" || { echo "❌ Test failed"; exit 1; }; \
-		echo "✅ Test completed successfully"; \
-	else \
-		echo "❌ pgvector is not installed. Please run 'make pgvector' first."; \
+# Remote Deployment
+deploy-remote:
+	@echo "$(MAGENTA)$(BOLD)🚀 Deploying to Remote VM...$(RESET)"
+	@if [ -z "$(REMOTE_HOST)" ]; then \
+		echo "$(RED)Error: Missing required parameter REMOTE_HOST.$(RESET)"; \
+		echo "Usage: make deploy-remote REMOTE_HOST=hostname.example.com [COMPONENT=keycloak] [REMOTE_USER=root] [SSH_KEY=/path/to/key] [SSH_PORT=22]"; \
 		exit 1; \
-	fi
+	fi; \
+	bash $(SCRIPTS_DIR)/utils/deploy_to_remote.sh \
+		--remote-host $(REMOTE_HOST) \
+		$(if $(REMOTE_USER),--remote-user $(REMOTE_USER),) \
+		$(if $(SSH_KEY),--ssh-key $(SSH_KEY),) \
+		$(if $(SSH_PORT),--ssh-port $(SSH_PORT),) \
+		$(if $(COMPONENT),--component $(COMPONENT),) \
+		$(if $(FORCE),--force,) \
+		$(if $(VERBOSE),--verbose,)
 
-dashboard-direct:
-	@echo "$(MAGENTA)$(BOLD)🔗 Opening dashboard via direct access...$(RESET)"
-	@SERVER_IP=$$(hostname -I | awk '{print $$1}'); \
-	echo "$(CYAN)Dashboard Direct Access URLs:$(RESET)"; \
-	echo "$(GREEN)Main:       http://$${SERVER_IP}:3001$(RESET)"; \
-	echo "$(GREEN)Fallback:   http://$${SERVER_IP}:8080$(RESET)"; \
-	echo "$(GREEN)Guaranteed: http://$${SERVER_IP}:8888$(RESET)"; \
-	xdg-open "http://$${SERVER_IP}:8888" 2>/dev/null || echo "$(YELLOW)No browser available. Access manually using the URLs above.$(RESET)"
+deploy-keycloak-remote:
+	@echo "$(MAGENTA)$(BOLD)🔑 Deploying Keycloak to Remote VM...$(RESET)"
+	@if [ -z "$(REMOTE_HOST)" ]; then \
+		echo "$(RED)Error: Missing required parameter REMOTE_HOST.$(RESET)"; \
+		echo "Usage: make deploy-keycloak-remote REMOTE_HOST=hostname.example.com [REMOTE_USER=root] [SSH_KEY=/path/to/key] [SSH_PORT=22]"; \
+		exit 1; \
+	fi; \
+	bash $(SCRIPTS_DIR)/utils/deploy_to_remote.sh \
+		--remote-host $(REMOTE_HOST) \
+		$(if $(REMOTE_USER),--remote-user $(REMOTE_USER),) \
+		$(if $(SSH_KEY),--ssh-key $(SSH_KEY),) \
+		$(if $(SSH_PORT),--ssh-port $(SSH_PORT),) \
+		--component keycloak \
+		$(if $(FORCE),--force,) \
+		$(if $(VERBOSE),--verbose,)
 
-dashboard-access:
-	@echo "$(MAGENTA)$(BOLD)🔧 Installing comprehensive dashboard access...$(RESET)"
-	@read -p "$(YELLOW)Enter domain (default: $${DOMAIN:-proto001.alpha.nerdofmouth.com}):$(RESET) " DOMAIN_INPUT; \
-	DOMAIN="$${DOMAIN_INPUT:-$${DOMAIN:-proto001.alpha.nerdofmouth.com}}"; \
-	read -p "$(YELLOW)Enter client ID (default: default):$(RESET) " CLIENT_ID_INPUT; \
-	CLIENT_ID="$${CLIENT_ID_INPUT:-default}"; \
-	sudo $(SCRIPTS_DIR)/components/install_dashboard_access.sh --domain "$${DOMAIN}" --client-id "$${CLIENT_ID}" $(if $(FORCE),--force,)
+configure-keycloak-remote:
+	@echo "$(MAGENTA)$(BOLD)🔧 Configuring Keycloak OAuth on Remote VM...$(RESET)"
+	@if [ -z "$(REMOTE_HOST)" ] || [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameters.$(RESET)"; \
+		echo "Usage: make configure-keycloak-remote REMOTE_HOST=hostname.example.com DOMAIN=auth.example.com [ENABLE_OAUTH_*=true]"; \
+		exit 1; \
+	fi; \
+	echo "$(CYAN)Deploying Keycloak files to remote...$(RESET)" && \
+	make deploy-keycloak-remote REMOTE_HOST=$(REMOTE_HOST) $(if $(REMOTE_USER),REMOTE_USER=$(REMOTE_USER),) $(if $(SSH_KEY),SSH_KEY=$(SSH_KEY),) $(if $(SSH_PORT),SSH_PORT=$(SSH_PORT),) && \
+	echo "$(CYAN)Configuring OAuth providers on remote...$(RESET)" && \
+	ssh $(if $(SSH_KEY),-i $(SSH_KEY),) $(if $(SSH_PORT),-p $(SSH_PORT),) $(if $(REMOTE_USER),$(REMOTE_USER),root)@$(REMOTE_HOST) \
+		"cd /opt/agency_stack && make keycloak-oauth-configure DOMAIN=$(DOMAIN) \
+		$(if $(CLIENT_ID),CLIENT_ID=$(CLIENT_ID),) \
+		$(if $(ENABLE_OAUTH_GOOGLE),ENABLE_OAUTH_GOOGLE=true,) \
+		$(if $(ENABLE_OAUTH_GITHUB),ENABLE_OAUTH_GITHUB=true,) \
+		$(if $(ENABLE_OAUTH_APPLE),ENABLE_OAUTH_APPLE=true,) \
+		$(if $(ENABLE_OAUTH_LINKEDIN),ENABLE_OAUTH_LINKEDIN=true,) \
+		$(if $(ENABLE_OAUTH_MICROSOFT),ENABLE_OAUTH_MICROSOFT=true,) \
+		$(if $(VERBOSE),VERBOSE=true,)"
 
-dashboard-check:
-	@echo "$(MAGENTA)$(BOLD)🔍 Checking dashboard access methods...$(RESET)"
-	@read -p "$(YELLOW)Enter domain (default: $${DOMAIN:-proto001.alpha.nerdofmouth.com}):$(RESET) " DOMAIN_INPUT; \
-	DOMAIN="$${DOMAIN_INPUT:-$${DOMAIN:-proto001.alpha.nerdofmouth.com}}"; \
-	read -p "$(YELLOW)Enter client ID (default: default):$(RESET) " CLIENT_ID_INPUT; \
-	CLIENT_ID="$${CLIENT_ID_INPUT:-default}"; \
-	sudo $(SCRIPTS_DIR)/utils/dashboard_dns_helper.sh --domain "$${DOMAIN}" --client-id "$${CLIENT_ID}" $(if $(VERBOSE),--verbose,)
-
-dashboard-fix:
-	@echo "$(MAGENTA)$(BOLD)🛠️ Fixing dashboard access issues...$(RESET)"
-	@read -p "$(YELLOW)Enter domain (default: $${DOMAIN:-proto001.alpha.nerdofmouth.com}):$(RESET) " DOMAIN_INPUT; \
-	DOMAIN="$${DOMAIN_INPUT:-$${DOMAIN:-proto001.alpha.nerdofmouth.com}}"; \
-	read -p "$(YELLOW)Enter client ID (default: default):$(RESET) " CLIENT_ID_INPUT; \
-	CLIENT_ID="$${CLIENT_ID_INPUT:-default}"; \
-	sudo $(SCRIPTS_DIR)/utils/dashboard_dns_helper.sh --domain "$${DOMAIN}" --client-id "$${CLIENT_ID}" --fix $(if $(VERBOSE),--verbose,)
-
-# Fix Traefik ports for standard HTTP/HTTPS access
-traefik-fix-ports:
-	@echo "$(MAGENTA)$(BOLD)🛠️ Fixing Traefik ports for standard HTTP/HTTPS access...$(RESET)"
-	@read -p "$(YELLOW)Enter domain (default: $${DOMAIN:-proto001.alpha.nerdofmouth.com}):$(RESET) " DOMAIN_INPUT; \
-	DOMAIN="$${DOMAIN_INPUT:-$${DOMAIN:-proto001.alpha.nerdofmouth.com}}"; \
-	read -p "$(YELLOW)Enter client ID (default: default):$(RESET) " CLIENT_ID_INPUT; \
-	CLIENT_ID="$${CLIENT_ID_INPUT:-default}"; \
-	sudo $(SCRIPTS_DIR)/components/fix_traefik_ports.sh --domain "$${DOMAIN}" --client-id "$${CLIENT_ID}" $(if $(FORCE),--force,) $(if $(VERBOSE),--verbose,)
-
-# Check Traefik port configuration
-traefik-check-ports:
-	@echo "$(MAGENTA)$(BOLD)🔍 Checking Traefik port configuration...$(RESET)"
-	@read -p "$(YELLOW)Enter domain (default: $${DOMAIN:-proto001.alpha.nerdofmouth.com}):$(RESET) " DOMAIN_INPUT; \
-	DOMAIN="$${DOMAIN_INPUT:-$${DOMAIN:-proto001.alpha.nerdofmouth.com}}"; \
-	read -p "$(YELLOW)Enter client ID (default: default):$(RESET) " CLIENT_ID_INPUT; \
-	CLIENT_ID="$${CLIENT_ID_INPUT:-default}"; \
-	sudo $(SCRIPTS_DIR)/components/fix_traefik_ports.sh --domain "$${DOMAIN}" --client-id "$${CLIENT_ID}" --check-only $(if $(VERBOSE),--verbose,)
-
-# Auto-generated target for keycloak
-keycloak:
-	@echo "🔑 Installing Keycloak SSO & Identity provider..."
-	@sudo $(SCRIPTS_DIR)/components/install_keycloak.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
-# Auto-generated target for keycloak
-keycloak-status:
-	@echo "🔍 Checking Keycloak status..."
-	@sudo docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep -E "keycloak|postgres"
-
-# Auto-generated target for keycloak
-keycloak-logs:
-	@echo "📋 Viewing Keycloak logs..."
-	@sudo docker logs --tail=100 -f keycloak_$(subst .,_,$(DOMAIN))
-
-# Auto-generated target for keycloak
-keycloak-restart:
-	@echo "🔄 Restarting Keycloak services..."
-	@cd /opt/agency_stack/keycloak/$(DOMAIN) && sudo docker-compose restart
+# Cross-VM OAuth Dashboard Sync
+sync-oauth-dashboard:
+	@echo "$(MAGENTA)$(BOLD)🔄 Synchronizing OAuth Dashboard Data Between VMs...$(RESET)"
+	@if [ -z "$(SOURCE_HOST)" ] || [ -z "$(TARGET_HOST)" ]; then \
+		echo "Usage: make sync-oauth-dashboard SOURCE_HOST=proto002.alpha.nerdofmouth.com TARGET_HOST=proto001.alpha.nerdofmouth.com [DOMAIN=auth.example.com] [VERBOSE=true]"; \
+		exit 1; \
+	fi; \
+	bash $(SCRIPTS_DIR)/utils/sync_dashboard_oauth.sh \
+		--source-host $(SOURCE_HOST) \
+		--target-host $(TARGET_HOST) \
+		$(if $(DOMAIN),--domain $(DOMAIN),) \
+		$(if $(SOURCE_CLIENT_ID),--source-client-id $(SOURCE_CLIENT_ID),) \
+		$(if $(TARGET_CLIENT_ID),--target-client-id $(TARGET_CLIENT_ID),) \
+		$(if $(FORCE),--force,) \
+		$(if $(VERBOSE),--verbose,) \
+		$(if $(DRY_RUN),--dry-run,)
 
 # SSO Integration targets
 sso-integrate:
@@ -2663,41 +1568,51 @@ sso-integrate:
 	fi
 	@sudo $(SCRIPTS_DIR)/components/implement_sso_integration.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) --client-id $(CLIENT_ID) --component $(COMPONENT) --framework $(FRAMEWORK) --component-url $(COMPONENT_URL) $(if $(FORCE),--force,) $(if $(VERBOSE),--verbose,)
 
-sso-status:
-	@echo "🔍 Checking SSO integration status for components..."
-	@echo "Components with SSO enabled:"
-	@grep -B 5 -A 3 '"sso": true' $(CONFIG_DIR)/registry/component_registry.json | grep '"name":' | awk -F'"' '{print $$4}' | sort | uniq
-	@echo ""
-	@echo "Components with SSO configured:"
-	@grep -B 10 -A 3 '"sso_configured": true' $(CONFIG_DIR)/registry/component_registry.json 2>/dev/null | grep '"name":' | awk -F'"' '{print $$4}' | sort | uniq || echo "None configured yet"
+# WordPress SSO integration
+wordpress-sso:
+	@echo "🔒 Integrating WordPress with Keycloak SSO..."
+	@sudo $(SCRIPTS_DIR)/components/implement_sso_integration.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) --client-id $(CLIENT_ID) --component wordpress --framework php --component-url https://wordpress.$(DOMAIN) $(if $(FORCE),--force,) $(if $(VERBOSE),--verbose,)
 
-# Add SSO integration for specific components
-%-sso:
-	@echo "🔒 Integrating $(subst -sso,,$@) with Keycloak SSO..."
-	@component=$(subst -sso,,$@); \
-	if grep -q "\"name\": \"$$component\"" $(CONFIG_DIR)/registry/component_registry.json && grep -q -A 20 "\"name\": \"$$component\"" $(CONFIG_DIR)/registry/component_registry.json | grep -q "\"sso\": true"; then \
-		framework="docker"; \
-		if [ "$$component" = "peertube" ] || [ "$$component" = "gitea" ] || [ "$$component" = "n8n" ]; then framework="nodejs"; fi; \
-		if [ "$$component" = "django" ] || [ "$$component" = "grafana" ]; then framework="python"; fi; \
-		$(MAKE) sso-integrate COMPONENT=$$component FRAMEWORK=$$framework COMPONENT_URL=https://$$component.$(DOMAIN); \
+# WordPress SSO integration (convenience target)
+wordpress-sso-configure: validate
+	@echo "$(MAGENTA)$(BOLD)🔑 Configuring WordPress SSO Integration...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/keycloak/configure_wordpress_client.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(VERBOSE),--verbose,)
+
+# Test WordPress-Keycloak SSO integration
+wordpress-sso-test: validate
+	@echo "$(MAGENTA)$(BOLD)🧪 Testing WordPress SSO Integration...$(RESET)"
+	@if [ -n "$(CLIENT_ID)" ]; then \
+		WP_CONTAINER="$(CLIENT_ID)_wordpress"; \
 	else \
-		echo "Component $$component does not exist or is not SSO-enabled in the registry"; \
-		exit 1; \
+		WP_CONTAINER="wordpress"; \
+	fi; \
+	if docker ps --format '{{.Names}}' | grep -q "$$WP_CONTAINER"; then \
+		echo "$(GREEN)✅ WordPress is running$(RESET)"; \
+		echo "$(CYAN)Testing OAuth configuration...$(RESET)"; \
+		OAUTH_CONFIG="/opt/agency_stack/clients/$(or $(CLIENT_ID),default)/wordpress_data/wp-content/plugins/nextcloud-auth/config/config.json"; \
+		if [ -f "$$OAUTH_CONFIG" ]; then \
+			echo "$(GREEN)✅ OAuth configuration exists:$(RESET)"; \
+			cat "$$OAUTH_CONFIG"; \
+			echo ""; \
+			echo "$(CYAN)Testing Keycloak connection...$(RESET)"; \
+			OPENID_URL=$$(grep "openid_url" "$$OAUTH_CONFIG" | awk -F"'" '{print $$2}'); \
+			if [ -n "$$OPENID_URL" ]; then \
+				echo "$(CYAN)Checking OpenID configuration at: $$OPENID_URL$(RESET)"; \
+				curl -s "$$OPENID_URL" | grep -q "issuer" && echo "$(GREEN)✅ Keycloak OpenID configuration is accessible$(RESET)" || echo "$(RED)❌ Keycloak OpenID configuration is not accessible$(RESET)"; \
+			else \
+				echo "$(RED)❌ Could not determine OpenID configuration URL$(RESET)"; \
+			fi; \
+		else \
+			echo "$(RED)❌ OAuth configuration not found$(RESET)"; \
+			echo "$(CYAN)Run: make wordpress-sso-configure DOMAIN=$(DOMAIN)$(RESET)"; \
+		fi; \
+	else \
+		echo "$(RED)❌ WordPress is not running$(RESET)"; \
+		echo "$(CYAN)Start WordPress with: make wordpress-restart$(RESET)"; \
 	fi
 
-# Implement SSO for all components marked with sso: true
-sso-integrate-all:
-	@echo "🔒 Integrating all SSO-enabled components with Keycloak..."
-	@for component in $$(grep -B 5 -A 3 '"sso": true' $(CONFIG_DIR)/registry/component_registry.json | grep '"name":' | awk -F'"' '{print $$4}' | sort | uniq); do \
-		echo "Integrating $$component..."; \
-		framework="docker"; \
-		if [ "$$component" = "peertube" ] || [ "$$component" = "gitea" ] || [ "$$component" = "n8n" ]; then framework="nodejs"; fi; \
-		if [ "$$component" = "django" ] || [ "$$component" = "grafana" ]; then framework="python"; fi; \
-		$(MAKE) sso-integrate COMPONENT=$$component FRAMEWORK=$$framework COMPONENT_URL=https://$$component.$(DOMAIN) || true; \
-		echo ""; \
-	done
-
-traefik:
+# Traefik
+traefik: validate
 	@echo "$(MAGENTA)$(BOLD)🔄 Installing Traefik Reverse Proxy...$(RESET)"
 	@read -p "$(YELLOW)Use host network mode? (true/false, default: true):$(RESET) " USE_HOST_NETWORK; \
 	USE_HOST_NETWORK="$${USE_HOST_NETWORK:-true}"; \
