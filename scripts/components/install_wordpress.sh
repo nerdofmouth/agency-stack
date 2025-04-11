@@ -41,11 +41,11 @@ VERBOSE=false
 FORCE=false
 WITH_DEPS=false
 DOMAIN=""
-CLIENT_ID=""
+CLIENT_ID="default"  # Default client ID
 ADMIN_EMAIL=""
 WP_ADMIN_USER="admin"
-DB_ROOT_PASSWORD=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-16)
-WP_DB_PASSWORD=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-16)
+WP_DB_PASSWORD=$(openssl rand -base64 12)
+WP_ROOT_PASSWORD=$(openssl rand -base64 12)
 WP_ADMIN_PASSWORD=$(openssl rand -base64 12 | tr -d "=+/")
 WP_VERSION="latest"
 PHP_VERSION="8.1"
@@ -336,19 +336,28 @@ mkdir -p "${WP_DIR}/${DOMAIN}/certs"
 mkdir -p "${WP_DIR}/${DOMAIN}/logs"
 mkdir -p "${WP_DIR}/${DOMAIN}/redis"
 
+# Store MySQL credentials for WP-CLI
+cat > "${WP_DIR}/${DOMAIN}/.my.cnf" <<EOL
+[client]
+host=${CLIENT_ID}_mariadb
+user=wordpress
+password=${WP_DB_PASSWORD}
+EOL
+chmod 600 "${WP_DIR}/${DOMAIN}/.my.cnf"
+
 # Create WordPress Docker Compose file
 log "INFO: Creating WordPress Docker Compose file" "${CYAN}Creating WordPress Docker Compose file...${NC}"
-cat > "${WP_DIR}/${DOMAIN}/docker-compose.yml" <<EOF
+cat > "${WP_DIR}/${DOMAIN}/docker-compose.yml" <<EOL
 version: '3.7'
 
 services:
   # MariaDB Database
   db:
     image: mariadb:10.6
-    container_name: ${MARIADB_CONTAINER}
+    container_name: ${CLIENT_ID}_mariadb
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${WP_ROOT_PASSWORD}
       MYSQL_DATABASE: wordpress
       MYSQL_USER: wordpress
       MYSQL_PASSWORD: ${WP_DB_PASSWORD}
@@ -388,7 +397,7 @@ services:
       - db
       - redis
     environment:
-      WORDPRESS_DB_HOST: default_mariadb
+      WORDPRESS_DB_HOST: ${CLIENT_ID}_mariadb
       WORDPRESS_DB_USER: wordpress
       WORDPRESS_DB_PASSWORD: ${WP_DB_PASSWORD}
       WORDPRESS_DB_NAME: wordpress
@@ -455,7 +464,7 @@ services:
 networks:
   ${NETWORK_NAME}:
     external: true
-EOF
+EOL
 
 # Create Nginx configuration
 log "INFO: Creating Nginx configuration" "${CYAN}Creating Nginx configuration...${NC}"
@@ -602,7 +611,7 @@ WP_ADMIN_USER=${WP_ADMIN_USER}
 WP_ADMIN_PASSWORD=${WP_ADMIN_PASSWORD}
 WP_ADMIN_EMAIL=${ADMIN_EMAIL}
 
-DB_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+DB_ROOT_PASSWORD=${WP_ROOT_PASSWORD}
 WP_DB_PASSWORD=${WP_DB_PASSWORD}
 
 # Docker containers
