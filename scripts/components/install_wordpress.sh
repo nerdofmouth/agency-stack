@@ -419,6 +419,11 @@ services:
     networks:
       - wordpress_network
       - ${NETWORK_NAME}
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "wordpress", "-p${WP_DB_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   redis:
     container_name: ${REDIS_CONTAINER_NAME}
