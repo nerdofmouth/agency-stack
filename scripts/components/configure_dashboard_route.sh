@@ -14,6 +14,8 @@ CLIENT_ID="${CLIENT_ID:-default}"
 DOMAIN="${DOMAIN:-localhost}"
 DASHBOARD_PORT="3001"  # Updated to match install_dashboard.sh port
 USE_HOST_NETWORK="${USE_HOST_NETWORK:-true}"  # Default to host network mode for better compatibility
+ENABLE_KEYCLOAK="${ENABLE_KEYCLOAK:-false}"
+ENFORCE_HTTPS="${ENFORCE_HTTPS:-false}"
 
 # Process command line arguments
 while [[ $# -gt 0 ]]; do
@@ -30,6 +32,14 @@ while [[ $# -gt 0 ]]; do
       USE_HOST_NETWORK="$2"
       shift 2
       ;;
+    --enable-keycloak)
+      ENABLE_KEYCLOAK=true
+      shift
+      ;;
+    --enforce-https)
+      ENFORCE_HTTPS=true
+      shift
+      ;;
     *)
       log_error "Unknown option: $1"
       exit 1
@@ -41,6 +51,8 @@ log_info "Starting configure_dashboard_route.sh"
 log_info "CLIENT_ID: ${CLIENT_ID}"
 log_info "DOMAIN: ${DOMAIN}"
 log_info "NETWORK MODE: ${USE_HOST_NETWORK}"
+log_info "ENABLE_KEYCLOAK: ${ENABLE_KEYCLOAK}"
+log_info "ENFORCE_HTTPS: ${ENFORCE_HTTPS}"
 
 # Paths
 TRAEFIK_CONFIG_DIR="/opt/agency_stack/clients/${CLIENT_ID}/traefik/config/dynamic"
@@ -82,6 +94,17 @@ http:
         - "web"
       service: "dashboard-service"
       priority: 10000
+EOF
+
+# Add HTTPS enforcement middleware if enabled
+if [[ "${ENFORCE_HTTPS}" == "true" ]]; then
+  cat >> "${TRAEFIK_DYNAMIC_CONFIG_DIR}/dashboard-route.yml" <<EOF
+      middlewares:
+        - "https-redirect"
+EOF
+fi
+
+cat >> "${TRAEFIK_DYNAMIC_CONFIG_DIR}/dashboard-route.yml" <<EOF
     
     # HTTP - Dashboard path router
     dashboard-path-http:
@@ -89,8 +112,26 @@ http:
       entrypoints:
         - "web"
       service: "dashboard-service"
+EOF
+
+# Add middlewares for dashboard path HTTP router
+cat >> "${TRAEFIK_DYNAMIC_CONFIG_DIR}/dashboard-route.yml" <<EOF
       middlewares:
-        - "dashboard-strip"
+EOF
+
+# Add middlewares based on configuration
+middleware_list=()
+middleware_list+=("dashboard-strip")
+
+if [[ "${ENFORCE_HTTPS}" == "true" ]]; then
+  middleware_list+=("https-redirect")
+fi
+
+# Join the middleware list with commas
+middleware_string=$(IFS=,; echo "${middleware_list[*]}")
+
+cat >> "${TRAEFIK_DYNAMIC_CONFIG_DIR}/dashboard-route.yml" <<EOF
+        - "${middleware_string}"
       priority: 10100
     
     # HTTPS - Root domain router
@@ -99,6 +140,17 @@ http:
       entrypoints:
         - "websecure"
       service: "dashboard-service"
+EOF
+
+# Add Keycloak authentication middleware if enabled for HTTPS root router
+if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
+  cat >> "${TRAEFIK_DYNAMIC_CONFIG_DIR}/dashboard-route.yml" <<EOF
+      middlewares:
+        - "keycloak-auth"
+EOF
+fi
+
+cat >> "${TRAEFIK_DYNAMIC_CONFIG_DIR}/dashboard-route.yml" <<EOF
       priority: 10000
       tls: {}
     
@@ -108,8 +160,26 @@ http:
       entrypoints:
         - "websecure"
       service: "dashboard-service"
+EOF
+
+# Add middlewares for dashboard path HTTPS router
+cat >> "${TRAEFIK_DYNAMIC_CONFIG_DIR}/dashboard-route.yml" <<EOF
       middlewares:
-        - "dashboard-strip"
+EOF
+
+# Reset and rebuild middleware list for HTTPS path router
+middleware_list=()
+middleware_list+=("dashboard-strip")
+
+if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
+  middleware_list+=("keycloak-auth")
+fi
+
+# Join the middleware list with commas
+middleware_string=$(IFS=,; echo "${middleware_list[*]}")
+
+cat >> "${TRAEFIK_DYNAMIC_CONFIG_DIR}/dashboard-route.yml" <<EOF
+        - "${middleware_string}"
       priority: 10100
       tls: {}
   
@@ -141,6 +211,23 @@ cat >> "${TRAEFIK_DYNAMIC_CONFIG_DIR}/dashboard-route.yml" <<EOF
         prefixes:
           - "/dashboard"
 EOF
+
+if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
+  cat >> "${TRAEFIK_DYNAMIC_CONFIG_DIR}/dashboard-route.yml" <<EOF
+    keycloak-auth:
+      forwardAuth:
+        address: "http://keycloak:8080/auth/realms/agencystack/protocol/openid-connect/auth"
+        trustForwardHeader: true
+EOF
+fi
+
+if [[ "${ENFORCE_HTTPS}" == "true" ]]; then
+  cat >> "${TRAEFIK_DYNAMIC_CONFIG_DIR}/dashboard-route.yml" <<EOF
+    https-redirect:
+      redirectScheme:
+        scheme: "https"
+EOF
+fi
 
 log_success "Dashboard routing configuration created: ${TRAEFIK_DYNAMIC_CONFIG_DIR}/dashboard-route.yml"
 log_info "Dashboard access URLs:"
