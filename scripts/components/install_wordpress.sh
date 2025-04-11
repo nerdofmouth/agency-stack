@@ -540,19 +540,14 @@ fi
 log "INFO: Waiting for WordPress to start" "${YELLOW}Waiting for WordPress to start...${NC}"
 sleep 10
 
-# Install WP-CLI
-log "INFO: Installing WP-CLI" "${CYAN}Installing WP-CLI...${NC}"
-if ! command -v wp &> /dev/null; then
-  curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar >> "$INSTALL_LOG" 2>&1
-  chmod +x wp-cli.phar
-  mv wp-cli.phar /usr/local/bin/wp
-fi
-
 # Configure WordPress using WP-CLI
 log "INFO: Configuring WordPress site" "${CYAN}Configuring WordPress site...${NC}"
 
 # Wait for WordPress to be ready
 sleep 10
+
+# Install WP-CLI inside the container
+docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar && chmod +x wp-cli.phar && mv wp-cli.phar /usr/local/bin/wp"
 
 # Run WP-CLI
 docker exec ${WORDPRESS_CONTAINER_NAME} wp --allow-root --path=/var/www/html core install \
