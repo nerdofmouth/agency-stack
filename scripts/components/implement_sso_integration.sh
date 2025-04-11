@@ -213,13 +213,61 @@ update_sso_configured_flag() {
   return 0
 }
 
+# Function to check if Keycloak is available
+check_keycloak_available() {
+  local domain="$1"
+  local max_attempts=30
+  local attempt=1
+  local ready=false
+
+  log_info "Checking if Keycloak is available for domain $domain..."
+
+  # Check if keycloak is installed
+  if [ ! -d /opt/agency_stack/keycloak ]; then
+    log_error "Keycloak directory not found at /opt/agency_stack/keycloak"
+    log_info "You can install Keycloak with: make install-keycloak DOMAIN=$domain ADMIN_EMAIL=$admin_email"
+    return 1
+  fi
+
+  # Check if domain-specific keycloak is installed
+  if [ ! -d "/opt/agency_stack/keycloak/$domain" ]; then
+    log_error "Keycloak is not installed for domain $domain"
+    log_info "You can install Keycloak with: make install-keycloak DOMAIN=$domain ADMIN_EMAIL=$admin_email"
+    return 1
+  fi
+
+  # Wait for Keycloak to be ready
+  while [ $attempt -lt $max_attempts ]; do
+    log_info "Waiting for Keycloak to be ready... ($attempt/$max_attempts)"
+    
+    # Try both legacy and new Keycloak health endpoints
+    if curl -s -f -o /dev/null -w '%{http_code}' "https://$domain/health" | grep -q 200 || \
+       curl -s -f -o /dev/null -w '%{http_code}' "https://$domain/auth/health" | grep -q 200 || \
+       curl -s -f -o /dev/null -w '%{http_code}' "https://$domain/admin/" | grep -q 200; then
+      ready=true
+      break
+    fi
+    
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+
+  if [ "$ready" = false ]; then
+    log_error "Keycloak health endpoint not responding after $max_attempts attempts."
+    return 1
+  fi
+
+  log_success "Keycloak is available for domain $domain"
+  return 0
+}
+
 # Check for prerequisites before proceeding
 log_info "Checking prerequisites for SSO integration..."
 
 # Validate Keycloak is properly installed
-if [ ! -d "/opt/agency_stack/keycloak" ]; then
-  log_error "Keycloak installation directory not found. Please install Keycloak first."
-  log_info "You can install Keycloak with: make keycloak DOMAIN=$DOMAIN ADMIN_EMAIL=$ADMIN_EMAIL"
+if ! check_keycloak_available "$DOMAIN"; then
+  log_error "Keycloak is not available for domain $DOMAIN. Please install and start Keycloak first."
+  log_info "You can install Keycloak with: make install-keycloak DOMAIN=$DOMAIN ADMIN_EMAIL=$ADMIN_EMAIL"
   exit 1
 fi
 
@@ -231,9 +279,9 @@ fi
 
 # Check if Keycloak is installed and running
 log_info "Checking if Keycloak is available for domain $DOMAIN..."
-if ! keycloak_is_available "$DOMAIN"; then
+if ! check_keycloak_available "$DOMAIN"; then
   log_error "Keycloak is not available for domain $DOMAIN. Please install and start Keycloak first."
-  log_info "You can install Keycloak with: make keycloak DOMAIN=$DOMAIN ADMIN_EMAIL=$ADMIN_EMAIL"
+  log_info "You can install Keycloak with: make install-keycloak DOMAIN=$DOMAIN ADMIN_EMAIL=$ADMIN_EMAIL"
   exit 1
 fi
 
