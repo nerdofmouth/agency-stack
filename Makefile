@@ -652,295 +652,32 @@ install-voip: validate
 voip: install-voip
 
 voip-status:
-	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking VoIP System Status...$(RESET)"
-	@if [ -n "$(CLIENT_ID)" ]; then \
-		LOKI_CONTAINER="$(CLIENT_ID)_loki"; \
-	else \
-		SITE_NAME=$$(echo "$(DOMAIN)" | sed 's/\./_/g'); \
-		LOKI_CONTAINER="loki_$${SITE_NAME}"; \
-	fi; \
-	if docker ps --format '{{.Names}}' | grep -q "$$LOKI_CONTAINER"; then \
-		echo "$(GREEN)✅ Loki is running$(RESET)"; \
-		docker ps --filter "name=$$LOKI_CONTAINER" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"; \
-		echo ""; \
-		if docker ps --format '{{.Names}}' | grep -q "$(CLIENT_ID)_promtail" || docker ps --format '{{.Names}}' | grep -q "promtail_$${SITE_NAME}"; then \
-			echo "$(GREEN)✅ Promtail log collector is running$(RESET)"; \
-			docker ps --filter "name=promtail" --format "table {{.Names}}\t{{.Status}}"; \
-		else \
-			echo "$(YELLOW)⚠️ Promtail log collector is not running$(RESET)"; \
-		fi; \
-	else \
-		echo "$(RED)❌ Loki is not running$(RESET)"; \
-		echo "$(CYAN)Install with: make loki DOMAIN=yourdomain.com$(RESET)"; \
-	fi; \
-	if [ -d "/opt/agency_stack/loki/$(DOMAIN)" ]; then \
-		echo ""; \
-		echo "$(CYAN)Configuration directory: /opt/agency_stack/loki/$(DOMAIN)$(RESET)"; \
-	fi
-
-loki-logs:
-	@echo "$(MAGENTA)$(BOLD)📜 Viewing Loki Logs...$(RESET)"
-	@if [ -n "$(CLIENT_ID)" ]; then \
-		LOKI_CONTAINER="$(CLIENT_ID)_loki"; \
-		PROMTAIL_CONTAINER="$(CLIENT_ID)_promtail"; \
-	else \
-		SITE_NAME=$$(echo "$(DOMAIN)" | sed 's/\./_/g'); \
-		LOKI_CONTAINER="loki_$${SITE_NAME}"; \
-		PROMTAIL_CONTAINER="promtail_$${SITE_NAME}"; \
-	fi; \
-	if docker ps --format '{{.Names}}' | grep -q "$$LOKI_CONTAINER"; then \
-		echo "$(CYAN)====== Loki Server Logs ======$(RESET)"; \
-		docker logs --tail 50 "$$LOKI_CONTAINER"; \
-		echo ""; \
-		if docker ps --format '{{.Names}}' | grep -q "$$PROMTAIL_CONTAINER"; then \
-			echo "$(CYAN)====== Promtail Collector Logs ======$(RESET)"; \
-			docker logs --tail 20 "$$PROMTAIL_CONTAINER"; \
-		fi; \
-	else \
-		echo "$(RED)❌ Loki container is not running$(RESET)"; \
-		if [ -f "/var/log/agency_stack/components/loki.log" ]; then \
-			echo "$(CYAN)Installation logs:$(RESET)"; \
-			tail -n 30 /var/log/agency_stack/components/loki.log; \
-		fi; \
-	fi
-
-loki-restart:
-	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Loki...$(RESET)"
-	@if [ -n "$(CLIENT_ID)" ]; then \
-		LOKI_DIR="/opt/agency_stack/loki/$(DOMAIN)"; \
-	else \
-		LOKI_DIR="/opt/agency_stack/loki/$(DOMAIN)"; \
-	fi; \
-	if [ -d "$$LOKI_DIR" ] && [ -f "$$LOKI_DIR/docker-compose.yml" ]; then \
-		echo "$(CYAN)Restarting Loki containers...$(RESET)"; \
-		cd "$$LOKI_DIR" && docker-compose restart; \
-		echo "$(GREEN)✅ Loki has been restarted$(RESET)"; \
-		echo "$(CYAN)Check status with: make loki-status$(RESET)"; \
-	else \
-		echo "$(RED)❌ Loki configuration not found at $$LOKI_DIR$(RESET)"; \
-		echo "$(CYAN)Install with: make loki DOMAIN=yourdomain.com$(RESET)"; \
-	fi
-
-# Prometheus
-install-prometheus: validate
-	@echo "$(MAGENTA)$(BOLD)📊 Installing Prometheus Monitoring...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/install_prometheus.sh --domain metrics.$(DOMAIN) $(if $(GRAFANA_DOMAIN),--grafana-domain $(GRAFANA_DOMAIN),--grafana-domain grafana.$(DOMAIN)) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
-prometheus: install-prometheus
-
-prometheus-status:
-	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Prometheus Status...$(RESET)"
-	@cd /opt/agency_stack/prometheus/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose ps
-	@echo "$(CYAN)Logs can be viewed with: make prometheus-logs$(RESET)"
-
-prometheus-logs:
-	@echo "$(MAGENTA)$(BOLD)📜 Viewing Prometheus Logs...$(RESET)"
-	@cd /opt/agency_stack/prometheus/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose logs -f
-
-prometheus-restart:
-	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Prometheus Services...$(RESET)"
-	@cd /opt/agency_stack/prometheus/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose restart
-
-prometheus-stop:
-	@echo "$(MAGENTA)$(BOLD)🛑 Stopping Prometheus Services...$(RESET)"
-	@cd /opt/agency_stack/prometheus/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose stop
-
-prometheus-start:
-	@echo "$(MAGENTA)$(BOLD)▶️ Starting Prometheus Services...$(RESET)"
-	@cd /opt/agency_stack/prometheus/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose start
-
-prometheus-reload:
-	@echo "$(MAGENTA)$(BOLD)🔄 Reloading Prometheus Configuration...$(RESET)"
-	@curl -X POST http://localhost:9090/-/reload || echo "$(RED)Failed to reload Prometheus. Is it running?$(RESET)"
-
-prometheus-alerts:
-	@echo "$(MAGENTA)$(BOLD)🔔 Viewing Prometheus Alerts...$(RESET)"
-	@curl -s http://localhost:9090/api/v1/alerts | jq . || echo "$(RED)Failed to fetch alerts. Is Prometheus running?$(RESET)"
-
-prometheus-config:
-	@echo "$(MAGENTA)$(BOLD)⚙️ Configuring Prometheus...$(RESET)"
-	@read -p "$(YELLOW)Enter domain for Prometheus (e.g., metrics.yourdomain.com):$(RESET) " DOMAIN; \
-	read -p "$(YELLOW)Enter Grafana domain (e.g., grafana.yourdomain.com):$(RESET) " GRAFANA_DOMAIN; \
-	read -p "$(YELLOW)Enter client ID (optional):$(RESET) " CLIENT_ID; \
-
-# Keycloak
-install-keycloak: validate
-	@echo "Installing Keycloak identity provider..."
-	@sudo $(SCRIPTS_DIR)/components/install_keycloak.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(ENABLE_OAUTH_GOOGLE),--enable-oauth-google,) $(if $(ENABLE_OAUTH_GITHUB),--enable-oauth-github,) $(if $(ENABLE_OAUTH_APPLE),--enable-oauth-apple,) $(if $(ENABLE_OAUTH_LINKEDIN),--enable-oauth-linkedin,) $(if $(ENABLE_OAUTH_MICROSOFT),--enable-oauth-microsoft,)
-
-# Keycloak IdP management targets
-keycloak-idp-status:
-	@echo "🔑 Checking Keycloak Identity Provider status..."
-	@bash $(SCRIPTS_DIR)/components/check_keycloak_idp_status.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(VERBOSE),--verbose,)
-
-keycloak-idp-test:
-	@echo "🧪 Testing Keycloak Identity Provider integration..."
-	@bash $(SCRIPTS_DIR)/components/test_keycloak_idp.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(VERBOSE),--verbose,)
-
-keycloak-idp-mock:
-	@echo "🔄 Starting Keycloak OAuth Identity Provider mock server..."
-	@bash $(SCRIPTS_DIR)/mock/mock_keycloak_idp.sh --domain $(DOMAIN) $(if $(PROVIDER),--provider $(PROVIDER),--provider google) $(if $(PORT),--port $(PORT),) $(if $(VERBOSE),--verbose,)
-
-keycloak-oauth-configure:
-	@echo "🔧 Configuring Keycloak OAuth Identity Providers..."
-	@bash $(SCRIPTS_DIR)/components/install_keycloak.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) --configure-oauth-only \
-		$(if $(ENABLE_OAUTH_GOOGLE),--enable-oauth-google,) \
-		$(if $(ENABLE_OAUTH_GITHUB),--enable-oauth-github,) \
-		$(if $(ENABLE_OAUTH_APPLE),--enable-oauth-apple,) \
-		$(if $(ENABLE_OAUTH_LINKEDIN),--enable-oauth-linkedin,) \
-		$(if $(ENABLE_OAUTH_MICROSOFT),--enable-oauth-microsoft,) \
-		$(if $(VERBOSE),--verbose,)
-
-# Keycloak OAuth dashboard targets
-keycloak-oauth-dashboard-status:
-	@echo "$(MAGENTA)$(BOLD)🔍 Checking Keycloak OAuth/IDP Status for Dashboard...$(RESET)"
-	@if [ -z "$(DOMAIN)" ]; then \
-		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
-		echo "Usage: make keycloak-oauth-dashboard-status DOMAIN=auth.example.com [CLIENT_ID=tenant1]"; \
-		exit 1; \
-	fi; \
-	mkdir -p logs/components; \
-	bash scripts/dashboard/keycloak_oauth_status.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),); \
-	echo "$(GREEN)✅ OAuth/IDP status updated in dashboard$(RESET)"
-
-dashboard-update-oauth:
-	@echo "$(MAGENTA)$(BOLD)🔄 Updating Dashboard with OAuth/IDP Status...$(RESET)"
-	@mkdir -p logs/components; \
-	bash scripts/dashboard/keycloak_oauth_status.sh; \
-	echo "$(GREEN)✅ Dashboard updated with OAuth/IDP status$(RESET)"
-
-# Health check for Keycloak OAuth providers
-keycloak-oauth-health:
-	@echo "$(MAGENTA)$(BOLD)🩺 Running Keycloak OAuth/IDP Health Check...$(RESET)"
-	@if [ -z "$(DOMAIN)" ]; then \
-		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
-		echo "Usage: make keycloak-oauth-health DOMAIN=auth.example.com [CLIENT_ID=tenant1] [VERBOSE=true] [ALERT=true]"; \
-		exit 1; \
-	fi; \
-	mkdir -p logs/components; \
-	bash scripts/components/health_check_keycloak_oauth.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(VERBOSE),--verbose,) $(if $(ALERT),--alert,); \
-	if [ $$? -eq 0 ]; then \
-		echo "$(GREEN)✅ Health check passed successfully$(RESET)"; \
-	else \
-		echo "$(RED)❌ Health check detected issues. See logs for details.$(RESET)"; \
-	fi
-
-# Update component registry with OAuth dashboard capability
-update-registry-oauth-dashboard:
-	@echo "$(MAGENTA)$(BOLD)📝 Updating Component Registry with OAuth Dashboard Capability...$(RESET)"
-	@if [ -f "scripts/utils/update_component_registry.sh" ]; then \
-		bash scripts/utils/update_component_registry.sh --update-component keycloak --update-flag oauth_dashboard --update-value true; \
-		echo "$(GREEN)✅ Component registry updated$(RESET)"; \
-	else \
-		echo "$(RED)❌ Component registry update script not found$(RESET)"; \
-	fi
-
-# Comprehensive Keycloak registry update
-keycloak-update-registry:
-	@echo "$(MAGENTA)$(BOLD)📊 Updating Keycloak Component Registry...$(RESET)"
-	@if [ -f "scripts/utils/update_keycloak_registry.sh" ]; then \
-		bash scripts/utils/update_keycloak_registry.sh; \
-		echo "$(GREEN)✅ Component registry updated with all Keycloak OAuth capabilities$(RESET)"; \
-	else \
-		echo "$(RED)❌ Registry update script not found$(RESET)"; \
-	fi
-
-# Rollback Keycloak OAuth providers
-keycloak-oauth-rollback:
-	@echo "$(MAGENTA)$(BOLD)🔄 Keycloak OAuth Provider Rollback...$(RESET)"
-	@if [ -z "$(DOMAIN)" ]; then \
-		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
-		echo "Usage: make keycloak-oauth-rollback DOMAIN=auth.example.com [CLIENT_ID=tenant1] [PROVIDER=google] [DISABLE_ONLY=true] [ALL_PROVIDERS=true]"; \
-		exit 1; \
-	fi; \
-	args="--domain $(DOMAIN)"; \
-	if [ -n "$(CLIENT_ID)" ]; then args="$$args --client-id $(CLIENT_ID)"; fi; \
-	if [ -n "$(PROVIDER)" ]; then args="$$args --provider $(PROVIDER)"; fi; \
-	if [ "$(DISABLE_ONLY)" = "true" ]; then args="$$args --disable-only"; fi; \
-	if [ "$(ALL_PROVIDERS)" = "true" ]; then args="$$args --all-providers"; fi; \
-	if [ "$(FORCE)" = "true" ]; then args="$$args --force"; fi; \
-	if [ "$(VERBOSE)" = "true" ]; then args="$$args --verbose"; fi; \
-	mkdir -p logs/components; \
-	bash scripts/components/rollback_keycloak_oauth.sh $$args; \
-	status=$$?; \
-	if [ $$status -eq 0 ]; then \
-		echo "$(GREEN)✅ OAuth provider rollback completed successfully$(RESET)"; \
-		make dashboard-update-oauth; \
-	else \
-		echo "$(RED)❌ OAuth provider rollback encountered issues$(RESET)"; \
-	fi
-
-# Core Infrastructure
-install-infrastructure:
-	@echo "Installing core infrastructure..."
-	@sudo $(SCRIPTS_DIR)/core/install_infrastructure.sh $(if $(VERBOSE),--verbose,)
-
-# Security Infrastructure
-install-security-infrastructure:
-	@echo "Installing security infrastructure..."
-	@sudo $(SCRIPTS_DIR)/core/install_security_infrastructure.sh --domain $(DOMAIN) --email $(ADMIN_EMAIL) $(if $(VERBOSE),--verbose,)
-
-# Multi-tenancy Infrastructure
-install-multi-tenancy:
-	@echo "Setting up multi-tenancy infrastructure..."
-	@sudo $(SCRIPTS_DIR)/multi-tenancy/install_multi_tenancy.sh $(if $(VERBOSE),--verbose,)
-
-# Business Applications
-business: erp cal killbill documenso chatwoot
-	@echo "Business Applications installed"
-
-# ERPNext - Enterprise Resource Planning
-erp:
-	@echo "Installing ERPNext..."
-	@sudo $(SCRIPTS_DIR)/components/install_erpnext.sh --domain $(ERP_DOMAIN) $(INSTALL_FLAGS)
-
-# Cal.com - Scheduling
-cal:
-	@echo "Installing Cal.com..."
-	@sudo $(SCRIPTS_DIR)/components/install_cal.sh --domain $(CAL_DOMAIN) $(INSTALL_FLAGS)
-
-# Documenso - Document signing
-documenso:
-	@echo "Installing Documenso..."
-	@sudo $(SCRIPTS_DIR)/components/install_documenso.sh --domain $(DOCUMENSO_DOMAIN) $(INSTALL_FLAGS)
-
-# KillBill - Billing
-killbill:
-	@echo "Installing KillBill..."
-	@sudo $(SCRIPTS_DIR)/components/install_killbill.sh --domain $(KILLBILL_DOMAIN) $(INSTALL_FLAGS)
-
-# Chatwoot - Customer Service Platform
-chatwoot:
-	@echo "Installing Chatwoot..."
-	@sudo $(SCRIPTS_DIR)/components/install_chatwoot.sh --domain $(CHATWOOT_DOMAIN) $(INSTALL_FLAGS)
-
-chatwoot-status:
 	@docker ps -a | grep chatwoot || echo "Chatwoot is not running"
 
-chatwoot-logs:
+voip-logs:
 	@docker logs -f chatwoot-app-$(CLIENT_ID) 2>&1 | tee $(LOG_DIR)/components/chatwoot.log
 
-chatwoot-stop:
+voip-stop:
 	@docker-compose -f $(DOCKER_DIR)/chatwoot/docker-compose.yml down
 
-chatwoot-start:
+voip-start:
 	@docker-compose -f $(DOCKER_DIR)/chatwoot/docker-compose.yml up -d
 
-chatwoot-restart:
+voip-restart:
 	@docker-compose -f $(DOCKER_DIR)/chatwoot/docker-compose.yml restart
 
-chatwoot-backup:
+voip-backup:
 	@echo "Backing up Chatwoot data..."
 	@mkdir -p $(BACKUP_DIR)/chatwoot
 	@docker exec chatwoot-postgres-$(CLIENT_ID) pg_dump -U chatwoot chatwoot > $(BACKUP_DIR)/chatwoot/chatwoot_db_$(shell date +%Y%m%d).sql
 	@tar -czf $(BACKUP_DIR)/chatwoot/chatwoot_storage_$(shell date +%Y%m%d).tar.gz -C $(CONFIG_DIR)/clients/$(CLIENT_ID)/chatwoot_data/storage .
 	@echo "Backup completed: $(BACKUP_DIR)/chatwoot/"
 
-chatwoot-config:
+voip-config:
 	@echo "Opening Chatwoot environment configuration..."
 	@$(EDITOR) $(DOCKER_DIR)/chatwoot/.env
 
-chatwoot-upgrade:
+voip-upgrade:
 	@echo "$(MAGENTA)$(BOLD)🔄 Upgrading Chatwoot to v4.1.0...$(RESET)"
 	@read -p "$(YELLOW)Enter domain for Chatwoot (e.g., chat.yourdomain.com):$(RESET) " DOMAIN; \
 	read -p "$(YELLOW)Enter admin email:$(RESET) " ADMIN_EMAIL; \
@@ -1776,3 +1513,20 @@ configure-keycloak-remote:
 		$(if $(ENABLE_OAUTH_LINKEDIN),ENABLE_OAUTH_LINKEDIN=true,) \
 		$(if $(ENABLE_OAUTH_MICROSOFT),ENABLE_OAUTH_MICROSOFT=true,) \
 		$(if $(VERBOSE),VERBOSE=true,)"
+
+# Cross-VM OAuth Dashboard Sync
+sync-oauth-dashboard:
+	@echo "$(MAGENTA)$(BOLD)🔄 Synchronizing OAuth Dashboard Data Between VMs...$(RESET)"
+	@if [ -z "$(SOURCE_HOST)" ] || [ -z "$(TARGET_HOST)" ]; then \
+		echo "Usage: make sync-oauth-dashboard SOURCE_HOST=proto002.alpha.nerdofmouth.com TARGET_HOST=proto001.alpha.nerdofmouth.com [DOMAIN=auth.example.com] [VERBOSE=true]"; \
+		exit 1; \
+	fi; \
+	bash $(SCRIPTS_DIR)/utils/sync_dashboard_oauth.sh \
+		--source-host $(SOURCE_HOST) \
+		--target-host $(TARGET_HOST) \
+		$(if $(DOMAIN),--domain $(DOMAIN),) \
+		$(if $(SOURCE_CLIENT_ID),--source-client-id $(SOURCE_CLIENT_ID),) \
+		$(if $(TARGET_CLIENT_ID),--target-client-id $(TARGET_CLIENT_ID),) \
+		$(if $(FORCE),--force,) \
+		$(if $(VERBOSE),--verbose,) \
+		$(if $(DRY_RUN),--dry-run,)
