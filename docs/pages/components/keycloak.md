@@ -170,7 +170,7 @@ make install-keycloak DOMAIN=yourdomain.com ADMIN_EMAIL=admin@yourdomain.com --f
 
 ## 🔐 External OAuth via Keycloak IDPs
 
-AgencyStack supports social login via external OAuth providers (Google, GitHub, Apple) while maintaining sovereignty by integrating these through Keycloak as the centralized identity provider.
+AgencyStack supports social login via external OAuth providers (Google, GitHub, Apple, LinkedIn, Microsoft) while maintaining sovereignty by integrating these through Keycloak as the centralized identity provider. This architecture ensures all authentication flows and user data remain within your control while offering the convenience of social login.
 
 ### Supported Providers
 
@@ -179,6 +179,8 @@ AgencyStack supports social login via external OAuth providers (Google, GitHub, 
 | Google   | `--enable-oauth-google` | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` |
 | GitHub   | `--enable-oauth-github` | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` |
 | Apple    | `--enable-oauth-apple`  | `APPLE_CLIENT_ID`, `APPLE_CLIENT_SECRET`   |
+| LinkedIn | `--enable-oauth-linkedin` | `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET` |
+| Microsoft | `--enable-oauth-microsoft` | `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` |
 
 ### Installation with OAuth Providers
 
@@ -191,8 +193,46 @@ make install-keycloak DOMAIN=yourdomain.com ADMIN_EMAIL=admin@yourdomain.com ENA
 # Install with multiple providers
 make install-keycloak DOMAIN=yourdomain.com ADMIN_EMAIL=admin@yourdomain.com \
   ENABLE_OAUTH_GOOGLE=true \
-  ENABLE_OAUTH_GITHUB=true
+  ENABLE_OAUTH_GITHUB=true \
+  ENABLE_OAUTH_LINKEDIN=true
 ```
+
+### Obtaining OAuth Credentials
+
+To use external OAuth providers, you'll need to obtain credentials from each provider:
+
+#### Google
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a project or select an existing one
+3. Navigate to "APIs & Services" > "Credentials"
+4. Click "Create Credentials" > "OAuth client ID"
+5. Set authorized redirect URI to: `https://your-domain.com/auth/realms/agency/broker/google/endpoint`
+
+#### GitHub
+1. Go to your [GitHub Settings](https://github.com/settings/developers)
+2. Navigate to "Developer settings" > "OAuth Apps"
+3. Click "New OAuth App"
+4. Set authorization callback URL to: `https://your-domain.com/auth/realms/agency/broker/github/endpoint`
+
+#### Apple
+1. Go to the [Apple Developer Portal](https://developer.apple.com/)
+2. Navigate to "Certificates, IDs & Profiles"
+3. Register a new "Services ID" with "Sign In with Apple" capability
+4. Configure the return URL as: `https://your-domain.com/auth/realms/agency/broker/apple/endpoint`
+
+#### LinkedIn
+1. Go to the [LinkedIn Developer Portal](https://www.linkedin.com/developers/)
+2. Click "Create App" to register a new application
+3. Under "Auth" tab, add the OAuth 2.0 redirect URL: `https://your-domain.com/auth/realms/agency/broker/linkedin/endpoint`
+4. Request the necessary scopes: `r_liteprofile` and `r_emailaddress`
+
+#### Microsoft/Azure AD
+1. Go to the [Azure Portal](https://portal.azure.com/)
+2. Navigate to "Azure Active Directory" > "App registrations"
+3. Click "New registration"
+4. Add redirect URI: `https://your-domain.com/auth/realms/agency/broker/microsoft/endpoint`
+5. Under "Certificates & secrets", create a new client secret
+6. Under "API permissions", add permissions for "Microsoft Graph" (email, profile, user.read)
 
 ### OAuth IdP Management
 
@@ -200,13 +240,40 @@ AgencyStack provides dedicated targets to manage and test OAuth identity provide
 
 | Target | Description |
 |--------|-------------|
-| `make keycloak-idp-status` | Check status of configured OAuth providers |
-| `make keycloak-idp-test` | Test OAuth provider integration |
+| `make keycloak-idp-status` | Check status of configured OAuth Identity Providers |
+| `make keycloak-idp-test` | Run comprehensive tests on OAuth Identity Provider configuration |
+| `make keycloak-idp-mock` | Start a mock OAuth server for testing without external dependencies |
 
-### Authentication Flow
+### OAuth Identity Provider Security
 
-1. User selects "Sign in with Google/GitHub/Apple" on a Keycloak login screen
-2. User is redirected to the external provider (Google, GitHub, Apple)
+When configuring OAuth Identity Providers, the following security considerations are automatically applied:
+
+- **Secure Credential Storage**: All OAuth client secrets are stored in restricted files (`/opt/agency_stack/secrets/keycloak/{DOMAIN}/{provider}_oauth.env`) with 600 permissions
+- **Signature Validation**: Token signatures are validated to prevent forgery
+- **Token Storage Policy**: OAuth tokens from external providers are not stored in Keycloak by default
+- **Scope Limitations**: Only essential scopes are requested (e.g., email, profile)
+- **Mappers**: Email and username mappers are configured automatically to ensure proper user attribution
+
+### Multi-Tenant OAuth Configuration
+
+For multi-tenant setups, OAuth providers can be configured per client:
+
+```bash
+# Configure OAuth for specific client/tenant
+make install-keycloak DOMAIN=your-domain.com \
+  CLIENT_ID=tenant1 \
+  ENABLE_OAUTH_GOOGLE=true
+
+# Check status for specific client/tenant
+make keycloak-idp-status DOMAIN=your-domain.com --client-id tenant1
+```
+
+Each client gets isolated OAuth configurations in their own realm.
+
+## Authentication Flow
+
+1. User selects "Sign in with Google/GitHub/Apple/LinkedIn/Microsoft" on a Keycloak login screen
+2. User is redirected to the external provider (Google, GitHub, Apple, LinkedIn, Microsoft)
 3. After successful authentication, the user is redirected back to Keycloak
 4. Keycloak creates or updates the user account based on information from the provider
 5. User is authenticated in AgencyStack with proper roles and permissions

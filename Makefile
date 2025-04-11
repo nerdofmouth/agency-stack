@@ -766,7 +766,7 @@ prometheus-config:
 # Keycloak
 install-keycloak: validate
 	@echo "Installing Keycloak identity provider..."
-	@sudo $(SCRIPTS_DIR)/components/install_keycloak.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(ENABLE_OAUTH_GOOGLE),--enable-oauth-google,) $(if $(ENABLE_OAUTH_GITHUB),--enable-oauth-github,) $(if $(ENABLE_OAUTH_APPLE),--enable-oauth-apple,)
+	@sudo $(SCRIPTS_DIR)/components/install_keycloak.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(ENABLE_OAUTH_GOOGLE),--enable-oauth-google,) $(if $(ENABLE_OAUTH_GITHUB),--enable-oauth-github,) $(if $(ENABLE_OAUTH_APPLE),--enable-oauth-apple,) $(if $(ENABLE_OAUTH_LINKEDIN),--enable-oauth-linkedin,) $(if $(ENABLE_OAUTH_MICROSOFT),--enable-oauth-microsoft,)
 
 # Keycloak IdP management targets
 keycloak-idp-status:
@@ -776,6 +776,20 @@ keycloak-idp-status:
 keycloak-idp-test:
 	@echo "🧪 Testing Keycloak Identity Provider integration..."
 	@bash $(SCRIPTS_DIR)/components/test_keycloak_idp.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(VERBOSE),--verbose,)
+
+keycloak-idp-mock:
+	@echo "🔄 Starting Keycloak OAuth Identity Provider mock server..."
+	@bash $(SCRIPTS_DIR)/mock/mock_keycloak_idp.sh --domain $(DOMAIN) $(if $(PROVIDER),--provider $(PROVIDER),--provider google) $(if $(PORT),--port $(PORT),) $(if $(VERBOSE),--verbose,)
+
+keycloak-oauth-configure:
+	@echo "🔧 Configuring Keycloak OAuth Identity Providers..."
+	@bash $(SCRIPTS_DIR)/components/install_keycloak.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) --configure-oauth-only \
+		$(if $(ENABLE_OAUTH_GOOGLE),--enable-oauth-google,) \
+		$(if $(ENABLE_OAUTH_GITHUB),--enable-oauth-github,) \
+		$(if $(ENABLE_OAUTH_APPLE),--enable-oauth-apple,) \
+		$(if $(ENABLE_OAUTH_LINKEDIN),--enable-oauth-linkedin,) \
+		$(if $(ENABLE_OAUTH_MICROSOFT),--enable-oauth-microsoft,) \
+		$(if $(VERBOSE),--verbose,)
 
 # Core Infrastructure
 install-infrastructure:
@@ -1630,3 +1644,56 @@ peertube-sso-test: validate
 		echo "$(RED)❌ PeerTube is not running$(RESET)"; \
 		echo "$(CYAN)Start PeerTube with: make peertube-restart$(RESET)"; \
 	fi
+
+# Remote Deployment
+deploy-remote:
+	@echo "$(MAGENTA)$(BOLD)🚀 Deploying to Remote VM...$(RESET)"
+	@if [ -z "$(REMOTE_HOST)" ]; then \
+		echo "$(RED)Error: Missing required parameter REMOTE_HOST.$(RESET)"; \
+		echo "Usage: make deploy-remote REMOTE_HOST=hostname.example.com [COMPONENT=keycloak] [REMOTE_USER=root] [SSH_KEY=/path/to/key] [SSH_PORT=22]"; \
+		exit 1; \
+	fi; \
+	bash $(SCRIPTS_DIR)/utils/deploy_to_remote.sh \
+		--remote-host $(REMOTE_HOST) \
+		$(if $(REMOTE_USER),--remote-user $(REMOTE_USER),) \
+		$(if $(SSH_KEY),--ssh-key $(SSH_KEY),) \
+		$(if $(SSH_PORT),--ssh-port $(SSH_PORT),) \
+		$(if $(COMPONENT),--component $(COMPONENT),) \
+		$(if $(FORCE),--force,) \
+		$(if $(VERBOSE),--verbose,)
+
+deploy-keycloak-remote:
+	@echo "$(MAGENTA)$(BOLD)🔑 Deploying Keycloak to Remote VM...$(RESET)"
+	@if [ -z "$(REMOTE_HOST)" ]; then \
+		echo "$(RED)Error: Missing required parameter REMOTE_HOST.$(RESET)"; \
+		echo "Usage: make deploy-keycloak-remote REMOTE_HOST=hostname.example.com [REMOTE_USER=root] [SSH_KEY=/path/to/key] [SSH_PORT=22]"; \
+		exit 1; \
+	fi; \
+	bash $(SCRIPTS_DIR)/utils/deploy_to_remote.sh \
+		--remote-host $(REMOTE_HOST) \
+		$(if $(REMOTE_USER),--remote-user $(REMOTE_USER),) \
+		$(if $(SSH_KEY),--ssh-key $(SSH_KEY),) \
+		$(if $(SSH_PORT),--ssh-port $(SSH_PORT),) \
+		--component keycloak \
+		$(if $(FORCE),--force,) \
+		$(if $(VERBOSE),--verbose,)
+
+configure-keycloak-remote:
+	@echo "$(MAGENTA)$(BOLD)🔧 Configuring Keycloak OAuth on Remote VM...$(RESET)"
+	@if [ -z "$(REMOTE_HOST)" ] || [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameters.$(RESET)"; \
+		echo "Usage: make configure-keycloak-remote REMOTE_HOST=hostname.example.com DOMAIN=auth.example.com [ENABLE_OAUTH_*=true]"; \
+		exit 1; \
+	fi; \
+	echo "$(CYAN)Deploying Keycloak files to remote...$(RESET)" && \
+	make deploy-keycloak-remote REMOTE_HOST=$(REMOTE_HOST) $(if $(REMOTE_USER),REMOTE_USER=$(REMOTE_USER),) $(if $(SSH_KEY),SSH_KEY=$(SSH_KEY),) $(if $(SSH_PORT),SSH_PORT=$(SSH_PORT),) && \
+	echo "$(CYAN)Configuring OAuth providers on remote...$(RESET)" && \
+	ssh $(if $(SSH_KEY),-i $(SSH_KEY),) $(if $(SSH_PORT),-p $(SSH_PORT),) $(if $(REMOTE_USER),$(REMOTE_USER),root)@$(REMOTE_HOST) \
+		"cd /opt/agency_stack && make keycloak-oauth-configure DOMAIN=$(DOMAIN) \
+		$(if $(CLIENT_ID),CLIENT_ID=$(CLIENT_ID),) \
+		$(if $(ENABLE_OAUTH_GOOGLE),ENABLE_OAUTH_GOOGLE=true,) \
+		$(if $(ENABLE_OAUTH_GITHUB),ENABLE_OAUTH_GITHUB=true,) \
+		$(if $(ENABLE_OAUTH_APPLE),ENABLE_OAUTH_APPLE=true,) \
+		$(if $(ENABLE_OAUTH_LINKEDIN),ENABLE_OAUTH_LINKEDIN=true,) \
+		$(if $(ENABLE_OAUTH_MICROSOFT),ENABLE_OAUTH_MICROSOFT=true,) \
+		$(if $(VERBOSE),VERBOSE=true,)"
