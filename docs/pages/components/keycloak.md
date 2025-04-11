@@ -1,138 +1,174 @@
+---
+layout: default
+title: Keycloak - AgencyStack Documentation
+---
+
 # Keycloak
 
 ## Overview
-Keycloak is an open-source Identity and Access Management solution that provides Single Sign-On (SSO) capabilities for AgencyStack applications. It serves as the central authentication and authorization system, enabling secure user management and access control across all integrated components.
+
+Keycloak is an open-source Identity and Access Management (IAM) solution that provides Single Sign-On (SSO) capabilities for AgencyStack components. It serves as the central identity provider for all components marked with `sso: true` in the component registry.
+
+**Key Features:**
+- Single Sign-On (SSO) across all AgencyStack components
+- Identity management with user registration and profile management
+- Role-based access control (RBAC)
+- Multi-factor authentication (MFA)
+- Social login integration
+- OpenID Connect (OIDC) and SAML support
+- Multi-tenancy through isolated realms
+
+## Technical Specifications
+
+| Parameter | Value |
+|-----------|-------|
+| **Version** | Latest (Quarkus-based) |
+| **Default URL** | https://yourdomain.com/admin |
+| **Web Port** | 8080 (internal) |
+| **Container Image** | quay.io/keycloak/keycloak:latest |
+| **Data Directory** | /opt/agency_stack/keycloak/{DOMAIN}/ |
+| **Log File** | /var/log/agency_stack/components/keycloak.log |
 
 ## Installation
 
 ### Prerequisites
 - Docker and Docker Compose
-- Traefik (for HTTPS and routing)
-- PostgreSQL (for persistent storage)
-- Domain name with proper DNS configuration
+- Traefik configured with Let's Encrypt
+- Domain name properly configured in DNS
+- PostgreSQL database (automatically installed as a dependency)
 
-### Installation Process
-The installation is handled by the `install_keycloak.sh` script, which can be executed using:
+### Installation Commands
 
+**Basic Installation:**
 ```bash
-make keycloak DOMAIN=yourdomain.com ADMIN_EMAIL=admin@yourdomain.com
+make install-keycloak DOMAIN=yourdomain.com ADMIN_EMAIL=admin@yourdomain.com
 ```
+
+**With Optional Parameters:**
+```bash
+make install-keycloak DOMAIN=yourdomain.com ADMIN_EMAIL=admin@yourdomain.com CLIENT_ID=customclient --force
+```
+
+### Installation Options
+- `--domain`: Domain name for Keycloak (required)
+- `--admin-email`: Admin email for notifications (required)
+- `--client-id`: Client ID for multi-tenancy (default: "default")
+- `--verbose`: Enable verbose output
+- `--force`: Force installation even if already installed
+- `--with-deps`: Install dependencies automatically
+- `--help`: Show help message and exit
 
 ## Configuration
 
 ### Default Configuration
-- Automatically creates a secure Docker network
-- Sets up PostgreSQL database for persistent storage
-- Configures Traefik integration for HTTPS
-- Creates default "agency" realm with admin user
-- Generates secure passwords and stores them in `/opt/agency_stack/secrets/keycloak/`
+- Admin user is created during installation
+- Default realm for the client ID is created
+- TLS termination is handled by Traefik
+- Database is automatically configured with PostgreSQL
 
 ### Customization
-- Configuration files are stored in `/opt/agency_stack/keycloak/<domain>/`
-- Realm configuration: `/opt/agency_stack/keycloak/<domain>/imports/agency-realm.json`
-- Docker Compose file: `/opt/agency_stack/keycloak/<domain>/docker-compose.yml`
+- Custom themes can be placed in `/opt/agency_stack/keycloak/{DOMAIN}/themes`
+- Import files can be placed in `/opt/agency_stack/keycloak/{DOMAIN}/imports`
+- Environment variables can be modified in the docker-compose.yml file
 
-## SSO Integration
+## Component Integration
 
-### Integration Process
-Components marked with `sso: true` in the component registry must integrate with Keycloak. The integration process is standardized using the `/scripts/utils/keycloak_integration.sh` utility script:
+Keycloak is designed to integrate with all AgencyStack components that have `sso: true` in the component registry. Currently supported components include:
+
+- **PeerTube**: Video streaming platform integration
+- **Gitea**: Git repository management integration
+- **Mattermost**: Team communication integration
+- **WordPress**: Content management integration
+
+### Integration Commands
+
+To integrate a component with Keycloak:
 
 ```bash
-source /home/revelationx/CascadeProjects/foss-server-stack/scripts/utils/keycloak_integration.sh
-integrate_with_keycloak "yourdomain.com" "component-name" "framework" "https://component.yourdomain.com"
+# For PeerTube
+make peertube-sso-configure DOMAIN=yourdomain.com
+
+# For other components
+make <component>-sso-configure DOMAIN=yourdomain.com
 ```
 
-### Integration Requirements
-For a component to be properly integrated with Keycloak SSO:
+### Client Configuration Templates
 
-1. The component installation script must:
-   - Check for Keycloak availability using `keycloak_is_available`
-   - Create a realm or use an existing one with `keycloak_create_realm`
-   - Register a client with `keycloak_register_client`
-   - Store credentials securely with `store_keycloak_credentials`
-   - Generate integration code with `generate_keycloak_integration_code`
-
-2. The component must support one of these authentication flows:
-   - OpenID Connect (OIDC) - Preferred
-   - SAML 2.0
-
-3. The component registry entry must include:
-   - `"sso": true` - Indicating SSO capability
-   - `"sso_configured": true` - Only after live integration is tested
-
-### Supported Frameworks
-The integration utility provides templates for:
-- Node.js (Express)
-- Python (Flask)
-- Docker (Environment variables)
-
-Custom frameworks can be integrated by implementing the OpenID Connect or SAML protocols using the credentials stored in `/opt/agency_stack/keycloak/clients/`.
-
-## Multi-Tenancy Support
-
-Keycloak supports multi-tenant deployments by:
-- Creating separate realms for each tenant
-- Isolating users and configurations between tenants
-- Supporting tenant-specific client configurations
-
-For components with `multi_tenant: true`, the integration will create tenant-isolated realms automatically.
+Client configuration templates are stored in:
+```
+/opt/agency_stack/repo/scripts/components/keycloak/clients/
+```
 
 ## Ports & Endpoints
 
 | Service | Port | Protocol | Description |
 |---------|------|----------|-------------|
-| Admin Console | 8080 | HTTP (internal) | Administration interface (proxied via Traefik) |
-| Auth API | 8080 | HTTP (internal) | Authentication and token endpoints (proxied via Traefik) |
-
-External access is provided through Traefik on standard HTTPS ports (443) at:
-- Admin Console: `https://<domain>/auth/admin`
-- Auth Endpoints: `https://<domain>/auth/realms/`
+| Admin UI | 8080 (internal) | HTTPS | Keycloak administration interface |
+| REST API | 8080 (internal) | HTTPS | OpenID Connect and administration API |
+| Health | 8080 (internal) | HTTPS | Health check endpoint |
 
 ## Logs & Monitoring
 
 ### Log Files
 - Installation logs: `/var/log/agency_stack/components/keycloak.log`
-- Integration logs: `/var/log/agency_stack/components/keycloak_integration.log`
-- Container logs: Access via `make keycloak-logs`
+- Container logs: Access with `make keycloak-logs`
+- Database logs: Access with `docker logs keycloak_postgres_<domain_underscore>`
 
-### Monitoring
-- Health check endpoint: `https://<domain>/auth/health`
-- Metrics endpoint: `https://<domain>/auth/metrics` (when enabled)
-- Events are logged to the database and can be viewed in the Admin Console
-
-## Security
-
-### Best Practices
-- Admin password is auto-generated and stored securely
-- HTTPS is enforced for all communications
-- Sensitive data is stored in the `/opt/agency_stack/secrets/` directory with restricted permissions
-- Client secrets are automatically rotated when using the `--force` flag during reinstallation
-
-### Password Policies
-- Default password policy requires minimum 8 characters with at least:
-  - 1 uppercase letter
-  - 1 lowercase letter
-  - 1 number
-  - 1 special character
+### Health Monitoring
+- Health endpoint: `https://yourdomain.com/health`
+- Status check: `make keycloak-status`
 
 ## Troubleshooting
 
 ### Common Issues
-- **Cannot access admin console**: Check Traefik logs and ensure proper DNS configuration
-- **Integration failures**: Verify Keycloak is running with `make keycloak-status`
-- **Client registration errors**: Check permissions and ensure admin credentials are correct
-- **Connection refused**: Ensure Docker network is properly configured
 
-### Debugging
-- Increase log verbosity with `make keycloak VERBOSE=true`
-- View detailed logs with `make keycloak-logs`
-- Check container status with `docker ps | grep keycloak`
+1. **Container fails to start:**
+   - Check PostgreSQL container is running
+   - Verify container logs with `make keycloak-logs`
+   - Ensure ports are not in use by other services
+
+2. **Cannot access admin console:**
+   - Verify Traefik is properly configured
+   - Check DNS resolution for the domain
+   - Ensure Keycloak container is running
+
+3. **SSO integration issues:**
+   - Verify client configuration in Keycloak
+   - Check component's OAuth configuration
+   - Validate OpenID configuration URL is accessible
+
+### Recovery Procedures
+
+If Keycloak fails or becomes corrupted:
+
+```bash
+# Restart Keycloak
+make keycloak-restart
+
+# Reinstall if necessary
+make install-keycloak DOMAIN=yourdomain.com ADMIN_EMAIL=admin@yourdomain.com --force
+```
 
 ## Makefile Targets
 
 | Target | Description |
 |--------|-------------|
-| `make keycloak` | Install Keycloak |
+| `make install-keycloak` | Install Keycloak |
+| `make keycloak` | Alias for install-keycloak |
 | `make keycloak-status` | Check status of Keycloak |
 | `make keycloak-logs` | View Keycloak logs |
 | `make keycloak-restart` | Restart Keycloak services |
+| `make keycloak-test` | Test Keycloak functionality |
+
+## Security Considerations
+
+- Admin credentials are stored in `/opt/agency_stack/secrets/keycloak/{DOMAIN}/admin.env`
+- Client secrets are stored in `/opt/agency_stack/secrets/keycloak/{DOMAIN}/{client}.env`
+- All communications are encrypted with TLS
+- Default configuration includes security headers for XSS protection
+- Multi-tenant isolation with separate realms per client
+
+## References
+
+- [Official Keycloak Documentation](https://www.keycloak.org/documentation)
+- [OpenID Connect Specification](https://openid.net/specs/openid-connect-core-1_0.html)
