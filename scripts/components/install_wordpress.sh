@@ -491,6 +491,10 @@ server {
         fastcgi_read_timeout 300;
         fastcgi_intercept_errors on;
         fastcgi_param HTTPS \$https if_not_empty;
+        # Additional FastCGI parameters
+        fastcgi_param SERVER_NAME \$host;
+        fastcgi_param HTTP_HOST \$host;
+        fastcgi_keep_conn on;
     }
     
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
