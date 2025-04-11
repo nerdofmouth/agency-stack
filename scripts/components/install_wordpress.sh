@@ -525,7 +525,6 @@ daemonize = no
 
 [www]
 listen = 0.0.0.0:9000
-listen.allowed_clients = any
 user = www-data
 group = www-data
 pm = dynamic
