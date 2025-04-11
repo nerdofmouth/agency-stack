@@ -21,6 +21,7 @@ ADMIN_EMAIL="${ADMIN_EMAIL:-admin@example.com}"
 HTTP_PORT=80
 HTTPS_PORT=443
 ENABLE_HTTPS_REDIRECT="${ENABLE_HTTPS_REDIRECT:-true}"
+USE_HOST_NETWORK="${USE_HOST_NETWORK:-true}"
 
 # Paths
 INSTALL_DIR="/opt/agency_stack/clients/${CLIENT_ID}/traefik"
@@ -74,6 +75,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --enable-https-redirect)
       ENABLE_HTTPS_REDIRECT="$2"
+      shift 2
+      ;;
+    --use-host-network)
+      USE_HOST_NETWORK="$2"
       shift 2
       ;;
     *)
@@ -257,6 +262,7 @@ EOL
 
 # Create docker-compose.yml
 log_cmd "Creating Traefik docker-compose.yml..."
+log_info "Network mode: ${USE_HOST_NETWORK}"
 cat > "${DOCKER_COMPOSE_FILE}" <<EOL
 version: '3'
 
@@ -267,11 +273,27 @@ services:
     restart: always
     security_opt:
       - no-new-privileges:true
+EOL
+
+# Add network configuration based on the selected mode
+if [[ "${USE_HOST_NETWORK}" == "true" ]]; then
+  log_info "Configuring Traefik to use host network mode for improved container-to-host communication"
+  cat >> "${DOCKER_COMPOSE_FILE}" <<EOL
+    network_mode: "host"
+EOL
+else
+  log_info "Configuring Traefik to use bridge network mode with port mapping"
+  cat >> "${DOCKER_COMPOSE_FILE}" <<EOL
     networks:
       - ${TRAEFIK_NETWORK_NAME}
     ports:
       - "${HTTP_PORT}:${HTTP_PORT}"
       - "${HTTPS_PORT}:${HTTPS_PORT}"
+EOL
+fi
+
+# Add the rest of the configuration
+cat >> "${DOCKER_COMPOSE_FILE}" <<EOL
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -285,11 +307,17 @@ services:
       - "traefik.http.routers.traefik.rule=Host(\`${DOMAIN}\`) && PathPrefix(\`/dashboard\`, \`/api\`)"
       - "traefik.http.routers.traefik.service=api@internal"
       - "traefik.http.routers.traefik.tls=true"
+EOL
+
+# Add networks section if not using host network
+if [[ "${USE_HOST_NETWORK}" != "true" ]]; then
+  cat >> "${DOCKER_COMPOSE_FILE}" <<EOL
       
 networks:
   ${TRAEFIK_NETWORK_NAME}:
     external: true
 EOL
+fi
 
 # Start Traefik
 log_cmd "Starting Traefik..."
