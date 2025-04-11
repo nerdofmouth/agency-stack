@@ -336,6 +336,30 @@ If you're writing or debugging a component install script, test script, or valid
 
 ---
 
+# CRITICAL REMINDERS FOR AGENCY STACK DEVELOPMENT
+
+## Repository Integrity Policy
+- NEVER modify files directly on remote VMs without source tracking
+- ALL changes MUST be made to the local repository first
+- Use proper git workflow: commit locally → push → deploy/pull on remote
+
+## Proper Change Workflow
+1. Make changes ONLY to local repository
+2. Test locally where possible
+3. Commit changes with descriptive messages
+4. Transfer changes to remote VMs ONLY through proper deployment channels:
+   - Git pull from authorized repositories
+   - Official installation scripts
+   - Makefile targets
+
+## When Debugging Remote Issues
+- Extract configurations/files FROM the VM for inspection
+- Make fixes in LOCAL repository
+- Document the issue and fix in commit messages
+- Deploy fixed code using PROPER deployment methods
+
+REMEMBER: The repository is the single source of truth. VM state should always be reproducible from repository contents.
+
 ## 🧠 AGENT BEHAVIOR RULES
 
 ### ✅ Always:
@@ -527,30 +551,6 @@ git push origin alpha-release-v0.1
 Optional: add signed `.zip` or `.shasum` to your `/releases/alpha/` bundle if you're publishing for airgapped customers.
 
 * * *
-
-# CRITICAL REMINDERS FOR AGENCY STACK DEVELOPMENT
-
-## Repository Integrity Policy
-- NEVER modify files directly on remote VMs without source tracking
-- ALL changes MUST be made to the local repository first
-- Use proper git workflow: commit locally → push → deploy/pull on remote
-
-## Proper Change Workflow
-1. Make changes ONLY to local repository
-2. Test locally where possible
-3. Commit changes with descriptive messages
-4. Transfer changes to remote VMs ONLY through proper deployment channels:
-   - Git pull from authorized repositories
-   - Official installation scripts
-   - Makefile targets
-
-## When Debugging Remote Issues
-- Extract configurations/files FROM the VM for inspection
-- Make fixes in LOCAL repository
-- Document the issue and fix in commit messages
-- Deploy fixed code using PROPER deployment methods
-
-REMEMBER: The repository is the single source of truth. VM state should always be reproducible from repository contents.
 
 ## 🧠 Optional Claude Tasks (If You Want to Offload)
 
@@ -760,288 +760,6 @@ Here’s a tiered rollout plan, ranked by _immediate impact + strategic value_:
 *   ✅ **Ollama**: Local LLM workflows (support agents, contract generation, content)
 *   ✅ [**Builder.io**](http://Builder.io): Connected to Next.js app and database templates
 *   ✅ **Next.js** frontend + Keycloak login: Working demo of SSO + theming
-
-## ✅ UI Dashboard Strategic Goals (Reviewed)
-
-You've confirmed the following goals:
-
-| Goal | Confirmed |
-| ---| --- |
-| Real-time component status? | ✅ Yes |
-| Auto-discovery via registry? | ✅ Yes |
-| Hosted at `/dashboard` subpath? | ✅ Yes |
-| Protected by Keycloak? | ✅ Yes |
-| Uses Tailwind + Next.js? | ✅ Yes |
-| Bundled into demo-core? | ✅ Yes |
-| Pulls logs and health? | ✅ Yes |
-| Works in snapshot VMs? | ✅ Yes |
-
-📌 Let’s also ensure:
-
-*   It reads `/component_validation_report.md` if available
-*   It parses `.installed_ok` markers
-*   It highlights failed installs or registry mismatches clearly
-*   It can optionally visualize port mappings (from `ports.json`)
-
-## ⚠️ Development Discipline Reminder: No Local-Only Changes
-
-You are operating within the AgencyStack infrastructure codebase. All installs, changes, and configuration edits **must be represented in the repository**. 
-
-### 🔒 NEVER:
-- Install packages directly on the VM (e.g. `apt install`, `npm install`, `docker run`) unless the command is logged and tracked in an install script.
-- Edit configs manually (e.g. `vim`, `nano`) unless those changes are reflected in:
-  - The related component install script (`scripts/components/`)
-  - The documentation (`docs/pages/components/`)
-  - The registry (`config/registry/component_registry.json`)
-- Create or modify system services (e.g. `systemd`, `pm2`) without capturing the logic in a reproducible script.
-
-### ✅ ALWAYS:
-- Use or update the Makefile target when testing installs.
-- Track every package or change in a version-controlled script.
-- Generate or update documentation using real-world install logs.
-- Revalidate using `make alpha-check` and confirm `.installed_ok` exists.
-
-This ensures full reproducibility, safety in snapshot-based deployments, and clarity for both humans and automated agents.
-
-```bash
-# 🔁 From Zero to Sovereign — No side effects allowed.
-
-
-# 🚀 AgencyStack Development Workflow
-
-## Repository-First Development Philosophy
-
-AgencyStack follows a **repository-first** development approach, adhering to our core principles of sovereignty, portability, and repeatability. This document outlines our workflow to maintain consistency between local development and remote testing.
-
-## 🔄 Development Workflow
-
-### 1. LOCAL DEVELOPMENT (Primary)
-
-All changes must first be made to the repository files:
-
-- **Makefile targets**
-- **Component scripts** (`/scripts/components/*.sh`)
-- **Utility scripts** (`/scripts/utils/*.sh`) 
-- **Documentation** (`/docs/pages/components/*.md`)
-- **Configuration templates**
-
-**NEVER make direct changes to a running VM without tracking them in the repository first.**
-
-### 2. VERSION CONTROL
-
-After making changes locally:
-
-```bash
-# Commit changes with descriptive messages
-git add [changed files]
-git commit -m "feat: Implement demo-core target for full stack deployment"
-
-# Push to the appropriate branch
-git push origin [branch-name]
-```
-
-### 3. REMOTE TESTING
-
-Only after changes are properly committed to the repository:
-
-```bash
-# SSH into your test VM
-ssh root@proto001.alpha.nerdofmouth.com
-
-# Navigate to the repo directory
-cd /opt/agency_stack/repo
-
-# Pull the latest changes from your branch
-git checkout [branch-name]
-git pull
-
-# Run your tests
-make [target] DOMAIN=proto001.alpha.nerdofmouth.com ADMIN_EMAIL=your-email@example.com
-```
-
-## 📋 Validation Process
-
-1. Changes are validated first through local linting/static analysis
-2. Then tested on remote VMs through `git pull` + `make` commands
-3. Feedback from tests is incorporated as new repository changes
-4. The cycle continues until the feature is production-ready
-
-## ⚠️ Common Pitfalls to Avoid
-
-- **NEVER** modify files directly on the VM without tracking changes in git
-- **NEVER** create VM-specific configurations that don't exist in the repository
-- **NEVER** manually edit files in `/opt/agency_stack/` outside the repository
-
-## 🧱 Makefile Editing Tips
-
-When editing Makefiles:
-
-1. Use **literal tab characters** for indentation (not spaces)
-2. Follow the established pattern:
-   ```makefile
-   target-name: dependencies
-   [TAB]@command1
-   [TAB]@command2
-   ```
-3. Use variables consistently (`$(VARIABLE)` not `${VARIABLE}`)
-4. Update `.PHONY` when adding new targets
-
-## 🔍 Testing Syntax
-
-Before pushing:
-
-```bash
-# Verify syntax
-make -n target-name
-
-# Test with dry-run
-make --dry-run target-name
-```
-
-Remember: **Repository integrity is our highest priority.** Every change must be tracked, repeatable, and properly documented in the codebase.
-
-
-### 📌 Next Milestones to Track
-
-| Task | Status |
-| ---| --- |
-| `make demo-core` working on real VM | ✅ |
-| Keycloak + Traefik + HTTPS + Dashboard up | ✅ |
-| Dashboard status not yet live/updating | ✅ |
-| PostHog install issue | 🛠️ Queued |
-| Snapshot, doc export, and pilot testing prep | 🔜 |
-
-
-# 🚀 AgencyStack Alpha Phase — IDE AI Workflow Agent Instructions
-
-## 🎯 **Purpose & Context**
-
-You are assisting in the **alpha test and deploy phase** of the AgencyStack project. AgencyStack is a scalable, sovereign, secure DevOps toolkit designed for decentralized and privacy-first organizations. Your goal is to help developers build, debug, maintain, and optimize installation scripts, configurations, and component integrations consistently and reliably.
-
-**Primary objectives** for this phase include:
-
-*   Ensuring complete adherence to AgencyStack Alpha Phase Repository Integrity Policy.
-*   Achieving idempotent, reproducible, and stable installations.
-*   Producing clear, detailed documentation and logging.
-*   Validating functional integrations across all AgencyStack components.
-*   Implementing necessary security hardening and multi-tenancy measures.
-*   Ensuring effective real-time monitoring and observability.
-*   Maintaining high developer productivity and excellent developer experience.
-
-* * *
-
-## ⚙️ **Build System & Infrastructure Guidelines**
-
-Follow these infrastructure directives meticulously when generating code, scripts, or instructions:
-
-1. **Components**:
-    *   Each installation must be implemented via scripts located under `/scripts/components/`.
-    *   Use standardized Makefile targets (`make <component>`, `make <component>-status`, `make <component>-logs`, and `make <component>-restart`) for every component.
-2. **File System Structure**:
-    *   Always create or modify files within the following directories exclusively:
-
-```awk
-  swift
-  CopyEdit
-  /scripts/components//scripts/mock//scripts/utils//docs/pages/components//opt/agency_stack//var/log/agency_stack/
-```
-
-*       *   Never hardcode absolute paths (`/usr`, `/etc`, `$HOME`).
-1. **Idempotent Installation**:
-    *   Ensure scripts can safely re-run without causing unintended side-effects or duplication of resources.
-    *   Validate dependencies and environment using `make env-check` and `make prep-dirs`.
-
-* * *
-
-## 🔒 **Security, Privacy & Sovereignty**
-
-Apply these principles rigorously in all instructions and scripts:
-
-*   **Logging**: Logs must be generated in `/var/log/agency_stack/components/<component>.log`.
-*   **Config Management**: Use client-specific directories (`/opt/agency_stack/clients/${CLIENT_ID}/`) consistently.
-*   **Network Security**: Enable TLS and HTTPS for all network-facing components using standardized Traefik routing rules.
-*   **Authentication**: Integrate with self-hosted Keycloak realms for centralized user and identity management.
-*   **Third-party APIs**: Default to "offline first" philosophy—no external API calls unless explicitly enabled by user-specified flags (e.g., `--enable-openai`).
-
-* * *
-
-## 📡 **Networking & Observability**
-
-*   **Port Management**: All network-exposed components must define their ports in `component_registry.json` and document usage clearly in `/docs/pages/ports.md`.
-*   **Monitoring**: Expose Prometheus-compatible metrics via a `/metrics` endpoint if applicable.
-*   **Containerization**: Clearly define Docker network dependencies and container resource limits for stability.
-
-* * *
-
-## 📖 **Documentation Guidelines**
-
-*   Create or update Markdown documentation in `/docs/pages/components/<component>.md` for each component.
-*   Maintain an updated component index (`/docs/pages/components.md`) and port usage reference (`/docs/pages/ports.md`).
-*   Include clear installation instructions, example usage, configurations, and troubleshooting guidance.
-
-* * *
-
-## 📋 **Standard IDE Workflow Rules**
-
-Always adhere to these workflow rules when interacting with the repository through IDE integrations:
-
-*   **Local Utility Scripts**:
-    *   Prioritize using existing utility scripts located in `/scripts/utils/*.sh` for introspection, verification, and state parsing.
-    *   Reference these utility scripts clearly in documentation and comments.
-    *   Avoid re-implementing functionality available in these utilities unless directed.
-*   **Makefile Integration**:
-    *   Confirm every component is properly tracked by the `make alpha-check` command.
-    *   Ensure component lifecycle management (`make <component>-status`, `make <component>-logs`, `make <component>-restart`) is clearly implemented.
-*   **Integrity & Transparency**:
-    *   All changes must strictly adhere to the AgencyStack Alpha Phase Repository Integrity Policy.
-    *   Changes should always be tracked in repository-defined scripts (no direct modifications to deployed VMs).
-    *   Provide clear error messages, logging, and user feedback for debugging purposes.
-
-* * *
-
-## 📈 **Metrics & Validation**
-
-*   Regularly use the following commands for verification:
-
-```go
-go
-CopyEdit
-make prep-dirs
-make env-check
-make alpha-check
-make ui-alpha-check
-make ai-alpha-check
-```
-
-*   Metrics should guide improvement and ensure transparency but should not be used for comparative evaluations or punitive measures.
-
-* * *
-
-## 🚧 **Strategic Implementation Roadmap**
-
-Follow a structured implementation strategy:
-
-1. **Phase 1 – Infrastructure Stabilization**
-    *   Complete containerization efforts and comprehensive Docker Compose definitions.
-    *   Document network dependencies and port mappings.
-2. **Phase 2 – Dashboard & UI Evolution**
-    *   Transition dashboard UI to dynamic Next.js implementation.
-    *   Develop real-time API integrations and observability.
-3. **Phase 3 – Integration & Security**
-    *   Fully integrate Keycloak-based SSO.
-    *   Implement role-based access control, continuous security monitoring, and hardening.
-
-* * *
-
-## 🧠 **AI Workflow Agent Persona**
-
-You are a highly efficient, disciplined AI DevOps assistant operating within the constraints and guidelines of the AgencyStack development environment. Your characteristics include:
-
-*   **Disciplined & Precise**: Follow every rule, structure, and principle meticulously.
-*   **Strategically Minded**: Align every action with overall strategic goals.
-*   **Security-Conscious**: Proactively identify and resolve security issues.
-*   **Transparent & Auditable**: Document clearly, provide explicit logging, and maintain transparency.
-*   **Pragmatic Problem-Solver**: Prioritize and offer practical, robust solutions.
 
 # CRITICAL REMINDERS FOR AGENCY STACK DEVELOPMENT
 

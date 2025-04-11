@@ -19,7 +19,7 @@ MAGENTA := $(shell tput setaf 5)
 CYAN := $(shell tput setaf 6)
 RESET := $(shell tput sgr0)
 
-.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit integrate-components dashboard dashboard-refresh dashboard-enable dashboard-update dashboard-open dashboard-direct integrate-sso integrate-email integrate-monitoring integrate-data-bridge detect-ports remap-ports scan-ports setup-cronjobs view-alerts log-summary create-client setup-roles security-audit security-fix rotate-secrets setup-log-segmentation verify-certs verify-auth multi-tenancy-status install-wordpress install-erpnext install-posthog install-voip install-mailu install-grafana install-loki install-prometheus install-keycloak install-infrastructure install-security-infrastructure install-multi-tenancy validate validate-report peertube peertube-sso peertube-with-deps peertube-reinstall peertube-status peertube-logs peertube-stop peertube-start peertube-restart demo-core demo-core-clean demo-core-status demo-core-logs
+.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit integrate-components dashboard dashboard-refresh dashboard-enable dashboard-update dashboard-open integrate-sso integrate-email integrate-monitoring integrate-data-bridge detect-ports remap-ports scan-ports setup-cronjobs view-alerts log-summary create-client setup-roles security-audit security-fix rotate-secrets setup-log-segmentation verify-certs verify-auth multi-tenancy-status install-wordpress install-erpnext install-posthog install-voip install-mailu install-grafana install-loki install-prometheus install-keycloak install-infrastructure install-security-infrastructure install-multi-tenancy validate validate-report peertube peertube-sso peertube-with-deps peertube-reinstall peertube-status peertube-logs peertube-stop peertube-start peertube-restart demo-core demo-core-clean demo-core-status demo-core-logs
 
 # Default target
 help:
@@ -58,12 +58,11 @@ help:
 	@echo "  $(BOLD)make motd$(RESET)             Generate server message of the day"
 	@echo "  $(BOLD)make audit$(RESET)            Audit running components and system status"
 	@echo "  $(BOLD)make integrate-components$(RESET) Integrate AgencyStack components"
-	@echo "  $(BOLD)make dashboard-legacy$(RESET)        Open AgencyStack dashboard"
+	@echo "  $(BOLD)make dashboard$(RESET)        Open AgencyStack dashboard"
 	@echo "  $(BOLD)make dashboard-refresh$(RESET) Refresh AgencyStack dashboard"
 	@echo "  $(BOLD)make dashboard-enable$(RESET) Enable AgencyStack dashboard"
 	@echo "  $(BOLD)make dashboard-update$(RESET) Update AgencyStack dashboard data"
 	@echo "  $(BOLD)make dashboard-open$(RESET)   Open AgencyStack dashboard in browser"
-	@echo "  $(BOLD)make dashboard-direct$(RESET) Open AgencyStack dashboard via direct IP address"
 	@echo "  $(BOLD)make integrate-sso$(RESET)    Integrate Single Sign-On for AgencyStack components"
 	@echo "  $(BOLD)make integrate-email$(RESET)  Integrate Email systems for AgencyStack components"
 	@echo "  $(BOLD)make integrate-monitoring$(RESET) Integrate Monitoring for AgencyStack components"
@@ -121,17 +120,8 @@ help:
 	@echo "  $(BOLD)make peertube-restart$(RESET)         Restart PeerTube"
 	@echo "  $(BOLD)make peertube-upgrade$(RESET)         Upgrade PeerTube to v7.0"
 
-# Pre-flight installation verification
-preflight-check:
-	@echo "$(MAGENTA)$(BOLD)🔍 Performing pre-installation checklist verification...$(RESET)"
-	@$(SCRIPTS_DIR)/components/preflight_check.sh $(if $(DOMAIN),--domain "$(DOMAIN)",) $(if $(INTERACTIVE),--interactive,) $(if $(SKIP_PORTS),--skip-ports,) $(if $(SKIP_DNS),--skip-dns,) $(if $(SKIP_SYSTEM),--skip-system,) $(if $(SKIP_NETWORK),--skip-network,) $(if $(SKIP_SSH),--skip-ssh,)
-	@if [ -f "$(REPO_ROOT)/pre_installation_report.md" ]; then \
-		echo "$(CYAN)Pre-installation report generated at: $(REPO_ROOT)/pre_installation_report.md$(RESET)"; \
-		grep -A2 "^## Summary" "$(REPO_ROOT)/pre_installation_report.md" | grep -v "^##"; \
-	fi
-
 # Install AgencyStack
-install: preflight-check validate
+install: validate
 	@echo "🔧 Installing AgencyStack..."
 	@sudo $(SCRIPTS_DIR)/install.sh
 
@@ -349,7 +339,7 @@ integrate-data-bridge:
 	@sudo bash $(SCRIPTS_DIR)/integrate_components.sh --type=data-bridge
 
 # Open AgencyStack dashboard
-dashboard-legacy:
+dashboard:
 	@echo "📊 Opening AgencyStack dashboard..."
 	@sudo bash $(SCRIPTS_DIR)/dashboard.sh
 
@@ -368,25 +358,7 @@ dashboard-update:
 	@echo "🔄 Updating AgencyStack dashboard data..."
 	@sudo bash $(SCRIPTS_DIR)/dashboard/update_dashboard_data.sh
 
-# Directly open dashboard via IP address (bypassing DNS)
-dashboard-direct:
-	@echo "$(MAGENTA)$(BOLD)🔌 Opening AgencyStack Dashboard via Direct IP Address...$(RESET)"
-	@if [ -d "/opt/agency_stack/clients/$(CLIENT_ID)/dashboard" ]; then \
-		SERVER_IP=$$(hostname -I | awk '{print $$1}'); \
-		DASHBOARD_PORT=$$(docker ps | grep dashboard | grep -oP '\d+->80' | cut -d'-' -f1 || echo "3001"); \
-		echo "$(GREEN)✅ Dashboard is available at: http://$${SERVER_IP}:$${DASHBOARD_PORT}$(RESET)"; \
-		if command -v xdg-open >/dev/null 2>&1; then \
-			xdg-open "http://$${SERVER_IP}:$${DASHBOARD_PORT}" || echo "$(YELLOW)⚠️ Could not open browser automatically$(RESET)"; \
-		elif command -v open >/dev/null 2>&1; then \
-			open "http://$${SERVER_IP}:$${DASHBOARD_PORT}" || echo "$(YELLOW)⚠️ Could not open browser automatically$(RESET)"; \
-		else \
-			echo "$(YELLOW)⚠️ Could not detect browser. Please open the URL manually.$(RESET)"; \
-		fi; \
-	else \
-		echo "$(RED)❌ Dashboard not installed. Install with: make dashboard$(RESET)"; \
-	fi
-
-# Open AgencyStack dashboard in browser
+# Open dashboard in browser
 dashboard-open:
 	@echo "🌐 Opening AgencyStack dashboard in browser..."
 	@xdg-open http://dashboard.$(shell grep PRIMARY_DOMAIN /opt/agency_stack/config.env 2>/dev/null | cut -d '=' -f2 || echo "localhost")
@@ -464,19 +436,32 @@ setup-roles:
 
 security-audit:
 	@echo "🔐 Running security audit..."
-		sudo bash $(SCRIPTS_DIR)/security/audit_stack.sh $(if $(VERBOSE),--verbose,) $(if $(REPORT),--report,)
+		sudo bash $(SCRIPTS_DIR)/security/audit_stack.sh --client-id "$(CLIENT_ID)"; \
+	else \
+		sudo bash $(SCRIPTS_DIR)/security/audit_stack.sh; \
+	fi
 
 security-fix:
 	@echo "🔧 Fixing security issues..."
-		sudo bash $(SCRIPTS_DIR)/security/audit_stack.sh --fix $(if $(VERBOSE),--verbose,) $(if $(REPORT),--report,)
+		sudo bash $(SCRIPTS_DIR)/security/audit_stack.sh --fix --client-id "$(CLIENT_ID)"; \
+	else \
+		sudo bash $(SCRIPTS_DIR)/security/audit_stack.sh --fix; \
+	fi
 
 rotate-secrets:
 	@echo "🔄 Rotating secrets..."
-		sudo bash $(SCRIPTS_DIR)/security/generate_secrets.sh --rotate $(if $(VERBOSE),--verbose,) $(if $(REPORT),--report,)
+		sudo bash $(SCRIPTS_DIR)/security/generate_secrets.sh --rotate --client-id "$(CLIENT_ID)" --service "$(SERVICE)"; \
+		sudo bash $(SCRIPTS_DIR)/security/generate_secrets.sh --rotate --client-id "$(CLIENT_ID)"; \
+	else \
+		sudo bash $(SCRIPTS_DIR)/security/generate_secrets.sh --rotate; \
+	fi
 
 setup-log-segmentation:
 	@echo "📋 Setting up log segmentation..."
-		sudo bash $(SCRIPTS_DIR)/security/setup_log_segmentation.sh $(if $(VERBOSE),--verbose,) $(if $(REPORT),--report,)
+		sudo bash $(SCRIPTS_DIR)/security/setup_log_segmentation.sh --client-id "$(CLIENT_ID)"; \
+	else \
+		sudo bash $(SCRIPTS_DIR)/security/setup_log_segmentation.sh; \
+	fi
 
 verify-certs:
 	@echo "🔒 Verifying TLS certificates..."
@@ -867,55 +852,86 @@ prometheus-config:
 	read -p "$(YELLOW)Enter client ID (optional):$(RESET) " CLIENT_ID; \
 
 # Keycloak
+install-keycloak: validate
+	@echo "Installing Keycloak identity provider..."
+	@sudo $(SCRIPTS_DIR)/components/install_keycloak.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
 keycloak: validate
-	@echo "$(MAGENTA)$(BOLD)🔐 Installing Keycloak Identity Provider...$(RESET)"
+	@echo "$(MAGENTA)$(BOLD)🔐 Installing Keycloak SSO & Identity provider...$(RESET)"
 	@sudo $(SCRIPTS_DIR)/components/install_keycloak.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
 keycloak-status:
-	@echo "$(MAGENTA)$(BOLD)🔍 Checking Keycloak Status...$(RESET)"
-	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/keycloak/.installed_ok" ]; then \
-		echo "$(GREEN)✅ Keycloak is installed$(RESET)"; \
-		if docker ps | grep -q "keycloak"; then \
-			echo "$(GREEN)✅ Keycloak container is running$(RESET)"; \
-			docker ps | grep keycloak; \
-		else \
-			echo "$(RED)❌ Keycloak container is not running$(RESET)"; \
-		fi; \
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Keycloak Status...$(RESET)"
+	@if [ -n "$(CLIENT_ID)" ]; then \
+		KEYCLOAK_CONTAINER="$(CLIENT_ID)_keycloak"; \
 	else \
-		echo "$(RED)❌ Keycloak is not installed$(RESET)"; \
-		echo "$(CYAN)To install, run: make keycloak$(RESET)"; \
-		exit 1; \
+		KEYCLOAK_CONTAINER="keycloak_$(subst .,_,$(DOMAIN))"; \
+	fi; \
+	if docker ps --format '{{.Names}}' | grep -q "$$KEYCLOAK_CONTAINER"; then \
+		echo "$(GREEN)✅ Keycloak is running$(RESET)"; \
+		docker ps --filter "name=$$KEYCLOAK_CONTAINER" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"; \
+		echo ""; \
+		echo "$(CYAN)Admin URL: https://$(DOMAIN)/admin/$(RESET)"; \
+		echo "$(CYAN)Realm: $(DOMAIN)$(RESET)"; \
+		echo "$(CYAN)Username: admin$(RESET)"; \
+		echo "$(CYAN)Password: $(shell grep KEYCLOAK_ADMIN_PASSWORD /opt/agency_stack/config.env | cut -d '=' -f2)$(RESET)"; \
+	else \
+		echo "$(RED)❌ Keycloak is not running$(RESET)"; \
+		echo "$(CYAN)Install with: make keycloak$(RESET)"; \
 	fi
 
 keycloak-logs:
 	@echo "$(MAGENTA)$(BOLD)📜 Viewing Keycloak Logs...$(RESET)"
-	@if [ -f "/var/log/agency_stack/components/keycloak.log" ]; then \
+	@if [ -n "$(CLIENT_ID)" ]; then \
+		KEYCLOAK_CONTAINER="$(CLIENT_ID)_keycloak"; \
+	else \
+		KEYCLOAK_CONTAINER="keycloak_$(subst .,_,$(DOMAIN))"; \
+	fi; \
+	if [ -f "/var/log/agency_stack/components/keycloak.log" ]; then \
 		echo "$(CYAN)Recent Keycloak installation logs:$(RESET)"; \
-		sudo grep "Keycloak" /var/log/syslog | tail -n 20; \
+		sudo tail -n 30 /var/log/agency_stack/components/keycloak.log; \
 		echo ""; \
 		echo "$(CYAN)For container logs, use:$(RESET)"; \
-		echo "docker logs keycloak-$(CLIENT_ID) --tail 50"; \
+		echo "docker logs $$KEYCLOAK_CONTAINER"; \
 	else \
-		echo "$(YELLOW)Keycloak installation logs not found.$(RESET)"; \
-		if docker ps | grep -q "keycloak"; then \
-			echo "$(CYAN)Container logs:$(RESET)"; \
-			docker logs keycloak-$(CLIENT_ID) --tail 20; \
-		fi; \
+		echo "$(YELLOW)Keycloak logs not found.$(RESET)"; \
+		docker logs $$KEYCLOAK_CONTAINER 2>/dev/null || echo "$(RED)Keycloak container logs not available.$(RESET)"; \
 	fi
 
 keycloak-restart:
-	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Keycloak...$(RESET)"
-	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/keycloak/.installed_ok" ]; then \
-		docker restart keycloak-$(CLIENT_ID); \
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Keycloak Services...$(RESET)"
+	@if [ -n "$(CLIENT_ID)" ]; then \
+		KEYCLOAK_CONTAINER="$(CLIENT_ID)_keycloak"; \
+	else \
+		KEYCLOAK_CONTAINER="keycloak_$(subst .,_,$(DOMAIN))"; \
+	fi; \
+	if docker ps --format '{{.Names}}' | grep -q "$$KEYCLOAK_CONTAINER"; then \
+		docker restart $$KEYCLOAK_CONTAINER; \
 		echo "$(GREEN)✅ Keycloak has been restarted$(RESET)"; \
 		echo "$(CYAN)Check status with: make keycloak-status$(RESET)"; \
 	else \
-		echo "$(RED)❌ Keycloak is not installed$(RESET)"; \
-		echo "$(CYAN)To install, run: make keycloak$(RESET)"; \
+		echo "$(RED)❌ Keycloak is not running$(RESET)"; \
+		echo "$(CYAN)Install with: make keycloak$(RESET)"; \
 	fi
 
-# Alias for backward compatibility
-install-keycloak: keycloak
+keycloak-test:
+	@echo "$(MAGENTA)$(BOLD)🧪 Testing Keycloak functionality...$(RESET)"
+	@if [ -n "$(CLIENT_ID)" ]; then \
+		KEYCLOAK_CONTAINER="$(CLIENT_ID)_keycloak"; \
+	else \
+		KEYCLOAK_CONTAINER="keycloak_$(subst .,_,$(DOMAIN))"; \
+	fi; \
+	if docker ps --format '{{.Names}}' | grep -q "$$KEYCLOAK_CONTAINER"; then \
+		echo "$(GREEN)✅ Keycloak is running$(RESET)"; \
+		echo "$(CYAN)Admin URL: https://$(DOMAIN)/admin/$(RESET)"; \
+		echo "$(CYAN)Realm: $(DOMAIN)$(RESET)"; \
+		echo "$(CYAN)Username: admin$(RESET)"; \
+		echo "$(CYAN)Password: $(shell grep KEYCLOAK_ADMIN_PASSWORD /opt/agency_stack/config.env | cut -d '=' -f2)$(RESET)"; \
+		echo "$(CYAN)Test Keycloak with: make keycloak-test$(RESET)"; \
+	else \
+		echo "$(RED)❌ Keycloak is not running$(RESET)"; \
+		echo "$(CYAN)Install with: make keycloak$(RESET)"; \
+	fi
 
 # Core Infrastructure
 install-infrastructure:
@@ -1050,7 +1066,7 @@ peertube-restart:
 # Drone CI - Continuous Integration and Delivery Platform
 droneci:
 	@echo "Installing Drone CI..."
-	@sudo $(SCRIPTS_DIR)/components/install_droneci.sh --domain $(DOMAIN) $(INSTALL_FLAGS)
+	@sudo $(SCRIPTS_DIR)/components/install_droneci.sh --domain $(DRONECI_DOMAIN) $(INSTALL_FLAGS)
 
 droneci-status:
 	@docker ps -a | grep drone || echo "Drone CI is not running"
@@ -1073,7 +1089,7 @@ droneci-restart:
 droneci-backup:
 	@echo "Backing up Drone CI data..."
 	@mkdir -p $(BACKUP_DIR)/droneci
-	@$(CONFIG_DIR)/clients/$(CLIENT_ID)/droneci_data/scripts/backup.sh "$(BACKUP_DIR)/droneci"
+	@$(CONFIG_DIR)/clients/$(CLIENT_ID)/droneci_data/scripts/backup.sh $(BACKUP_DIR)/droneci
 	@echo "Backup completed: $(BACKUP_DIR)/droneci/"
 
 droneci-config:
@@ -1492,7 +1508,7 @@ tailscale-status:
 
 tailscale-logs:
 	@echo "Viewing Tailscale logs..."
-	@if [ -f "/var/log/agency_stack/components/tailscale.log" ]; then \
+	@if [ -f "$(LOG_DIR)/components/tailscale.log" ]; then \
 		echo "$(CYAN)Recent Tailscale actions:$(RESET)"; \
 		sudo grep "Tailscale" /var/log/syslog | tail -n 20; \
 		echo ""; \
@@ -1602,67 +1618,24 @@ seafile-restart:
 	@exit 1
 
 # Auto-generated target for traefik
-traefik: validate
-	@echo "$(MAGENTA)$(BOLD)🔧 Installing Traefik Reverse Proxy...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/install_traefik.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+traefik:
+	@echo "TODO: Implement traefik"
+	@exit 1
 
+# Auto-generated target for traefik
 traefik-status:
-	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Traefik Status...$(RESET)"
-	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/traefik/.installed_ok" ]; then \
-		echo "$(GREEN)✅ Traefik is installed$(RESET)"; \
-		if docker ps | grep -q "traefik"; then \
-			echo "$(GREEN)✅ Traefik container is running$(RESET)"; \
-		else \
-			echo "$(RED)❌ Traefik container is not running$(RESET)"; \
-		fi; \
-	else \
-		echo "$(RED)❌ Traefik is not installed$(RESET)"; \
-		echo "$(CYAN)Install with: make traefik$(RESET)"; \
-	fi
+	@echo "TODO: Implement traefik-status"
+	@exit 1
 
+# Auto-generated target for traefik
 traefik-logs:
-	@echo "$(MAGENTA)$(BOLD)📜 Viewing Traefik Logs...$(RESET)"
-	@if [ -f "/var/log/agency_stack/components/traefik.log" ]; then \
-		echo "$(CYAN)Recent Traefik actions:$(RESET)"; \
-		sudo grep "Traefik" /var/log/syslog | tail -n 20; \
-		echo ""; \
-		echo "$(CYAN)For installation logs, use:$(RESET)"; \
-		echo "cat /var/log/agency_stack/components/traefik.log"; \
-	else \
-		echo "$(YELLOW)Traefik logs not found.$(RESET)"; \
-		journalctl -u traefik 2>/dev/null; \
-	fi
+	@echo "TODO: Implement traefik-logs"
+	@exit 1
 
+# Auto-generated target for traefik
 traefik-restart:
-	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Traefik...$(RESET)"
-	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/traefik/.installed_ok" ]; then \
-		docker restart traefik-$(CLIENT_ID); \
-		echo "$(GREEN)✅ Traefik has been restarted$(RESET)"; \
-		echo "$(CYAN)Check status with: make traefik-status$(RESET)"; \
-	else \
-		echo "$(RED)❌ Traefik is not installed$(RESET)"; \
-		echo "$(CYAN)Install with: make traefik$(RESET)"; \
-	fi
-
-traefik-dns-check:
-	@echo "$(MAGENTA)$(BOLD)🔍 Checking Traefik DNS Configuration...$(RESET)"
-	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/traefik/.installed_ok" ]; then \
-		echo "$(CYAN)Verifying DNS configuration for Traefik...$(RESET)"; \
-		scripts/verify_dns.sh --domain $(DOMAIN) --client-id $(CLIENT_ID) --direct-check; \
-		if [ $$? -eq 0 ]; then \
-			echo "$(GREEN)✅ DNS configuration is correct$(RESET)"; \
-		else \
-			echo "$(YELLOW)⚠️ DNS configuration issues detected$(RESET)"; \
-			echo "$(CYAN)For detailed information, check the generated report or logs$(RESET)"; \
-			echo "$(CYAN)For testing, you can directly access:$(RESET)"; \
-			DASHBOARD_PORT=$$(docker ps | grep dashboard | grep -oP '\d+->80' | cut -d'-' -f1 || echo "3001"); \
-			SERVER_IP=$$(hostname -I | awk '{print $$1}'); \
-			echo "  Dashboard: http://$${SERVER_IP}:$${DASHBOARD_PORT}"; \
-		fi; \
-	else \
-		echo "$(RED)❌ Traefik is not installed$(RESET)"; \
-		echo "$(CYAN)Install with: make traefik$(RESET)"; \
-	fi
+	@echo "TODO: Implement traefik-restart"
+	@exit 1
 
 # Auto-generated target for vault
 vault:
@@ -1957,6 +1930,26 @@ grafana-restart:
 	@echo "TODO: Implement grafana-restart"
 	@exit 1
 
+# Auto-generated target for keycloak
+keycloak:
+	@echo "TODO: Implement keycloak"
+	@exit 1
+
+# Auto-generated target for keycloak
+keycloak-status:
+	@echo "TODO: Implement keycloak-status"
+	@exit 1
+
+# Auto-generated target for keycloak
+keycloak-logs:
+	@echo "TODO: Implement keycloak-logs"
+	@exit 1
+
+# Auto-generated target for keycloak
+keycloak-restart:
+	@echo "TODO: Implement keycloak-restart"
+	@exit 1
+
 # Auto-generated target for killbill
 killbill-status:
 	@echo "TODO: Implement killbill-status"
@@ -1971,6 +1964,7 @@ killbill-logs:
 killbill-restart:
 	@echo "TODO: Implement killbill-restart"
 	@exit 1
+
 	@exit 1
 
 # Auto-generated target for mailu
@@ -2233,6 +2227,7 @@ fail2ban-status:
 		fi; \
 	else \
 		echo "$(RED)❌ Fail2ban is not running$(RESET)"; \
+		echo "$(CYAN)Install with: make fail2ban$(RESET)"; \
 	fi
 
 fail2ban-logs:
@@ -2245,7 +2240,9 @@ fail2ban-logs:
 		echo "cat /var/log/agency_stack/components/fail2ban.log"; \
 	else \
 		echo "$(YELLOW)Fail2ban logs not found.$(RESET)"; \
-		journalctl -u fail2ban 2>/dev/null; \
+		if [ -f "/var/log/agency_stack/components/fail2ban.log" ]; then \
+			cat /var/log/agency_stack/components/fail2ban.log | tail -n 20; \
+		fi; \
 	fi
 
 fail2ban-restart:
@@ -2321,76 +2318,105 @@ security-restart:
 		echo "$(CYAN)Install with: make security$(RESET)"; \
 	fi
 
-# Dashboard Component
-dashboard: validate
-	@echo "$(MAGENTA)$(BOLD)🚀 Installing AgencyStack Next.js Dashboard...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/install_dashboard.sh --domain "$(DOMAIN)" --admin-email "$(ADMIN_EMAIL)" $(if $(CLIENT_ID),--client-id "$(CLIENT_ID)",) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-	@$(MAKE) dashboard-configure-route
-
-dashboard-configure-route:
-	@echo "$(MAGENTA)$(BOLD)🔄 Configuring Dashboard Routing with Traefik...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/configure_dashboard_route.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),)
-
-dashboard-status:
-	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Dashboard Status...$(RESET)"
-	@if [ -f "/opt/agency_stack/dashboard/.installed_ok" ] || [ -f "/opt/agency_stack/clients/default/dashboard/.installed_ok" ] || [ -f "/opt/agency_stack/clients/${CLIENT_ID}/dashboard/.installed_ok" ]; then \
-		echo "Dashboard is installed and ready"; \
-		export PATH="/opt/agency_stack/apps/dashboard/node/bin:$$PATH"; \
-		if command -v pm2 >/dev/null 2>&1; then \
-			if pm2 list | grep -q "agency-stack-dashboard"; then \
-				echo "Dashboard service is running"; \
-			else \
-				echo "Dashboard service is not running"; \
-			fi; \
-		elif [ -f "/opt/agency_stack/apps/dashboard/node/bin/pm2" ]; then \
-			if /opt/agency_stack/apps/dashboard/node/bin/pm2 list | grep -q "agency-stack-dashboard"; then \
-				echo "Dashboard service is running"; \
-			else \
-				echo "Dashboard service is not running"; \
-			fi; \
-		else \
-			echo "PM2 not found in path or project directory"; \
-		fi; \
-		DOMAIN_TO_USE="$${DOMAIN:-proto001.alpha.nerdofmouth.com}"; \
-		echo "Dashboard URL: https://$${DOMAIN_TO_USE}/dashboard"; \
-	else \
-		echo "Dashboard is not installed"; \
-		echo "Install with: make dashboard DOMAIN=$(DOMAIN)"; \
+# Demo Core Installation
+# Installs high-value components suitable for client/investor demos
+demo-core: validate
+	@echo "$(MAGENTA)$(BOLD)🚀 Installing AgencyStack Demo Core Components...$(RESET)"
+	@echo "$(CYAN)This will install a set of high-value components for demonstration purposes.$(RESET)"
+	@echo ""
+	
+	@echo "$(YELLOW)📊 Installing Core Infrastructure...$(RESET)"
+	@$(MAKE) docker docker-status docker_compose traefik_ssl
+	
+	@echo "$(YELLOW)🔐 Installing Security Components...$(RESET)"
+	@$(MAKE) keycloak keycloak-status fail2ban
+	
+	@echo "$(YELLOW)📧 Installing Communication Components...$(RESET)"
+	@$(MAKE) mailu mailu-status chatwoot chatwoot-status voip voip-status
+	
+	@echo "$(YELLOW)📊 Installing Monitoring Components...$(RESET)"
+	@$(MAKE) prometheus prometheus-status grafana grafana-status posthog posthog-status
+	
+	@echo "$(YELLOW)📝 Installing Content & CMS Components...$(RESET)"
+	@$(MAKE) wordpress wordpress-status peertube peertube-status builderio builderio-status
+	
+	@echo "$(YELLOW)🧰 Installing DevOps Components...$(RESET)"
+	@$(MAKE) gitea gitea-status droneci
+	
+	@echo "$(YELLOW)📅 Installing Business Components...$(RESET)"
+	@$(MAKE) calcom calcom-status erpnext documenso focalboard
+	
+	@echo "$(YELLOW)🔄 Integrating Components...$(RESET)"
+	@$(MAKE) integrate-sso
+	@$(MAKE) integrate-monitoring
+	@$(MAKE) dashboard-update
+	
+	@echo "$(YELLOW)🧪 Running Validation Checks...$(RESET)"
+	@$(MAKE) alpha-check
+	@if [ -f "$(SCRIPTS_DIR)/smoke_test.sh" ]; then \
+		$(MAKE) smoke-test; \
 	fi
+	
+	@echo "$(GREEN)$(BOLD)✅ Demo Core Components Installed Successfully!$(RESET)"
+	@echo "$(CYAN)Open the AgencyStack dashboard to view your installation:$(RESET)"
+	@echo "$(CYAN)$(MAKE) dashboard-open$(RESET)"
 
-dashboard-logs:
-	@echo "$(MAGENTA)$(BOLD)📋 Viewing Dashboard Logs...$(RESET)"
-	@if [ -f "/var/log/agency_stack/components/dashboard-out.log" ]; then \
-		tail -n 50 /var/log/agency_stack/components/dashboard-out.log; \
-	elif [ -f "/var/log/agency_stack/components/dashboard.log" ]; then \
-		tail -n 50 /var/log/agency_stack/components/dashboard.log; \
-	else \
-		echo "$(RED)No dashboard logs found$(RESET)"; \
-	fi
+# Demo Core Cleanup
+# Removes the demo core components for a clean slate
+demo-core-clean:
+	@echo "$(MAGENTA)$(BOLD)🧹 Cleaning Up AgencyStack Demo Core Components...$(RESET)"
+	@echo "$(RED)This will remove all demo core components and their data.$(RESET)"
+	@echo ""
+	
+	@echo "$(YELLOW)Stopping and Removing Business Components...$(RESET)"
+	@-$(MAKE) calcom-stop focalboard-stop erpnext-stop documenso-stop 2>/dev/null || true
+	
+	@echo "$(YELLOW)Stopping and Removing DevOps Components...$(RESET)"
+	@-$(MAKE) gitea-stop droneci-stop 2>/dev/null || true
+	
+	@echo "$(YELLOW)Stopping and Removing Content Components...$(RESET)"
+	@-$(MAKE) wordpress-stop peertube-stop builderio-stop 2>/dev/null || true
+	
+	@echo "$(YELLOW)Stopping and Removing Monitoring Components...$(RESET)"
+	@-$(MAKE) prometheus-stop grafana-stop posthog-stop 2>/dev/null || true
+	
+	@echo "$(YELLOW)Stopping and Removing Communication Components...$(RESET)"
+	@-$(MAKE) mailu-stop chatwoot-stop voip-stop 2>/dev/null || true
+	
+	@echo "$(YELLOW)Stopping and Removing Security Components...$(RESET)"
+	@-$(MAKE) keycloak-stop fail2ban-stop 2>/dev/null || true
+	
+	@echo "$(GREEN)$(BOLD)✅ Demo Core Components Cleaned Up Successfully!$(RESET)"
+	@echo "$(CYAN)The system has been returned to a clean state.$(RESET)"
 
-dashboard-restart:
-	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Dashboard...$(RESET)"
-	@if [ -f "/opt/agency_stack/dashboard/.installed_ok" ] || [ -f "/opt/agency_stack/clients/default/dashboard/.installed_ok" ] || [ -f "/opt/agency_stack/clients/${CLIENT_ID}/dashboard/.installed_ok" ]; then \
-		if [ -d "/opt/agency_stack/apps/dashboard/node" ]; then \
-			export PATH="/opt/agency_stack/apps/dashboard/node/bin:$$PATH"; \
-			if [ -f "/opt/agency_stack/apps/dashboard/node/bin/pm2" ]; then \
-				/opt/agency_stack/apps/dashboard/node/bin/pm2 restart agency-stack-dashboard || \
-				/opt/agency_stack/apps/dashboard/node/bin/pm2 start --name agency-stack-dashboard --max-memory-restart 250M --exp-backoff-restart-delay=100 npm -- start; \
-				echo "Dashboard service $(GREEN)started with pm2$(RESET)"; \
-			else \
-				# Try with global pm2 as fallback \
-				pm2 restart agency-stack-dashboard 2>/dev/null || \
-				pm2 start --name agency-stack-dashboard --max-memory-restart 250M --exp-backoff-restart-delay=100 npm -- start; \
-				echo "Dashboard service $(GREEN)started with global pm2$(RESET)"; \
-			fi; \
-		else \
-			echo "$(RED)Dashboard installation not found. Is Dashboard installed?$(RESET)"; \
-			echo "$(CYAN)Install with: make dashboard DOMAIN=$(DOMAIN)$(RESET)"; \
-		fi; \
-	else \
-		echo "$(RED)Dashboard is not installed$(RESET)"; \
-		echo "$(CYAN)Install with: make dashboard DOMAIN=$(DOMAIN)$(RESET)"; \
-	fi
+# Demo Core Status
+# Checks the status of all demo core components
+demo-core-status:
+	@echo "$(MAGENTA)$(BOLD)📊 AgencyStack Demo Core Components Status:$(RESET)"
+	@echo ""
+	
+	@echo "$(YELLOW)📊 Core Infrastructure Components:$(RESET)"
+	@-$(MAKE) docker-status docker_compose-status traefik-status 2>/dev/null || true
+	
+	@echo "$(YELLOW)🔐 Security Components:$(RESET)"
+	@-$(MAKE) keycloak-status fail2ban-status 2>/dev/null || true
+	
+	@echo "$(YELLOW)📧 Communication Components:$(RESET)"
+	@-$(MAKE) mailu-status chatwoot-status voip-status 2>/dev/null || true
+	
+	@echo "$(YELLOW)📊 Monitoring Components:$(RESET)"
+	@-$(MAKE) prometheus-status grafana-status posthog-status 2>/dev/null || true
+	
+	@echo "$(YELLOW)📝 Content & CMS Components:$(RESET)"
+	@-$(MAKE) wordpress-status peertube-status builderio-status 2>/dev/null || true
+	
+	@echo "$(YELLOW)🧰 DevOps Components:$(RESET)"
+	@-$(MAKE) gitea-status droneci-status 2>/dev/null || true
+	
+	@echo "$(YELLOW)📅 Business Components:$(RESET)"
+	@-$(MAKE) calcom-status erpnext-status documenso-status focalboard-status 2>/dev/null || true
+	
+	@echo "$(GREEN)$(BOLD)✅ Status Check Complete!$(RESET)"
 
 # Demo Core Logs
 # Views logs from all demo core components
@@ -2595,60 +2621,73 @@ traefik-check-ports:
 	CLIENT_ID="$${CLIENT_ID_INPUT:-default}"; \
 	sudo $(SCRIPTS_DIR)/components/fix_traefik_ports.sh --domain "$${DOMAIN}" --client-id "$${CLIENT_ID}" --check-only $(if $(VERBOSE),--verbose,)
 
-dashboard-fix:
-	@echo "$(MAGENTA)$(BOLD)ℹ️ Dashboard FQDN access is now integrated into the core installation$(RESET)"
-	@echo "$(YELLOW)This target is maintained for backward compatibility$(RESET)"
-	@echo "$(CYAN)To properly configure dashboard access, run:$(RESET)"
-	@echo "  make dashboard DOMAIN=yourdomain.com"
+# Auto-generated target for keycloak
+keycloak:
+	@echo "🔑 Installing Keycloak SSO & Identity provider..."
+	@sudo $(SCRIPTS_DIR)/components/install_keycloak.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+# Auto-generated target for keycloak
+keycloak-status:
+	@echo "🔍 Checking Keycloak status..."
+	@sudo docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep -E "keycloak|postgres"
+
+# Auto-generated target for keycloak
+keycloak-logs:
+	@echo "📋 Viewing Keycloak logs..."
+	@sudo docker logs --tail=100 -f keycloak_$(subst .,_,$(DOMAIN))
+
+# Auto-generated target for keycloak
+keycloak-restart:
+	@echo "🔄 Restarting Keycloak services..."
+	@cd /opt/agency_stack/keycloak/$(DOMAIN) && sudo docker-compose restart
+
+# SSO Integration targets
+sso-integrate:
+	@echo "🔒 Integrating component with Keycloak SSO..."
+	@if [ -z "$(COMPONENT)" ]; then \
+		echo "Error: COMPONENT parameter is required. Usage: make sso-integrate COMPONENT=name FRAMEWORK=nodejs COMPONENT_URL=https://example.com"; \
+		exit 1; \
+	fi
+	@if [ -z "$(FRAMEWORK)" ]; then \
+		echo "Error: FRAMEWORK parameter is required. Valid options: nodejs, python, docker"; \
+		exit 1; \
+	fi
+	@if [ -z "$(COMPONENT_URL)" ]; then \
+		echo "Error: COMPONENT_URL parameter is required."; \
+		exit 1; \
+	fi
+	@sudo $(SCRIPTS_DIR)/components/implement_sso_integration.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) --client-id $(CLIENT_ID) --component $(COMPONENT) --framework $(FRAMEWORK) --component-url $(COMPONENT_URL) $(if $(FORCE),--force,) $(if $(VERBOSE),--verbose,)
+
+sso-status:
+	@echo "🔍 Checking SSO integration status for components..."
+	@echo "Components with SSO enabled:"
+	@grep -B 5 -A 3 '"sso": true' $(CONFIG_DIR)/registry/component_registry.json | grep '"name":' | awk -F'"' '{print $$4}' | sort | uniq
 	@echo ""
-	@echo "$(YELLOW)Running diagnostics to verify current configuration...$(RESET)"
-	@read -p "Enter domain [$(DOMAIN)]: " DOMAIN_INPUT; \
-	DOMAIN="$${DOMAIN_INPUT:-$(DOMAIN)}"; \
-	read -p "Enter client ID [default]: " CLIENT_ID_INPUT; \
-	CLIENT_ID="$${CLIENT_ID_INPUT:-default}"; \
-	echo ""; \
-	echo "$(MAGENTA)$(BOLD)🔍 Checking dashboard access configuration...$(RESET)"; \
-	# Check if Traefik routes exist
-	TRAEFIK_DIR="/opt/agency_stack/clients/$${CLIENT_ID}/traefik"; \
-	DASHBOARD_ROUTE="$${TRAEFIK_DIR}/config/dynamic/dashboard-route.yml"; \
-	if [ -f "$${DASHBOARD_ROUTE}" ]; then \
-		echo "$(GREEN)✅ Dashboard routes are configured in Traefik$(RESET)"; \
-		echo "$(CYAN)Route file: $${DASHBOARD_ROUTE}$(RESET)"; \
+	@echo "Components with SSO configured:"
+	@grep -B 10 -A 3 '"sso_configured": true' $(CONFIG_DIR)/registry/component_registry.json 2>/dev/null | grep '"name":' | awk -F'"' '{print $$4}' | sort | uniq || echo "None configured yet"
+
+# Add SSO integration for specific components
+%-sso:
+	@echo "🔒 Integrating $(subst -sso,,$@) with Keycloak SSO..."
+	@component=$(subst -sso,,$@); \
+	if grep -q "\"name\": \"$$component\"" $(CONFIG_DIR)/registry/component_registry.json && grep -q -A 20 "\"name\": \"$$component\"" $(CONFIG_DIR)/registry/component_registry.json | grep -q "\"sso\": true"; then \
+		framework="docker"; \
+		if [ "$$component" = "peertube" ] || [ "$$component" = "gitea" ] || [ "$$component" = "n8n" ]; then framework="nodejs"; fi; \
+		if [ "$$component" = "django" ] || [ "$$component" = "grafana" ]; then framework="python"; fi; \
+		$(MAKE) sso-integrate COMPONENT=$$component FRAMEWORK=$$framework COMPONENT_URL=https://$$component.$(DOMAIN); \
 	else \
-		echo "$(RED)❌ Dashboard routes not found in Traefik configuration$(RESET)"; \
-		echo "$(YELLOW)Would you like to configure dashboard access now? [y/N]$(RESET)"; \
-		read -p "" CONFIGURE; \
-		if [[ $$CONFIGURE =~ ^[Yy] ]]; then \
-			sudo $(SCRIPTS_DIR)/components/install_dashboard.sh --domain "$${DOMAIN}" --client-id "$${CLIENT_ID}" --configure-only; \
-		fi; \
-	fi; \
-	# Check if dashboard is accessible
-	SERVER_IP=$$(hostname -I | awk '{print $$1}'); \
-	echo ""; \
-	echo "$(MAGENTA)$(BOLD)Dashboard access URLs:$(RESET)"; \
-	echo "$(CYAN)1. HTTP FQDN (Root):       http://$${DOMAIN}$(RESET)"; \
-	echo "$(CYAN)2. HTTP FQDN (Path):       http://$${DOMAIN}/dashboard$(RESET)"; \
-	echo "$(CYAN)3. Direct IP:              http://$${SERVER_IP}:3001$(RESET)"
+		echo "Component $$component does not exist or is not SSO-enabled in the registry"; \
+		exit 1; \
+	fi
 
-traefik-fix-ports:
-	@echo "$(MAGENTA)$(BOLD)ℹ️ Traefik port configuration is now integrated into the core installation$(RESET)"
-	@echo "$(YELLOW)This target is maintained for backward compatibility$(RESET)"
-	@echo "$(CYAN)To properly configure Traefik with ports 80/443, run:$(RESET)"
-	@echo "  make traefik DOMAIN=yourdomain.com ADMIN_EMAIL=admin@example.com"
-	@echo ""
-	@echo "$(YELLOW)Running diagnostics to verify current configuration...$(RESET)"
-	@read -p "Enter domain [$(DOMAIN)]: " DOMAIN_INPUT; \
-	DOMAIN="$${DOMAIN_INPUT:-$(DOMAIN)}"; \
-	read -p "Enter client ID [default]: " CLIENT_ID_INPUT; \
-	CLIENT_ID="$${CLIENT_ID_INPUT:-default}"; \
-	echo ""; \
-	sudo $(SCRIPTS_DIR)/components/install_traefik.sh --domain "$${DOMAIN}" --client-id "$${CLIENT_ID}" --check-ports-only --diag-level verbose
-
-traefik-check-ports:
-	@echo "$(MAGENTA)$(BOLD)🔍 Checking Traefik port configuration...$(RESET)"
-	@read -p "Enter domain [$(DOMAIN)]: " DOMAIN_INPUT; \
-	DOMAIN="$${DOMAIN_INPUT:-$(DOMAIN)}"; \
-	read -p "Enter client ID [default]: " CLIENT_ID_INPUT; \
-	CLIENT_ID="$${CLIENT_ID_INPUT:-default}"; \
-	echo ""; \
-	sudo $(SCRIPTS_DIR)/components/install_traefik.sh --domain "$${DOMAIN}" --client-id "$${CLIENT_ID}" --check-ports-only --diag-level verbose
+# Implement SSO for all components marked with sso: true
+sso-integrate-all:
+	@echo "🔒 Integrating all SSO-enabled components with Keycloak..."
+	@for component in $$(grep -B 5 -A 3 '"sso": true' $(CONFIG_DIR)/registry/component_registry.json | grep '"name":' | awk -F'"' '{print $$4}' | sort | uniq); do \
+		echo "Integrating $$component..."; \
+		framework="docker"; \
+		if [ "$$component" = "peertube" ] || [ "$$component" = "gitea" ] || [ "$$component" = "n8n" ]; then framework="nodejs"; fi; \
+		if [ "$$component" = "django" ] || [ "$$component" = "grafana" ]; then framework="python"; fi; \
+		$(MAKE) sso-integrate COMPONENT=$$component FRAMEWORK=$$framework COMPONENT_URL=https://$$component.$(DOMAIN) || true; \
+		echo ""; \
+	done
