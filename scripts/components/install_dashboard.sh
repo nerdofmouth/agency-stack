@@ -272,20 +272,25 @@ configure_keycloak_sso() {
 EOF
 )
       
-      # Try to register the client - this is a simplified version, in practice would need more robust token handling
+      # Try to register the client
       log_info "Attempting to register dashboard client with Keycloak"
-      # This would typically involve:
-      # 1. Getting an admin token from Keycloak
-      # 2. Using the token to register the client
-      # 3. Retrieving the client secret
       
-      # For now, we'll just log it as a success
-      log_success "Dashboard client registration prepared"
+      # Get admin token
+      local token=$(curl -s -d "client_id=admin-cli" -d "username=$KEYCLOAK_ADMIN" -d "password=$KEYCLOAK_ADMIN_PASSWORD" -d "grant_type=password" "https://${DOMAIN}/auth/realms/master/protocol/openid-connect/token" | jq -r '.access_token')
       
-      # Note: In a production implementation, we would need to:
-      # - Get a token: curl -d "client_id=admin-cli" -d "username=$KEYCLOAK_ADMIN" -d "password=$KEYCLOAK_ADMIN_PASSWORD" -d "grant_type=password" "https://${DOMAIN}/auth/realms/master/protocol/openid-connect/token"
-      # - Create client: curl -H "Authorization: Bearer $token" -H "Content-Type: application/json" -d "$client_json" "https://${DOMAIN}/auth/admin/realms/${KEYCLOAK_REALM}/clients"
-      # - Get client secret: curl -H "Authorization: Bearer $token" "https://${DOMAIN}/auth/admin/realms/${KEYCLOAK_REALM}/clients/$client_id/client-secret"
+      # Register client
+      curl -s -H "Authorization: Bearer $token" -H "Content-Type: application/json" -d "$client_json" "https://${DOMAIN}/auth/admin/realms/${KEYCLOAK_REALM}/clients" || {
+        log_error "Failed to register dashboard client with Keycloak"
+        return 1
+      }
+      
+      # Get client secret
+      local client_secret=$(curl -s -H "Authorization: Bearer $token" "https://${DOMAIN}/auth/admin/realms/${KEYCLOAK_REALM}/clients/${KEYCLOAK_CLIENT_ID}/client-secret" | jq -r '.value')
+      
+      # Update .env.local with client secret
+      sed -i "s|^KEYCLOAK_CLIENT_SECRET=.*|KEYCLOAK_CLIENT_SECRET=${client_secret}|" "${DASHBOARD_DIR}/.env.local"
+      
+      log_success "Dashboard client registration successful"
     else
       log_warning "No Keycloak credentials found, manual client registration will be required"
       log_info "Please register https://${DOMAIN} as a client in Keycloak realm ${KEYCLOAK_REALM}"
@@ -411,7 +416,7 @@ NEXTAUTH_SECRET="$(openssl rand -hex 32)"
 ENFORCE_SSO=true
 SSO_PROVIDER="keycloak"
 SSO_CLIENT_ID="${KEYCLOAK_CLIENT_ID}"
-SSO_CLIENT_SECRET="$(openssl rand -hex 32)"
+SSO_CLIENT_SECRET=""
 SSO_ISSUER="https://${DOMAIN}/auth/realms/${KEYCLOAK_REALM}"
 EOF
     
