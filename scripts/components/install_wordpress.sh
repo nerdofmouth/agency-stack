@@ -388,7 +388,7 @@ services:
       - db
       - redis
     environment:
-      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_HOST: default_mariadb
       WORDPRESS_DB_USER: wordpress
       WORDPRESS_DB_PASSWORD: ${WP_DB_PASSWORD}
       WORDPRESS_DB_NAME: wordpress
