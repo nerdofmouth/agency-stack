@@ -394,11 +394,17 @@ services:
       WORDPRESS_DB_NAME: wordpress
       WORDPRESS_CONFIG_EXTRA: |
         define('WP_REDIS_HOST', 'redis');
-        define('WP_REDIS_PORT', '6379');
+        define('WP_REDIS_PORT', 6379);
         define('WP_CACHE', true);
         define('WP_ENVIRONMENT_TYPE', 'production');
         define('AUTOMATIC_UPDATER_DISABLED', false);
         define('WP_AUTO_UPDATE_CORE', 'minor');
+    healthcheck:
+      test: ["CMD", "php", "-r", "if (!file_exists('/var/www/html/wp-config.php')) { exit(1); } else { exit(0); }"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
     volumes:
       - ${WP_DIR}/${DOMAIN}/html:/var/www/html
     networks:
@@ -424,7 +430,8 @@ services:
     image: nginx:alpine
     restart: unless-stopped
     depends_on:
-      - wordpress
+      wordpress:
+        condition: service_healthy
     volumes:
       - ${WP_DIR}/${DOMAIN}/html:/var/www/html:ro
       - ${WP_DIR}/${DOMAIN}/nginx.conf:/etc/nginx/conf.d/default.conf:ro
@@ -474,6 +481,8 @@ server {
         include fastcgi_params;
         fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
         fastcgi_param PATH_INFO \$fastcgi_path_info;
+        fastcgi_buffers 16 16k;
+        fastcgi_buffer_size 32k;
     }
     
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
