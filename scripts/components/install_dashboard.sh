@@ -47,6 +47,7 @@ DASHBOARD_LOGS_DIR="/var/log/agency_stack/components"
 DASHBOARD_REPO="https://github.com/nerdofmouth/agency-stack-dashboard.git"
 DASHBOARD_BRANCH="main"
 CONFIGURE_ONLY=false
+USE_HOST_NETWORK=${USE_HOST_NETWORK:-true}
 
 # Parse command-line arguments
 ADMIN_EMAIL=""
@@ -100,6 +101,10 @@ while [[ $# -gt 0 ]]; do
     --enable-keycloak)
       ENABLE_KEYCLOAK=true
       shift
+      ;;
+    --use-host-network)
+      USE_HOST_NETWORK="$2"
+      shift 2
       ;;
     --configure-only)
       CONFIGURE_ONLY=true
@@ -399,6 +404,7 @@ EOF
 # Create Traefik route configuration for the dashboard
 configure_traefik_routes() {
   log_info "Configuring Traefik routes for dashboard access..."
+  log_info "Network mode: ${USE_HOST_NETWORK}"
   
   # Determine Traefik dynamic configuration directory
   local traefik_dir="/opt/agency_stack/clients/${CLIENT_ID}/traefik"
@@ -467,7 +473,21 @@ http:
     dashboard-service:
       loadBalancer:
         servers:
-          - url: "http://localhost:${DASHBOARD_PORT}"
+EOL
+
+  # Determine the appropriate URL format based on network mode
+  if [[ "${USE_HOST_NETWORK}" == "true" ]]; then
+    log_info "Using localhost URL for host network mode"
+    echo "          - url: \"http://localhost:${DASHBOARD_PORT}\"" >> "${dashboard_route}"
+  else
+    log_info "Using host IP URL for bridge network mode"
+    # When using bridge network mode, Traefik needs to access the dashboard via host IP
+    HOST_IP=$(hostname -I | awk '{print $1}')
+    echo "          - url: \"http://${HOST_IP}:${DASHBOARD_PORT}\"" >> "${dashboard_route}"
+  fi
+
+  # Continue with the middleware configuration
+  cat >> "${dashboard_route}" <<EOL
   
   middlewares:
     dashboard-strip:

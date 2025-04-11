@@ -13,6 +13,7 @@ source "${SCRIPT_DIR}/../utils/log_helpers.sh"
 CLIENT_ID="${CLIENT_ID:-default}"
 DOMAIN="${DOMAIN:-localhost}"
 DASHBOARD_PORT="3001"  # Updated to match install_dashboard.sh port
+USE_HOST_NETWORK="${USE_HOST_NETWORK:-true}"  # Default to host network mode for better compatibility
 
 # Process command line arguments
 while [[ $# -gt 0 ]]; do
@@ -25,6 +26,10 @@ while [[ $# -gt 0 ]]; do
       CLIENT_ID="$2"
       shift 2
       ;;
+    --use-host-network)
+      USE_HOST_NETWORK="$2"
+      shift 2
+      ;;
     *)
       log_error "Unknown option: $1"
       exit 1
@@ -35,6 +40,7 @@ done
 log_info "Starting configure_dashboard_route.sh"
 log_info "CLIENT_ID: ${CLIENT_ID}"
 log_info "DOMAIN: ${DOMAIN}"
+log_info "NETWORK MODE: ${USE_HOST_NETWORK}"
 
 # Paths
 TRAEFIK_CONFIG_DIR="/opt/agency_stack/clients/${CLIENT_ID}/traefik/config/dynamic"
@@ -112,7 +118,22 @@ http:
     dashboard-service:
       loadBalancer:
         servers:
-          - url: "http://localhost:${DASHBOARD_PORT}"
+EOF
+
+# Determine the right URL format based on network mode
+if [[ "${USE_HOST_NETWORK}" == "true" ]]; then
+  log_info "Using localhost URL for host network mode"
+  # When using host network mode, Traefik can access the dashboard via localhost
+  echo "          - url: \"http://localhost:${DASHBOARD_PORT}\"" >> "${TRAEFIK_DYNAMIC_CONFIG_DIR}/dashboard-route.yml"
+else
+  log_info "Using host IP URL for bridge network mode"
+  # When using bridge network mode, Traefik needs to access the dashboard via host IP
+  HOST_IP=$(hostname -I | awk '{print $1}')
+  echo "          - url: \"http://${HOST_IP}:${DASHBOARD_PORT}\"" >> "${TRAEFIK_DYNAMIC_CONFIG_DIR}/dashboard-route.yml"
+fi
+
+# Continue with the rest of the configuration
+cat >> "${TRAEFIK_DYNAMIC_CONFIG_DIR}/dashboard-route.yml" <<EOF
   
   middlewares:
     dashboard-strip:
