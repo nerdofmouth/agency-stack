@@ -49,33 +49,42 @@ WP_DB_PASSWORD=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-16)
 WP_ADMIN_PASSWORD=$(openssl rand -base64 12 | tr -d "=+/")
 WP_VERSION="latest"
 PHP_VERSION="8.1"
+ENABLE_KEYCLOAK=false
+ENFORCE_HTTPS=true
+USE_HOST_NETWORK=true
+
+# Source the component_sso_helper.sh if available
+if [ -f "${SCRIPT_DIR}/../utils/component_sso_helper.sh" ]; then
+  source "${SCRIPT_DIR}/../utils/component_sso_helper.sh"
+fi
 
 # Show help message
 show_help() {
-  echo -e "${MAGENTA}${BOLD}AgencyStack WordPress Setup${NC}"
-  echo -e "=============================="
-  echo -e "This script installs and configures WordPress with MariaDB and Redis caching."
+  echo -e "${BOLD}AgencyStack WordPress Installer${NC}"
+  echo -e "Installs and configures WordPress with MariaDB, Redis caching, and Nginx"
   echo -e ""
   echo -e "${CYAN}Usage:${NC}"
   echo -e "  $0 [options]"
   echo -e ""
   echo -e "${CYAN}Options:${NC}"
-  echo -e "  ${BOLD}--domain${NC} <domain>         Primary domain for WordPress (required)"
-  echo -e "  ${BOLD}--client-id${NC} <client_id>   Client ID for multi-tenant setup (optional)"
-  echo -e "  ${BOLD}--admin-email${NC} <email>     Admin email address (required)"
-  echo -e "  ${BOLD}--wp-version${NC} <version>    WordPress version (default: latest)"
-  echo -e "  ${BOLD}--php-version${NC} <version>   PHP version (default: 8.1)"
-  echo -e "  ${BOLD}--force${NC}                   Force reinstallation even if WordPress is already installed"
-  echo -e "  ${BOLD}--with-deps${NC}               Automatically install dependencies if missing"
-  echo -e "  ${BOLD}--verbose${NC}                 Show detailed output during installation"
-  echo -e "  ${BOLD}--help${NC}                    Show this help message and exit"
+  echo -e "  ${BOLD}--domain${NC} DOMAIN        Domain name for WordPress (required)"
+  echo -e "  ${BOLD}--client-id${NC} ID         Client ID for multi-tenant deployment (default: default)"
+  echo -e "  ${BOLD}--admin-email${NC} EMAIL    Admin email address (required)"
+  echo -e "  ${BOLD}--wp-version${NC} VERSION   WordPress version to install (default: latest)"
+  echo -e "  ${BOLD}--php-version${NC} VERSION  PHP version to use (default: 8.1)"
+  echo -e "  ${BOLD}--force${NC}                Force reinstallation if already installed"
+  echo -e "  ${BOLD}--with-deps${NC}            Automatically install dependencies if missing"
+  echo -e "  ${BOLD}--verbose${NC}              Show detailed output during installation"
+  echo -e "  ${BOLD}--enable-keycloak${NC}      Enable Keycloak SSO integration"
+  echo -e "  ${BOLD}--enforce-https${NC}        Enforce HTTPS for WordPress (default: true)"
+  echo -e "  ${BOLD}--use-host-network${NC}     Use host network mode (default: true)"
+  echo -e "  ${BOLD}--help${NC}                 Show this help message and exit"
   echo -e ""
   echo -e "${CYAN}Example:${NC}"
-  echo -e "  $0 --domain example.com --admin-email admin@example.com --client-id acme"
+  echo -e "  $0 --domain wordpress.example.com --admin-email admin@example.com --client-id acme"
+  echo -e "  $0 --domain wordpress.example.com --admin-email admin@example.com --enable-keycloak --enforce-https"
   echo -e ""
-  echo -e "${CYAN}Notes:${NC}"
-  echo -e "  - The script requires root privileges for installation"
-  echo -e "  - Log file is saved to: ${INSTALL_LOG}"
+  echo -e "${YELLOW}Note: This script requires root privileges to run.${NC}"
   exit 0
 }
 
@@ -118,6 +127,18 @@ while [[ $# -gt 0 ]]; do
       ;;
     --verbose)
       VERBOSE=true
+      shift
+      ;;
+    --enable-keycloak)
+      ENABLE_KEYCLOAK=true
+      shift
+      ;;
+    --enforce-https)
+      ENFORCE_HTTPS=true
+      shift
+      ;;
+    --use-host-network)
+      USE_HOST_NETWORK=true
       shift
       ;;
     --help|-h)
@@ -569,8 +590,93 @@ if [ -d "${CONFIG_DIR}/components" ]; then
 EOF
 fi
 
-# Final message
-log "INFO: WordPress installation completed successfully" "${GREEN}${BOLD}✅ WordPress installed successfully!${NC}"
+# Configure Keycloak SSO integration if enabled
+if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
+  log "INFO: Configuring Keycloak SSO integration for WordPress" "${CYAN}Configuring Keycloak SSO integration for WordPress...${NC}"
+  
+  # Check if component_sso_helper.sh is available and the enable_component_sso function exists
+  if type enable_component_sso &>/dev/null; then
+    # Get redirect URIs for WordPress
+    WP_REDIRECT_URIS='["https://'"${DOMAIN}"'/*", "https://'"${DOMAIN}"'/wp-login.php", "https://'"${DOMAIN}"'/wp-admin/*"]'
+    
+    # Enable SSO for WordPress
+    if enable_component_sso "wordpress" "${DOMAIN}" "${WP_REDIRECT_URIS}" "wordpress" "agency_stack"; then
+      log "INFO: Successfully registered WordPress with Keycloak" "${GREEN}Successfully registered WordPress with Keycloak${NC}"
+      
+      # Create SSO configuration directory
+      mkdir -p "${WP_DIR}/${DOMAIN}/sso"
+      
+      # Install and configure the OpenID Connect plugin
+      log "INFO: Installing OpenID Connect plugin for WordPress" "${CYAN}Installing OpenID Connect plugin for WordPress...${NC}"
+      docker exec -it ${WP_CONTAINER} wp plugin install openid-connect-generic --activate
+      
+      # Get client credentials from the SSO configuration
+      if [ -f "${WP_DIR}/${DOMAIN}/sso/credentials" ]; then
+        source "${WP_DIR}/${DOMAIN}/sso/credentials"
+        
+        # Configure the OpenID Connect plugin
+        log "INFO: Configuring OpenID Connect plugin" "${CYAN}Configuring OpenID Connect plugin...${NC}"
+        docker exec -it ${WP_CONTAINER} wp option update openid_connect_generic_settings '{
+          "login_type":"auto",
+          "client_id":"'"${KEYCLOAK_CLIENT_ID}"'",
+          "client_secret":"'"${KEYCLOAK_CLIENT_SECRET}"'",
+          "scope":"openid email profile",
+          "endpoint_login":"'"${KEYCLOAK_URL}"'/realms/'"${KEYCLOAK_REALM}"'/protocol/openid-connect/auth",
+          "endpoint_token":"'"${KEYCLOAK_URL}"'/realms/'"${KEYCLOAK_REALM}"'/protocol/openid-connect/token",
+          "endpoint_userinfo":"'"${KEYCLOAK_URL}"'/realms/'"${KEYCLOAK_REALM}"'/protocol/openid-connect/userinfo",
+          "identity_key":"preferred_username",
+          "link_existing_users":true,
+          "create_if_does_not_exist":true,
+          "redirect_user_back":true,
+          "redirect_on_logout":true,
+          "enable_logging":true
+        }' --format=json
+        
+        # Create a marker file for the SSO configuration
+        touch "${WP_DIR}/${DOMAIN}/sso/.sso_configured"
+        
+        log "INFO: SSO integration completed for WordPress" "${GREEN}SSO integration completed for WordPress${NC}"
+      else
+        log "WARNING: Keycloak credentials not found" "${YELLOW}Keycloak credentials not found${NC}"
+        log "INFO: Manual SSO configuration will be required" "${CYAN}Manual SSO configuration will be required${NC}"
+      fi
+    else
+      log "WARNING: Failed to enable Keycloak SSO for WordPress" "${YELLOW}Failed to enable Keycloak SSO for WordPress${NC}"
+    fi
+  else
+    log "WARNING: component_sso_helper.sh not found or not properly sourced" "${YELLOW}Keycloak SSO integration helper not available${NC}"
+    log "INFO: Manual SSO configuration will be required" "${CYAN}Manual SSO configuration will be required${NC}"
+  fi
+fi
+
+# Update component registry
+if [ -f "${ROOT_DIR}/scripts/utils/update_component_registry.sh" ]; then
+  log "INFO: Updating component registry" "${CYAN}Updating component registry...${NC}"
+  
+  REGISTRY_ARGS=(
+    "--component" "wordpress"
+    "--installed" "true"
+    "--monitoring" "true"
+    "--traefik_tls" "true"
+  )
+  
+  if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
+    REGISTRY_ARGS+=(
+      "--sso" "true"
+      "--sso_configured" "true"
+    )
+  fi
+  
+  bash "${ROOT_DIR}/scripts/utils/update_component_registry.sh" "${REGISTRY_ARGS[@]}"
+fi
+
+log "INFO: WordPress installation completed successfully" "${GREEN}WordPress installation completed successfully!${NC}"
+log "INFO: WordPress is now accessible at https://${DOMAIN}" "${GREEN}WordPress is now accessible at:${NC} https://${DOMAIN}"
+log "INFO: Admin URL: https://${DOMAIN}/wp-admin/" "${GREEN}Admin URL:${NC} https://${DOMAIN}/wp-admin/"
+log "INFO: Admin username: ${WP_ADMIN_USER}" "${GREEN}Admin username:${NC} ${WP_ADMIN_USER}"
+log "INFO: Admin password: ${WP_ADMIN_PASSWORD}" "${GREEN}Admin password:${NC} ${WP_ADMIN_PASSWORD}"
+
+log "INFO: Installation complete" "${GREEN}Installation complete!${NC}"
 echo -e "${CYAN}WordPress URL: https://${DOMAIN}/${NC}"
 echo -e "${CYAN}Admin URL: https://${DOMAIN}/wp-admin/${NC}"
 echo -e "${YELLOW}Admin Username: ${WP_ADMIN_USER}${NC}"
