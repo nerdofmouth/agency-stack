@@ -119,6 +119,67 @@ When integrating AI services with SSO, consider these security aspects:
    - Check the time synchronization between services
    - Verify the signing keys are correctly configured
 
+## Remote Deployment of SSO Components
+
+Following AgencyStack's repository integrity policy, all SSO component changes must be made to the local repository first, then deployed to remote VMs through proper channels:
+
+### Deploying Keycloak OAuth to Remote VMs
+
+To deploy Keycloak OAuth Identity Provider changes to a remote VM:
+
+```bash
+# Deploy Keycloak component to a remote VM
+make deploy-keycloak-remote REMOTE_HOST=hostname.example.com
+
+# With custom SSH settings
+make deploy-keycloak-remote REMOTE_HOST=hostname.example.com REMOTE_USER=admin SSH_KEY=~/.ssh/id_rsa SSH_PORT=2222
+```
+
+### Configuring OAuth Identity Providers on Remote VMs
+
+To configure OAuth Identity Providers (Google, GitHub, Apple, LinkedIn, Microsoft) on a remote VM:
+
+```bash
+# Configure Google OAuth on remote VM
+make configure-keycloak-remote REMOTE_HOST=hostname.example.com DOMAIN=auth.example.com ENABLE_OAUTH_GOOGLE=true
+
+# Configure multiple OAuth providers 
+make configure-keycloak-remote REMOTE_HOST=hostname.example.com DOMAIN=auth.example.com \
+  ENABLE_OAUTH_GOOGLE=true \
+  ENABLE_OAUTH_GITHUB=true \
+  ENABLE_OAUTH_LINKEDIN=true
+```
+
+This approach ensures that:
+1. All code changes are tracked in the repository
+2. VM state can be reproduced from the repository
+3. Changes follow proper deployment protocols
+4. No direct modifications happen on production systems
+
+### Remote Deployment Workflow for AI SSO Integration
+
+1. **Local Development**: Make and test changes locally
+2. **Commit Changes**: Commit all changes to the repository
+3. **Remote Deployment**: Use the deployment targets to push changes to remote VMs
+4. **Verification**: Verify the deployment with remote status checks
+
+```bash
+# Example complete workflow
+# 1. Make local changes to SSO components
+# 2. Commit changes to repository
+git add .
+git commit -m "Enhanced Keycloak OAuth providers for AI services"
+
+# 3. Deploy to remote VM
+make deploy-keycloak-remote REMOTE_HOST=hostname.example.com
+
+# 4. Configure OAuth on remote VM
+make configure-keycloak-remote REMOTE_HOST=hostname.example.com DOMAIN=auth.example.com ENABLE_OAUTH_GOOGLE=true
+
+# 5. Test AI service SSO integration on remote VM
+ssh user@hostname.example.com "cd /opt/agency_stack && make langchain-sso-test DOMAIN=auth.example.com"
+```
+
 ## Testing SSO Integration
 
 To verify the SSO integration is working:
