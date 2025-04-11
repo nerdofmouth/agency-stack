@@ -381,7 +381,7 @@ services:
 
   # WordPress with PHP-FPM and Nginx
   wordpress:
-    image: wordpress:${WP_VERSION}-php${PHP_VERSION}-fpm
+    image: wordpress:php${PHP_VERSION}-fpm
     container_name: wordpress
     restart: unless-stopped
     depends_on:
