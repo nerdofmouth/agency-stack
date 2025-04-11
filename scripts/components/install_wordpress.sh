@@ -342,11 +342,29 @@ mkdir -p "${WP_DIR}/${DOMAIN}/certs"
 mkdir -p "${WP_DIR}/${DOMAIN}/logs"
 mkdir -p "${WP_DIR}/${DOMAIN}/redis"
 
+# Generate random passwords if not specified
+if [ -z "$WP_DB_PASSWORD" ]; then
+  WP_DB_PASSWORD=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | fold -w 16 | head -n 1)
+fi
+
+if [ -z "$WP_ROOT_PASSWORD" ]; then
+  WP_ROOT_PASSWORD=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | fold -w 16 | head -n 1)
+fi
+
+if [ -z "$WP_ADMIN_PASSWORD" ]; then
+  WP_ADMIN_PASSWORD=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | fold -w 16 | head -n 1)
+fi
+
+# Define consistent database variables
+WP_DB_NAME="wordpress"
+WP_DB_USER="wordpress"
+WP_TABLE_PREFIX="wp_"
+
 # Store MySQL credentials for WP-CLI
 cat > "${WP_DIR}/${DOMAIN}/.my.cnf" <<EOL
 [client]
 host=${MARIADB_CONTAINER_NAME}
-user=wordpress
+user=${WP_DB_USER}
 password=${WP_DB_PASSWORD}
 EOL
 chmod 600 "${WP_DIR}/${DOMAIN}/.my.cnf"
@@ -366,10 +384,10 @@ services:
       - ${WP_DIR}/${DOMAIN}/php-fpm.conf:/usr/local/etc/php-fpm.d/www.conf
     environment:
       - WORDPRESS_DB_HOST=${MARIADB_CONTAINER_NAME}:3306
-      - WORDPRESS_DB_USER=wordpress
+      - WORDPRESS_DB_USER=${WP_DB_USER}
       - WORDPRESS_DB_PASSWORD=${WP_DB_PASSWORD}
-      - WORDPRESS_DB_NAME=wordpress
-      - WORDPRESS_TABLE_PREFIX=wp_
+      - WORDPRESS_DB_NAME=${WP_DB_NAME}
+      - WORDPRESS_TABLE_PREFIX=${WP_TABLE_PREFIX}
     networks:
       - wordpress_network
       - ${NETWORK_NAME}
@@ -412,15 +430,15 @@ services:
     volumes:
       - ${WP_DIR}/${DOMAIN}/mariadb:/var/lib/mysql
     environment:
-      - MYSQL_DATABASE=wordpress
-      - MYSQL_USER=wordpress
+      - MYSQL_DATABASE=${WP_DB_NAME}
+      - MYSQL_USER=${WP_DB_USER}
       - MYSQL_PASSWORD=${WP_DB_PASSWORD}
       - MYSQL_ROOT_PASSWORD=${WP_ROOT_PASSWORD}
     networks:
       - wordpress_network
       - ${NETWORK_NAME}
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "wordpress", "-p${WP_DB_PASSWORD}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "${WP_DB_USER}", "-p${WP_DB_PASSWORD}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -548,6 +566,14 @@ sleep 10
 
 # Install WP-CLI inside the container
 docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar && chmod +x wp-cli.phar && mv wp-cli.phar /usr/local/bin/wp"
+
+# Install MySQL client for database verification
+docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "apt-get update && apt-get install -y default-mysql-client"
+
+# Wait for database to be fully ready (important for container networking)
+log "INFO: Ensuring database is ready" "${CYAN}Ensuring database is ready...${NC}"
+sleep 5
+docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "until mysql -h ${MARIADB_CONTAINER_NAME} -u ${WP_DB_USER} -p${WP_DB_PASSWORD} -e 'SELECT 1'; do echo 'Waiting for database connection...'; sleep 2; done"
 
 # Run WP-CLI
 docker exec ${WORDPRESS_CONTAINER_NAME} wp --allow-root --path=/var/www/html core install \
