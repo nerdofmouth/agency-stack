@@ -632,96 +632,12 @@ prerequisites-restart:
 # WordPress
 install-wordpress: validate
 	@echo "$(MAGENTA)$(BOLD)🌐 Installing WordPress...$(RESET)"
-	@read -p "$(YELLOW)Enable Keycloak SSO integration? (true/false, default: false):$(RESET) " ENABLE_KEYCLOAK; \
-	ENABLE_KEYCLOAK="$${ENABLE_KEYCLOAK:-false}"; \
-	read -p "$(YELLOW)Enforce HTTPS? (true/false, default: true):$(RESET) " ENFORCE_HTTPS; \
-	ENFORCE_HTTPS="$${ENFORCE_HTTPS:-true}"; \
-	echo "$(CYAN)Keycloak SSO integration: $${ENABLE_KEYCLOAK}$(RESET)"; \
-	echo "$(CYAN)HTTPS enforcement: $${ENFORCE_HTTPS}$(RESET)"; \
-	EXTRA_ARGS=""; \
-	if [ "$${ENABLE_KEYCLOAK}" = "true" ]; then EXTRA_ARGS="$${EXTRA_ARGS} --enable-keycloak"; fi; \
-	if [ "$${ENFORCE_HTTPS}" = "true" ]; then EXTRA_ARGS="$${EXTRA_ARGS} --enforce-https"; fi; \
-	sudo $(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $${EXTRA_ARGS} $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+	@sudo $(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
 # WordPress with SSO integration (convenience target)
 wordpress-sso: validate
 	@echo "$(MAGENTA)$(BOLD)🌐 Installing WordPress with Keycloak SSO integration...$(RESET)"
-	@read -p "$(YELLOW)Enforce HTTPS? (true/false, default: true):$(RESET) " ENFORCE_HTTPS; \
-	ENFORCE_HTTPS="$${ENFORCE_HTTPS:-true}"; \
-	echo "$(CYAN)Keycloak SSO integration: enabled$(RESET)"; \
-	echo "$(CYAN)HTTPS enforcement: $${ENFORCE_HTTPS}$(RESET)"; \
-	EXTRA_ARGS="--enable-keycloak"; \
-	if [ "$${ENFORCE_HTTPS}" = "true" ]; then EXTRA_ARGS="$${EXTRA_ARGS} --enforce-https"; fi; \
-	sudo $(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $${EXTRA_ARGS} $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
-# Auto-generated target for wordpress
-wordpress-status:
-	@echo "$(MAGENTA)$(BOLD)🔍 Checking WordPress Status...$(RESET)"
-	@if [ -f "/opt/agency_stack/wordpress/$(DOMAIN)/.installed_ok" ]; then \
-		echo "$(GREEN)✅ WordPress is installed$(RESET)"; \
-		SITE_NAME=$$(echo "$(DOMAIN)" | tr '.' '_'); \
-		if [ -n "$(CLIENT_ID)" ]; then \
-			CONTAINER="$(CLIENT_ID)_wordpress"; \
-		else \
-			CONTAINER="wordpress_$${SITE_NAME}"; \
-		fi; \
-		if docker ps | grep -q "$${CONTAINER}"; then \
-			echo "$(GREEN)✅ WordPress container is running$(RESET)"; \
-			docker ps | grep "$${CONTAINER}"; \
-		else \
-			echo "$(RED)❌ WordPress container is not running$(RESET)"; \
-		fi; \
-		echo ""; \
-		echo "$(CYAN)SSO Status:$(RESET)"; \
-		if [ -f "/opt/agency_stack/wordpress/$(DOMAIN)/sso/.sso_configured" ]; then \
-			echo "$(GREEN)✅ SSO is configured$(RESET)"; \
-		else \
-			echo "$(YELLOW)⚠️ SSO is not configured$(RESET)"; \
-			echo "$(CYAN)To enable SSO, run: make wordpress-sso DOMAIN=$(DOMAIN) ADMIN_EMAIL=admin@$(DOMAIN)$(RESET)"; \
-		fi; \
-	else \
-		echo "$(RED)❌ WordPress is not installed$(RESET)"; \
-		echo "$(CYAN)To install, run: make wordpress DOMAIN=$(DOMAIN) ADMIN_EMAIL=admin@$(DOMAIN)$(RESET)"; \
-		exit 1; \
-	fi
-
-# Auto-generated target for wordpress
-wordpress-logs:
-	@echo "$(MAGENTA)$(BOLD)📜 Viewing WordPress Logs...$(RESET)"
-	@if [ -f "/var/log/agency_stack/components/wordpress.log" ]; then \
-		echo "$(CYAN)Installation logs:$(RESET)"; \
-		tail -n 20 /var/log/agency_stack/components/wordpress.log; \
-		echo ""; \
-		SITE_NAME=$$(echo "$(DOMAIN)" | tr '.' '_'); \
-		if [ -n "$(CLIENT_ID)" ]; then \
-			CONTAINER="$(CLIENT_ID)_wordpress"; \
-		else \
-			CONTAINER="wordpress_$${SITE_NAME}"; \
-		fi; \
-		echo "$(CYAN)Container logs:$(RESET)"; \
-		docker logs "$${CONTAINER}" --tail 20 2>/dev/null || echo "$(YELLOW)No container logs found.$(RESET)"; \
-	else \
-		echo "$(YELLOW)WordPress logs not found.$(RESET)"; \
-	fi
-
-# Auto-generated target for wordpress
-wordpress-restart:
-	@echo "$(MAGENTA)$(BOLD)🔄 Restarting WordPress...$(RESET)"
-	@SITE_NAME=$$(echo "$(DOMAIN)" | tr '.' '_'); \
-	if [ -n "$(CLIENT_ID)" ]; then \
-		CONTAINER_PREFIX="$(CLIENT_ID)"; \
-	else \
-		CONTAINER_PREFIX="wordpress_$${SITE_NAME}"; \
-	fi; \
-	if [ -d "/opt/agency_stack/wordpress/$(DOMAIN)" ]; then \
-		echo "$(CYAN)Restarting WordPress containers...$(RESET)"; \
-		cd /opt/agency_stack/wordpress/$(DOMAIN) && docker-compose restart; \
-		echo "$(GREEN)✅ WordPress has been restarted$(RESET)"; \
-	else \
-		echo "$(RED)❌ WordPress installation not found$(RESET)"; \
-		echo "$(CYAN)To install, run: make wordpress DOMAIN=$(DOMAIN) ADMIN_EMAIL=admin@$(DOMAIN)$(RESET)"; \
-		exit 1; \
-	fi
+	@sudo $(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) --enable-keycloak $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
 # ERPNext
 install-erpnext: validate
