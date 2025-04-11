@@ -466,6 +466,29 @@ networks:
     external: true
 EOL
 
+# Create PHP-FPM configuration
+log "INFO: Creating PHP-FPM configuration" "${CYAN}Creating PHP-FPM configuration...${NC}"
+cat > "${WP_DIR}/${DOMAIN}/php-fpm.conf" <<EOL
+[global]
+daemonize = no
+error_log = /proc/self/fd/2
+
+[www]
+listen = 9000
+listen.backlog = 511
+access.log = /proc/self/fd/2
+catch_workers_output = yes
+decorate_workers_output = no
+
+user = www-data
+group = www-data
+pm = dynamic
+pm.max_children = 10
+pm.start_servers = 2
+pm.min_spare_servers = 1
+pm.max_spare_servers = 3
+EOL
+
 # Create Nginx configuration
 log "INFO: Creating Nginx configuration" "${CYAN}Creating Nginx configuration...${NC}"
 cat > "${WP_DIR}/${DOMAIN}/nginx.conf" <<EOL
@@ -528,23 +551,6 @@ server {
         deny all;
     }
 }
-EOL
-
-# Create PHP-FPM configuration
-log "INFO: Creating PHP-FPM configuration" "${CYAN}Creating PHP-FPM configuration...${NC}"
-cat > "${WP_DIR}/${DOMAIN}/php-fpm.conf" <<EOL
-[global]
-daemonize = no
-
-[www]
-listen = 0.0.0.0:9000
-user = www-data
-group = www-data
-pm = dynamic
-pm.max_children = 10
-pm.start_servers = 2
-pm.min_spare_servers = 1
-pm.max_spare_servers = 3
 EOL
 
 # Start the WordPress stack
