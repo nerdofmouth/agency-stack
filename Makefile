@@ -856,6 +856,83 @@ install-keycloak: validate
 	@echo "Installing Keycloak identity provider..."
 	@sudo $(SCRIPTS_DIR)/components/install_keycloak.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
+keycloak: validate
+	@echo "$(MAGENTA)$(BOLD)🔐 Installing Keycloak SSO & Identity provider...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_keycloak.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+keycloak-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Keycloak Status...$(RESET)"
+	@if [ -n "$(CLIENT_ID)" ]; then \
+		KEYCLOAK_CONTAINER="$(CLIENT_ID)_keycloak"; \
+	else \
+		KEYCLOAK_CONTAINER="keycloak_$(subst .,_,$(DOMAIN))"; \
+	fi; \
+	if docker ps --format '{{.Names}}' | grep -q "$$KEYCLOAK_CONTAINER"; then \
+		echo "$(GREEN)✅ Keycloak is running$(RESET)"; \
+		docker ps --filter "name=$$KEYCLOAK_CONTAINER" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"; \
+		echo ""; \
+		echo "$(CYAN)Admin URL: https://$(DOMAIN)/admin/$(RESET)"; \
+		echo "$(CYAN)Realm: $(DOMAIN)$(RESET)"; \
+		echo "$(CYAN)Username: admin$(RESET)"; \
+		echo "$(CYAN)Password: $(shell grep KEYCLOAK_ADMIN_PASSWORD /opt/agency_stack/config.env | cut -d '=' -f2)$(RESET)"; \
+	else \
+		echo "$(RED)❌ Keycloak is not running$(RESET)"; \
+		echo "$(CYAN)Install with: make keycloak$(RESET)"; \
+	fi
+
+keycloak-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing Keycloak Logs...$(RESET)"
+	@if [ -n "$(CLIENT_ID)" ]; then \
+		KEYCLOAK_CONTAINER="$(CLIENT_ID)_keycloak"; \
+	else \
+		KEYCLOAK_CONTAINER="keycloak_$(subst .,_,$(DOMAIN))"; \
+	fi; \
+	if [ -f "/var/log/agency_stack/components/keycloak.log" ]; then \
+		echo "$(CYAN)Recent Keycloak installation logs:$(RESET)"; \
+		sudo tail -n 30 /var/log/agency_stack/components/keycloak.log; \
+		echo ""; \
+		echo "$(CYAN)For container logs, use:$(RESET)"; \
+		echo "docker logs $$KEYCLOAK_CONTAINER"; \
+	else \
+		echo "$(YELLOW)Keycloak logs not found.$(RESET)"; \
+		docker logs $$KEYCLOAK_CONTAINER 2>/dev/null || echo "$(RED)Keycloak container logs not available.$(RESET)"; \
+	fi
+
+keycloak-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Keycloak Services...$(RESET)"
+	@if [ -n "$(CLIENT_ID)" ]; then \
+		KEYCLOAK_CONTAINER="$(CLIENT_ID)_keycloak"; \
+	else \
+		KEYCLOAK_CONTAINER="keycloak_$(subst .,_,$(DOMAIN))"; \
+	fi; \
+	if docker ps --format '{{.Names}}' | grep -q "$$KEYCLOAK_CONTAINER"; then \
+		docker restart $$KEYCLOAK_CONTAINER; \
+		echo "$(GREEN)✅ Keycloak has been restarted$(RESET)"; \
+		echo "$(CYAN)Check status with: make keycloak-status$(RESET)"; \
+	else \
+		echo "$(RED)❌ Keycloak is not running$(RESET)"; \
+		echo "$(CYAN)Install with: make keycloak$(RESET)"; \
+	fi
+
+keycloak-test:
+	@echo "$(MAGENTA)$(BOLD)🧪 Testing Keycloak functionality...$(RESET)"
+	@if [ -n "$(CLIENT_ID)" ]; then \
+		KEYCLOAK_CONTAINER="$(CLIENT_ID)_keycloak"; \
+	else \
+		KEYCLOAK_CONTAINER="keycloak_$(subst .,_,$(DOMAIN))"; \
+	fi; \
+	if docker ps --format '{{.Names}}' | grep -q "$$KEYCLOAK_CONTAINER"; then \
+		echo "$(GREEN)✅ Keycloak is running$(RESET)"; \
+		echo "$(CYAN)Admin URL: https://$(DOMAIN)/admin/$(RESET)"; \
+		echo "$(CYAN)Realm: $(DOMAIN)$(RESET)"; \
+		echo "$(CYAN)Username: admin$(RESET)"; \
+		echo "$(CYAN)Password: $(shell grep KEYCLOAK_ADMIN_PASSWORD /opt/agency_stack/config.env | cut -d '=' -f2)$(RESET)"; \
+		echo "$(CYAN)Test Keycloak with: make keycloak-test$(RESET)"; \
+	else \
+		echo "$(RED)❌ Keycloak is not running$(RESET)"; \
+		echo "$(CYAN)Install with: make keycloak$(RESET)"; \
+	fi
+
 # Core Infrastructure
 install-infrastructure:
 	@echo "Installing core infrastructure..."
