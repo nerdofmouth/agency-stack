@@ -458,7 +458,7 @@ EOF
 
 # Create Nginx configuration
 log "INFO: Creating Nginx configuration" "${CYAN}Creating Nginx configuration...${NC}"
-cat > "${WP_DIR}/${DOMAIN}/nginx.conf" <<EOF
+cat > "${WP_DIR}/${DOMAIN}/nginx.conf" <<EOL
 server {
     listen 80;
     server_name ${DOMAIN} www.${DOMAIN};
@@ -467,7 +467,7 @@ server {
     index index.php;
     
     access_log /var/log/nginx/access.log;
-    error_log /var/log/nginx/error.log;
+    error_log /var/log/nginx/error.log debug;
     
     client_max_body_size 100M;
     
@@ -478,7 +478,7 @@ server {
     location ~ \.php$ {
         try_files \$uri =404;
         fastcgi_split_path_info ^(.+\.php)(/.+)$;
-        fastcgi_pass wordpress:9000;
+        fastcgi_pass 172.20.0.4:9000;
         fastcgi_index index.php;
         include fastcgi_params;
         fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
@@ -514,7 +514,7 @@ server {
         deny all;
     }
 }
-EOF
+EOL
 
 # Start the WordPress stack
 log "INFO: Starting WordPress stack" "${CYAN}Starting WordPress stack...${NC}"
