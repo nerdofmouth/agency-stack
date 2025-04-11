@@ -424,6 +424,8 @@ services:
         max-file: "5"
         tag: "wordpress_${SITE_NAME}"
     command: bash -c "docker-php-ext-install mysqli pdo pdo_mysql && docker-php-ext-enable mysqli && php-fpm -R"
+    expose:
+      - "9000"
 
   # Nginx as a reverse proxy for WordPress
   nginx:
@@ -486,6 +488,8 @@ server {
         fastcgi_connect_timeout 300;
         fastcgi_send_timeout 300;
         fastcgi_read_timeout 300;
+        fastcgi_intercept_errors on;
+        fastcgi_param HTTPS \$https if_not_empty;
     }
     
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
