@@ -1,0 +1,60 @@
+version: '3.7'
+
+services:
+  postgres:
+    image: postgres:13-alpine
+    container_name: keycloak_postgres_${DOMAIN_UNDERSCORE}
+    restart: unless-stopped
+    volumes:
+      - ${KEYCLOAK_DATA_DIR}/postgres-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    networks:
+      - agency-network
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: keycloak_${DOMAIN_UNDERSCORE}
+    restart: unless-stopped
+    command:
+      - start
+      - --hostname=${DOMAIN}
+      - --proxy=edge
+      - --db=postgres
+      - --db-url=jdbc:postgresql://postgres:5432/keycloak
+      - --db-username=keycloak
+      - --db-password=${DB_PASSWORD}
+      - --health-enabled=true
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      KC_PROXY_ADDRESS_FORWARDING: 'true'
+      KC_HOSTNAME_URL: https://${DOMAIN}
+      KC_HOSTNAME_ADMIN_URL: https://${DOMAIN}
+    volumes:
+      - ${KEYCLOAK_DATA_DIR}/keycloak-data:/opt/keycloak/data
+      - ${KEYCLOAK_DATA_DIR}/themes:/opt/keycloak/themes
+      - ${KEYCLOAK_DATA_DIR}/imports:/opt/keycloak/imports
+    depends_on:
+      - postgres
+    networks:
+      - agency-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.keycloak_${DOMAIN_UNDERSCORE}.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.keycloak_${DOMAIN_UNDERSCORE}.entrypoints=websecure"
+      - "traefik.http.routers.keycloak_${DOMAIN_UNDERSCORE}.tls.certresolver=myresolver"
+      - "traefik.http.services.keycloak_${DOMAIN_UNDERSCORE}.loadbalancer.server.port=8080"
+      - "traefik.http.middlewares.keycloak_${DOMAIN_UNDERSCORE}_security.headers.browserXssFilter=true"
+      - "traefik.http.middlewares.keycloak_${DOMAIN_UNDERSCORE}_security.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.keycloak_${DOMAIN_UNDERSCORE}_security.headers.forceSTSHeader=true"
+      - "traefik.http.middlewares.keycloak_${DOMAIN_UNDERSCORE}_security.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.keycloak_${DOMAIN_UNDERSCORE}_security.headers.stsPreload=true"
+      - "traefik.http.middlewares.keycloak_${DOMAIN_UNDERSCORE}_security.headers.stsSeconds=31536000"
+      - "traefik.http.routers.keycloak_${DOMAIN_UNDERSCORE}.middlewares=keycloak_${DOMAIN_UNDERSCORE}_security"
+
+networks:
+  agency-network:
+    external: true

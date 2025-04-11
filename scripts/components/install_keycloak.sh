@@ -338,20 +338,25 @@ services:
     image: quay.io/keycloak/keycloak:${KEYCLOAK_VERSION}
     container_name: ${KEYCLOAK_CONTAINER}
     restart: unless-stopped
+    command:
+      - start
+      - --hostname=${DOMAIN}
+      - --proxy=edge
+      - --db=postgres
+      - --db-url=jdbc:postgresql://postgres:5432/keycloak
+      - --db-username=keycloak
+      - --db-password=${KC_DB_PASSWORD}
+      - --health-enabled=true
     environment:
-      DB_VENDOR: POSTGRES
-      DB_ADDR: postgres
-      DB_DATABASE: keycloak
-      DB_USER: keycloak
-      DB_PASSWORD: ${KC_DB_PASSWORD}
-      KEYCLOAK_USER: admin
-      KEYCLOAK_PASSWORD: ${ADMIN_PASSWORD}
-      PROXY_ADDRESS_FORWARDING: "true"
-      KEYCLOAK_FRONTEND_URL: https://${DOMAIN}/auth
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      KC_PROXY_ADDRESS_FORWARDING: 'true'
+      KC_HOSTNAME_URL: https://${DOMAIN}
+      KC_HOSTNAME_ADMIN_URL: https://${DOMAIN}
     volumes:
-      - ${KEYCLOAK_DIR}/${DOMAIN}/keycloak-data:/opt/jboss/keycloak/standalone/data
-      - ${KEYCLOAK_DIR}/${DOMAIN}/themes:/opt/jboss/keycloak/themes
-      - ${KEYCLOAK_DIR}/${DOMAIN}/imports:/opt/jboss/keycloak/imports
+      - ${KEYCLOAK_DIR}/${DOMAIN}/keycloak-data:/opt/keycloak/data
+      - ${KEYCLOAK_DIR}/${DOMAIN}/themes:/opt/keycloak/themes
+      - ${KEYCLOAK_DIR}/${DOMAIN}/imports:/opt/keycloak/imports
     depends_on:
       - postgres
     networks:
