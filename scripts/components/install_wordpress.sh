@@ -207,7 +207,9 @@ log "INFO: Starting WordPress installation validation for $DOMAIN" "${BLUE}Start
 
 # Set container names based on client ID
 log "INFO: Setting container names" "Setting container names..."
+DOMAIN=$(echo "$DOMAIN" | tr '[:upper:]' '[:lower:]')
 SITE_NAME=${DOMAIN//./_}
+DOMAIN_UNDERSCORE=$(echo "$DOMAIN" | tr '.' '_')
 if [ -n "$CLIENT_ID" ]; then
   WORDPRESS_CONTAINER_NAME="${CLIENT_ID}_wordpress"
   NGINX_CONTAINER_NAME="${CLIENT_ID}_nginx"
