@@ -1,4 +1,7 @@
 #!/bin/bash
+# Source common utilities
+source "$(dirname "$0")/../utils/common.sh"
+        
 # install_erpnext.sh - Install and configure ERPNext for AgencyStack
 # https://stack.nerdofmouth.com
 #
