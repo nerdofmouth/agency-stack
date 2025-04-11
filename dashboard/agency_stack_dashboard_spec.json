@@ -1,0 +1,297 @@
+{
+  "dashboard": {
+    "title": "AgencyStack Status Dashboard",
+    "version": "1.0.0",
+    "description": "Real-time status monitor for AgencyStack components",
+    "refresh_interval_seconds": 30,
+    "categories": [
+      {
+        "id": "infrastructure",
+        "name": "Core Infrastructure",
+        "icon": "server"
+      },
+      {
+        "id": "security",
+        "name": "Security & Identity",
+        "icon": "shield-check"
+      },
+      {
+        "id": "communication",
+        "name": "Email & Communication", 
+        "icon": "chat"
+      },
+      {
+        "id": "monitoring",
+        "name": "Monitoring & Analytics",
+        "icon": "chart-line"
+      },
+      {
+        "id": "content",
+        "name": "Content & CMS",
+        "icon": "newspaper"
+      },
+      {
+        "id": "devops",
+        "name": "DevOps Tools",
+        "icon": "git"
+      },
+      {
+        "id": "business",
+        "name": "Business Applications",
+        "icon": "briefcase"
+      }
+    ],
+    "component_status_indicators": [
+      {
+        "id": "running",
+        "label": "Running",
+        "color": "#10b981",
+        "icon": "check-circle"
+      },
+      {
+        "id": "stopped",
+        "label": "Stopped",
+        "color": "#f59e0b",
+        "icon": "pause-circle"
+      },
+      {
+        "id": "error",
+        "label": "Error",
+        "color": "#ef4444",
+        "icon": "exclamation-circle"
+      },
+      {
+        "id": "not_installed",
+        "label": "Not Installed",
+        "color": "#6b7280",
+        "icon": "minus-circle"
+      }
+    ],
+    "feature_flags": [
+      {
+        "id": "sso",
+        "label": "SSO",
+        "tooltip": "Single Sign-On Enabled",
+        "icon": "key",
+        "color": "#8b5cf6"
+      },
+      {
+        "id": "tls",
+        "label": "TLS",
+        "tooltip": "Secure TLS Connection",
+        "icon": "lock-closed",
+        "color": "#3b82f6"
+      },
+      {
+        "id": "multi_tenant",
+        "label": "Multi-Tenant",
+        "tooltip": "Multi-Tenant Capable",
+        "icon": "users",
+        "color": "#ec4899"
+      },
+      {
+        "id": "logs",
+        "label": "Logs",
+        "tooltip": "Logs Available",
+        "icon": "document-text",
+        "color": "#6366f1"
+      },
+      {
+        "id": "dashboard",
+        "label": "UI",
+        "tooltip": "Dashboard UI Available",
+        "icon": "template",
+        "color": "#14b8a6"
+      }
+    ],
+    "actions": [
+      {
+        "id": "view_logs",
+        "label": "View Logs",
+        "command": "make {component_id}-logs",
+        "icon": "document-search"
+      },
+      {
+        "id": "restart",
+        "label": "Restart",
+        "command": "make {component_id}-restart",
+        "icon": "refresh"
+      },
+      {
+        "id": "open_ui",
+        "label": "Open UI",
+        "url": "{component_url}",
+        "icon": "external-link",
+        "condition": "has_ui"
+      },
+      {
+        "id": "check_status",
+        "label": "Check Status",
+        "command": "make {component_id}-status",
+        "icon": "clipboard-check"
+      }
+    ]
+  },
+  "data_sources": {
+    "component_registry": {
+      "path": "/config/registry/component_registry.json",
+      "refresh_interval_seconds": 60
+    },
+    "installed_markers": {
+      "path": "/opt/agency_stack/{component_id}/.installed_ok",
+      "type": "file_exists"
+    },
+    "component_status": {
+      "command": "make {component_id}-status",
+      "parse_regex": "Status:\\s*(Running|Stopped|Error)",
+      "refresh_interval_seconds": 30
+    },
+    "component_logs": {
+      "path": "/var/log/agency_stack/components/{component_id}.log",
+      "tail_lines": 100,
+      "refresh_interval_seconds": 10
+    }
+  },
+  "ui_layout": {
+    "type": "responsive_grid",
+    "header": {
+      "title": "AgencyStack Status Dashboard",
+      "subtitle": "VM Installation: {hostname}",
+      "actions": [
+        {
+          "id": "refresh",
+          "label": "Refresh All",
+          "icon": "refresh"
+        },
+        {
+          "id": "full_check",
+          "label": "Run Alpha Check",
+          "command": "make alpha-check",
+          "icon": "clipboard-check"
+        }
+      ]
+    },
+    "summary_stats": {
+      "total_components": {"data_source": "count(component_registry.components)"},
+      "installed_components": {"data_source": "count(installed_markers)"},
+      "running_components": {"data_source": "count(component_status where status='Running')"},
+      "error_components": {"data_source": "count(component_status where status='Error')"}
+    },
+    "filters": [
+      {
+        "id": "category_filter",
+        "label": "Category",
+        "type": "multi_select",
+        "options": "dashboard.categories"
+      },
+      {
+        "id": "status_filter",
+        "label": "Status",
+        "type": "multi_select",
+        "options": "dashboard.component_status_indicators"
+      },
+      {
+        "id": "feature_filter",
+        "label": "Features",
+        "type": "multi_select",
+        "options": "dashboard.feature_flags"
+      }
+    ],
+    "component_grid": {
+      "data_source": "component_registry.components",
+      "filters": ["category_filter", "status_filter", "feature_filter"],
+      "sort_options": [
+        {"id": "name", "label": "Name (A-Z)"},
+        {"id": "status", "label": "Status"},
+        {"id": "category", "label": "Category"}
+      ],
+      "default_sort": "category",
+      "card_layout": {
+        "header": {
+          "title": "{component.name}",
+          "subtitle": "{component.version}",
+          "status_indicator": {
+            "data_source": "component_status",
+            "mapping": "dashboard.component_status_indicators"
+          }
+        },
+        "body": {
+          "description": "{component.description}",
+          "feature_flags": {
+            "data_source": "component.integration_status",
+            "mapping": "dashboard.feature_flags"
+          }
+        },
+        "footer": {
+          "actions": [
+            {"id": "view_logs", "condition": "component.integration_status.logs"},
+            {"id": "restart"},
+            {"id": "open_ui", "condition": "component.integration_status.dashboard", "url": "{component.dashboard_url}"},
+            {"id": "check_status"}
+          ]
+        }
+      }
+    }
+  },
+  "dashboard_logic": {
+    "status_determination": {
+      "method": "priority_chain",
+      "chain": [
+        {
+          "condition": "!file_exists('/opt/agency_stack/{component_id}/.installed_ok')",
+          "result": "not_installed"
+        },
+        {
+          "condition": "command_exit_code('make {component_id}-status') != 0",
+          "result": "error"
+        },
+        {
+          "condition": "grep('running|active', command_output('make {component_id}-status'))",
+          "result": "running"
+        },
+        {
+          "condition": "default",
+          "result": "stopped"
+        }
+      ]
+    },
+    "refresh_logic": {
+      "auto_refresh": true,
+      "refresh_all_on_load": true,
+      "stagger_refresh": true,
+      "component_refresh_batch_size": 5
+    }
+  },
+  "implementation_notes": {
+    "backend_api": {
+      "get_components": {
+        "description": "Retrieves all components with their current status",
+        "endpoint": "/api/v1/components",
+        "query_params": ["category", "status", "features"],
+        "implementation_suggestion": "Parse component registry and check status markers"
+      },
+      "get_component_status": {
+        "description": "Get detailed status for a specific component",
+        "endpoint": "/api/v1/components/{component_id}/status",
+        "implementation_suggestion": "Run make {component_id}-status and parse the output"
+      },
+      "get_component_logs": {
+        "description": "Get recent logs for a specific component",
+        "endpoint": "/api/v1/components/{component_id}/logs",
+        "query_params": ["lines", "start_time", "end_time"],
+        "implementation_suggestion": "Retrieve from /var/log/agency_stack/components/{component_id}.log"
+      },
+      "perform_component_action": {
+        "description": "Perform an action on a component (restart, etc)",
+        "endpoint": "/api/v1/components/{component_id}/actions/{action_id}",
+        "method": "POST",
+        "implementation_suggestion": "Execute corresponding make command"
+      }
+    },
+    "cli_implementation": {
+      "suggestion": "If implementing as a CLI tool, consider using a TUI library like blessed-contrib or tui-go",
+      "refresh_command": "Implement 'make dashboard-refresh' to update the dashboard data",
+      "example_command": "make dashboard"
+    }
+  }
+}

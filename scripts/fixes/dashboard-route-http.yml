@@ -1,0 +1,32 @@
+http:
+  routers:
+    # HTTPS Router
+    dashboard:
+      rule: "Host(`proto001.alpha.nerdofmouth.com`) && PathPrefix(`/dashboard`)"
+      entrypoints:
+        - "websecure"
+      service: "dashboard"
+      middlewares:
+        - "dashboard-strip"
+      tls: {}
+    
+    # HTTP Router (no TLS requirement)
+    dashboard-http:
+      rule: "Host(`proto001.alpha.nerdofmouth.com`) && PathPrefix(`/dashboard`)"
+      entrypoints:
+        - "web"
+      service: "dashboard"
+      middlewares:
+        - "dashboard-strip"
+
+  services:
+    dashboard:
+      loadBalancer:
+        servers:
+          - url: "http://dashboard_default:80"
+
+  middlewares:
+    dashboard-strip:
+      stripPrefix:
+        prefixes: 
+          - "/dashboard"
