@@ -1,0 +1,179 @@
+<!-- Keycloak OAuth IDP Status Widget - AgencyStack Dashboard Component -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-primary text-white">
+    <div class="d-flex justify-content-between align-items-center">
+      <h5 class="mb-0">
+        <i class="fas fa-key me-2"></i> OAuth Identity Providers
+      </h5>
+      <button class="btn btn-sm btn-outline-light" id="refresh-oauth-status">
+        <i class="fas fa-sync-alt"></i>
+      </button>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <div id="oauth-providers-container">
+      <!-- OAuth providers will be loaded here -->
+      <div class="text-center py-4" id="oauth-loading">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2 text-muted">Loading OAuth providers...</p>
+      </div>
+    </div>
+    
+    <div class="p-3 border-top" id="oauth-summary" style="display: none">
+      <div class="d-flex justify-content-between">
+        <div>
+          <span class="badge bg-success me-2" id="oauth-active-count">0 Active</span>
+          <span class="badge bg-secondary" id="oauth-inactive-count">0 Inactive</span>
+        </div>
+        <div>
+          <span class="text-muted small" id="oauth-last-updated">Last updated: Never</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- OAuth Provider Template -->
+<template id="oauth-provider-template">
+  <div class="oauth-provider p-3 border-bottom">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <h6 class="provider-name mb-1"></h6>
+        <div class="small text-muted provider-type"></div>
+      </div>
+      <div class="text-end">
+        <span class="badge provider-status"></span>
+      </div>
+    </div>
+  </div>
+</template>
+
+<!-- No OAuth Providers Message -->
+<div id="no-oauth-providers" class="p-4 text-center" style="display: none">
+  <div class="mb-3">
+    <i class="fas fa-info-circle text-muted fa-2x"></i>
+  </div>
+  <h6 class="text-muted">No OAuth Providers Configured</h6>
+  <p class="small text-muted mb-3">Add OAuth Identity Providers to enhance your authentication options.</p>
+  <a href="/docs/pages/components/keycloak.html#external-oauth-via-keycloak-idps" class="btn btn-sm btn-outline-primary">
+    <i class="fas fa-book me-1"></i> View Documentation
+  </a>
+</div>
+
+<script>
+// Function to load OAuth provider data
+function loadOAuthProviders() {
+  const providerContainer = document.getElementById('oauth-providers-container');
+  const loading = document.getElementById('oauth-loading');
+  const noProviders = document.getElementById('no-oauth-providers');
+  const summary = document.getElementById('oauth-summary');
+  const activeCount = document.getElementById('oauth-active-count');
+  const inactiveCount = document.getElementById('oauth-inactive-count');
+  const lastUpdated = document.getElementById('oauth-last-updated');
+  
+  // Show loading
+  loading.style.display = 'block';
+  noProviders.style.display = 'none';
+  summary.style.display = 'none';
+  
+  // Clear existing providers
+  const existing = providerContainer.querySelectorAll('.oauth-provider');
+  existing.forEach(el => el.remove());
+  
+  // Fetch dashboard data
+  fetch('/api/dashboard/data')
+    .then(response => response.json())
+    .then(data => {
+      // Hide loading
+      loading.style.display = 'none';
+      
+      // Process OAuth providers
+      const providers = data?.components?.security_identity?.keycloak_oauth || {};
+      let hasProviders = false;
+      let activeProviders = 0;
+      let inactiveProviders = 0;
+      
+      // Loop through each domain
+      Object.keys(providers).forEach(domain => {
+        const domainData = providers[domain];
+        
+        if (domainData.running && domainData.providers && domainData.providers.length > 0) {
+          hasProviders = true;
+          
+          // Create domain header if multiple domains
+          if (Object.keys(providers).length > 1) {
+            const domainHeader = document.createElement('div');
+            domainHeader.className = 'domain-header p-2 bg-light';
+            domainHeader.innerHTML = `<strong>${domain}</strong>`;
+            providerContainer.appendChild(domainHeader);
+          }
+          
+          // Create each provider entry
+          domainData.providers.forEach(provider => {
+            const template = document.getElementById('oauth-provider-template');
+            const clone = document.importNode(template.content, true);
+            
+            // Set provider data
+            clone.querySelector('.provider-name').textContent = provider.name;
+            clone.querySelector('.provider-type').textContent = `Provider Type: ${provider.type}`;
+            
+            // Set status badge
+            const statusBadge = clone.querySelector('.provider-status');
+            if (provider.enabled) {
+              statusBadge.textContent = 'Active';
+              statusBadge.className = 'badge bg-success provider-status';
+              activeProviders++;
+            } else {
+              statusBadge.textContent = 'Inactive';
+              statusBadge.className = 'badge bg-secondary provider-status';
+              inactiveProviders++;
+            }
+            
+            // Add to container
+            providerContainer.appendChild(clone);
+          });
+        }
+      });
+      
+      // Show summary or no providers message
+      if (hasProviders) {
+        summary.style.display = 'block';
+        activeCount.textContent = `${activeProviders} Active`;
+        inactiveCount.textContent = `${inactiveProviders} Inactive`;
+        
+        // Format last updated time
+        const timestamp = new Date();
+        lastUpdated.textContent = `Last updated: ${timestamp.toLocaleString()}`;
+      } else {
+        noProviders.style.display = 'block';
+      }
+    })
+    .catch(error => {
+      console.error('Error loading OAuth providers:', error);
+      loading.style.display = 'none';
+      
+      // Show error message
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'p-4 text-center text-danger';
+      errorDiv.innerHTML = '<i class="fas fa-exclamation-triangle mb-3"></i><p>Failed to load OAuth providers. Please try again.</p>';
+      providerContainer.appendChild(errorDiv);
+    });
+}
+
+// Initial load
+document.addEventListener('DOMContentLoaded', () => {
+  loadOAuthProviders();
+  
+  // Refresh button handler
+  document.getElementById('refresh-oauth-status').addEventListener('click', () => {
+    loadOAuthProviders();
+  });
+  
+  // Also refresh when dashboard data is updated
+  document.addEventListener('dashboard-data-updated', () => {
+    loadOAuthProviders();
+  });
+});
+</script>

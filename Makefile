@@ -791,6 +791,34 @@ keycloak-oauth-configure:
 		$(if $(ENABLE_OAUTH_MICROSOFT),--enable-oauth-microsoft,) \
 		$(if $(VERBOSE),--verbose,)
 
+# Keycloak OAuth dashboard targets
+keycloak-oauth-dashboard-status:
+	@echo "$(MAGENTA)$(BOLD)🔍 Checking Keycloak OAuth/IDP Status for Dashboard...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make keycloak-oauth-dashboard-status DOMAIN=auth.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	mkdir -p logs/components; \
+	bash scripts/dashboard/keycloak_oauth_status.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),); \
+	echo "$(GREEN)✅ OAuth/IDP status updated in dashboard$(RESET)"
+
+dashboard-update-oauth:
+	@echo "$(MAGENTA)$(BOLD)🔄 Updating Dashboard with OAuth/IDP Status...$(RESET)"
+	@mkdir -p logs/components; \
+	bash scripts/dashboard/keycloak_oauth_status.sh; \
+	echo "$(GREEN)✅ Dashboard updated with OAuth/IDP status$(RESET)"
+
+# Update component registry with OAuth dashboard capability
+update-registry-oauth-dashboard:
+	@echo "$(MAGENTA)$(BOLD)📝 Updating Component Registry with OAuth Dashboard Capability...$(RESET)"
+	@if [ -f "scripts/utils/update_component_registry.sh" ]; then \
+		bash scripts/utils/update_component_registry.sh --update-component keycloak --update-flag oauth_dashboard --update-value true; \
+		echo "$(GREEN)✅ Component registry updated$(RESET)"; \
+	else \
+		echo "$(RED)❌ Component registry update script not found$(RESET)"; \
+	fi
+
 # Core Infrastructure
 install-infrastructure:
 	@echo "Installing core infrastructure..."
