@@ -2,6 +2,25 @@
 
 Use this checklist to ensure your environment is ready before deploying the FOSS server stack.
 
+> **New!** You can now automatically verify your system against this checklist using:
+> ```bash
+> make preflight-check DOMAIN=your-domain.com
+> ```
+> The verification will produce a detailed report in `pre_installation_report.md` and will identify any potential issues before installation.
+> 
+> **Parameters:**
+> - `DOMAIN=your-domain.com` - Specify your domain for DNS checks
+> - `SKIP_PORTS=1` - Skip port accessibility checks
+> - `SKIP_DNS=1` - Skip DNS configuration checks
+> - `SKIP_SYSTEM=1` - Skip system requirements checks
+> - `SKIP_NETWORK=1` - Skip network configuration checks
+> - `SKIP_SSH=1` - Skip SSH security configuration checks
+>
+> **Example with multiple parameters:**
+> ```bash
+> make preflight-check DOMAIN=example.com SKIP_PORTS=1 SKIP_SSH=1
+> ```
+
 ## Server Requirements
 
 - [ ] Server with Linux OS (Ubuntu/Debian recommended)

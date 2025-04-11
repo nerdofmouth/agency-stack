@@ -1,4 +1,7 @@
 #!/bin/bash
+# Source common utilities
+source "$(dirname "$0")/../utils/common.sh"
+        
 # install_peertube.sh - AgencyStack PeerTube Component Installer
 # [https://stack.nerdofmouth.com](https://stack.nerdofmouth.com)
 #
