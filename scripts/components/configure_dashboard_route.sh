@@ -12,7 +12,7 @@ source "${SCRIPT_DIR}/../utils/log_helpers.sh"
 # Configuration
 CLIENT_ID="${CLIENT_ID:-default}"
 DOMAIN="${DOMAIN:-localhost}"
-DASHBOARD_PORT="3000"  # Default Next.js port
+DASHBOARD_PORT="3001"  # Updated to match install_dashboard.sh port
 
 # Process command line arguments
 while [[ $# -gt 0 ]]; do
@@ -69,30 +69,64 @@ mkdir -p "${TRAEFIK_DYNAMIC_CONFIG_DIR}"
 cat > "${TRAEFIK_DYNAMIC_CONFIG_DIR}/dashboard-route.yml" <<EOF
 http:
   routers:
-    dashboard:
+    # HTTP - Root domain router
+    dashboard-root-http:
+      rule: "Host(\`${DOMAIN}\`)"
+      entrypoints:
+        - "web"
+      service: "dashboard-service"
+      priority: 10000
+    
+    # HTTP - Dashboard path router
+    dashboard-path-http:
+      rule: "Host(\`${DOMAIN}\`) && PathPrefix(\`/dashboard\`)"
+      entrypoints:
+        - "web"
+      service: "dashboard-service"
+      middlewares:
+        - "dashboard-strip"
+      priority: 10100
+    
+    # HTTPS - Root domain router
+    dashboard-root-https:
+      rule: "Host(\`${DOMAIN}\`)"
+      entrypoints:
+        - "websecure"
+      service: "dashboard-service"
+      priority: 10000
+      tls: {}
+    
+    # HTTPS - Dashboard path router
+    dashboard-path-https:
       rule: "Host(\`${DOMAIN}\`) && PathPrefix(\`/dashboard\`)"
       entrypoints:
         - "websecure"
-      service: "dashboard"
+      service: "dashboard-service"
       middlewares:
         - "dashboard-strip"
+      priority: 10100
       tls: {}
-
+  
+  # Define the dashboard service and middleware
   services:
-    dashboard:
+    dashboard-service:
       loadBalancer:
         servers:
-          - url: "http://dashboard_${CLIENT_ID}:80"
-
+          - url: "http://localhost:${DASHBOARD_PORT}"
+  
   middlewares:
     dashboard-strip:
       stripPrefix:
-        prefixes: 
+        prefixes:
           - "/dashboard"
 EOF
 
 log_success "Dashboard routing configuration created: ${TRAEFIK_DYNAMIC_CONFIG_DIR}/dashboard-route.yml"
-log_info "Dashboard will be accessible at: https://${DOMAIN}/dashboard"
+log_info "Dashboard access URLs:"
+log_info "HTTP FQDN (Root):       http://${DOMAIN}"
+log_info "HTTP FQDN (Path):       http://${DOMAIN}/dashboard"
+log_info "HTTPS FQDN (Root):      https://${DOMAIN} (if TLS is configured)"
+log_info "HTTPS FQDN (Path):      https://${DOMAIN}/dashboard (if TLS is configured)"
 
 # Verify the dashboard is accessible
 log_info "Verifying dashboard is accessible from Traefik..."
