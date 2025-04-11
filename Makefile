@@ -809,6 +809,22 @@ dashboard-update-oauth:
 	bash scripts/dashboard/keycloak_oauth_status.sh; \
 	echo "$(GREEN)✅ Dashboard updated with OAuth/IDP status$(RESET)"
 
+# Health check for Keycloak OAuth providers
+keycloak-oauth-health:
+	@echo "$(MAGENTA)$(BOLD)🩺 Running Keycloak OAuth/IDP Health Check...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make keycloak-oauth-health DOMAIN=auth.example.com [CLIENT_ID=tenant1] [VERBOSE=true] [ALERT=true]"; \
+		exit 1; \
+	fi; \
+	mkdir -p logs/components; \
+	bash scripts/components/health_check_keycloak_oauth.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(VERBOSE),--verbose,) $(if $(ALERT),--alert,); \
+	if [ $$? -eq 0 ]; then \
+		echo "$(GREEN)✅ Health check passed successfully$(RESET)"; \
+	else \
+		echo "$(RED)❌ Health check detected issues. See logs for details.$(RESET)"; \
+	fi
+
 # Update component registry with OAuth dashboard capability
 update-registry-oauth-dashboard:
 	@echo "$(MAGENTA)$(BOLD)📝 Updating Component Registry with OAuth Dashboard Capability...$(RESET)"
@@ -817,6 +833,41 @@ update-registry-oauth-dashboard:
 		echo "$(GREEN)✅ Component registry updated$(RESET)"; \
 	else \
 		echo "$(RED)❌ Component registry update script not found$(RESET)"; \
+	fi
+
+# Comprehensive Keycloak registry update
+keycloak-update-registry:
+	@echo "$(MAGENTA)$(BOLD)📊 Updating Keycloak Component Registry...$(RESET)"
+	@if [ -f "scripts/utils/update_keycloak_registry.sh" ]; then \
+		bash scripts/utils/update_keycloak_registry.sh; \
+		echo "$(GREEN)✅ Component registry updated with all Keycloak OAuth capabilities$(RESET)"; \
+	else \
+		echo "$(RED)❌ Registry update script not found$(RESET)"; \
+	fi
+
+# Rollback Keycloak OAuth providers
+keycloak-oauth-rollback:
+	@echo "$(MAGENTA)$(BOLD)🔄 Keycloak OAuth Provider Rollback...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make keycloak-oauth-rollback DOMAIN=auth.example.com [CLIENT_ID=tenant1] [PROVIDER=google] [DISABLE_ONLY=true] [ALL_PROVIDERS=true]"; \
+		exit 1; \
+	fi; \
+	args="--domain $(DOMAIN)"; \
+	if [ -n "$(CLIENT_ID)" ]; then args="$$args --client-id $(CLIENT_ID)"; fi; \
+	if [ -n "$(PROVIDER)" ]; then args="$$args --provider $(PROVIDER)"; fi; \
+	if [ "$(DISABLE_ONLY)" = "true" ]; then args="$$args --disable-only"; fi; \
+	if [ "$(ALL_PROVIDERS)" = "true" ]; then args="$$args --all-providers"; fi; \
+	if [ "$(FORCE)" = "true" ]; then args="$$args --force"; fi; \
+	if [ "$(VERBOSE)" = "true" ]; then args="$$args --verbose"; fi; \
+	mkdir -p logs/components; \
+	bash scripts/components/rollback_keycloak_oauth.sh $$args; \
+	status=$$?; \
+	if [ $$status -eq 0 ]; then \
+		echo "$(GREEN)✅ OAuth provider rollback completed successfully$(RESET)"; \
+		make dashboard-update-oauth; \
+	else \
+		echo "$(RED)❌ OAuth provider rollback encountered issues$(RESET)"; \
 	fi
 
 # Core Infrastructure
