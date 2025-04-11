@@ -407,6 +407,7 @@ services:
       start_period: 30s
     volumes:
       - ${WP_DIR}/${DOMAIN}/html:/var/www/html
+      - ${WP_DIR}/${DOMAIN}/php-fpm.conf:/usr/local/etc/php-fpm.d/www.conf
     networks:
       - ${NETWORK_NAME}
     labels:
@@ -514,6 +515,24 @@ server {
         deny all;
     }
 }
+EOL
+
+# Create PHP-FPM configuration
+log "INFO: Creating PHP-FPM configuration" "${CYAN}Creating PHP-FPM configuration...${NC}"
+cat > "${WP_DIR}/${DOMAIN}/php-fpm.conf" <<EOL
+[global]
+daemonize = no
+
+[www]
+listen = 0.0.0.0:9000
+listen.allowed_clients = any
+user = www-data
+group = www-data
+pm = dynamic
+pm.max_children = 10
+pm.start_servers = 2
+pm.min_spare_servers = 1
+pm.max_spare_servers = 3
 EOL
 
 # Start the WordPress stack
