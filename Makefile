@@ -856,6 +856,83 @@ install-keycloak: validate
 	@echo "Installing Keycloak identity provider..."
 	@sudo $(SCRIPTS_DIR)/components/install_keycloak.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
+keycloak: validate
+	@echo "$(MAGENTA)$(BOLD)🔐 Installing Keycloak SSO & Identity provider...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_keycloak.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+keycloak-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Keycloak Status...$(RESET)"
+	@if [ -n "$(CLIENT_ID)" ]; then \
+		KEYCLOAK_CONTAINER="$(CLIENT_ID)_keycloak"; \
+	else \
+		KEYCLOAK_CONTAINER="keycloak_$(subst .,_,$(DOMAIN))"; \
+	fi; \
+	if docker ps --format '{{.Names}}' | grep -q "$$KEYCLOAK_CONTAINER"; then \
+		echo "$(GREEN)✅ Keycloak is running$(RESET)"; \
+		docker ps --filter "name=$$KEYCLOAK_CONTAINER" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"; \
+		echo ""; \
+		echo "$(CYAN)Admin URL: https://$(DOMAIN)/admin/$(RESET)"; \
+		echo "$(CYAN)Realm: $(DOMAIN)$(RESET)"; \
+		echo "$(CYAN)Username: admin$(RESET)"; \
+		echo "$(CYAN)Password: $(shell grep KEYCLOAK_ADMIN_PASSWORD /opt/agency_stack/config.env | cut -d '=' -f2)$(RESET)"; \
+	else \
+		echo "$(RED)❌ Keycloak is not running$(RESET)"; \
+		echo "$(CYAN)Install with: make keycloak$(RESET)"; \
+	fi
+
+keycloak-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing Keycloak Logs...$(RESET)"
+	@if [ -n "$(CLIENT_ID)" ]; then \
+		KEYCLOAK_CONTAINER="$(CLIENT_ID)_keycloak"; \
+	else \
+		KEYCLOAK_CONTAINER="keycloak_$(subst .,_,$(DOMAIN))"; \
+	fi; \
+	if [ -f "/var/log/agency_stack/components/keycloak.log" ]; then \
+		echo "$(CYAN)Recent Keycloak installation logs:$(RESET)"; \
+		sudo tail -n 30 /var/log/agency_stack/components/keycloak.log; \
+		echo ""; \
+		echo "$(CYAN)For container logs, use:$(RESET)"; \
+		echo "docker logs $$KEYCLOAK_CONTAINER"; \
+	else \
+		echo "$(YELLOW)Keycloak logs not found.$(RESET)"; \
+		docker logs $$KEYCLOAK_CONTAINER 2>/dev/null || echo "$(RED)Keycloak container logs not available.$(RESET)"; \
+	fi
+
+keycloak-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Keycloak Services...$(RESET)"
+	@if [ -n "$(CLIENT_ID)" ]; then \
+		KEYCLOAK_CONTAINER="$(CLIENT_ID)_keycloak"; \
+	else \
+		KEYCLOAK_CONTAINER="keycloak_$(subst .,_,$(DOMAIN))"; \
+	fi; \
+	if docker ps --format '{{.Names}}' | grep -q "$$KEYCLOAK_CONTAINER"; then \
+		docker restart $$KEYCLOAK_CONTAINER; \
+		echo "$(GREEN)✅ Keycloak has been restarted$(RESET)"; \
+		echo "$(CYAN)Check status with: make keycloak-status$(RESET)"; \
+	else \
+		echo "$(RED)❌ Keycloak is not running$(RESET)"; \
+		echo "$(CYAN)Install with: make keycloak$(RESET)"; \
+	fi
+
+keycloak-test:
+	@echo "$(MAGENTA)$(BOLD)🧪 Testing Keycloak functionality...$(RESET)"
+	@if [ -n "$(CLIENT_ID)" ]; then \
+		KEYCLOAK_CONTAINER="$(CLIENT_ID)_keycloak"; \
+	else \
+		KEYCLOAK_CONTAINER="keycloak_$(subst .,_,$(DOMAIN))"; \
+	fi; \
+	if docker ps --format '{{.Names}}' | grep -q "$$KEYCLOAK_CONTAINER"; then \
+		echo "$(GREEN)✅ Keycloak is running$(RESET)"; \
+		echo "$(CYAN)Admin URL: https://$(DOMAIN)/admin/$(RESET)"; \
+		echo "$(CYAN)Realm: $(DOMAIN)$(RESET)"; \
+		echo "$(CYAN)Username: admin$(RESET)"; \
+		echo "$(CYAN)Password: $(shell grep KEYCLOAK_ADMIN_PASSWORD /opt/agency_stack/config.env | cut -d '=' -f2)$(RESET)"; \
+		echo "$(CYAN)Test Keycloak with: make keycloak-test$(RESET)"; \
+	else \
+		echo "$(RED)❌ Keycloak is not running$(RESET)"; \
+		echo "$(CYAN)Install with: make keycloak$(RESET)"; \
+	fi
+
 # Core Infrastructure
 install-infrastructure:
 	@echo "Installing core infrastructure..."
@@ -2543,3 +2620,74 @@ traefik-check-ports:
 	read -p "$(YELLOW)Enter client ID (default: default):$(RESET) " CLIENT_ID_INPUT; \
 	CLIENT_ID="$${CLIENT_ID_INPUT:-default}"; \
 	sudo $(SCRIPTS_DIR)/components/fix_traefik_ports.sh --domain "$${DOMAIN}" --client-id "$${CLIENT_ID}" --check-only $(if $(VERBOSE),--verbose,)
+
+# Auto-generated target for keycloak
+keycloak:
+	@echo "🔑 Installing Keycloak SSO & Identity provider..."
+	@sudo $(SCRIPTS_DIR)/components/install_keycloak.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+# Auto-generated target for keycloak
+keycloak-status:
+	@echo "🔍 Checking Keycloak status..."
+	@sudo docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep -E "keycloak|postgres"
+
+# Auto-generated target for keycloak
+keycloak-logs:
+	@echo "📋 Viewing Keycloak logs..."
+	@sudo docker logs --tail=100 -f keycloak_$(subst .,_,$(DOMAIN))
+
+# Auto-generated target for keycloak
+keycloak-restart:
+	@echo "🔄 Restarting Keycloak services..."
+	@cd /opt/agency_stack/keycloak/$(DOMAIN) && sudo docker-compose restart
+
+# SSO Integration targets
+sso-integrate:
+	@echo "🔒 Integrating component with Keycloak SSO..."
+	@if [ -z "$(COMPONENT)" ]; then \
+		echo "Error: COMPONENT parameter is required. Usage: make sso-integrate COMPONENT=name FRAMEWORK=nodejs COMPONENT_URL=https://example.com"; \
+		exit 1; \
+	fi
+	@if [ -z "$(FRAMEWORK)" ]; then \
+		echo "Error: FRAMEWORK parameter is required. Valid options: nodejs, python, docker"; \
+		exit 1; \
+	fi
+	@if [ -z "$(COMPONENT_URL)" ]; then \
+		echo "Error: COMPONENT_URL parameter is required."; \
+		exit 1; \
+	fi
+	@sudo $(SCRIPTS_DIR)/components/implement_sso_integration.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) --client-id $(CLIENT_ID) --component $(COMPONENT) --framework $(FRAMEWORK) --component-url $(COMPONENT_URL) $(if $(FORCE),--force,) $(if $(VERBOSE),--verbose,)
+
+sso-status:
+	@echo "🔍 Checking SSO integration status for components..."
+	@echo "Components with SSO enabled:"
+	@grep -B 5 -A 3 '"sso": true' $(CONFIG_DIR)/registry/component_registry.json | grep '"name":' | awk -F'"' '{print $$4}' | sort | uniq
+	@echo ""
+	@echo "Components with SSO configured:"
+	@grep -B 10 -A 3 '"sso_configured": true' $(CONFIG_DIR)/registry/component_registry.json 2>/dev/null | grep '"name":' | awk -F'"' '{print $$4}' | sort | uniq || echo "None configured yet"
+
+# Add SSO integration for specific components
+%-sso:
+	@echo "🔒 Integrating $(subst -sso,,$@) with Keycloak SSO..."
+	@component=$(subst -sso,,$@); \
+	if grep -q "\"name\": \"$$component\"" $(CONFIG_DIR)/registry/component_registry.json && grep -q -A 20 "\"name\": \"$$component\"" $(CONFIG_DIR)/registry/component_registry.json | grep -q "\"sso\": true"; then \
+		framework="docker"; \
+		if [ "$$component" = "peertube" ] || [ "$$component" = "gitea" ] || [ "$$component" = "n8n" ]; then framework="nodejs"; fi; \
+		if [ "$$component" = "django" ] || [ "$$component" = "grafana" ]; then framework="python"; fi; \
+		$(MAKE) sso-integrate COMPONENT=$$component FRAMEWORK=$$framework COMPONENT_URL=https://$$component.$(DOMAIN); \
+	else \
+		echo "Component $$component does not exist or is not SSO-enabled in the registry"; \
+		exit 1; \
+	fi
+
+# Implement SSO for all components marked with sso: true
+sso-integrate-all:
+	@echo "🔒 Integrating all SSO-enabled components with Keycloak..."
+	@for component in $$(grep -B 5 -A 3 '"sso": true' $(CONFIG_DIR)/registry/component_registry.json | grep '"name":' | awk -F'"' '{print $$4}' | sort | uniq); do \
+		echo "Integrating $$component..."; \
+		framework="docker"; \
+		if [ "$$component" = "peertube" ] || [ "$$component" = "gitea" ] || [ "$$component" = "n8n" ]; then framework="nodejs"; fi; \
+		if [ "$$component" = "django" ] || [ "$$component" = "grafana" ]; then framework="python"; fi; \
+		$(MAKE) sso-integrate COMPONENT=$$component FRAMEWORK=$$framework COMPONENT_URL=https://$$component.$(DOMAIN) || true; \
+		echo ""; \
+	done
