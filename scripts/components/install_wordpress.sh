@@ -423,7 +423,7 @@ services:
         max-size: "10m"
         max-file: "5"
         tag: "wordpress_${SITE_NAME}"
-    command: sh -c "docker-php-ext-install mysqli pdo pdo_mysql && docker-php-ext-enable mysqli && php-fpm"
+    command: bash -c "docker-php-ext-install mysqli pdo pdo_mysql && docker-php-ext-enable mysqli && php-fpm -R"
 
   # Nginx as a reverse proxy for WordPress
   nginx:
@@ -483,6 +483,9 @@ server {
         fastcgi_param PATH_INFO \$fastcgi_path_info;
         fastcgi_buffers 16 16k;
         fastcgi_buffer_size 32k;
+        fastcgi_connect_timeout 300;
+        fastcgi_send_timeout 300;
+        fastcgi_read_timeout 300;
     }
     
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
