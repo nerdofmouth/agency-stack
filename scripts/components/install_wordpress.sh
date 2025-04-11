@@ -209,28 +209,32 @@ log "INFO: Starting WordPress installation validation for $DOMAIN" "${BLUE}Start
 log "INFO: Setting container names" "Setting container names..."
 SITE_NAME=${DOMAIN//./_}
 if [ -n "$CLIENT_ID" ]; then
-  WP_CONTAINER="${CLIENT_ID}_wordpress"
-  REDIS_CONTAINER="${CLIENT_ID}_redis"
+  WORDPRESS_CONTAINER_NAME="${CLIENT_ID}_wordpress"
+  NGINX_CONTAINER_NAME="${CLIENT_ID}_nginx"
+  MARIADB_CONTAINER_NAME="${CLIENT_ID}_mariadb"
+  REDIS_CONTAINER_NAME="${CLIENT_ID}_redis"
   NETWORK_NAME="${CLIENT_ID}_network"
 else
-  WP_CONTAINER="wordpress"
-  REDIS_CONTAINER="default_redis"
+  WORDPRESS_CONTAINER_NAME="wordpress"
+  NGINX_CONTAINER_NAME="nginx"
+  MARIADB_CONTAINER_NAME="mariadb"
+  REDIS_CONTAINER_NAME="redis"
   NETWORK_NAME="default_network"
 fi
 
 # Check if WordPress is already installed
-if docker ps -a --format '{{.Names}}' | grep -q "$WP_CONTAINER"; then
+if docker ps -a --format '{{.Names}}' | grep -q "$WORDPRESS_CONTAINER_NAME"; then
   if [ "$FORCE" = true ]; then
-    log "WARNING: WordPress container '$WP_CONTAINER' already exists, will reinstall because --force was specified" "${YELLOW}⚠️ WordPress container '$WP_CONTAINER' already exists, will reinstall because --force was specified${NC}"
+    log "WARNING: WordPress container '$WORDPRESS_CONTAINER_NAME' already exists, will reinstall because --force was specified" "${YELLOW}⚠️ WordPress container '$WORDPRESS_CONTAINER_NAME' already exists, will reinstall because --force was specified${NC}"
     # Stop and remove existing containers
     log "INFO: Stopping and removing existing WordPress containers" "${CYAN}Stopping and removing existing WordPress containers...${NC}"
     cd "${WP_DIR}/${DOMAIN}" && docker-compose down 2>/dev/null || true
   else
-    log "INFO: WordPress container '$WP_CONTAINER' already exists" "${GREEN}✅ WordPress installation for $DOMAIN already exists${NC}"
+    log "INFO: WordPress container '$WORDPRESS_CONTAINER_NAME' already exists" "${GREEN}✅ WordPress installation for $DOMAIN already exists${NC}"
     log "INFO: To reinstall, use --force flag" "${CYAN}To reinstall, use --force flag${NC}"
     
     # Check if the containers are running
-    if docker ps --format '{{.Names}}' | grep -q "$WP_CONTAINER"; then
+    if docker ps --format '{{.Names}}' | grep -q "$WORDPRESS_CONTAINER_NAME"; then
       log "INFO: WordPress container is running" "${GREEN}✅ WordPress is running${NC}"
       echo -e "${GREEN}WordPress is already installed and running for $DOMAIN${NC}"
       echo -e "${CYAN}Admin URL: https://${DOMAIN}/wp-admin/${NC}"
@@ -330,8 +334,8 @@ log "INFO: Starting WordPress installation for $DOMAIN" "${BLUE}Starting WordPre
 # Create WordPress directories
 log "INFO: Creating WordPress directories" "${CYAN}Creating WordPress directories...${NC}"
 mkdir -p "${WP_DIR}/${DOMAIN}"
-mkdir -p "${WP_DIR}/${DOMAIN}/html"
-mkdir -p "${WP_DIR}/${DOMAIN}/db"
+mkdir -p "${WP_DIR}/${DOMAIN}/wordpress"
+mkdir -p "${WP_DIR}/${DOMAIN}/mariadb"
 mkdir -p "${WP_DIR}/${DOMAIN}/certs"
 mkdir -p "${WP_DIR}/${DOMAIN}/logs"
 mkdir -p "${WP_DIR}/${DOMAIN}/redis"
@@ -339,7 +343,7 @@ mkdir -p "${WP_DIR}/${DOMAIN}/redis"
 # Store MySQL credentials for WP-CLI
 cat > "${WP_DIR}/${DOMAIN}/.my.cnf" <<EOL
 [client]
-host=${MARIADB_CONTAINER}
+host=${MARIADB_CONTAINER_NAME}
 user=wordpress
 password=${WP_DB_PASSWORD}
 EOL
@@ -348,120 +352,83 @@ chmod 600 "${WP_DIR}/${DOMAIN}/.my.cnf"
 # Create WordPress Docker Compose file
 log "INFO: Creating WordPress Docker Compose file" "${CYAN}Creating WordPress Docker Compose file...${NC}"
 cat > "${WP_DIR}/${DOMAIN}/docker-compose.yml" <<EOL
-version: '3.7'
+version: '3'
 
 services:
-  # MariaDB Database
-  db:
-    image: mariadb:10.6
-    container_name: ${MARIADB_CONTAINER}
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: ${WP_ROOT_PASSWORD}
-      MYSQL_DATABASE: wordpress
-      MYSQL_USER: wordpress
-      MYSQL_PASSWORD: ${WP_DB_PASSWORD}
-    volumes:
-      - ${WP_DIR}/${DOMAIN}/db:/var/lib/mysql
-    networks:
-      - ${NETWORK_NAME}
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "5"
-        tag: "mariadb_${SITE_NAME}"
-
-  # Redis Cache
-  redis:
-    image: redis:alpine
-    container_name: ${REDIS_CONTAINER}
-    restart: unless-stopped
-    volumes:
-      - ${WP_DIR}/${DOMAIN}/redis:/data
-    networks:
-      - ${NETWORK_NAME}
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "5"
-        tag: "redis_${SITE_NAME}"
-
-  # WordPress with PHP-FPM and Nginx
   wordpress:
+    container_name: ${WORDPRESS_CONTAINER_NAME}
     image: wordpress:php${PHP_VERSION}-fpm
-    container_name: wordpress
     restart: unless-stopped
-    depends_on:
-      - db
-      - redis
-    environment:
-      WORDPRESS_DB_HOST: ${MARIADB_CONTAINER}
-      WORDPRESS_DB_USER: wordpress
-      WORDPRESS_DB_PASSWORD: ${WP_DB_PASSWORD}
-      WORDPRESS_DB_NAME: wordpress
-      WORDPRESS_CONFIG_EXTRA: |
-        define('WP_REDIS_HOST', 'redis');
-        define('WP_REDIS_PORT', 6379);
-        define('WP_CACHE', true);
-        define('WP_ENVIRONMENT_TYPE', 'production');
-        define('AUTOMATIC_UPDATER_DISABLED', false);
-        define('WP_AUTO_UPDATE_CORE', 'minor');
-    healthcheck:
-      test: ["CMD", "php", "-r", "if (!file_exists('/var/www/html/wp-config.php')) { exit(1); } else { exit(0); }"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-      start_period: 30s
     volumes:
-      - ${WP_DIR}/${DOMAIN}/html:/var/www/html
+      - ${WP_DIR}/${DOMAIN}/wordpress:/var/www/html
       - ${WP_DIR}/${DOMAIN}/php-fpm.conf:/usr/local/etc/php-fpm.d/www.conf
+    environment:
+      - WORDPRESS_DB_HOST=${MARIADB_CONTAINER_NAME}:3306
+      - WORDPRESS_DB_USER=wordpress
+      - WORDPRESS_DB_PASSWORD=${WP_DB_PASSWORD}
+      - WORDPRESS_DB_NAME=wordpress
+      - WORDPRESS_TABLE_PREFIX=wp_
     networks:
+      - wordpress_network
       - ${NETWORK_NAME}
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.wordpress_${SITE_NAME}.rule=Host(\`${DOMAIN}\`)"
-      - "traefik.http.routers.wordpress_${SITE_NAME}.entrypoints=websecure"
-      - "traefik.http.routers.wordpress_${SITE_NAME}.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.wordpress_${SITE_NAME}.middlewares=secure-headers@file"
-      - "traefik.http.services.wordpress_${SITE_NAME}.loadbalancer.server.port=9000"
-      - "traefik.docker.network=${NETWORK_NAME}"
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "5"
-        tag: "wordpress_${SITE_NAME}"
-    command: bash -c "docker-php-ext-install mysqli pdo pdo_mysql && docker-php-ext-enable mysqli && php-fpm -R"
-    expose:
-      - "9000"
-
-  # Nginx as a reverse proxy for WordPress
-  nginx:
-    image: nginx:alpine
-    restart: unless-stopped
     depends_on:
-      wordpress:
+      mariadb:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "php", "-r", "if(!file_exists('/var/www/html/wp-config.php')) {exit(1);} else {exit(0);}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+
+  nginx:
+    container_name: ${NGINX_CONTAINER_NAME}
+    image: nginx:latest
+    restart: unless-stopped
     volumes:
-      - ${WP_DIR}/${DOMAIN}/html:/var/www/html:ro
-      - ${WP_DIR}/${DOMAIN}/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ${WP_DIR}/${DOMAIN}/logs:/var/log/nginx
+      - ${WP_DIR}/${DOMAIN}/wordpress:/var/www/html
+      - ${WP_DIR}/${DOMAIN}/nginx.conf:/etc/nginx/conf.d/default.conf
     ports:
       - "8080:80"
     networks:
+      - wordpress_network
       - ${NETWORK_NAME}
+    depends_on:
+      wordpress:
+        condition: service_healthy
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.wordpress_${SITE_NAME}.rule=Host(\`${DOMAIN}\`)"
-      - "traefik.http.routers.wordpress_${SITE_NAME}.entrypoints=websecure"
+      - "traefik.http.routers.wordpress_${SITE_NAME}.entrypoints=web,websecure"
+      - "traefik.http.routers.wordpress_${SITE_NAME}.tls=true"
       - "traefik.http.routers.wordpress_${SITE_NAME}.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.wordpress_${SITE_NAME}.middlewares=secure-headers@file"
       - "traefik.http.services.wordpress_${SITE_NAME}.loadbalancer.server.port=80"
-      - "traefik.docker.network=${NETWORK_NAME}"
+
+  mariadb:
+    container_name: ${MARIADB_CONTAINER_NAME}
+    image: mariadb:10.6
+    restart: unless-stopped
+    volumes:
+      - ${WP_DIR}/${DOMAIN}/mariadb:/var/lib/mysql
+    environment:
+      - MYSQL_DATABASE=wordpress
+      - MYSQL_USER=wordpress
+      - MYSQL_PASSWORD=${WP_DB_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${WP_ROOT_PASSWORD}
+    networks:
+      - wordpress_network
+      - ${NETWORK_NAME}
+
+  redis:
+    container_name: ${REDIS_CONTAINER_NAME}
+    image: redis:latest
+    restart: unless-stopped
+    networks:
+      - wordpress_network
+      - ${NETWORK_NAME}
 
 networks:
+  wordpress_network:
+    name: ${CLIENT_ID}_${DOMAIN_UNDERSCORE}_network
   ${NETWORK_NAME}:
     external: true
 EOL
@@ -622,8 +589,8 @@ WP_DB_PASSWORD=${WP_DB_PASSWORD}
 
 # Docker containers
 WP_CONTAINER=wordpress
-MARIADB_CONTAINER=${MARIADB_CONTAINER}
-REDIS_CONTAINER=${REDIS_CONTAINER}
+MARIADB_CONTAINER=${MARIADB_CONTAINER_NAME}
+REDIS_CONTAINER=${REDIS_CONTAINER_NAME}
 EOF
 
 chmod 600 "${CONFIG_DIR}/secrets/wordpress/${DOMAIN}.env"
