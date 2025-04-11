@@ -22,20 +22,80 @@ BOLD='\033[1m'
 # Variables
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
+CONFIG_DIR="/opt/agency_stack"
+KEYCLOAK_DIR="${CONFIG_DIR}/keycloak"
+SECRETS_DIR="${CONFIG_DIR}/secrets/keycloak"
 LOG_DIR="/var/log/agency_stack"
 COMPONENTS_LOG_DIR="${LOG_DIR}/components"
 LOG_FILE="${COMPONENTS_LOG_DIR}/keycloak_idp_test.log"
+
+# Check if log directories are writable, use local paths for development if not
+if [ ! -w "$LOG_DIR" ] && [ ! -w "/var/log" ]; then
+  LOG_DIR="${ROOT_DIR}/logs"
+  COMPONENTS_LOG_DIR="${LOG_DIR}/components"
+  LOG_FILE="${COMPONENTS_LOG_DIR}/keycloak_idp_test.log"
+  echo "Notice: Using local log directory for development: ${LOG_DIR}"
+fi
+
 VERBOSE=false
 DOMAIN=""
 CLIENT_ID=""
+EXIT_CODE=0
+SECURITY_ISSUES=0
+WARNINGS=0
 
-# Log function
+# Log function with levels
 log() {
-  local message="$1"
+  local level="$1"
+  local message="$2"
   local timestamp=$(date +"%Y-%m-%d %H:%M:%S")
-  echo -e "[$timestamp] $message" >> "$LOG_FILE"
-  if [ "$VERBOSE" = true ]; then
-    echo -e "$message"
+  
+  case "$level" in
+    INFO)
+      echo -e "[$timestamp] [INFO] $message" >> "$LOG_FILE"
+      if [ "$VERBOSE" = true ] || [ -z "$3" ]; then
+        echo -e "${BLUE}[INFO] $message${NC}"
+      fi
+      ;;
+    WARN)
+      echo -e "[$timestamp] [WARNING] $message" >> "$LOG_FILE"
+      echo -e "${YELLOW}[WARNING] $message${NC}"
+      WARNINGS=$((WARNINGS + 1))
+      ;;
+    ERROR)
+      echo -e "[$timestamp] [ERROR] $message" >> "$LOG_FILE"
+      echo -e "${RED}[ERROR] $message${NC}"
+      EXIT_CODE=1
+      ;;
+    SECURITY)
+      echo -e "[$timestamp] [SECURITY ISSUE] $message" >> "$LOG_FILE"
+      echo -e "${RED}[SECURITY ISSUE] $message${NC}"
+      SECURITY_ISSUES=$((SECURITY_ISSUES + 1))
+      ;;
+    SUCCESS)
+      echo -e "[$timestamp] [SUCCESS] $message" >> "$LOG_FILE"
+      echo -e "${GREEN}[SUCCESS] $message${NC}"
+      ;;
+    *)
+      echo -e "[$timestamp] $message" >> "$LOG_FILE"
+      if [ "$VERBOSE" = true ]; then
+        echo -e "$message"
+      fi
+      ;;
+  esac
+}
+
+# Security check function
+check_security() {
+  local check_name="$1"
+  local check_result="$2"
+  local success_message="$3"
+  local failure_message="$4"
+  
+  if [ "$check_result" = true ]; then
+    log "SUCCESS" "✅ $check_name: $success_message"
+  else
+    log "SECURITY" "❌ $check_name: $failure_message"
   fi
 }
 
@@ -105,13 +165,26 @@ echo -e "======================================================="
 
 # Test if jq is installed
 if ! command -v jq &> /dev/null; then
-  echo -e "${RED}Error: jq is not installed. Please install jq first:${NC}"
+  log "ERROR" "jq is not installed. Please install jq first:"
   echo -e "${CYAN}sudo apt-get install jq${NC}"
   exit 1
 fi
 
+# Test if curl is installed
+if ! command -v curl &> /dev/null; then
+  log "ERROR" "curl is not installed. Please install curl first:"
+  echo -e "${CYAN}sudo apt-get install curl${NC}"
+  exit 1
+fi
+
+# Check for TLS/SSL support in curl
+if ! curl --version | grep -q "https"; then
+  log "ERROR" "curl does not support HTTPS. Please install curl with SSL support"
+  exit 1
+fi
+
 # Check if Keycloak is running
-echo -e "${BLUE}Checking if Keycloak is running...${NC}"
+log "INFO" "Checking if Keycloak is running..."
 
 # Use separate client ID for each tenant if provided
 REALM_NAME="agency"
@@ -122,49 +195,78 @@ fi
 # Get admin credentials from installation file
 KEYCLOAK_DIR="/opt/agency_stack/keycloak/${DOMAIN}"
 ADMIN_PASSWORD_FILE="${KEYCLOAK_DIR}/admin_password.txt"
+KEYCLOAK_SECRETS="${SECRETS_DIR}/${DOMAIN}"
 
 if [ ! -f "$ADMIN_PASSWORD_FILE" ]; then
-  echo -e "${RED}Admin password file not found. Cannot authenticate to Keycloak.${NC}"
-  echo -e "${YELLOW}You may need to run a Keycloak installation first.${NC}"
+  log "ERROR" "Admin password file not found. Cannot authenticate to Keycloak."
+  log "INFO" "You may need to run a Keycloak installation first."
   exit 1
 fi
 
 ADMIN_PASSWORD=$(cat "$ADMIN_PASSWORD_FILE")
 
 # Check if Keycloak is accessible
+log "INFO" "Testing connectivity to Keycloak..."
 HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://${DOMAIN}/auth/")
 
 if [ "$HTTP_STATUS" != "200" ]; then
-  echo -e "${RED}❌ Keycloak is not accessible at https://${DOMAIN}/auth/ (HTTP Status: ${HTTP_STATUS})${NC}"
-  echo -e "${YELLOW}Please check if Keycloak is running and properly configured.${NC}"
+  log "ERROR" "Keycloak is not accessible at https://${DOMAIN}/auth/ (HTTP Status: ${HTTP_STATUS})"
+  log "INFO" "Please check if Keycloak is running and properly configured."
   exit 1
 fi
 
-echo -e "${GREEN}✅ Keycloak is running at https://${DOMAIN}/auth/${NC}"
+log "SUCCESS" "Keycloak is running at https://${DOMAIN}/auth/"
+
+# Check for HTTP to HTTPS redirect
+log "INFO" "Testing HTTP to HTTPS redirect..."
+HTTP_REDIRECT=$(curl -s -o /dev/null -w "%{redirect_url}" "http://${DOMAIN}/auth/")
+if [[ "$HTTP_REDIRECT" == https://* ]]; then
+  log "SUCCESS" "HTTP to HTTPS redirect is working properly"
+else
+  log "WARN" "HTTP to HTTPS redirect not detected. This could be a security issue."
+fi
 
 # Get admin token for Keycloak API
-echo -e "${BLUE}Authenticating to Keycloak API...${NC}"
+log "INFO" "Authenticating to Keycloak API..."
 ADMIN_TOKEN=$(curl -s -X POST "https://${DOMAIN}/auth/realms/master/protocol/openid-connect/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=password&client_id=admin-cli&username=admin&password=${ADMIN_PASSWORD}" | jq -r '.access_token')
 
 if [ -z "$ADMIN_TOKEN" ] || [ "$ADMIN_TOKEN" = "null" ]; then
-  echo -e "${RED}❌ Failed to authenticate to Keycloak API${NC}"
-  echo -e "${YELLOW}This could be due to incorrect admin credentials or API issues.${NC}"
+  log "ERROR" "Failed to authenticate to Keycloak API"
+  log "WARN" "This could be due to incorrect admin credentials or API issues."
+  
+  # Try one more time with increased timeout
+  log "INFO" "Retrying with increased timeout..."
+  sleep 5
+  ADMIN_TOKEN=$(curl -s -X POST "https://${DOMAIN}/auth/realms/master/protocol/openid-connect/token" \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    -d "grant_type=password&client_id=admin-cli&username=admin&password=${ADMIN_PASSWORD}" | jq -r '.access_token')
+  
+  if [ -z "$ADMIN_TOKEN" ] || [ "$ADMIN_TOKEN" = "null" ]; then
+    log "ERROR" "Failed to authenticate to Keycloak API after retry"
+    exit 1
+  fi
+fi
+
+log "SUCCESS" "Successfully authenticated to Keycloak API"
+
+# Validate token is a proper JWT
+if [[ ! "$ADMIN_TOKEN" =~ ^[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+$ ]]; then
+  log "ERROR" "Admin token does not appear to be a valid JWT"
   exit 1
 fi
 
-echo -e "${GREEN}✅ Successfully authenticated to Keycloak API${NC}"
-
 # Check if realm exists
+log "INFO" "Checking if realm '${REALM_NAME}' exists..."
 REALM_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer ${ADMIN_TOKEN}" \
   "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}")
 
 if [ "$REALM_STATUS" != "200" ]; then
-  echo -e "${RED}❌ Realm '${REALM_NAME}' does not exist (HTTP Status: ${REALM_STATUS})${NC}"
+  log "ERROR" "Realm '${REALM_NAME}' does not exist (HTTP Status: ${REALM_STATUS})"
   
   if [ -n "$CLIENT_ID" ]; then
-    echo -e "${YELLOW}Falling back to default 'agency' realm...${NC}"
+    log "INFO" "Falling back to default 'agency' realm..."
     REALM_NAME="agency"
     
     # Check if default realm exists
@@ -172,63 +274,124 @@ if [ "$REALM_STATUS" != "200" ]; then
       "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}")
     
     if [ "$REALM_STATUS" != "200" ]; then
-      echo -e "${RED}❌ Default realm 'agency' does not exist either (HTTP Status: ${REALM_STATUS})${NC}"
-      echo -e "${YELLOW}Please check your Keycloak configuration.${NC}"
+      log "ERROR" "Default realm 'agency' does not exist either (HTTP Status: ${REALM_STATUS})"
+      log "INFO" "Please check your Keycloak configuration."
       exit 1
     fi
   else
-    echo -e "${YELLOW}Please check your Keycloak configuration.${NC}"
+    log "INFO" "Please check your Keycloak configuration."
     exit 1
   fi
 fi
 
-echo -e "${GREEN}✅ Realm '${REALM_NAME}' exists${NC}"
+log "SUCCESS" "Realm '${REALM_NAME}' exists"
+
+# Get realm settings for security checks
+log "INFO" "Retrieving realm settings for security validation..."
+REALM_SETTINGS=$(curl -s -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+  "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}")
+
+# Security checks on realm settings
+echo -e "\n${CYAN}${BOLD}Performing Security Checks on Realm:${NC}"
+echo -e "-----------------------------------------"
+
+# Check SSL Required
+SSL_REQUIRED=$(echo "$REALM_SETTINGS" | jq -r '.sslRequired')
+check_security "SSL Required" \
+  [[ "$SSL_REQUIRED" == "external" || "$SSL_REQUIRED" == "all" ]] \
+  "SSL required setting is properly configured as '$SSL_REQUIRED'" \
+  "SSL required setting is set to '$SSL_REQUIRED', should be 'external' or 'all'"
+
+# Check Brute Force Protection
+BRUTE_FORCE=$(echo "$REALM_SETTINGS" | jq -r '.bruteForceProtected')
+check_security "Brute Force Protection" \
+  [[ "$BRUTE_FORCE" == "true" ]] \
+  "Brute force protection is enabled" \
+  "Brute force protection is disabled"
+
+# Check Access Token Lifespan
+ACCESS_TOKEN_LIFESPAN=$(echo "$REALM_SETTINGS" | jq -r '.accessTokenLifespan')
+check_security "Access Token Lifespan" \
+  [[ "$ACCESS_TOKEN_LIFESPAN" -le 300 ]] \
+  "Access token lifespan is properly set to $(($ACCESS_TOKEN_LIFESPAN / 60)) minutes" \
+  "Access token lifespan is set to $(($ACCESS_TOKEN_LIFESPAN / 60)) minutes, which is more than recommended 5 minutes"
 
 # Get list of identity providers
-echo -e "${BLUE}Getting identity providers from realm '${REALM_NAME}'...${NC}"
+log "INFO" "Getting identity providers from realm '${REALM_NAME}'..."
 IDP_RESPONSE=$(curl -s -H "Authorization: Bearer ${ADMIN_TOKEN}" \
   "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances")
 
 # Check if any IDPs exist
 IDP_COUNT=$(echo "$IDP_RESPONSE" | jq -r 'if type=="array" then length else 0 end')
 if [ "$IDP_COUNT" -eq 0 ]; then
-  echo -e "${YELLOW}⚠️ No identity providers configured in this realm${NC}"
-  echo -e "${BLUE}To configure OAuth providers, run install_keycloak.sh with --enable-oauth-* flags${NC}"
+  log "WARN" "No identity providers configured in this realm"
+  log "INFO" "To configure OAuth providers, run install_keycloak.sh with --enable-oauth-* flags"
   exit 1
 fi
 
-echo -e "${GREEN}✅ Found ${IDP_COUNT} identity providers${NC}"
+log "SUCCESS" "Found ${IDP_COUNT} identity providers"
 
-# Test each IDP
-echo -e "\n${CYAN}${BOLD}Testing Identity Providers:${NC}"
-echo -e "--------------------------"
+# Security checks for each IdP configuration
+echo -e "\n${CYAN}${BOLD}Validating Identity Provider Configurations:${NC}"
+echo -e "--------------------------------------------"
 
-# Function to test an identity provider
+# Function to test an identity provider with security checks
 test_idp() {
   local alias="$1"
   local provider_id="$2"
   local display_name="$3"
   local enabled="$4"
+  local idp_config="$5"
   
   echo -e "\n${BLUE}Testing ${display_name} (${provider_id}) IdP...${NC}"
   
   # Check if enabled
   if [ "$enabled" != "true" ]; then
-    echo -e "${YELLOW}⚠️ Provider is disabled. Skipping tests.${NC}"
-    return
+    log "WARN" "Provider is disabled. Limited testing will be performed."
   fi
   
-  # Check if well-known configuration is accessible for this provider
-  echo -e "  ${CYAN}Testing well-known configuration...${NC}"
-  WELLKNOWN_URL="https://${DOMAIN}/auth/realms/${REALM_NAME}/broker/${alias}/endpoint/.well-known/openid-configuration"
-  WELLKNOWN_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$WELLKNOWN_URL")
+  # Load expected values for this provider type
+  local expected_scope=""
+  local discovery_url=""
+  case "$provider_id" in
+    google)
+      expected_scope="openid email profile"
+      discovery_url="https://accounts.google.com/.well-known/openid-configuration"
+      ;;
+    github)
+      expected_scope="user:email"
+      discovery_url=""
+      ;;
+    apple)
+      expected_scope="email name"
+      discovery_url="https://appleid.apple.com/.well-known/openid-configuration"
+      ;;
+  esac
   
-  if [ "$WELLKNOWN_STATUS" = "200" ]; then
-    echo -e "  ${GREEN}✅ Well-known endpoint accessible${NC}"
-  else
-    echo -e "  ${YELLOW}⚠️ Well-known endpoint not accessible (HTTP Status: ${WELLKNOWN_STATUS})${NC}"
-    # This is expected for some providers like GitHub that don't expose a well-known endpoint
+  # Check for proper settings
+  # Check validateSignature
+  local validate_signature=$(echo "$idp_config" | jq -r '.config.validateSignature')
+  check_security "${display_name} Signature Validation" \
+    [[ "$validate_signature" == "true" || -z "$validate_signature" ]] \
+    "Signature validation is properly enabled" \
+    "Signature validation is disabled, which is a security risk"
+  
+  # Check for correct scope
+  if [ -n "$expected_scope" ]; then
+    local scope=$(echo "$idp_config" | jq -r '.config.defaultScope // ""')
+    if [[ "$scope" != *"$expected_scope"* ]]; then
+      log "WARN" "The scope for ${display_name} may be misconfigured. Expected: ${expected_scope}, Found: ${scope}"
+    else
+      log "SUCCESS" "Scope properly configured for ${display_name}"
+    fi
   fi
+  
+  # Check for storeToken (should generally be false)
+  local store_token=$(echo "$idp_config" | jq -r '.storeToken')
+  check_security "${display_name} Token Storage" \
+    [[ "$store_token" == "false" ]] \
+    "Token storage is properly disabled" \
+    "Token storage is enabled, which may pose a security risk"
   
   # Check if the login URL works
   echo -e "  ${CYAN}Testing login redirect...${NC}"
@@ -238,69 +401,83 @@ test_idp() {
   # Most providers will redirect to their login page, resulting in various status codes
   # We just check that it's not a server error (5xx)
   if [[ "$LOGIN_STATUS" -lt 500 ]]; then
-    echo -e "  ${GREEN}✅ Login redirect works (HTTP Status: ${LOGIN_STATUS})${NC}"
+    log "SUCCESS" "Login redirect works (HTTP Status: ${LOGIN_STATUS})"
   else
-    echo -e "  ${RED}❌ Login redirect failed (HTTP Status: ${LOGIN_STATUS})${NC}"
+    log "ERROR" "Login redirect failed (HTTP Status: ${LOGIN_STATUS})"
   fi
   
-  # Test the discovery URL for OAuth providers
-  # This varies by provider type
-  case "$provider_id" in
-    google)
-      echo -e "  ${CYAN}Testing Google discovery URL...${NC}"
-      DISCOVERY_URL="https://accounts.google.com/.well-known/openid-configuration"
-      DISCOVERY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$DISCOVERY_URL")
-      if [ "$DISCOVERY_STATUS" = "200" ]; then
-        echo -e "  ${GREEN}✅ Google discovery endpoint accessible${NC}"
+  # Test the discovery URL for OAuth providers if available
+  if [ -n "$discovery_url" ]; then
+    echo -e "  ${CYAN}Testing discovery URL: ${discovery_url}...${NC}"
+    DISCOVERY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$discovery_url")
+    if [ "$DISCOVERY_STATUS" = "200" ]; then
+      log "SUCCESS" "Discovery endpoint accessible"
+      
+      # Fetch discovery document and check key claims
+      DISCOVERY_DOC=$(curl -s "$discovery_url")
+      if echo "$DISCOVERY_DOC" | jq -e '.jwks_uri, .authorization_endpoint, .token_endpoint' > /dev/null; then
+        log "SUCCESS" "Discovery document contains expected endpoints"
       else
-        echo -e "  ${RED}❌ Google discovery endpoint not accessible (HTTP Status: ${DISCOVERY_STATUS})${NC}"
+        log "WARN" "Discovery document may be missing required endpoints"
       fi
-      ;;
-    github)
-      echo -e "  ${CYAN}Testing GitHub API...${NC}"
-      GITHUB_API="https://api.github.com"
-      GITHUB_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$GITHUB_API")
-      if [ "$GITHUB_STATUS" = "200" ]; then
-        echo -e "  ${GREEN}✅ GitHub API accessible${NC}"
-      else
-        echo -e "  ${RED}❌ GitHub API not accessible (HTTP Status: ${GITHUB_STATUS})${NC}"
-      fi
-      ;;
-    apple)
-      echo -e "  ${CYAN}Testing Apple discovery URL...${NC}"
-      APPLE_URL="https://appleid.apple.com/.well-known/openid-configuration"
-      APPLE_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$APPLE_URL")
-      if [ "$APPLE_STATUS" = "200" ]; then
-        echo -e "  ${GREEN}✅ Apple discovery endpoint accessible${NC}"
-      else
-        echo -e "  ${RED}❌ Apple discovery endpoint not accessible (HTTP Status: ${APPLE_STATUS})${NC}"
-      fi
-      ;;
-    *)
-      echo -e "  ${YELLOW}⚠️ No specific tests available for provider type: ${provider_id}${NC}"
-      ;;
-  esac
-  
-  # Check if clientId and clientSecret are set (we don't show the actual values for security)
-  echo -e "  ${CYAN}Checking configuration...${NC}"
-  CONFIG=$(curl -s -H "Authorization: Bearer ${ADMIN_TOKEN}" \
-    "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances/${alias}")
-  
-  # Check for clientId (don't output the actual value)
-  if [ "$(echo "$CONFIG" | jq -r '.config.clientId')" != "null" ] && [ "$(echo "$CONFIG" | jq -r '.config.clientId')" != "" ]; then
-    echo -e "  ${GREEN}✅ Client ID is configured${NC}"
-  else
-    echo -e "  ${RED}❌ Client ID is not configured${NC}"
+    else
+      log "ERROR" "Discovery endpoint not accessible (HTTP Status: ${DISCOVERY_STATUS})"
+    fi
   fi
   
-  # Check for clientSecret (don't output the actual value)
-  if [ "$(echo "$CONFIG" | jq -r '.config.clientSecret')" != "null" ] && [ "$(echo "$CONFIG" | jq -r '.config.clientSecret')" != "" ]; then
-    echo -e "  ${GREEN}✅ Client Secret is configured${NC}"
+  # Check client credentials
+  echo -e "  ${CYAN}Checking client credentials configuration...${NC}"
+  local client_id=$(echo "$idp_config" | jq -r '.config.clientId')
+  local client_secret=$(echo "$idp_config" | jq -r '.config.clientSecret')
+  
+  if [ -z "$client_id" ] || [ "$client_id" = "null" ]; then
+    log "ERROR" "Client ID is not configured for ${display_name}"
   else
-    echo -e "  ${RED}❌ Client Secret is not configured${NC}"
+    # Check if client ID looks valid (minimum length check)
+    if [ ${#client_id} -lt 10 ]; then
+      log "WARN" "Client ID for ${display_name} seems suspiciously short (length: ${#client_id})"
+    else
+      log "SUCCESS" "Client ID is configured for ${display_name}"
+    fi
   fi
   
-  echo -e "  ${GREEN}✅ ${display_name} IdP test completed${NC}"
+  if [ -z "$client_secret" ] || [ "$client_secret" = "null" ]; then
+    log "ERROR" "Client Secret is not configured for ${display_name}"
+  else
+    # Check if client secret looks valid (minimum length for security)
+    if [ ${#client_secret} -lt 16 ]; then
+      log "SECURITY" "Client Secret for ${display_name} may be too short (less than 16 chars)"
+    else
+      log "SUCCESS" "Client Secret is properly configured for ${display_name}"
+    fi
+  fi
+  
+  # Check if credentials are securely stored
+  if [ -f "${SECRETS_DIR}/${DOMAIN}/${alias}_oauth.env" ]; then
+    # Check file permissions
+    local file_perms=$(stat -c "%a" "${SECRETS_DIR}/${DOMAIN}/${alias}_oauth.env")
+    if [ "$file_perms" = "600" ]; then
+      log "SUCCESS" "Credentials are stored securely with correct permissions (600)"
+    else
+      log "SECURITY" "Credential file has incorrect permissions: ${file_perms}, should be 600"
+    fi
+  else
+    log "WARN" "No secure credential storage found for ${display_name}"
+  fi
+  
+  # Check for mappers (email mapper is crucial)
+  echo -e "  ${CYAN}Checking identity provider mappers...${NC}"
+  local mappers=$(curl -s -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+    "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances/${alias}/mappers")
+  
+  local email_mapper=$(echo "$mappers" | jq -r '[.[] | select(.config.user.attribute=="email" or .config.userAttribute=="email")] | length')
+  if [ "$email_mapper" -gt 0 ]; then
+    log "SUCCESS" "Email mapper properly configured"
+  else
+    log "WARN" "No email mapper found. This may cause issues with user identification."
+  fi
+  
+  log "SUCCESS" "${display_name} IdP test completed"
 }
 
 # Loop through each IdP and test it
@@ -310,10 +487,26 @@ echo "$IDP_RESPONSE" | jq -c 'if type=="array" then .[] else empty end' | while 
   display_name=$(echo "$idp" | jq -r '.displayName')
   enabled=$(echo "$idp" | jq -r '.enabled')
   
-  test_idp "$alias" "$provider_id" "$display_name" "$enabled"
+  test_idp "$alias" "$provider_id" "$display_name" "$enabled" "$idp"
 done
 
-# Check for Keycloak clients that can use these IDPs
+# Check for authentication flows using identity providers
+echo -e "\n${BLUE}Checking authentication flows...${NC}"
+AUTH_FLOWS=$(curl -s -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+  "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/authentication/flows")
+
+BROWSER_FLOW=$(curl -s -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+  "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/authentication/flows/browser/executions")
+
+IDENTITY_PROVIDER_AUTH=$(echo "$BROWSER_FLOW" | jq -r '[.[] | select(.displayName=="Identity Provider Redirector" or .providerId=="identity-provider-redirector")] | length')
+
+if [ "$IDENTITY_PROVIDER_AUTH" -gt 0 ]; then
+  log "SUCCESS" "Identity Provider Redirector is configured in the authentication flow"
+else
+  log "WARN" "Identity Provider Redirector is not configured in the authentication flow. Social login buttons may not appear."
+fi
+
+# Check for client configurations
 echo -e "\n${BLUE}Checking for clients that can use these identity providers...${NC}"
 CLIENTS=$(curl -s -H "Authorization: Bearer ${ADMIN_TOKEN}" \
   "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/clients")
@@ -321,29 +514,108 @@ CLIENTS=$(curl -s -H "Authorization: Bearer ${ADMIN_TOKEN}" \
 CLIENT_COUNT=$(echo "$CLIENTS" | jq -r 'length')
 echo -e "${GREEN}Found ${CLIENT_COUNT} clients in realm '${REALM_NAME}'${NC}"
 
+# Check compatibility of clients with OIDC
+COMPATIBLE_CLIENTS=0
+NON_COMPATIBLE_CLIENTS=0
+
 # List clients with standard flow enabled (which can use IDPs)
 echo -e "\n${CYAN}${BOLD}Compatible Clients:${NC}"
 echo -e "------------------"
-echo "$CLIENTS" | jq -r '.[] | select(.standardFlowEnabled == true) | .clientId' | while read -r client_id; do
-  echo -e "${GREEN}✅ ${client_id}${NC}"
+echo "$CLIENTS" | jq -c '.[] | select(.standardFlowEnabled == true)' | while read -r client; do
+  client_id=$(echo "$client" | jq -r '.clientId')
+  client_protocol=$(echo "$client" | jq -r '.protocol // "unknown"')
+  
+  if [ "$client_protocol" = "openid-connect" ]; then
+    echo -e "${GREEN}✅ ${client_id} - Protocol: ${client_protocol}${NC}"
+    COMPATIBLE_CLIENTS=$((COMPATIBLE_CLIENTS + 1))
+  else
+    echo -e "${YELLOW}⚠️ ${client_id} - Protocol: ${client_protocol} (not OIDC)${NC}"
+    NON_COMPATIBLE_CLIENTS=$((NON_COMPATIBLE_CLIENTS + 1))
+  fi
 done
 
-# Check for default login page
+if [ $COMPATIBLE_CLIENTS -eq 0 ]; then
+  log "WARN" "No OIDC-compatible clients found. This may indicate an issue with IDPs."
+fi
+
+# Check for direct client OAuth settings that bypass Keycloak
+echo -e "\n${CYAN}${BOLD}Direct OAuth Checks:${NC}"
+echo -e "------------------"
+echo "$CLIENTS" | jq -c '.[]' | while read -r client; do
+  client_id=$(echo "$client" | jq -r '.clientId')
+  redirect_uris=$(echo "$client" | jq -r '.redirectUris[]? // ""')
+  
+  # Look for signs of direct OAuth integration (bypassing Keycloak)
+  if [[ "$redirect_uris" == *"google"* || "$redirect_uris" == *"github"* || "$redirect_uris" == *"apple"* || 
+        "$redirect_uris" == *"callback"* || "$redirect_uris" == *"oauth"* ]]; then
+    log "SECURITY" "Client '${client_id}' appears to have direct OAuth integration URIs: ${redirect_uris}"
+    log "INFO" "Direct OAuth integration bypasses Keycloak and should be removed."
+  fi
+done
+
+# Check for realm login page
 echo -e "\n${BLUE}Testing realm login page...${NC}"
 LOGIN_URL="https://${DOMAIN}/auth/realms/${REALM_NAME}/protocol/openid-connect/auth?client_id=account-console&redirect_uri=https://${DOMAIN}/auth/realms/${REALM_NAME}/account/&response_type=code"
 LOGIN_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$LOGIN_URL")
 
 if [ "$LOGIN_STATUS" = "200" ]; then
-  echo -e "${GREEN}✅ Login page is accessible${NC}"
+  log "SUCCESS" "Login page is accessible"
+  
+  # Check if the login page HTML contains references to identity providers
+  LOGIN_HTML=$(curl -s "$LOGIN_URL")
+  if echo "$LOGIN_HTML" | grep -q "identity-provider"; then
+    log "SUCCESS" "Login page contains identity provider buttons"
+  else
+    log "WARN" "Login page does not appear to show identity provider buttons"
+  fi
+  
   echo -e "${CYAN}You can manually test the login flow at:${NC}"
   echo -e "${CYAN}${LOGIN_URL}${NC}"
 else
-  echo -e "${RED}❌ Login page is not accessible (HTTP Status: ${LOGIN_STATUS})${NC}"
+  log "ERROR" "Login page is not accessible (HTTP Status: ${LOGIN_STATUS})"
 fi
 
-# Final message
+# Final report
 echo -e "\n${GREEN}${BOLD}Keycloak Identity Provider Tests Completed${NC}"
 echo -e "Realm: ${CYAN}${REALM_NAME}${NC}"
 echo -e "Admin Console: ${CYAN}https://${DOMAIN}/auth/admin/${NC}"
 
-exit 0
+echo -e "\n${CYAN}${BOLD}Summary:${NC}"
+echo -e "--------"
+echo -e "Security Issues: ${RED}${SECURITY_ISSUES}${NC}"
+echo -e "Warnings: ${YELLOW}${WARNINGS}${NC}"
+
+# Component registry check
+echo -e "\n${BLUE}Checking component registry...${NC}"
+if [ -f "${ROOT_DIR}/config/registry/component_registry.json" ]; then
+  OAUTH_IDP_CONFIGURED=$(jq -r '.components.security.keycloak.integration_status.oauth_idp_configured // "false"' "${ROOT_DIR}/config/registry/component_registry.json")
+  
+  if [ "$OAUTH_IDP_CONFIGURED" = "true" ]; then
+    log "SUCCESS" "Component registry has oauth_idp_configured flag set correctly"
+  else
+    log "WARN" "Component registry does not have oauth_idp_configured flag set to true"
+    
+    # Update the registry if IDPs were found and testing was successful
+    if [ $IDP_COUNT -gt 0 ] && [ $EXIT_CODE -eq 0 ]; then
+      if [ -f "${ROOT_DIR}/scripts/utils/update_component_registry.sh" ]; then
+        echo -e "${BLUE}Updating component registry...${NC}"
+        ${ROOT_DIR}/scripts/utils/update_component_registry.sh --update-component keycloak --update-flag oauth_idp_configured --update-value true
+        echo -e "${GREEN}✅ Component registry updated${NC}"
+      fi
+    fi
+  fi
+else
+  log "WARN" "Component registry file not found"
+fi
+
+# Exit with appropriate code
+if [ $SECURITY_ISSUES -gt 0 ]; then
+  echo -e "\n${RED}${BOLD}⚠️ Security issues detected! Please address them before deploying to production.${NC}"
+  exit 2
+elif [ $EXIT_CODE -ne 0 ]; then
+  echo -e "\n${RED}${BOLD}❌ Tests completed with errors.${NC}"
+  exit $EXIT_CODE
+else
+  echo -e "\n${GREEN}${BOLD}✅ All tests completed successfully!${NC}"
+  exit 0
+fi
