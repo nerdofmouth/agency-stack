@@ -115,7 +115,7 @@ check_registry() {
   for category in $(jq -r '.components | keys[]' "${REGISTRY_FILE}"); do
     for component in $(jq -r --arg cat "$category" '.components[$cat] | keys[]' "${REGISTRY_FILE}"); do
       # Check if all required flags are present
-      for flag in installed hardened makefile sso dashboard logs docs auditable traefik_tls multi_tenant; do
+      for flag in installed hardened makefile sso dashboard logs docs auditable traefik_tls multi_tenant oauth_idp_configured; do
         if ! jq -e --arg cat "$category" --arg comp "$component" --arg flag "$flag" '.components[$cat][$comp].integration_status[$flag] != null' "${REGISTRY_FILE}" > /dev/null; then
           echo -e "${YELLOW}Missing flag:${NC} ${flag} for component ${BOLD}${component}${NC} in category ${category}"
           issues_found=$((issues_found + 1))
@@ -239,6 +239,7 @@ Each component is evaluated against the following integration criteria:
 | **Auditable** | Properly handled by audit/tracking system |
 | **Traefik TLS** | Has proper reverse proxy config with TLS |
 | **Multi-tenant** | Supports client-aware installation or usage patterns |
+| **OAuth IDP Configured** | OAuth IDP is configured for the component |
 
 EOF
   
@@ -266,8 +267,8 @@ EOF
     echo -e "## ${category_name}\n" >> "${SUMMARY_FILE}"
     
     # Add table header
-    echo -e "| Component | Version | Installed | Hardened | Makefile | SSO | Dashboard | Logs | Docs | Auditable | Traefik TLS | Multi-tenant |" >> "${SUMMARY_FILE}"
-    echo -e "|-----------|---------|:---------:|:--------:|:--------:|:---:|:---------:|:----:|:----:|:---------:|:-----------:|:------------:|" >> "${SUMMARY_FILE}"
+    echo -e "| Component | Version | Installed | Hardened | Makefile | SSO | Dashboard | Logs | Docs | Auditable | Traefik TLS | Multi-tenant | OAuth IDP Configured |" >> "${SUMMARY_FILE}"
+    echo -e "|-----------|---------|:---------:|:--------:|:--------:|:---:|:---------:|:----:|:----:|:---------:|:-----------:|:------------:|:-------------------:|" >> "${SUMMARY_FILE}"
     
     # Process each component in the category
     for component in $(jq -r --arg cat "$category" '.components[$cat] | keys[]' "${REGISTRY_FILE}" | sort); do
@@ -288,6 +289,7 @@ EOF
       local auditable=$(jq -r --arg cat "$category" --arg comp "$component" '.components[$cat][$comp].integration_status.auditable' "${REGISTRY_FILE}")
       local traefik_tls=$(jq -r --arg cat "$category" --arg comp "$component" '.components[$cat][$comp].integration_status.traefik_tls' "${REGISTRY_FILE}")
       local multi_tenant=$(jq -r --arg cat "$category" --arg comp "$component" '.components[$cat][$comp].integration_status.multi_tenant' "${REGISTRY_FILE}")
+      local oauth_idp_configured=$(jq -r --arg cat "$category" --arg comp "$component" '.components[$cat][$comp].integration_status.oauth_idp_configured' "${REGISTRY_FILE}")
       
       # Convert boolean values to checkmarks or X
       installed=$([ "$installed" = "true" ] && echo "✅" || echo "❌")
@@ -300,6 +302,7 @@ EOF
       auditable=$([ "$auditable" = "true" ] && echo "✅" || echo "❌")
       traefik_tls=$([ "$traefik_tls" = "true" ] && echo "✅" || echo "❌")
       multi_tenant=$([ "$multi_tenant" = "true" ] && echo "✅" || echo "❌")
+      oauth_idp_configured=$([ "$oauth_idp_configured" = "true" ] && echo "✅" || echo "❌")
       
       # Check if fully integrated (all true)
       local all_flags=$(jq -r --arg cat "$category" --arg comp "$component" '.components[$cat][$comp].integration_status | to_entries | map(.value) | all' "${REGISTRY_FILE}")
@@ -316,7 +319,7 @@ EOF
       fi
       
       # Add component row to table
-      echo -e "| **${name}** | ${version} | ${installed} | ${hardened} | ${makefile} | ${sso} | ${dashboard} | ${logs} | ${docs} | ${auditable} | ${traefik_tls} | ${multi_tenant} |" >> "${SUMMARY_FILE}"
+      echo -e "| **${name}** | ${version} | ${installed} | ${hardened} | ${makefile} | ${sso} | ${dashboard} | ${logs} | ${docs} | ${auditable} | ${traefik_tls} | ${multi_tenant} | ${oauth_idp_configured} |" >> "${SUMMARY_FILE}"
     done
     
     # Add empty line after category
