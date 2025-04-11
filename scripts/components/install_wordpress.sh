@@ -52,6 +52,7 @@ PHP_VERSION="8.1"
 ENABLE_KEYCLOAK=false
 ENFORCE_HTTPS=true
 USE_HOST_NETWORK=true
+MARIADB_CONTAINER="default_mariadb"
 
 # Source the component_sso_helper.sh if available
 if [ -f "${SCRIPT_DIR}/../utils/component_sso_helper.sh" ]; then
@@ -204,18 +205,17 @@ integration_log() {
 
 log "INFO: Starting WordPress installation validation for $DOMAIN" "${BLUE}Starting WordPress installation validation for $DOMAIN...${NC}"
 
-# Set up site-specific variables
+# Set container names based on client ID
+log "INFO: Setting container names" "Setting container names..."
 SITE_NAME=${DOMAIN//./_}
 if [ -n "$CLIENT_ID" ]; then
   WP_CONTAINER="${CLIENT_ID}_wordpress"
-  MARIADB_CONTAINER="${CLIENT_ID}_mariadb"
   REDIS_CONTAINER="${CLIENT_ID}_redis"
   NETWORK_NAME="${CLIENT_ID}_network"
 else
-  WP_CONTAINER="wordpress_${SITE_NAME}"
-  MARIADB_CONTAINER="mariadb_${SITE_NAME}"
-  REDIS_CONTAINER="redis_${SITE_NAME}"
-  NETWORK_NAME="agency-network"
+  WP_CONTAINER="wordpress"
+  REDIS_CONTAINER="default_redis"
+  NETWORK_NAME="default_network"
 fi
 
 # Check if WordPress is already installed
@@ -339,7 +339,7 @@ mkdir -p "${WP_DIR}/${DOMAIN}/redis"
 # Store MySQL credentials for WP-CLI
 cat > "${WP_DIR}/${DOMAIN}/.my.cnf" <<EOL
 [client]
-host=${CLIENT_ID}_mariadb
+host=${MARIADB_CONTAINER}
 user=wordpress
 password=${WP_DB_PASSWORD}
 EOL
@@ -354,7 +354,7 @@ services:
   # MariaDB Database
   db:
     image: mariadb:10.6
-    container_name: ${CLIENT_ID}_mariadb
+    container_name: ${MARIADB_CONTAINER}
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${WP_ROOT_PASSWORD}
@@ -397,7 +397,7 @@ services:
       - db
       - redis
     environment:
-      WORDPRESS_DB_HOST: ${CLIENT_ID}_mariadb
+      WORDPRESS_DB_HOST: ${MARIADB_CONTAINER}
       WORDPRESS_DB_USER: wordpress
       WORDPRESS_DB_PASSWORD: ${WP_DB_PASSWORD}
       WORDPRESS_DB_NAME: wordpress
