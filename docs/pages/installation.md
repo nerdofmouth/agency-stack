@@ -60,8 +60,16 @@ The simplest way to install AgencyStack is with our one-line installer.
 
 ### Option 1: One-Step Installation (Fully Automated)
 
+Using curl (if available on your system):
+
 ```bash
 curl -sSL https://stack.nerdofmouth.com/install.sh | sudo bash
+```
+
+Using wget (alternative method):
+
+```bash
+sudo bash -c "$(wget -qO- https://stack.nerdofmouth.com/install.sh)"
 ```
 
 This will download the installer, set up the environment, and launch the interactive component selection menu.
