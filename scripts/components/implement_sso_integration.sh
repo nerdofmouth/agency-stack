@@ -181,7 +181,7 @@ update_sso_configured_flag() {
   if [ ! -f "$registry_file" ]; then
     log_error "Component registry file not found: $registry_file"
     return 1
-  }
+  fi
   
   # Create a backup of the registry file
   cp "$registry_file" "${registry_file}.bak"
