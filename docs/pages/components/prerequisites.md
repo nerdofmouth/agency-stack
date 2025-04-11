@@ -36,6 +36,9 @@ This is the foundational component that prepares the server environment, ensurin
 - Debian or Ubuntu Linux system
 - Root access (sudo)
 - Internet connection (for package installation)
+- **DNS Configuration**: Domain(s) properly configured to point to the server IP
+  - Required for Traefik, Dashboard, and other web components
+  - For local testing, entries can be added to `/etc/hosts`
 
 ### Installation Commands
 

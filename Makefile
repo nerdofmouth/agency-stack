@@ -2212,7 +2212,7 @@ docker-compose-restart:
 
 # Fail2ban
 fail2ban: validate
-	@echo "$(MAGENTA)$(BOLD)🔒 Installing Fail2ban Intrusion Prevention...$(RESET)"
+	@echo "🔒 Installing Fail2ban Intrusion Prevention...$(RESET)"
 	@sudo $(SCRIPTS_DIR)/components/install_fail2ban.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(TEST_MODE),--test-mode,)
 
 fail2ban-status:
@@ -2258,7 +2258,7 @@ fail2ban-restart:
 
 # Security
 security: validate
-	@echo "$(MAGENTA)$(BOLD)🔒 Installing Security Hardening...$(RESET)"
+	@echo "🔒 Installing Security Hardening...$(RESET)"
 	@sudo $(SCRIPTS_DIR)/components/install_security.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(TEST_MODE),--test-mode,)
 
 security-status:
@@ -2436,11 +2436,11 @@ demo-core-logs:
 
 # Bolt DIY
 bolt-diy: validate
-	@echo "⚡ Installing Bolt DIY..."
+	@echo "Installing Bolt DIY..."
 	@sudo $(SCRIPTS_DIR)/components/install_bolt_diy.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
 bolt-diy-status:
-	@echo "ℹ️ Checking Bolt DIY Status..."
+	@echo "Checking Bolt DIY Status..."
 	@if [ -n "$(CLIENT_ID)" ]; then \
 		BOLT_CONTAINER="$(CLIENT_ID)_bolt_diy"; \
 	else \
@@ -2453,7 +2453,7 @@ bolt-diy-status:
 	fi
 
 bolt-diy-logs:
-	@echo "📜 Viewing Bolt DIY Logs..."
+	@echo "Viewing Bolt DIY Logs..."
 	@if [ -f "/var/log/agency_stack/components/bolt_diy.log" ]; then \
 		tail -n 50 "/var/log/agency_stack/components/bolt_diy.log"; \
 	else \
@@ -2461,7 +2461,7 @@ bolt-diy-logs:
 	fi
 
 bolt-diy-restart:
-	@echo "🔄 Restarting Bolt DIY..."
+	@echo "Restarting Bolt DIY..."
 	@if [ -f "$(SCRIPTS_DIR)/components/restart_bolt_diy.sh" ]; then \
 		$(SCRIPTS_DIR)/components/restart_bolt_diy.sh; \
 	else \
@@ -2475,11 +2475,11 @@ bolt-diy-restart:
 
 # Archon
 archon: validate
-	@echo "🧠 Installing Archon..."
+	@echo "Installing Archon..."
 	@sudo $(SCRIPTS_DIR)/components/install_archon.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
 archon-status:
-	@echo "ℹ️ Checking Archon Status..."
+	@echo "Checking Archon Status..."
 	@if [ -n "$(CLIENT_ID)" ]; then \
 		ARCHON_CONTAINER="$(CLIENT_ID)_archon"; \
 	else \
@@ -2492,7 +2492,7 @@ archon-status:
 	fi
 
 archon-logs:
-	@echo "📜 Viewing Archon Logs..."
+	@echo "Viewing Archon Logs..."
 	@if [ -f "/var/log/agency_stack/components/archon.log" ]; then \
 		tail -n 50 "/var/log/agency_stack/components/archon.log"; \
 	else \
@@ -2500,7 +2500,7 @@ archon-logs:
 	fi
 
 archon-restart:
-	@echo "🔄 Restarting Archon..."
+	@echo "Restarting Archon..."
 	@if [ -f "$(SCRIPTS_DIR)/components/restart_archon.sh" ]; then \
 		$(SCRIPTS_DIR)/components/restart_archon.sh; \
 	else \
@@ -2691,3 +2691,109 @@ sso-integrate-all:
 		$(MAKE) sso-integrate COMPONENT=$$component FRAMEWORK=$$framework COMPONENT_URL=https://$$component.$(DOMAIN) || true; \
 		echo ""; \
 	done
+
+traefik:
+	@echo "$(MAGENTA)$(BOLD)🔄 Installing Traefik Reverse Proxy...$(RESET)"
+	@read -p "$(YELLOW)Use host network mode? (true/false, default: true):$(RESET) " USE_HOST_NETWORK; \
+	USE_HOST_NETWORK="$${USE_HOST_NETWORK:-true}"; \
+	echo "$(CYAN)Using network mode: $${USE_HOST_NETWORK}$(RESET)"; \
+	sudo $(SCRIPTS_DIR)/components/install_traefik.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) --use-host-network=$${USE_HOST_NETWORK} $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+# Auto-generated target for traefik
+traefik-status:
+	@echo "$(MAGENTA)$(BOLD)🔍 Checking Traefik Status...$(RESET)"
+	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/traefik/.installed_ok" ]; then \
+		echo "$(GREEN)✅ Traefik is installed$(RESET)"; \
+		if docker ps | grep -q "traefik_$(CLIENT_ID)"; then \
+			echo "$(GREEN)✅ Traefik container is running$(RESET)"; \
+			docker ps | grep traefik; \
+			echo ""; \
+			echo "$(CYAN)Configuration files:$(RESET)"; \
+			ls -la /opt/agency_stack/clients/$(CLIENT_ID)/traefik/config/; \
+		else \
+			echo "$(RED)❌ Traefik container is not running$(RESET)"; \
+		fi; \
+	else \
+		echo "$(RED)❌ Traefik is not installed$(RESET)"; \
+		echo "$(CYAN)To install, run: make traefik DOMAIN=$(DOMAIN)$(RESET)"; \
+		exit 1; \
+	fi
+
+# Auto-generated target for traefik
+traefik-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing Traefik Logs...$(RESET)"
+	@if [ -f "/var/log/agency_stack/components/traefik.log" ]; then \
+		echo "$(CYAN)Installation logs:$(RESET)"; \
+		tail -n 20 /var/log/agency_stack/components/traefik.log; \
+		echo ""; \
+		echo "$(CYAN)Container logs:$(RESET)"; \
+		docker logs traefik_$(CLIENT_ID) --tail 20; \
+	else \
+		echo "$(YELLOW)Traefik logs not found.$(RESET)"; \
+		echo "$(CYAN)Container logs:$(RESET)"; \
+		docker logs traefik_$(CLIENT_ID) --tail 20 2>/dev/null || echo "$(RED)No container logs found.$(RESET)"; \
+	fi
+
+# Auto-generated target for traefik
+traefik-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Traefik...$(RESET)"
+	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/traefik/docker-compose.yml" ]; then \
+		cd /opt/agency_stack/clients/$(CLIENT_ID)/traefik && docker-compose restart; \
+		echo "$(GREEN)✅ Traefik has been restarted$(RESET)"; \
+	else \
+		echo "$(RED)❌ Traefik docker-compose.yml not found$(RESET)"; \
+		echo "$(CYAN)To install, run: make traefik DOMAIN=$(DOMAIN)$(RESET)"; \
+		exit 1; \
+	fi
+
+# Dashboard Component - installation & management
+# -------------------------------------------------------------------------------
+install-dashboard: validate
+	@echo "$(MAGENTA)$(BOLD)📊 Installing AgencyStack Dashboard...$(RESET)"
+	@read -p "$(YELLOW)Use host network mode? (true/false, default: true):$(RESET) " USE_HOST_NETWORK; \
+	USE_HOST_NETWORK="$${USE_HOST_NETWORK:-true}"; \
+	echo "$(CYAN)Using network mode: $${USE_HOST_NETWORK}$(RESET)"; \
+	sudo $(SCRIPTS_DIR)/components/install_dashboard.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) --use-host-network=$${USE_HOST_NETWORK} $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(ENABLE_KEYCLOAK),--enable-keycloak,)
+
+install-dashboard-status:
+	@echo "$(MAGENTA)$(BOLD)🔍 Checking Dashboard Status...$(RESET)"
+	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/apps/dashboard/.installed_ok" ]; then \
+		echo "$(GREEN)✅ Dashboard is installed$(RESET)"; \
+		if pm2 list | grep -q "dashboard"; then \
+			echo "$(GREEN)✅ Dashboard service is running$(RESET)"; \
+			pm2 info dashboard; \
+		else \
+			echo "$(RED)❌ Dashboard service is not running$(RESET)"; \
+		fi; \
+	else \
+		echo "$(RED)❌ Dashboard is not installed$(RESET)"; \
+		echo "$(CYAN)To install, run: make install-dashboard DOMAIN=$(DOMAIN)$(RESET)"; \
+		exit 1; \
+	fi
+
+install-dashboard-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing Dashboard Logs...$(RESET)"
+	@if [ -f "/var/log/agency_stack/components/dashboard.log" ]; then \
+		echo "$(CYAN)Installation logs:$(RESET)"; \
+		tail -n 20 /var/log/agency_stack/components/dashboard.log; \
+		echo ""; \
+		echo "$(CYAN)Service logs:$(RESET)"; \
+		if pm2 list | grep -q "dashboard"; then \
+			pm2 logs dashboard --lines 20; \
+		else \
+			echo "$(RED)Dashboard service is not running$(RESET)"; \
+		fi; \
+	else \
+		echo "$(YELLOW)Dashboard logs not found.$(RESET)"; \
+	fi
+
+install-dashboard-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Dashboard...$(RESET)"
+	@if pm2 list | grep -q "dashboard"; then \
+		pm2 restart dashboard; \
+		echo "$(GREEN)✅ Dashboard service has been restarted$(RESET)"; \
+	else \
+		echo "$(RED)❌ Dashboard service is not running$(RESET)"; \
+		echo "$(CYAN)To install, run: make install-dashboard DOMAIN=$(DOMAIN)$(RESET)"; \
+		exit 1; \
+	fi

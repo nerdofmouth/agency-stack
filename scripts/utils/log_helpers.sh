@@ -187,6 +187,43 @@ log_summary() {
     fi
 }
 
+# Create a summary report with success/failure counts
+log_summary() {
+    local total="$1"
+    local success="$2"
+    local failed="$3"
+    local title="${4:-Summary}"
+    
+    local success_rate=$((success * 100 / total))
+    
+    log_banner "$title"
+    echo -e "  ${BOLD}Total:${NC} $total operations"
+    echo -e "  ${GREEN}${BOLD}Successful:${NC} $success operations ($success_rate%)"
+    
+    if [[ "$failed" -gt 0 ]]; then
+        echo -e "  ${RED}${BOLD}Failed:${NC} $failed operations ($((100 - success_rate))%)"
+    else
+        echo -e "  ${GREEN}${BOLD}No failures!${NC}"
+    fi
+    
+    # Log to file if LOG_FILE is defined
+    if [[ -n "${LOG_FILE:-}" ]]; then
+        echo "[$title] Total: $total, Success: $success, Failed: $failed, Rate: $success_rate%" >> "${LOG_FILE}" 2>/dev/null || true
+    fi
+}
+
+# Log a command being executed with standardized formatting
+log_cmd() {
+    local command_desc="$1"
+    local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+    echo -e "[${timestamp}] [${CYAN}CMD${NC}] ${command_desc}"
+    
+    # Log to file if LOG_FILE is defined
+    if [[ -n "${LOG_FILE:-}" ]]; then
+        echo "[${timestamp}] [CMD] ${command_desc}" >> "${LOG_FILE}" 2>/dev/null || true
+    fi
+}
+
 # Archive old logs
 archive_logs() {
     local log_dir="${1:-$DEFAULT_LOG_DIR}"
