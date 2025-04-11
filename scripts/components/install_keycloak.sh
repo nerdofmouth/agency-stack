@@ -48,6 +48,11 @@ DB_ROOT_PASSWORD=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-16)
 KC_DB_PASSWORD=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-16)
 ADMIN_PASSWORD=$(openssl rand -base64 12 | tr -d "=+/")
 
+# OAuth Identity Provider flags
+ENABLE_OAUTH_GOOGLE=false
+ENABLE_OAUTH_GITHUB=false
+ENABLE_OAUTH_APPLE=false
+
 # Show help message
 show_help() {
   echo -e "${MAGENTA}${BOLD}AgencyStack Keycloak Setup${NC}"
@@ -65,13 +70,18 @@ show_help() {
   echo -e "  ${BOLD}--force${NC}                   Force reinstallation even if Keycloak is already installed"
   echo -e "  ${BOLD}--with-deps${NC}               Automatically install dependencies if missing"
   echo -e "  ${BOLD}--verbose${NC}                 Show detailed output during installation"
+  echo -e "  ${BOLD}--enable-oauth-google${NC}     Enable Google as an external OAuth identity provider"
+  echo -e "  ${BOLD}--enable-oauth-github${NC}     Enable GitHub as an external OAuth identity provider"
+  echo -e "  ${BOLD}--enable-oauth-apple${NC}      Enable Apple as an external OAuth identity provider"
   echo -e "  ${BOLD}--help${NC}                    Show this help message and exit"
   echo -e ""
   echo -e "${CYAN}Example:${NC}"
-  echo -e "  $0 --domain auth.example.com --admin-email admin@example.com --client-id acme"
+  echo -e "  $0 --domain auth.example.com --admin-email admin@example.com --client-id acme --enable-oauth-google"
   echo -e ""
   echo -e "${CYAN}Notes:${NC}"
   echo -e "  - The script requires root privileges for installation"
+  echo -e "  - OAuth providers require client secrets to be set in environment variables"
+  echo -e "    (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, etc.)"
   echo -e "  - Log file is saved to: ${INSTALL_LOG}"
   exit 0
 }
@@ -110,6 +120,18 @@ while [[ $# -gt 0 ]]; do
       ;;
     --verbose)
       VERBOSE=true
+      shift
+      ;;
+    --enable-oauth-google)
+      ENABLE_OAUTH_GOOGLE=true
+      shift
+      ;;
+    --enable-oauth-github)
+      ENABLE_OAUTH_GITHUB=true
+      shift
+      ;;
+    --enable-oauth-apple)
+      ENABLE_OAUTH_APPLE=true
       shift
       ;;
     --help|-h)
@@ -531,6 +553,248 @@ integration_log "INFO: Created integration information at ${CONFIG_DIR}/integrat
 # Wait for Keycloak to be ready
 log "INFO: Waiting for Keycloak to be ready" "${CYAN}Waiting for Keycloak to be ready...${NC}"
 sleep 10
+
+# Check if any OAuth providers are enabled
+if [ "$ENABLE_OAUTH_GOOGLE" = true ] || [ "$ENABLE_OAUTH_GITHUB" = true ] || [ "$ENABLE_OAUTH_APPLE" = true ]; then
+  log "INFO: OAuth identity providers requested, will configure after Keycloak is running" "${BLUE}OAuth identity providers will be configured after Keycloak setup...${NC}"
+  
+  # Validate required environment variables for each enabled provider
+  if [ "$ENABLE_OAUTH_GOOGLE" = true ]; then
+    if [ -z "${GOOGLE_CLIENT_ID}" ] || [ -z "${GOOGLE_CLIENT_SECRET}" ]; then
+      log "ERROR: Google OAuth requested but GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET not set" "${RED}Error: Google OAuth requested but GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET environment variables are not set.${NC}"
+      echo -e "${YELLOW}Hint: export GOOGLE_CLIENT_ID=\"your-client-id\" && export GOOGLE_CLIENT_SECRET=\"your-client-secret\"${NC}"
+      ENABLE_OAUTH_GOOGLE=false
+    fi
+  fi
+  
+  if [ "$ENABLE_OAUTH_GITHUB" = true ]; then
+    if [ -z "${GITHUB_CLIENT_ID}" ] || [ -z "${GITHUB_CLIENT_SECRET}" ]; then
+      log "ERROR: GitHub OAuth requested but GITHUB_CLIENT_ID or GITHUB_CLIENT_SECRET not set" "${RED}Error: GitHub OAuth requested but GITHUB_CLIENT_ID or GITHUB_CLIENT_SECRET environment variables are not set.${NC}"
+      echo -e "${YELLOW}Hint: export GITHUB_CLIENT_ID=\"your-client-id\" && export GITHUB_CLIENT_SECRET=\"your-client-secret\"${NC}"
+      ENABLE_OAUTH_GITHUB=false
+    fi
+  fi
+  
+  if [ "$ENABLE_OAUTH_APPLE" = true ]; then
+    if [ -z "${APPLE_CLIENT_ID}" ] || [ -z "${APPLE_CLIENT_SECRET}" ]; then
+      log "ERROR: Apple OAuth requested but APPLE_CLIENT_ID or APPLE_CLIENT_SECRET not set" "${RED}Error: Apple OAuth requested but APPLE_CLIENT_ID or APPLE_CLIENT_SECRET environment variables are not set.${NC}"
+      echo -e "${YELLOW}Hint: export APPLE_CLIENT_ID=\"your-client-id\" && export APPLE_CLIENT_SECRET=\"your-client-secret\"${NC}"
+      ENABLE_OAUTH_APPLE=false
+    fi
+  fi
+fi
+
+# Configure OAuth Identity Providers if enabled
+if [ "$ENABLE_OAUTH_GOOGLE" = true ] || [ "$ENABLE_OAUTH_GITHUB" = true ] || [ "$ENABLE_OAUTH_APPLE" = true ]; then
+  log "INFO: Setting up OAuth identity providers..." "${CYAN}Setting up OAuth identity providers...${NC}"
+  
+  # Wait for Keycloak to fully initialize (additional 10 seconds)
+  sleep 10
+  
+  # Get admin token for Keycloak API
+  log "INFO: Getting admin token for Keycloak API" "${BLUE}Getting admin token for Keycloak API...${NC}"
+  ADMIN_TOKEN=$(curl -s -X POST "https://${DOMAIN}/auth/realms/master/protocol/openid-connect/token" \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    -d "grant_type=password&client_id=admin-cli&username=admin&password=${ADMIN_PASSWORD}" | jq -r '.access_token')
+  
+  if [ -z "$ADMIN_TOKEN" ] || [ "$ADMIN_TOKEN" = "null" ]; then
+    log "ERROR: Failed to get admin token" "${RED}Failed to get admin token. OAuth providers will not be configured.${NC}"
+  else
+    log "INFO: Successfully obtained admin token" "${GREEN}Successfully obtained admin token.${NC}"
+    
+    # Use separate client ID for each tenant if provided
+    REALM_NAME="agency"
+    if [ -n "$CLIENT_ID" ]; then
+      REALM_NAME="${CLIENT_ID}"
+      
+      # Check if client-specific realm exists
+      REALM_EXISTS=$(curl -s -X GET "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}" \
+        -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+        -H "Content-Type: application/json" -o /dev/null -w "%{http_code}")
+      
+      if [ "$REALM_EXISTS" != "200" ]; then
+        log "ERROR: Realm ${REALM_NAME} does not exist" "${RED}Realm ${REALM_NAME} does not exist. Will use default 'agency' realm.${NC}"
+        REALM_NAME="agency"
+      else
+        log "INFO: Using client-specific realm: ${REALM_NAME}" "${BLUE}Using client-specific realm: ${REALM_NAME}${NC}"
+      fi
+    fi
+    
+    # Configure Google Identity Provider
+    if [ "$ENABLE_OAUTH_GOOGLE" = true ]; then
+      log "INFO: Configuring Google as identity provider" "${CYAN}Configuring Google as identity provider...${NC}"
+      
+      # Check if Google IdP already exists
+      IDP_EXISTS=$(curl -s -X GET "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances/google" \
+        -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+        -o /dev/null -w "%{http_code}")
+      
+      if [ "$IDP_EXISTS" = "200" ]; then
+        log "INFO: Google IdP already exists, updating configuration" "${YELLOW}Google IdP already exists, updating configuration...${NC}"
+        # Delete existing Google IdP first to avoid conflicts
+        curl -s -X DELETE "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances/google" \
+          -H "Authorization: Bearer ${ADMIN_TOKEN}" >> "$INSTALL_LOG" 2>&1
+      fi
+      
+      # Create Google IdP
+      GOOGLE_IDP=$(cat <<EOF
+{
+  "alias": "google",
+  "displayName": "Google",
+  "providerId": "google",
+  "enabled": true,
+  "updateProfileFirstLoginMode": "on",
+  "trustEmail": true,
+  "storeToken": false,
+  "addReadTokenRoleOnCreate": false,
+  "authenticateByDefault": false,
+  "linkOnly": false,
+  "firstBrokerLoginFlowAlias": "first broker login",
+  "config": {
+    "clientId": "${GOOGLE_CLIENT_ID}",
+    "clientSecret": "${GOOGLE_CLIENT_SECRET}",
+    "useJwksUrl": "true"
+  }
+}
+EOF
+)
+      
+      # Create Google IdP
+      HTTP_STATUS=$(curl -s -X POST "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances" \
+        -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d "$GOOGLE_IDP" \
+        -o /dev/null -w "%{http_code}")
+      
+      if [ "$HTTP_STATUS" = "201" ]; then
+        log "INFO: Google IdP successfully configured" "${GREEN}✅ Google IdP successfully configured${NC}"
+        # Update component registry with oauth_idp_configured flag
+        if [ -f "${ROOT_DIR}/scripts/utils/update_component_registry.sh" ]; then
+          ${ROOT_DIR}/scripts/utils/update_component_registry.sh --update-component keycloak --update-flag oauth_idp_configured --update-value true >> "$INSTALL_LOG" 2>&1
+        fi
+      else
+        log "ERROR: Failed to configure Google IdP, HTTP status: ${HTTP_STATUS}" "${RED}Failed to configure Google IdP, HTTP status: ${HTTP_STATUS}${NC}"
+      fi
+    fi
+    
+    # Configure GitHub Identity Provider
+    if [ "$ENABLE_OAUTH_GITHUB" = true ]; then
+      log "INFO: Configuring GitHub as identity provider" "${CYAN}Configuring GitHub as identity provider...${NC}"
+      
+      # Check if GitHub IdP already exists
+      IDP_EXISTS=$(curl -s -X GET "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances/github" \
+        -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+        -o /dev/null -w "%{http_code}")
+      
+      if [ "$IDP_EXISTS" = "200" ]; then
+        log "INFO: GitHub IdP already exists, updating configuration" "${YELLOW}GitHub IdP already exists, updating configuration...${NC}"
+        # Delete existing GitHub IdP first to avoid conflicts
+        curl -s -X DELETE "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances/github" \
+          -H "Authorization: Bearer ${ADMIN_TOKEN}" >> "$INSTALL_LOG" 2>&1
+      fi
+      
+      # Create GitHub IdP
+      GITHUB_IDP=$(cat <<EOF
+{
+  "alias": "github",
+  "displayName": "GitHub",
+  "providerId": "github",
+  "enabled": true,
+  "updateProfileFirstLoginMode": "on",
+  "trustEmail": true,
+  "storeToken": false,
+  "addReadTokenRoleOnCreate": false,
+  "authenticateByDefault": false,
+  "linkOnly": false,
+  "firstBrokerLoginFlowAlias": "first broker login",
+  "config": {
+    "clientId": "${GITHUB_CLIENT_ID}",
+    "clientSecret": "${GITHUB_CLIENT_SECRET}",
+    "useJwksUrl": "true"
+  }
+}
+EOF
+)
+      
+      # Create GitHub IdP
+      HTTP_STATUS=$(curl -s -X POST "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances" \
+        -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d "$GITHUB_IDP" \
+        -o /dev/null -w "%{http_code}")
+      
+      if [ "$HTTP_STATUS" = "201" ]; then
+        log "INFO: GitHub IdP successfully configured" "${GREEN}✅ GitHub IdP successfully configured${NC}"
+        # Update component registry with oauth_idp_configured flag
+        if [ -f "${ROOT_DIR}/scripts/utils/update_component_registry.sh" ]; then
+          ${ROOT_DIR}/scripts/utils/update_component_registry.sh --update-component keycloak --update-flag oauth_idp_configured --update-value true >> "$INSTALL_LOG" 2>&1
+        fi
+      else
+        log "ERROR: Failed to configure GitHub IdP, HTTP status: ${HTTP_STATUS}" "${RED}Failed to configure GitHub IdP, HTTP status: ${HTTP_STATUS}${NC}"
+      fi
+    fi
+    
+    # Configure Apple Identity Provider
+    if [ "$ENABLE_OAUTH_APPLE" = true ]; then
+      log "INFO: Configuring Apple as identity provider" "${CYAN}Configuring Apple as identity provider...${NC}"
+      
+      # Check if Apple IdP already exists
+      IDP_EXISTS=$(curl -s -X GET "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances/apple" \
+        -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+        -o /dev/null -w "%{http_code}")
+      
+      if [ "$IDP_EXISTS" = "200" ]; then
+        log "INFO: Apple IdP already exists, updating configuration" "${YELLOW}Apple IdP already exists, updating configuration...${NC}"
+        # Delete existing Apple IdP first to avoid conflicts
+        curl -s -X DELETE "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances/apple" \
+          -H "Authorization: Bearer ${ADMIN_TOKEN}" >> "$INSTALL_LOG" 2>&1
+      fi
+      
+      # Create Apple IdP
+      APPLE_IDP=$(cat <<EOF
+{
+  "alias": "apple",
+  "displayName": "Apple",
+  "providerId": "apple",
+  "enabled": true,
+  "updateProfileFirstLoginMode": "on",
+  "trustEmail": true,
+  "storeToken": false,
+  "addReadTokenRoleOnCreate": false,
+  "authenticateByDefault": false,
+  "linkOnly": false,
+  "firstBrokerLoginFlowAlias": "first broker login",
+  "config": {
+    "clientId": "${APPLE_CLIENT_ID}",
+    "clientSecret": "${APPLE_CLIENT_SECRET}",
+    "useJwksUrl": "true"
+  }
+}
+EOF
+)
+      
+      # Create Apple IdP
+      HTTP_STATUS=$(curl -s -X POST "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances" \
+        -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d "$APPLE_IDP" \
+        -o /dev/null -w "%{http_code}")
+      
+      if [ "$HTTP_STATUS" = "201" ]; then
+        log "INFO: Apple IdP successfully configured" "${GREEN}✅ Apple IdP successfully configured${NC}"
+        # Update component registry with oauth_idp_configured flag
+        if [ -f "${ROOT_DIR}/scripts/utils/update_component_registry.sh" ]; then
+          ${ROOT_DIR}/scripts/utils/update_component_registry.sh --update-component keycloak --update-flag oauth_idp_configured --update-value true >> "$INSTALL_LOG" 2>&1
+        fi
+      else
+        log "ERROR: Failed to configure Apple IdP, HTTP status: ${HTTP_STATUS}" "${RED}Failed to configure Apple IdP, HTTP status: ${HTTP_STATUS}${NC}"
+      fi
+    fi
+  fi
+fi
+
+# Final success message
+log "INFO: Keycloak installation and configuration completed successfully." "${GREEN}Keycloak installation and configuration completed successfully!${NC}"
 
 # Final message
 log "INFO: Keycloak installation completed successfully" "${GREEN}${BOLD}✅ Keycloak installed successfully!${NC}"

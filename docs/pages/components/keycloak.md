@@ -168,6 +168,63 @@ make install-keycloak DOMAIN=yourdomain.com ADMIN_EMAIL=admin@yourdomain.com --f
 - Default configuration includes security headers for XSS protection
 - Multi-tenant isolation with separate realms per client
 
+## 🔐 External OAuth via Keycloak IDPs
+
+AgencyStack supports social login via external OAuth providers (Google, GitHub, Apple) while maintaining sovereignty by integrating these through Keycloak as the centralized identity provider.
+
+### Supported Providers
+
+| Provider | Feature Flag | Required Environment Variables |
+|----------|--------------|--------------------------------|
+| Google   | `--enable-oauth-google` | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` |
+| GitHub   | `--enable-oauth-github` | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` |
+| Apple    | `--enable-oauth-apple`  | `APPLE_CLIENT_ID`, `APPLE_CLIENT_SECRET`   |
+
+### Installation with OAuth Providers
+
+```bash
+# Install Keycloak with Google OAuth support
+export GOOGLE_CLIENT_ID="your-client-id"
+export GOOGLE_CLIENT_SECRET="your-client-secret"
+make install-keycloak DOMAIN=yourdomain.com ADMIN_EMAIL=admin@yourdomain.com ENABLE_OAUTH_GOOGLE=true
+
+# Install with multiple providers
+make install-keycloak DOMAIN=yourdomain.com ADMIN_EMAIL=admin@yourdomain.com \
+  ENABLE_OAUTH_GOOGLE=true \
+  ENABLE_OAUTH_GITHUB=true
+```
+
+### OAuth IdP Management
+
+AgencyStack provides dedicated targets to manage and test OAuth identity providers:
+
+| Target | Description |
+|--------|-------------|
+| `make keycloak-idp-status` | Check status of configured OAuth providers |
+| `make keycloak-idp-test` | Test OAuth provider integration |
+
+### Authentication Flow
+
+1. User selects "Sign in with Google/GitHub/Apple" on a Keycloak login screen
+2. User is redirected to the external provider (Google, GitHub, Apple)
+3. After successful authentication, the user is redirected back to Keycloak
+4. Keycloak creates or updates the user account based on information from the provider
+5. User is authenticated in AgencyStack with proper roles and permissions
+
+### Security Benefits
+
+- OAuth credentials are managed centrally, not in individual applications
+- User identity remains under AgencyStack control
+- All security policies, role mappings, and access controls are managed in Keycloak
+- Authentication sessions are unified through Keycloak
+- Applications never get direct access to external provider tokens
+
+### Important Notes
+
+- Applications must NOT configure their own direct OAuth integrations
+- All OAuth flows MUST go through Keycloak as the identity broker
+- Roles from external providers must be explicitly mapped in Keycloak
+
 ## References
 
 - [Official Keycloak Documentation](https://www.keycloak.org/documentation)

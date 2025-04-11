@@ -653,94 +653,6 @@ voip: install-voip
 
 voip-status:
 	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking VoIP System Status...$(RESET)"
-	@cd /opt/agency_stack/voip/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose ps
-	@echo "$(CYAN)Logs can be viewed with: make voip-logs$(RESET)"
-
-voip-logs:
-	@echo "$(MAGENTA)$(BOLD)📜 Viewing VoIP Logs...$(RESET)"
-	@cd /opt/agency_stack/voip/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose logs -f
-
-voip-restart:
-	@echo "$(MAGENTA)$(BOLD)🔄 Restarting VoIP Services...$(RESET)"
-	@cd /opt/agency_stack/voip/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose restart
-
-voip-stop:
-	@echo "$(MAGENTA)$(BOLD)🛑 Stopping VoIP Services...$(RESET)"
-	@cd /opt/agency_stack/voip/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose stop
-
-voip-start:
-	@echo "$(MAGENTA)$(BOLD)▶️ Starting VoIP Services...$(RESET)"
-	@cd /opt/agency_stack/voip/$(if $(CLIENT_ID),clients/$(CLIENT_ID)/,) && docker-compose start
-
-voip-config:
-	@echo "$(MAGENTA)$(BOLD)⚙️ Configuring VoIP System...$(RESET)"
-	@read -p "$(YELLOW)Enter domain for VoIP (e.g., voip.yourdomain.com):$(RESET) " DOMAIN; \
-	read -p "$(YELLOW)Enter admin email:$(RESET) " ADMIN_EMAIL; \
-	read -p "$(YELLOW)Enter client ID (optional):$(RESET) " CLIENT_ID; \
-
-# Mailu Email Server
-install-mailu: validate
-	@echo "Installing Mailu email server..."
-	@sudo $(SCRIPTS_DIR)/components/install_mailu.sh --domain mail.$(DOMAIN) --email-domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
-# Listmonk - Newsletter & Mailing Lists
-listmonk:
-	@echo "Installing Listmonk..."
-	@sudo $(SCRIPTS_DIR)/components/install_listmonk.sh --domain $(LISTMONK_DOMAIN) $(INSTALL_FLAGS)
-
-listmonk-status:
-	@docker ps -a | grep listmonk || echo "Listmonk is not running"
-
-listmonk-logs:
-	@docker logs -f listmonk-app-$(CLIENT_ID) 2>&1 | tee $(LOG_DIR)/components/listmonk.log
-
-listmonk-stop:
-	@docker-compose -f $(DOCKER_DIR)/listmonk/docker-compose.yml down
-
-listmonk-start:
-	@docker-compose -f $(DOCKER_DIR)/listmonk/docker-compose.yml up -d
-
-listmonk-restart:
-	@docker-compose -f $(DOCKER_DIR)/listmonk/docker-compose.yml restart
-
-listmonk-backup:
-	@echo "Backing up Listmonk data..."
-	@mkdir -p $(BACKUP_DIR)/listmonk
-	@docker exec listmonk-postgres-$(CLIENT_ID) pg_dump -U listmonk listmonk > $(BACKUP_DIR)/listmonk/listmonk_db_$(shell date +%Y%m%d).sql
-	@tar -czf $(BACKUP_DIR)/listmonk/listmonk_storage_$(shell date +%Y%m%d).tar.gz -C $(CONFIG_DIR)/clients/$(CLIENT_ID)/listmonk_data/storage .
-	@echo "Backup completed: $(BACKUP_DIR)/listmonk/"
-
-listmonk-restore:
-	@echo "Restoring Listmonk from backup is a manual process."
-	@echo "Please refer to the documentation for detailed instructions."
-
-listmonk-config:
-	@echo "Opening Listmonk environment configuration..."
-	@$(EDITOR) $(DOCKER_DIR)/listmonk/.env
-
-listmonk-upgrade:
-	@echo "$(MAGENTA)$(BOLD)🔄 Upgrading Listmonk to v4.1.0...$(RESET)"
-	@read -p "$(YELLOW)Enter domain for Listmonk (e.g., mail.yourdomain.com):$(RESET) " DOMAIN; \
-	read -p "$(YELLOW)Enter admin email:$(RESET) " ADMIN_EMAIL; \
-	read -p "$(YELLOW)Enter client ID (optional):$(RESET) " CLIENT_ID; \
-	sudo $(SCRIPTS_DIR)/components/upgrade_listmonk.sh --domain $$DOMAIN --admin-email $$ADMIN_EMAIL $(if $$CLIENT_ID,--client-id $$CLIENT_ID,) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
-# Grafana
-install-grafana: validate
-	@echo "Installing Grafana monitoring..."
-	@sudo $(SCRIPTS_DIR)/components/install_grafana.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
-# Loki
-install-loki: validate
-	@echo "Installing Loki log aggregation..."
-	@sudo $(SCRIPTS_DIR)/components/install_loki.sh --domain logs.$(DOMAIN) $(if $(GRAFANA_DOMAIN),--grafana-domain $(GRAFANA_DOMAIN),--grafana-domain grafana.$(DOMAIN)) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
-loki: validate
-	@echo "$(MAGENTA)$(BOLD)📊 Installing Loki - Log Aggregation System...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/install_loki.sh --domain logs.$(DOMAIN) $(if $(GRAFANA_DOMAIN),--grafana-domain $(GRAFANA_DOMAIN),--grafana-domain grafana.$(DOMAIN)) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
-loki-status:
-	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Loki Status...$(RESET)"
 	@if [ -n "$(CLIENT_ID)" ]; then \
 		LOKI_CONTAINER="$(CLIENT_ID)_loki"; \
 	else \
@@ -854,7 +766,16 @@ prometheus-config:
 # Keycloak
 install-keycloak: validate
 	@echo "Installing Keycloak identity provider..."
-	@sudo $(SCRIPTS_DIR)/components/install_keycloak.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+	@sudo $(SCRIPTS_DIR)/components/install_keycloak.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(ENABLE_OAUTH_GOOGLE),--enable-oauth-google,) $(if $(ENABLE_OAUTH_GITHUB),--enable-oauth-github,) $(if $(ENABLE_OAUTH_APPLE),--enable-oauth-apple,)
+
+# Keycloak IdP management targets
+keycloak-idp-status:
+	@echo "🔑 Checking Keycloak Identity Provider status..."
+	@bash $(SCRIPTS_DIR)/components/check_keycloak_idp_status.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(VERBOSE),--verbose,)
+
+keycloak-idp-test:
+	@echo "🧪 Testing Keycloak Identity Provider integration..."
+	@bash $(SCRIPTS_DIR)/components/test_keycloak_idp.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(VERBOSE),--verbose,)
 
 # Core Infrastructure
 install-infrastructure:
