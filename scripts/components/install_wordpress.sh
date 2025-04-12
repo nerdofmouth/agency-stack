@@ -491,8 +491,6 @@ exit 1
 EOL
 
 chmod +x "${WP_DIR}/${DOMAIN}/test_db.sh"
-docker cp "${WP_DIR}/${DOMAIN}/test_db.sh" ${WORDPRESS_CONTAINER_NAME}:/tmp/test_db.sh
-docker exec ${WORDPRESS_CONTAINER_NAME} /tmp/test_db.sh
 
 # Create WordPress Docker Compose file
 log "INFO: Creating WordPress Docker Compose file" "${CYAN}Creating WordPress Docker Compose file...${NC}"
@@ -702,6 +700,12 @@ docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "apt-get update && apt-get insta
 # Improve connection reliability by waiting for MariaDB to be fully initialized
 log "INFO: Ensuring database is ready" "${CYAN}Ensuring database is ready...${NC}"
 sleep 10
+
+# Copy test_db.sh to the WordPress container
+docker cp "${WP_DIR}/${DOMAIN}/test_db.sh" ${WORDPRESS_CONTAINER_NAME}:/tmp/test_db.sh
+
+# Run test_db.sh
+docker exec ${WORDPRESS_CONTAINER_NAME} /tmp/test_db.sh
 
 # Run WP-CLI
 docker exec ${WORDPRESS_CONTAINER_NAME} wp --allow-root --path=/var/www/html core install \
