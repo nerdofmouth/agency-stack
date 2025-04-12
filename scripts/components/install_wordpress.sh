@@ -369,6 +369,20 @@ cat > "${WP_DIR}/${DOMAIN}/mariadb-init/init.sql" <<EOL
 
 -- Grant privileges to WordPress user (already created by Docker)
 GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'%';
+
+-- Create additional users with specific hostnames for reliable connectivity
+CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'172.%.%.%' IDENTIFIED BY '${WP_DB_PASSWORD}';
+GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'172.%.%.%';
+
+CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'default_wordpress.default_network' IDENTIFIED BY '${WP_DB_PASSWORD}';
+GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'default_wordpress.default_network';
+
+CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'wordpress.default_network' IDENTIFIED BY '${WP_DB_PASSWORD}';
+GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'wordpress.default_network';
+
+CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'wp.default_network' IDENTIFIED BY '${WP_DB_PASSWORD}';
+GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'wp.default_network';
+
 FLUSH PRIVILEGES;
 
 -- Create wp_options table with proper defaults
