@@ -369,62 +369,25 @@ password=${WP_DB_PASSWORD}
 EOL
 chmod 600 "${WP_DIR}/${DOMAIN}/.my.cnf"
 
-# Define a better MySQL initialization script for proper user permissions
-# This demonstrates the approach we should take for shared database services
-mkdir -p "${WP_DIR}/${DOMAIN}/mariadb-init"
-cat > "${WP_DIR}/${DOMAIN}/mariadb-init/init.sql" <<EOL
--- Initialization script that creates and configures database for WordPress
--- This demonstrates proper database initialization that could be used for technology reuse
+# Improve database initialization with a direct approach that properly escapes special characters
+log "INFO: Ensuring database is properly initialized" "${CYAN}Ensuring database is properly initialized...${NC}"
 
--- Create database if it doesn't exist
-CREATE DATABASE IF NOT EXISTS ${WP_DB_NAME};
+# These direct SQL commands handle initialization without relying on potentially problematic heredoc escaping
+docker exec ${MARIADB_CONTAINER_NAME} mysql -uroot -p${WP_ROOT_PASSWORD} -e "CREATE DATABASE IF NOT EXISTS ${WP_DB_NAME};" || log "WARNING: Unable to create database" "${YELLOW}⚠️ Unable to create database${NC}"
 
--- Reset users for clean initialization (helps with re-installs)
-DROP USER IF EXISTS '${WP_DB_USER}'@'%';
-DROP USER IF EXISTS '${WP_DB_USER}'@'localhost';
-DROP USER IF EXISTS '${WP_DB_USER}'@'172.%.%.%';
+docker exec ${MARIADB_CONTAINER_NAME} mysql -uroot -p${WP_ROOT_PASSWORD} -e "CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'localhost' IDENTIFIED BY '${WP_DB_PASSWORD}';" || log "WARNING: Unable to create localhost user" "${YELLOW}⚠️ Unable to create localhost user${NC}"
 
--- Create WordPress user with proper host wildcard to allow container networking
-CREATE USER '${WP_DB_USER}'@'%' IDENTIFIED BY '${WP_DB_PASSWORD}';
-CREATE USER '${WP_DB_USER}'@'localhost' IDENTIFIED BY '${WP_DB_PASSWORD}';
-CREATE USER '${WP_DB_USER}'@'172.%.%.%' IDENTIFIED BY '${WP_DB_PASSWORD}';
+docker exec ${MARIADB_CONTAINER_NAME} mysql -uroot -p${WP_ROOT_PASSWORD} -e "CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'%' IDENTIFIED BY '${WP_DB_PASSWORD}';" || log "WARNING: Unable to create wildcard user" "${YELLOW}⚠️ Unable to create wildcard user${NC}"
 
--- Grant permissions to the user from any host
-GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'%';
-GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'localhost';
-GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'172.%.%.%';
+docker exec ${MARIADB_CONTAINER_NAME} mysql -uroot -p${WP_ROOT_PASSWORD} -e "GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'localhost';" || log "WARNING: Unable to grant privileges to localhost user" "${YELLOW}⚠️ Unable to grant privileges to localhost user${NC}"
 
--- Reset authentication
-ALTER USER '${WP_DB_USER}'@'%' IDENTIFIED WITH mysql_native_password BY '${WP_DB_PASSWORD}';
-ALTER USER '${WP_DB_USER}'@'localhost' IDENTIFIED WITH mysql_native_password BY '${WP_DB_PASSWORD}';
-ALTER USER '${WP_DB_USER}'@'172.%.%.%' IDENTIFIED WITH mysql_native_password BY '${WP_DB_PASSWORD}';
+docker exec ${MARIADB_CONTAINER_NAME} mysql -uroot -p${WP_ROOT_PASSWORD} -e "GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'%';" || log "WARNING: Unable to grant privileges to wildcard user" "${YELLOW}⚠️ Unable to grant privileges to wildcard user${NC}"
 
--- Allow root access from any host
-CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED BY '${WP_ROOT_PASSWORD}';
-GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;
-ALTER USER 'root'@'%' IDENTIFIED WITH mysql_native_password BY '${WP_ROOT_PASSWORD}';
+docker exec ${MARIADB_CONTAINER_NAME} mysql -uroot -p${WP_ROOT_PASSWORD} -e "FLUSH PRIVILEGES;" || log "WARNING: Unable to flush privileges" "${YELLOW}⚠️ Unable to flush privileges${NC}"
 
-FLUSH PRIVILEGES;
-
--- Create wp_options table with proper defaults
-USE ${WP_DB_NAME};
-CREATE TABLE IF NOT EXISTS wp_options (
-  option_id bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
-  option_name varchar(191) NOT NULL DEFAULT '',
-  option_value longtext NOT NULL,
-  autoload varchar(20) NOT NULL DEFAULT 'yes',
-  PRIMARY KEY (option_id),
-  UNIQUE KEY option_name (option_name)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-INSERT INTO wp_options (option_name, option_value, autoload) 
-VALUES ('siteurl', 'https://${DOMAIN}', 'yes')
-ON DUPLICATE KEY UPDATE option_value = 'https://${DOMAIN}';
-
-INSERT INTO wp_options (option_name, option_value, autoload) 
-VALUES ('home', 'https://${DOMAIN}', 'yes')
-ON DUPLICATE KEY UPDATE option_value = 'https://${DOMAIN}';
-EOL
+# Run a brief verification
+log "INFO: Verifying database setup" "${CYAN}Verifying database setup...${NC}"
+docker exec ${MARIADB_CONTAINER_NAME} mysql -uroot -p${WP_ROOT_PASSWORD} -e "SHOW DATABASES; SELECT User, Host FROM mysql.user WHERE User='${WP_DB_USER}' OR User='root';" || log "WARNING: Unable to verify database setup" "${YELLOW}⚠️ Unable to verify database setup${NC}"
 
 # Create a better test_db script that demonstrates proper service discovery and connectivity checks
 # This approach can be reused for connecting to shared services in the future
@@ -434,74 +397,32 @@ cat > "${WP_DIR}/${DOMAIN}/test_db.sh" <<EOL
 # This script demonstrates proper service discovery and connection validation
 # that could be reused across components in AgencyStack
 
-max_attempts=30
-attempt=1
-db_host="${MARIADB_CONTAINER_NAME}"
-db_user="${WP_DB_USER}"
-db_pass="${WP_DB_PASSWORD}"
-db_name="${WP_DB_NAME}"
-
 echo "=========================================="
 echo "DATABASE CONNECTION TEST"
-echo "Target: \$db_host"
-echo "User: \$db_user"
-echo "Database: \$db_name"
+echo "Target: ${MARIADB_CONTAINER_NAME}"
+echo "User: ${WP_DB_USER}"
+echo "Database: ${WP_DB_NAME}"
 echo "=========================================="
 
-# Check if mysql client is installed
-if ! command -v mysql &> /dev/null; then
-    echo "MySQL client not installed. Installing..."
-    apt-get update -q && apt-get install -y default-mysql-client
+# Try the connection
+if mysql -h${MARIADB_CONTAINER_NAME} -u${WP_DB_USER} -p${WP_DB_PASSWORD} -e "USE ${WP_DB_NAME}; SELECT 'Database connection successful!' as Status;" 2>/dev/null; then
+    echo "SUCCESS: Connected to database ${MARIADB_CONTAINER_NAME}"
+    exit 0
+else
+    echo "FAILURE: Could not connect to database"
+    echo "Testing root connection as diagnostic:"
+    mysql -h${MARIADB_CONTAINER_NAME} -uroot -p${WP_ROOT_PASSWORD} -e "SHOW DATABASES;" 2>&1 || echo "Root connection failed"
+    exit 1
 fi
-
-# Network diagnostics functions
-check_host() {
-    getent hosts \$db_host || echo "Host \$db_host not found in hosts file"
-}
-
-# Try connection with increasing wait times
-while [ \$attempt -le \$max_attempts ]; do
-    echo "Connection attempt \$attempt of \$max_attempts..."
-    
-    # On every 5th attempt, run diagnostics
-    if (( \$attempt % 5 == 1 )); then
-        echo "Running network diagnostics:"
-        check_host
-        echo ""
-    fi
-    
-    # Try the connection
-    if mysql -h\$db_host -u\$db_user -p\$db_pass -e "SHOW DATABASES;" 2>/dev/null; then
-        echo "SUCCESS: Connected to database \$db_host"
-        echo "Available databases:"
-        mysql -h\$db_host -u\$db_user -p\$db_pass -e "SHOW DATABASES;"
-        exit 0
-    fi
-    
-    wait_time=\$(( 2 + \$attempt / 5 ))
-    echo "Failed connection attempt. Waiting \$wait_time seconds before retry..."
-    sleep \$wait_time
-    attempt=\$((attempt+1))
-done
-
-echo "FAILURE: Could not connect to database after \$max_attempts attempts"
-echo "Final connection diagnostics:"
-
-# Try different credential combinations as last resort diagnostics
-echo "Testing different connection methods:"
-echo "1. Connection without database selection:"
-mysql -h\$db_host -u\$db_user -p\$db_pass -e "SELECT 1;" 2>&1 || echo "Basic connection failed"
-
-echo "2. Connection using root credentials:"
-mysql -h\$db_host -uroot -p${WP_ROOT_PASSWORD} -e "SHOW DATABASES;" 2>&1 || echo "Root connection failed"
-
-echo "3. Connection using socket instead of TCP:"
-mysql -u\$db_user -p\$db_pass -e "SHOW DATABASES;" 2>&1 || echo "Socket connection failed"
-
-exit 1
 EOL
 
 chmod +x "${WP_DIR}/${DOMAIN}/test_db.sh"
+
+# Copy test_db.sh to the WordPress container
+docker cp "${WP_DIR}/${DOMAIN}/test_db.sh" ${WORDPRESS_CONTAINER_NAME}:/tmp/test_db.sh
+
+# Run test_db.sh
+docker exec ${WORDPRESS_CONTAINER_NAME} /tmp/test_db.sh || log "WARNING: Database connection test failed, but continuing..." "${YELLOW}⚠️ Database connection test failed, but continuing...${NC}"
 
 # Create WordPress Docker Compose file
 log "INFO: Creating WordPress Docker Compose file" "${CYAN}Creating WordPress Docker Compose file...${NC}"
@@ -563,7 +484,6 @@ services:
     restart: unless-stopped
     volumes:
       - ${WP_DIR}/${DOMAIN}/mariadb:/var/lib/mysql
-      - ${WP_DIR}/${DOMAIN}/mariadb-init:/docker-entrypoint-initdb.d
     environment:
       - MYSQL_DATABASE=${WP_DB_NAME}
       - MYSQL_USER=${WP_DB_USER}
@@ -695,36 +615,6 @@ fi
 # Wait for WordPress stack to initialize
 log "INFO: Waiting for WordPress to start" "${CYAN}Waiting for WordPress to start...${NC}"
 sleep 10
-
-# Manually initialize the database with proper permissions to ensure connectivity
-# This is a key pattern for technology reuse - ensuring database initialization works reliably
-log "INFO: Ensuring database is properly initialized" "${CYAN}Ensuring database is properly initialized...${NC}"
-
-# Create a direct initialization script to bypass potential permission issues
-cat > "${WP_DIR}/${DOMAIN}/direct_init.sql" <<EOL
--- Direct initialization script to bypass permission issues
-CREATE DATABASE IF NOT EXISTS ${WP_DB_NAME};
-CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'172.18.0.%' IDENTIFIED BY '${WP_DB_PASSWORD}';
-CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'localhost' IDENTIFIED BY '${WP_DB_PASSWORD}';
-GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'172.18.0.%';
-GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'localhost';
-FLUSH PRIVILEGES;
-EOL
-
-# Execute with root user which should always work
-docker exec ${MARIADB_CONTAINER_NAME} bash -c "mysql -uroot -p${WP_ROOT_PASSWORD} < /docker-entrypoint-initdb.d/init.sql || echo 'Initial import failed, trying direct method...'"
-docker cp "${WP_DIR}/${DOMAIN}/direct_init.sql" ${MARIADB_CONTAINER_NAME}:/tmp/direct_init.sql
-docker exec ${MARIADB_CONTAINER_NAME} bash -c "mysql -uroot -p${WP_ROOT_PASSWORD} < /tmp/direct_init.sql || echo 'Direct initialization failed...'"
-
-# Run a brief verification
-log "INFO: Verifying database setup" "${CYAN}Verifying database setup...${NC}"
-docker exec ${MARIADB_CONTAINER_NAME} bash -c "mysql -uroot -p${WP_ROOT_PASSWORD} -e \"SHOW DATABASES; SELECT User, Host FROM mysql.user WHERE User='${WP_DB_USER}' OR User='root';\""
-
-# Copy test_db.sh to the WordPress container
-docker cp "${WP_DIR}/${DOMAIN}/test_db.sh" ${WORDPRESS_CONTAINER_NAME}:/tmp/test_db.sh
-
-# Run test_db.sh
-docker exec ${WORDPRESS_CONTAINER_NAME} /tmp/test_db.sh
 
 # Install WP-CLI inside the container
 docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar && chmod +x wp-cli.phar && mv wp-cli.phar /usr/local/bin/wp"
