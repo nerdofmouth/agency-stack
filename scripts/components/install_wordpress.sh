@@ -677,6 +677,13 @@ set -e
 
 cd /var/www/html
 
+# Install WP-CLI first
+echo "Installing WP-CLI..."
+curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+chmod +x wp-cli.phar
+mv wp-cli.phar /usr/local/bin/wp
+wp --info
+
 # Install WordPress core
 echo "Installing WordPress core..."
 wp --allow-root core install --url="https://${DOMAIN}" --title="WordPress on AgencyStack" --admin_user="${WP_ADMIN_USER}" --admin_password="${WP_ADMIN_PASSWORD}" --admin_email="${ADMIN_EMAIL}" --skip-email
