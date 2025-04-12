@@ -693,6 +693,24 @@ if [ $REQUIRED_TABLES -eq 1 ]; then
   docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "rm -rf /var/www/html/wp-config.php /var/www/html/wp-config-docker.php"
   docker exec ${MARIADB_CONTAINER_NAME} bash -c "MYSQL_PWD='${WP_ROOT_PASSWORD}' mysql -uroot -e 'DROP DATABASE IF EXISTS ${WP_DB_NAME}; CREATE DATABASE ${WP_DB_NAME}; GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO \"${WP_DB_USER}\"@\"%\"; FLUSH PRIVILEGES;'"
   
+  # Create additional database users with specific hostnames
+  log "INFO: Creating additional database users" "${CYAN}Creating additional database users...${NC}"
+  docker exec ${MARIADB_CONTAINER_NAME} bash -c "MYSQL_PWD='${WP_ROOT_PASSWORD}' mysql -uroot -e \"
+    CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'172.%.%.%' IDENTIFIED BY '${WP_DB_PASSWORD}';
+    GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'172.%.%.%';
+    
+    CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'default_wordpress.default_network' IDENTIFIED BY '${WP_DB_PASSWORD}';
+    GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'default_wordpress.default_network';
+    
+    CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'wordpress.default_network' IDENTIFIED BY '${WP_DB_PASSWORD}';
+    GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'wordpress.default_network';
+    
+    CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'wp.default_network' IDENTIFIED BY '${WP_DB_PASSWORD}';
+    GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'wp.default_network';
+    
+    FLUSH PRIVILEGES;
+  \"" || log "WARNING: Failed to create additional database users" "${YELLOW}⚠️ Failed to create additional database users${NC}"
+  
   # Recreate wp-config.php
   log "INFO: Creating WordPress configuration file" "${CYAN}Creating WordPress configuration file...${NC}"
   docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "cat > /var/www/html/wp-config.php << EOL
@@ -861,7 +879,9 @@ if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
       
       # Configure OpenID Connect plugin
       log "INFO: Configuring OpenID Connect plugin" "${CYAN}Configuring OpenID Connect plugin...${NC}"
-      docker exec -w /var/www/html ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI option update openid_connect_generic_settings '{\"login_type\":\"auto\",\"client_id\":\"wordpress-${CLIENT_ID}\",\"client_secret\":\"${KEYCLOAK_CLIENT_SECRET}\",\"scope\":\"openid email profile\",\"endpoint_login\":\"${KEYCLOAK_BASE_URL}/protocol/openid-connect/auth\",\"endpoint_userinfo\":\"${KEYCLOAK_BASE_URL}/protocol/openid-connect/userinfo\",\"endpoint_token\":\"${KEYCLOAK_BASE_URL}/protocol/openid-connect/token\",\"endpoint_end_session\":\"${KEYCLOAK_BASE_URL}/protocol/openid-connect/logout\",\"identity_key\":\"preferred_username\",\"no_sslverify\":0,\"http_request_timeout\":5,\"redirect_user_back\":1,\"redirect_on_logout\":1,\"link_existing_users\":1,\"create_if_does_not_exist\":1,\"enforce_privacy\":0,\"nickname_key\":\"nickname\",\"email_format\":\"{email}\",\"displayname_format\":\"{given_name} {family_name}\",\"identify_with_username\":true,\"state_time_limit\":180,\"token_refresh_enable\":1,\"nickname_format\":\"{preferred_username}\",\"support_state\":1}'" || log "WARNING: Failed to configure OpenID Connect plugin" "${YELLOW}⚠️ Failed to configure OpenID Connect plugin${NC}"
+      KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET:-"client_secret"}
+      KEYCLOAK_BASE_URL=${KEYCLOAK_BASE_URL:-"https://${DOMAIN}/auth/realms/agency-stack"}
+      docker exec -w /var/www/html ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI option update openid_connect_generic_settings '{\"login_type\":\"auto\",\"client_id\":\"wordpress-${CLIENT_ID}\",\"client_secret\":\"${KEYCLOAK_CLIENT_SECRET}\",\"scope\":\"openid email profile\",\"endpoint_login\":\"${KEYCLOAK_BASE_URL}/protocol/openid-connect/auth\",\"endpoint_userinfo\":\"${KEYCLOAK_BASE_URL}/protocol/openid-connect/userinfo\",\"endpoint_token\":\"${KEYCLOAK_BASE_URL}/protocol/openid-connect/token\",\"endpoint_end_session\":\"${KEYCLOAK_BASE_URL}/protocol/openid-connect/logout\",\"identity_key\":\"preferred_username\",\"no_sslverify\":1,\"http_request_timeout\":5,\"redirect_user_back\":1,\"redirect_on_logout\":1,\"link_existing_users\":1,\"create_if_does_not_exist\":1,\"enforce_privacy\":0,\"nickname_key\":\"nickname\",\"email_format\":\"{email}\",\"displayname_format\":\"{given_name} {family_name}\",\"identify_with_username\":true,\"state_time_limit\":180,\"token_refresh_enable\":1,\"nickname_format\":\"{preferred_username}\",\"support_state\":1}'" || log "WARNING: Failed to configure OpenID Connect plugin" "${YELLOW}⚠️ Failed to configure OpenID Connect plugin${NC}"
       
       # Create a marker file for the SSO configuration
       touch "${WP_DIR}/${DOMAIN}/sso/.sso_configured"
