@@ -664,12 +664,11 @@ docker exec ${WORDPRESS_CONTAINER_NAME} ping -c 2 ${MARIADB_CONTAINER_NAME} || l
 log "INFO: Installing MySQL client for diagnostics" "${CYAN}Installing MySQL client for diagnostics...${NC}"
 docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "apt-get update && apt-get install -y default-mysql-client" || log "WARNING: Unable to install MySQL client" "${YELLOW}⚠️ Unable to install MySQL client${NC}"
 
-# NOW we can initialize the database AFTER the containers are started
-# Improve database initialization with a direct approach that properly escapes special characters
-log "INFO: Ensuring database is properly initialized" "${CYAN}Ensuring database is properly initialized...${NC}"
+# Define WP-CLI with --allow-root flag for consistent usage
+WP_CLI="wp --allow-root"
 
-# Wait for MariaDB to fully initialize (more time for first run)
-sleep 20
+# Ensuring database is properly initialized...
+log "INFO: Ensuring database is properly initialized" "${CYAN}Ensuring database is properly initialized...${NC}"
 
 # Check if all required WordPress tables exist
 log "INFO: Checking for required WordPress tables" "${CYAN}Checking for required WordPress tables...${NC}"
@@ -747,8 +746,6 @@ docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI db tables" || log "WARN
 
 # Install WP-CLI inside the container
 docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar && chmod +x wp-cli.phar && mv wp-cli.phar /usr/local/bin/wp"
-
-WP_CLI="wp --allow-root"
 
 # Configure WordPress using WP-CLI
 log "INFO: Configuring WordPress site" "${CYAN}Configuring WordPress site...${NC}"
