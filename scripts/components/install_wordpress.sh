@@ -44,8 +44,8 @@ DOMAIN=""
 CLIENT_ID="default"  # Default client ID
 ADMIN_EMAIL=""
 WP_ADMIN_USER="admin"
-WP_DB_PASSWORD=$(openssl rand -base64 12)
-WP_ROOT_PASSWORD=$(openssl rand -base64 12)
+WP_DB_PASSWORD="wordpress_password"  # Fixed password for consistent deployment
+WP_ROOT_PASSWORD="mariadb_root_password"  # Fixed root password for consistent deployment
 WP_ADMIN_PASSWORD=$(openssl rand -base64 12 | tr -d "=+/")
 WP_VERSION="latest"
 PHP_VERSION="8.1"
@@ -342,19 +342,6 @@ mkdir -p "${WP_DIR}/${DOMAIN}/certs"
 mkdir -p "${WP_DIR}/${DOMAIN}/logs"
 mkdir -p "${WP_DIR}/${DOMAIN}/redis"
 
-# Generate random passwords if not specified
-if [ -z "$WP_DB_PASSWORD" ]; then
-  WP_DB_PASSWORD=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | fold -w 16 | head -n 1)
-fi
-
-if [ -z "$WP_ROOT_PASSWORD" ]; then
-  WP_ROOT_PASSWORD=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | fold -w 16 | head -n 1)
-fi
-
-if [ -z "$WP_ADMIN_PASSWORD" ]; then
-  WP_ADMIN_PASSWORD=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | fold -w 16 | head -n 1)
-fi
-
 # Define consistent database variables
 WP_DB_NAME="wordpress"
 WP_DB_USER="wordpress"
@@ -442,7 +429,7 @@ services:
       - ${WP_DIR}/${DOMAIN}/php-fpm/www.conf:/usr/local/etc/php-fpm.d/www.conf
       - ${WP_DIR}/${DOMAIN}/php-fpm/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini
     environment:
-      - WORDPRESS_DB_HOST=${MARIADB_CONTAINER_NAME}
+      - WORDPRESS_DB_HOST=mariadb
       - WORDPRESS_DB_NAME=${WP_DB_NAME}
       - WORDPRESS_DB_USER=${WP_DB_USER}
       - WORDPRESS_DB_PASSWORD=${WP_DB_PASSWORD}
@@ -586,27 +573,27 @@ sleep 10
 
 # Use the environment variables already specified in the docker-compose file
 log "INFO: Checking database connection" "${CYAN}Checking database connection...${NC}"
-docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_DB_PASSWORD} mysql -h${MARIADB_CONTAINER_NAME} -u${WP_DB_USER} -e 'SELECT 1;'" && {
+docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_DB_PASSWORD} mysql -h mariadb -u${WP_DB_USER} -e 'SELECT 1;'" && {
   log "INFO: Database connection successful with WordPress user" "${GREEN}✅ Database connection successful with WordPress user${NC}"
 } || {
   log "WARNING: Database connection with WordPress user failed, initializing database" "${YELLOW}⚠️ Database connection with WordPress user failed, initializing database${NC}"
   
   # Try with root
-  docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysql -h${MARIADB_CONTAINER_NAME} -uroot -e 'SELECT 1;'" && {
+  docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysql -h mariadb -uroot -e 'SELECT 1;'" && {
     log "INFO: Database connection successful with root user" "${GREEN}✅ Database connection successful with root user${NC}"
     
     # These direct SQL commands handle initialization without relying on potentially problematic heredoc escaping
-    docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysql -h${MARIADB_CONTAINER_NAME} -uroot -e \"CREATE DATABASE IF NOT EXISTS ${WP_DB_NAME};\"" || log "WARNING: Unable to create database" "${YELLOW}⚠️ Unable to create database${NC}"
+    docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysql -h mariadb -uroot -e \"CREATE DATABASE IF NOT EXISTS ${WP_DB_NAME};\"" || log "WARNING: Unable to create database" "${YELLOW}⚠️ Unable to create database${NC}"
     
-    docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysql -h${MARIADB_CONTAINER_NAME} -uroot -e \"CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'localhost' IDENTIFIED BY '${WP_DB_PASSWORD}';\"" || log "WARNING: Unable to create localhost user" "${YELLOW}⚠️ Unable to create localhost user${NC}"
+    docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysql -h mariadb -uroot -e \"CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'localhost' IDENTIFIED BY '${WP_DB_PASSWORD}';\"" || log "WARNING: Unable to create localhost user" "${YELLOW}⚠️ Unable to create localhost user${NC}"
     
-    docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysql -h${MARIADB_CONTAINER_NAME} -uroot -e \"CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'%' IDENTIFIED BY '${WP_DB_PASSWORD}';\"" || log "WARNING: Unable to create wildcard user" "${YELLOW}⚠️ Unable to create wildcard user${NC}"
+    docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysql -h mariadb -uroot -e \"CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'%' IDENTIFIED BY '${WP_DB_PASSWORD}';\"" || log "WARNING: Unable to create wildcard user" "${YELLOW}⚠️ Unable to create wildcard user${NC}"
     
-    docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysql -h${MARIADB_CONTAINER_NAME} -uroot -e \"GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'localhost';\"" || log "WARNING: Unable to grant privileges to localhost user" "${YELLOW}⚠️ Unable to grant privileges to localhost user${NC}"
+    docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysql -h mariadb -uroot -e \"GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'localhost';\"" || log "WARNING: Unable to grant privileges to localhost user" "${YELLOW}⚠️ Unable to grant privileges to localhost user${NC}"
     
-    docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysql -h${MARIADB_CONTAINER_NAME} -uroot -e \"GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'%';\"" || log "WARNING: Unable to grant privileges to wildcard user" "${YELLOW}⚠️ Unable to grant privileges to wildcard user${NC}"
+    docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysql -h mariadb -uroot -e \"GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'%';\"" || log "WARNING: Unable to grant privileges to wildcard user" "${YELLOW}⚠️ Unable to grant privileges to wildcard user${NC}"
     
-    docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysql -h${MARIADB_CONTAINER_NAME} -uroot -e \"FLUSH PRIVILEGES;\"" || log "WARNING: Unable to flush privileges" "${YELLOW}⚠️ Unable to flush privileges${NC}"
+    docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysql -h mariadb -uroot -e \"FLUSH PRIVILEGES;\"" || log "WARNING: Unable to flush privileges" "${YELLOW}⚠️ Unable to flush privileges${NC}"
   } || {
     log "WARNING: Database connection with root user failed" "${YELLOW}⚠️ Database connection with root user failed${NC}"
   }
@@ -614,7 +601,7 @@ docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_DB_PASSWORD} mys
 
 # Run a brief verification
 log "INFO: Verifying database setup" "${CYAN}Verifying database setup...${NC}"
-docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysql -h${MARIADB_CONTAINER_NAME} -uroot -e \"SHOW DATABASES; SELECT User, Host FROM mysql.user WHERE User='${WP_DB_USER}' OR User='root';\"" || log "WARNING: Unable to verify database setup" "${YELLOW}⚠️ Unable to verify database setup${NC}"
+docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysql -h mariadb -uroot -e \"SHOW DATABASES; SELECT User, Host FROM mysql.user WHERE User='${WP_DB_USER}' OR User='root';\"" || log "WARNING: Unable to verify database setup" "${YELLOW}⚠️ Unable to verify database setup${NC}"
 
 # Create a better test_db script that demonstrates proper service discovery and connectivity checks
 # This approach can be reused for connecting to shared services in the future
@@ -626,23 +613,23 @@ cat > "${WP_DIR}/${DOMAIN}/test_db.sh" <<EOL
 
 echo "=========================================="
 echo "DATABASE CONNECTION TEST"
-echo "Target: ${MARIADB_CONTAINER_NAME}"
+echo "Target: mariadb"
 echo "User: ${WP_DB_USER}"
 echo "Database: ${WP_DB_NAME}"
 echo "=========================================="
 
 # Try the connection with environment variables
 export MYSQL_PWD="${WP_DB_PASSWORD}"
-if mysql -h${MARIADB_CONTAINER_NAME} -u${WP_DB_USER} -e "USE ${WP_DB_NAME}; SELECT 'Database connection successful!' as Status;" 2>/dev/null; then
-    echo "SUCCESS: Connected to database ${MARIADB_CONTAINER_NAME}"
+if mysql -h mariadb -u${WP_DB_USER} -e "USE ${WP_DB_NAME}; SELECT 'Database connection successful!' as Status;" 2>/dev/null; then
+    echo "SUCCESS: Connected to database mariadb"
     exit 0
 else
     echo "FAILURE: Could not connect to database"
     echo "Testing root connection as diagnostic:"
     export MYSQL_PWD="${WP_ROOT_PASSWORD}"
-    mysql -h${MARIADB_CONTAINER_NAME} -uroot -e "SHOW DATABASES;" 2>&1 || echo "Root connection failed"
+    mysql -h mariadb -uroot -e "SHOW DATABASES;" 2>&1 || echo "Root connection failed"
     echo "Testing IP resolution:"
-    getent hosts ${MARIADB_CONTAINER_NAME} || echo "Host lookup failed"
+    getent hosts mariadb || echo "Host lookup failed"
     exit 1
 fi
 EOL
