@@ -790,38 +790,16 @@ if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
       
       # Install and configure the OpenID Connect plugin
       log "INFO: Installing OpenID Connect plugin for WordPress" "${CYAN}Installing OpenID Connect plugin for WordPress...${NC}"
-      docker exec ${WORDPRESS_CONTAINER_NAME} wp plugin install openid-connect-generic --activate
+      docker exec -w /var/www/html ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI plugin install openid-connect-generic --activate" || log "WARNING: Failed to install OpenID Connect plugin" "${YELLOW}⚠️ Failed to install OpenID Connect plugin${NC}"
       
-      # Get client credentials from the SSO configuration
-      if [ -f "${WP_DIR}/${DOMAIN}/sso/credentials" ]; then
-        source "${WP_DIR}/${DOMAIN}/sso/credentials"
-        
-        # Configure the OpenID Connect plugin
-        log "INFO: Configuring OpenID Connect plugin" "${CYAN}Configuring OpenID Connect plugin...${NC}"
-        docker exec ${WORDPRESS_CONTAINER_NAME} wp option update openid_connect_generic_settings '{
-          "login_type":"auto",
-          "client_id":"'"${KEYCLOAK_CLIENT_ID}"'",
-          "client_secret":"'"${KEYCLOAK_CLIENT_SECRET}"'",
-          "scope":"openid email profile",
-          "endpoint_login":"'"${KEYCLOAK_URL}"'/realms/'"${KEYCLOAK_REALM}"'/protocol/openid-connect/auth",
-          "endpoint_token":"'"${KEYCLOAK_URL}"'/realms/'"${KEYCLOAK_REALM}"'/protocol/openid-connect/token",
-          "endpoint_userinfo":"'"${KEYCLOAK_URL}"'/realms/'"${KEYCLOAK_REALM}"'/protocol/openid-connect/userinfo",
-          "identity_key":"preferred_username",
-          "link_existing_users":true,
-          "create_if_does_not_exist":true,
-          "redirect_user_back":true,
-          "redirect_on_logout":true,
-          "enable_logging":true
-        }' --format=json
-        
-        # Create a marker file for the SSO configuration
-        touch "${WP_DIR}/${DOMAIN}/sso/.sso_configured"
-        
-        log "INFO: SSO integration completed for WordPress" "${GREEN}SSO integration completed for WordPress${NC}"
-      else
-        log "WARNING: Keycloak credentials not found" "${YELLOW}Keycloak credentials not found${NC}"
-        log "INFO: Manual SSO configuration will be required" "${CYAN}Manual SSO configuration will be required${NC}"
-      fi
+      # Configure OpenID Connect plugin
+      log "INFO: Configuring OpenID Connect plugin" "${CYAN}Configuring OpenID Connect plugin...${NC}"
+      docker exec -w /var/www/html ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI option update openid_connect_generic_settings '{\"login_type\":\"auto\",\"client_id\":\"wordpress-${CLIENT_ID}\",\"client_secret\":\"${KEYCLOAK_CLIENT_SECRET}\",\"scope\":\"openid email profile\",\"endpoint_login\":\"${KEYCLOAK_BASE_URL}/protocol/openid-connect/auth\",\"endpoint_userinfo\":\"${KEYCLOAK_BASE_URL}/protocol/openid-connect/userinfo\",\"endpoint_token\":\"${KEYCLOAK_BASE_URL}/protocol/openid-connect/token\",\"endpoint_end_session\":\"${KEYCLOAK_BASE_URL}/protocol/openid-connect/logout\",\"identity_key\":\"preferred_username\",\"no_sslverify\":0,\"http_request_timeout\":5,\"redirect_user_back\":1,\"redirect_on_logout\":1,\"link_existing_users\":1,\"create_if_does_not_exist\":1,\"enforce_privacy\":0,\"nickname_key\":\"nickname\",\"email_format\":\"{email}\",\"displayname_format\":\"{given_name} {family_name}\",\"identify_with_username\":true,\"state_time_limit\":180,\"token_refresh_enable\":1,\"nickname_format\":\"{preferred_username}\",\"support_state\":1}'" || log "WARNING: Failed to configure OpenID Connect plugin" "${YELLOW}⚠️ Failed to configure OpenID Connect plugin${NC}"
+      
+      # Create a marker file for the SSO configuration
+      touch "${WP_DIR}/${DOMAIN}/sso/.sso_configured"
+      
+      log "INFO: SSO integration completed for WordPress" "${GREEN}SSO integration completed for WordPress${NC}"
     else
       log "WARNING: Failed to enable Keycloak SSO for WordPress" "${YELLOW}Failed to enable Keycloak SSO for WordPress${NC}"
     fi
