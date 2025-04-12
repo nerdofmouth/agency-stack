@@ -701,7 +701,7 @@ wp --allow-root rewrite flush
 
 if [ "${ENABLE_KEYCLOAK}" = "true" ]; then
   echo "Installing Keycloak integration..."
-  wp --allow-root plugin install openid-connect-generic --activate
+  wp --allow-root plugin install https://downloads.wordpress.org/plugin/openid-connect-generic.3.9.1.zip --activate
   
   # Configure Keycloak OpenID Connect
   echo "Configuring OpenID Connect..."
@@ -857,7 +857,7 @@ if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
       
       # Install and configure the OpenID Connect plugin
       log "INFO: Installing OpenID Connect plugin for WordPress" "${CYAN}Installing OpenID Connect plugin for WordPress...${NC}"
-      docker exec -w /var/www/html ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI plugin install openid-connect-generic --activate" || log "WARNING: Failed to install OpenID Connect plugin" "${YELLOW}⚠️ Failed to install OpenID Connect plugin${NC}"
+      docker exec -w /var/www/html ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI plugin install https://downloads.wordpress.org/plugin/openid-connect-generic.3.9.1.zip --activate" || log "WARNING: Failed to install OpenID Connect plugin" "${YELLOW}⚠️ Failed to install OpenID Connect plugin${NC}"
       
       # Configure OpenID Connect plugin
       log "INFO: Configuring OpenID Connect plugin" "${CYAN}Configuring OpenID Connect plugin...${NC}"
