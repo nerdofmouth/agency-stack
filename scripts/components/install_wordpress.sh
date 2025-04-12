@@ -360,15 +360,161 @@ WP_DB_NAME="wordpress"
 WP_DB_USER="wordpress"
 WP_TABLE_PREFIX="wp_"
 
-# Store MySQL credentials for WP-CLI
-cat > "${WP_DIR}/${DOMAIN}/.my.cnf" <<EOL
-[client]
-host=${MARIADB_CONTAINER_NAME}
-user=${WP_DB_USER}
-password=${WP_DB_PASSWORD}
-EOL
-chmod 600 "${WP_DIR}/${DOMAIN}/.my.cnf"
+# Create WordPress Docker Compose file
+log "INFO: Creating WordPress Docker Compose file" "${CYAN}Creating WordPress Docker Compose file...${NC}"
+cat > "${WP_DIR}/${DOMAIN}/docker-compose.yml" <<EOL
+version: '3'
 
+networks:
+  wordpress_network:
+    name: ${CLIENT_ID}_wordpress_${SITE_NAME}_network
+  ${CLIENT_ID}_network:
+    external: true
+
+services:
+  wordpress:
+    container_name: ${WORDPRESS_CONTAINER_NAME}
+    image: wordpress:php8.2-fpm
+    restart: unless-stopped
+    depends_on:
+      - mariadb
+      - redis
+    networks:
+      - wordpress_network
+      - ${CLIENT_ID}_network
+    volumes:
+      - ${WP_DIR}/${DOMAIN}/wordpress:/var/www/html
+      - ${WP_DIR}/${DOMAIN}/php-fpm/www.conf:/usr/local/etc/php-fpm.d/www.conf
+      - ${WP_DIR}/${DOMAIN}/php-fpm/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini
+    environment:
+      - WORDPRESS_DB_HOST=${MARIADB_CONTAINER_NAME}
+      - WORDPRESS_DB_NAME=${WP_DB_NAME}
+      - WORDPRESS_DB_USER=${WP_DB_USER}
+      - WORDPRESS_DB_PASSWORD=${WP_DB_PASSWORD}
+      - WORDPRESS_TABLE_PREFIX=wp_
+      - WORDPRESS_DEBUG=true
+      - WORDPRESS_CONFIG_EXTRA=define('WP_HOME', 'https://${DOMAIN}');define('WP_SITEURL', 'https://${DOMAIN}');
+    healthcheck:
+      test: ["CMD", "php", "-r", "if(!file_exists('/var/www/html/wp-includes/version.php')) exit(1);"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    labels:
+      - "traefik.enable=false"
+  
+  nginx:
+    container_name: ${NGINX_CONTAINER_NAME}
+    image: nginx:latest
+    restart: unless-stopped
+    depends_on:
+      wordpress:
+        condition: service_healthy
+    networks:
+      - wordpress_network
+      - ${CLIENT_ID}_network
+    volumes:
+      - ${WP_DIR}/${DOMAIN}/wordpress:/var/www/html
+      - ${WP_DIR}/${DOMAIN}/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.wordpress_${SITE_NAME}.rule=Host(\`${DOMAIN}\`)"
+      - "traefik.http.routers.wordpress_${SITE_NAME}.entrypoints=websecure"
+      - "traefik.http.routers.wordpress_${SITE_NAME}.tls=true"
+      - "traefik.http.routers.wordpress_${SITE_NAME}.tls.certresolver=myresolver"
+      - "traefik.http.services.wordpress_${SITE_NAME}.loadbalancer.server.port=80"
+  
+  mariadb:
+    container_name: ${MARIADB_CONTAINER_NAME}
+    image: mariadb:10.5
+    restart: unless-stopped
+    volumes:
+      - ${WP_DIR}/${DOMAIN}/mariadb:/var/lib/mysql
+    environment:
+      - MYSQL_DATABASE=${WP_DB_NAME}
+      - MYSQL_USER=${WP_DB_USER}
+      - MYSQL_PASSWORD=${WP_DB_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${WP_ROOT_PASSWORD}
+    networks:
+      - wordpress_network
+    labels:
+      - "traefik.enable=false"
+  
+  redis:
+    container_name: ${REDIS_CONTAINER_NAME}
+    image: redis:alpine
+    restart: unless-stopped
+    networks:
+      - wordpress_network
+    labels:
+      - "traefik.enable=false"
+EOL
+
+# Create PHP-FPM configuration
+log "INFO: Creating PHP-FPM configuration" "${CYAN}Creating PHP-FPM configuration...${NC}"
+mkdir -p "${WP_DIR}/${DOMAIN}/php-fpm"
+cat > "${WP_DIR}/${DOMAIN}/php-fpm/www.conf" <<EOL
+[www]
+user = www-data
+group = www-data
+listen = 9000
+pm = dynamic
+pm.max_children = 5
+pm.start_servers = 2
+pm.min_spare_servers = 1
+pm.max_spare_servers = 3
+EOL
+
+cat > "${WP_DIR}/${DOMAIN}/php-fpm/uploads.ini" <<EOL
+file_uploads = On
+memory_limit = 256M
+upload_max_filesize = 64M
+post_max_size = 64M
+max_execution_time = 600
+EOL
+
+# Create Nginx configuration
+log "INFO: Creating Nginx configuration" "${CYAN}Creating Nginx configuration...${NC}"
+mkdir -p "${WP_DIR}/${DOMAIN}/nginx"
+cat > "${WP_DIR}/${DOMAIN}/nginx/default.conf" <<EOL
+server {
+    listen 80;
+    server_name ${DOMAIN};
+    root /var/www/html;
+    index index.php;
+
+    location / {
+        try_files \$uri \$uri/ /index.php?\$args;
+    }
+
+    location ~ \.php$ {
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        fastcgi_pass wordpress:9000;
+        fastcgi_index index.php;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+        fastcgi_param PATH_INFO \$fastcgi_path_info;
+    }
+
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico)$ {
+        expires max;
+        log_not_found off;
+    }
+}
+EOL
+
+# Start WordPress stack
+log "INFO: Starting WordPress stack" "${CYAN}Starting WordPress stack...${NC}"
+cd "${WP_DIR}/${DOMAIN}" && docker-compose up -d
+if [ $? -ne 0 ]; then
+  log "ERROR: Failed to start WordPress stack" "${RED}Failed to start WordPress stack${NC}"
+  exit 1
+fi
+
+# Wait for WordPress stack to initialize
+log "INFO: Waiting for WordPress to start" "${CYAN}Waiting for WordPress to start...${NC}"
+sleep 15
+
+# NOW we can initialize the database AFTER the containers are started
 # Improve database initialization with a direct approach that properly escapes special characters
 log "INFO: Ensuring database is properly initialized" "${CYAN}Ensuring database is properly initialized...${NC}"
 
@@ -424,205 +570,10 @@ docker cp "${WP_DIR}/${DOMAIN}/test_db.sh" ${WORDPRESS_CONTAINER_NAME}:/tmp/test
 # Run test_db.sh
 docker exec ${WORDPRESS_CONTAINER_NAME} /tmp/test_db.sh || log "WARNING: Database connection test failed, but continuing..." "${YELLOW}⚠️ Database connection test failed, but continuing...${NC}"
 
-# Create WordPress Docker Compose file
-log "INFO: Creating WordPress Docker Compose file" "${CYAN}Creating WordPress Docker Compose file...${NC}"
-cat > "${WP_DIR}/${DOMAIN}/docker-compose.yml" <<EOL
-version: '3'
-
-services:
-  wordpress:
-    container_name: ${WORDPRESS_CONTAINER_NAME}
-    image: wordpress:php${PHP_VERSION}-fpm
-    restart: unless-stopped
-    volumes:
-      - ${WP_DIR}/${DOMAIN}/wordpress:/var/www/html
-      - ${WP_DIR}/${DOMAIN}/php-fpm.conf:/usr/local/etc/php-fpm.d/www.conf
-    environment:
-      - WORDPRESS_DB_HOST=${MARIADB_CONTAINER_NAME}:3306
-      - WORDPRESS_DB_USER=${WP_DB_USER}
-      - WORDPRESS_DB_PASSWORD=${WP_DB_PASSWORD}
-      - WORDPRESS_DB_NAME=${WP_DB_NAME}
-      - WORDPRESS_TABLE_PREFIX=${WP_TABLE_PREFIX}
-      - WORDPRESS_CONFIG_EXTRA=define('WP_DEBUG', true); define('WP_DEBUG_LOG', true);
-    networks:
-      - wordpress_network
-      - ${NETWORK_NAME}
-    depends_on:
-      - mariadb
-    healthcheck:
-      test: ["CMD", "php", "-r", "if(!file_exists('/var/www/html/wp-config.php')) {exit(1);} else {exit(0);}" ]
-      interval: 5s
-      timeout: 5s
-      retries: 3
-
-  nginx:
-    container_name: ${NGINX_CONTAINER_NAME}
-    image: nginx:latest
-    restart: unless-stopped
-    volumes:
-      - ${WP_DIR}/${DOMAIN}/wordpress:/var/www/html
-      - ${WP_DIR}/${DOMAIN}/nginx.conf:/etc/nginx/conf.d/default.conf
-    ports:
-      - "8080:80"
-    networks:
-      - wordpress_network
-      - ${NETWORK_NAME}
-    depends_on:
-      wordpress:
-        condition: service_healthy
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.wordpress_${SITE_NAME}.rule=Host(\`${DOMAIN}\`)"
-      - "traefik.http.routers.wordpress_${SITE_NAME}.entrypoints=web,websecure"
-      - "traefik.http.routers.wordpress_${SITE_NAME}.tls=true"
-      - "traefik.http.routers.wordpress_${SITE_NAME}.tls.certresolver=letsencrypt"
-      - "traefik.http.services.wordpress_${SITE_NAME}.loadbalancer.server.port=80"
-
-  mariadb:
-    container_name: ${MARIADB_CONTAINER_NAME}
-    image: mariadb:10.6
-    restart: unless-stopped
-    volumes:
-      - ${WP_DIR}/${DOMAIN}/mariadb:/var/lib/mysql
-    environment:
-      - MYSQL_DATABASE=${WP_DB_NAME}
-      - MYSQL_USER=${WP_DB_USER}
-      - MYSQL_PASSWORD=${WP_DB_PASSWORD}
-      - MYSQL_ROOT_PASSWORD=${WP_ROOT_PASSWORD}
-      - MYSQL_ROOT_HOST=%
-      - MYSQL_HOST=%
-    networks:
-      - wordpress_network
-      - ${NETWORK_NAME}
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "${WP_DB_USER}", "-p${WP_DB_PASSWORD}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --skip-host-cache --skip-name-resolve
-
-  redis:
-    container_name: ${REDIS_CONTAINER_NAME}
-    image: redis:latest
-    restart: unless-stopped
-    networks:
-      - wordpress_network
-      - ${NETWORK_NAME}
-
-networks:
-  wordpress_network:
-    name: ${CLIENT_ID}_${DOMAIN_UNDERSCORE}_network
-  ${NETWORK_NAME}:
-    external: true
-EOL
-
-# Create PHP-FPM configuration
-log "INFO: Creating PHP-FPM configuration" "${CYAN}Creating PHP-FPM configuration...${NC}"
-cat > "${WP_DIR}/${DOMAIN}/php-fpm.conf" <<EOL
-[global]
-daemonize = no
-error_log = /proc/self/fd/2
-
-[www]
-listen = 9000
-listen.backlog = 511
-access.log = /proc/self/fd/2
-catch_workers_output = yes
-decorate_workers_output = no
-
-user = www-data
-group = www-data
-pm = dynamic
-pm.max_children = 10
-pm.start_servers = 2
-pm.min_spare_servers = 1
-pm.max_spare_servers = 3
-EOL
-
-# Create Nginx configuration
-log "INFO: Creating Nginx configuration" "${CYAN}Creating Nginx configuration...${NC}"
-cat > "${WP_DIR}/${DOMAIN}/nginx.conf" <<EOL
-server {
-    listen 80;
-    server_name ${DOMAIN} www.${DOMAIN};
-    
-    root /var/www/html;
-    index index.php;
-    
-    access_log /var/log/nginx/access.log;
-    error_log /var/log/nginx/error.log debug;
-    
-    client_max_body_size 100M;
-    
-    location / {
-        try_files \$uri \$uri/ /index.php?\$args;
-    }
-    
-    location ~ \.php$ {
-        try_files \$uri =404;
-        fastcgi_split_path_info ^(.+\.php)(/.+)$;
-        fastcgi_pass wordpress:9000;
-        fastcgi_index index.php;
-        include fastcgi_params;
-        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
-        fastcgi_param PATH_INFO \$fastcgi_path_info;
-        fastcgi_buffers 16 16k;
-        fastcgi_buffer_size 32k;
-        fastcgi_connect_timeout 300;
-        fastcgi_send_timeout 300;
-        fastcgi_read_timeout 300;
-        fastcgi_intercept_errors on;
-        fastcgi_param HTTPS \$https if_not_empty;
-        # Additional FastCGI parameters
-        fastcgi_param SERVER_NAME \$host;
-        fastcgi_param HTTP_HOST \$host;
-        fastcgi_keep_conn on;
-    }
-    
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
-        expires max;
-        log_not_found off;
-    }
-    
-    # Deny access to hidden files
-    location ~ /\. {
-        deny all;
-        access_log off;
-        log_not_found off;
-    }
-    
-    # Deny access to wp-config.php
-    location ~* wp-config\.php {
-        deny all;
-    }
-    
-    # Deny access to debug.log
-    location ~* debug\.log {
-        deny all;
-    }
-}
-EOL
-
-# Start the WordPress stack
-log "INFO: Starting WordPress stack" "${CYAN}Starting WordPress stack...${NC}"
-cd "${WP_DIR}/${DOMAIN}" && docker-compose up -d
-
-if [ $? -ne 0 ]; then
-  log "ERROR: Failed to start WordPress stack" "${RED}Failed to start WordPress stack. See log for details.${NC}"
-  exit 1
-fi
-
-# Wait for WordPress stack to initialize
-log "INFO: Waiting for WordPress to start" "${CYAN}Waiting for WordPress to start...${NC}"
-sleep 10
-
 # Install WP-CLI inside the container
 docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar && chmod +x wp-cli.phar && mv wp-cli.phar /usr/local/bin/wp"
 
-# Install MySQL client for database verification
-docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "apt-get update && apt-get install -y default-mysql-client"
-
-# Improve connection reliability by waiting for MariaDB to be fully initialized
+# Ensure database is ready
 log "INFO: Ensuring database is ready" "${CYAN}Ensuring database is ready...${NC}"
 sleep 10
 
