@@ -379,19 +379,30 @@ cat > "${WP_DIR}/${DOMAIN}/mariadb-init/init.sql" <<EOL
 -- Create database if it doesn't exist
 CREATE DATABASE IF NOT EXISTS ${WP_DB_NAME};
 
+-- Reset users for clean initialization (helps with re-installs)
+DROP USER IF EXISTS '${WP_DB_USER}'@'%';
+DROP USER IF EXISTS '${WP_DB_USER}'@'localhost';
+DROP USER IF EXISTS '${WP_DB_USER}'@'172.%.%.%';
+
 -- Create WordPress user with proper host wildcard to allow container networking
-CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'%' IDENTIFIED BY '${WP_DB_PASSWORD}';
-CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'localhost' IDENTIFIED BY '${WP_DB_PASSWORD}';
-CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'172.%.%.%' IDENTIFIED BY '${WP_DB_PASSWORD}';
+CREATE USER '${WP_DB_USER}'@'%' IDENTIFIED BY '${WP_DB_PASSWORD}';
+CREATE USER '${WP_DB_USER}'@'localhost' IDENTIFIED BY '${WP_DB_PASSWORD}';
+CREATE USER '${WP_DB_USER}'@'172.%.%.%' IDENTIFIED BY '${WP_DB_PASSWORD}';
 
 -- Grant permissions to the user from any host
 GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'%';
 GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'localhost';
 GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'172.%.%.%';
 
--- Allow root access from any host (for admin purposes, would be restricted in production)
+-- Reset authentication
+ALTER USER '${WP_DB_USER}'@'%' IDENTIFIED WITH mysql_native_password BY '${WP_DB_PASSWORD}';
+ALTER USER '${WP_DB_USER}'@'localhost' IDENTIFIED WITH mysql_native_password BY '${WP_DB_PASSWORD}';
+ALTER USER '${WP_DB_USER}'@'172.%.%.%' IDENTIFIED WITH mysql_native_password BY '${WP_DB_PASSWORD}';
+
+-- Allow root access from any host
 CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED BY '${WP_ROOT_PASSWORD}';
 GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;
+ALTER USER 'root'@'%' IDENTIFIED WITH mysql_native_password BY '${WP_ROOT_PASSWORD}';
 
 FLUSH PRIVILEGES;
 
@@ -568,7 +579,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --skip-host-cache --skip-name-resolve
 
   redis:
     container_name: ${REDIS_CONTAINER_NAME}
