@@ -369,6 +369,15 @@ password=${WP_DB_PASSWORD}
 EOL
 chmod 600 "${WP_DIR}/${DOMAIN}/.my.cnf"
 
+# Define MySQL initialization script for proper user permissions
+mkdir -p "${WP_DIR}/${DOMAIN}/mariadb-init"
+cat > "${WP_DIR}/${DOMAIN}/mariadb-init/init.sql" <<EOL
+CREATE DATABASE IF NOT EXISTS ${WP_DB_NAME};
+CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'%' IDENTIFIED BY '${WP_DB_PASSWORD}';
+GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'%';
+FLUSH PRIVILEGES;
+EOL
+
 # Create WordPress Docker Compose file
 log "INFO: Creating WordPress Docker Compose file" "${CYAN}Creating WordPress Docker Compose file...${NC}"
 cat > "${WP_DIR}/${DOMAIN}/docker-compose.yml" <<EOL
@@ -429,6 +438,7 @@ services:
     restart: unless-stopped
     volumes:
       - ${WP_DIR}/${DOMAIN}/mariadb:/var/lib/mysql
+      - ${WP_DIR}/${DOMAIN}/mariadb-init:/docker-entrypoint-initdb.d
     environment:
       - MYSQL_DATABASE=${WP_DB_NAME}
       - MYSQL_USER=${WP_DB_USER}
@@ -583,12 +593,24 @@ cat > "${WP_DIR}/${DOMAIN}/test_db.sh" <<EOL
 max_attempts=30
 attempt=1
 echo "Testing database connection to ${MARIADB_CONTAINER_NAME}..."
+
+# Basic network diagnostics
+echo "Network diagnostics:"
+ping -c 2 ${MARIADB_CONTAINER_NAME} || echo "Cannot ping database container"
+
 while [ \$attempt -le \$max_attempts ]; do
   echo "Attempt \$attempt of \$max_attempts..."
-  if mysql -h${MARIADB_CONTAINER_NAME} -u${WP_DB_USER} -p${WP_DB_PASSWORD} -e "SELECT 1" ${WP_DB_NAME} 2>/dev/null; then
+  if mysql -h${MARIADB_CONTAINER_NAME} -u${WP_DB_USER} -p${WP_DB_PASSWORD} -e "SHOW DATABASES;" 2>/dev/null; then
     echo "Database connection successful!"
     exit 0
   fi
+  
+  # Try root connection on failure
+  if [ \$attempt -eq 10 ]; then
+    echo "Trying with root credentials:"
+    mysql -h${MARIADB_CONTAINER_NAME} -uroot -p${WP_ROOT_PASSWORD} -e "SHOW DATABASES;" || echo "Root connection failed too"
+  fi
+  
   sleep 3
   attempt=\$((attempt+1))
 done
