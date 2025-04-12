@@ -56,6 +56,7 @@ This document provides a comprehensive list of all port assignments used by Agen
 | **PeerTube** | Web UI | 9000 | HTTP | Video platform |
 | **PeerTube** | Admin UI | 9001 | HTTP | Administration |
 | **PeerTube** | RTMP | 1935 | RTMP | Live streaming |
+| **PeerTube** | WebRTC | Dynamic | UDP | Media streaming |
 | **Seafile** | Web UI | 8012 | HTTP | File sharing |
 | **Builder.io** | Web UI | 8013 | HTTP | Visual CMS |
 
@@ -65,6 +66,20 @@ This document provides a comprehensive list of all port assignments used by Agen
 |-----------|---------|------|----------|-------|
 | **Mastodon** | Streaming | 4000 | HTTP | Streaming API |
 | **Etebase** | Web API | 8732 | HTTP | Encrypted CalDAV/CardDAV server |
+
+## Communication Systems
+
+| Component | Service | Port | Protocol | Notes |
+|-----------|---------|------|----------|-------|
+| **VoIP** | SIP | 5060 | TCP/UDP | Session Initiation Protocol |
+| **VoIP** | RTP | 10000-20000 | UDP | Real-time audio streams |
+| **Mailu** | SMTP | 25 | TCP | Mail server (receiving) |
+| **Mailu** | Submission | 587 | TCP | Mail server (sending) |
+| **Mailu** | IMAP | 143/993 | TCP | Mail access |
+| **Mailu** | Admin UI | 8080 | HTTP | Admin interface |
+| **MiroTalk SFU** | Web UI | 3000 | HTTP | Video conferencing interface |
+| **MiroTalk SFU** | Metrics | 3001 | HTTP | Prometheus metrics endpoint |
+| **MiroTalk SFU** | WebRTC | Dynamic | UDP | Media streaming |
 
 ## Security & Identity
 
@@ -80,7 +95,7 @@ This document provides a comprehensive list of all port assignments used by Agen
 | Component | Service | Port | Protocol | Notes |
 |-----------|---------|------|----------|-------|
 | **Mailu** | SMTP | 25 | TCP | Mail transfer |
-| **Mailu** | IMAP | 143 | TCP | Mail access |
+| **Mailu** | IMAP | 143/993 | TCP | Mail access |
 | **Mailu** | IMAPS | 993 | TCP | Secure mail access |
 | **Mailu** | Web UI | 8020 | HTTP | Administration |
 | **Mattermost** | Web UI | 8065 | HTTP | Team chat |
