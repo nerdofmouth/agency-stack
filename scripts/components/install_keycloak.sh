@@ -31,6 +31,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 CONFIG_DIR="/opt/agency_stack"
 KEYCLOAK_DIR="${CONFIG_DIR}/keycloak"
+SECRETS_DIR="${CONFIG_DIR}/secrets/keycloak"
 LOG_DIR="/var/log/agency_stack"
 COMPONENTS_LOG_DIR="${LOG_DIR}/components"
 INTEGRATIONS_LOG_DIR="${LOG_DIR}/integrations"
@@ -47,32 +48,70 @@ KEYCLOAK_VERSION="latest"
 DB_ROOT_PASSWORD=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-16)
 KC_DB_PASSWORD=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-16)
 ADMIN_PASSWORD=$(openssl rand -base64 12 | tr -d "=+/")
+CONFIGURE_OAUTH_ONLY=false
+
+# OAuth Identity Provider flags
+ENABLE_OAUTH_GOOGLE=false
+ENABLE_OAUTH_GITHUB=false
+ENABLE_OAUTH_APPLE=false
+ENABLE_OAUTH_LINKEDIN=false
+ENABLE_OAUTH_MICROSOFT=false
+
+# OAuth security settings
+OAUTH_STORE_TOKENS=false
+OAUTH_VALIDATE_SIGNATURES=true
+OAUTH_USE_JWKS_URL=true
+OAUTH_DISABLE_USER_INFO=false
+OAUTH_TRUST_EMAIL=false
+
+# Check if log directories are writable, use local paths for development if not
+if [ ! -w "$LOG_DIR" ] && [ ! -w "/var/log" ]; then
+  LOG_DIR="${ROOT_DIR}/logs"
+  COMPONENTS_LOG_DIR="${LOG_DIR}/components"
+  INSTALL_LOG="${COMPONENTS_LOG_DIR}/keycloak.log"
+  INTEGRATIONS_LOG_DIR="${LOG_DIR}/integrations"
+  INTEGRATION_LOG="${INTEGRATIONS_LOG_DIR}/keycloak.log"
+  MAIN_INTEGRATION_LOG="${INTEGRATIONS_LOG_DIR}/integration.log"
+  echo "Notice: Using local log directory for development: ${LOG_DIR}"
+fi
+
+# Ensure the log directory exists
+mkdir -p "$COMPONENTS_LOG_DIR"
+touch "$INSTALL_LOG"
+mkdir -p "$INTEGRATIONS_LOG_DIR"
+touch "$INTEGRATION_LOG"
+touch "$MAIN_INTEGRATION_LOG"
 
 # Show help message
 show_help() {
-  echo -e "${MAGENTA}${BOLD}AgencyStack Keycloak Setup${NC}"
-  echo -e "=============================="
-  echo -e "This script installs and configures Keycloak for identity management and SSO."
+  echo -e "${MAGENTA}${BOLD}AgencyStack Keycloak Installer${NC}"
+  echo -e "=================================="
+  echo -e "This script installs and configures Keycloak with PostgreSQL."
   echo -e ""
   echo -e "${CYAN}Usage:${NC}"
   echo -e "  $0 [options]"
   echo -e ""
   echo -e "${CYAN}Options:${NC}"
-  echo -e "  ${BOLD}--domain${NC} <domain>         Primary domain for Keycloak (required)"
-  echo -e "  ${BOLD}--client-id${NC} <client_id>   Client ID for multi-tenant setup (optional)"
-  echo -e "  ${BOLD}--admin-email${NC} <email>     Admin email address (required)"
-  echo -e "  ${BOLD}--keycloak-version${NC} <ver>  Keycloak version (default: latest)"
-  echo -e "  ${BOLD}--force${NC}                   Force reinstallation even if Keycloak is already installed"
-  echo -e "  ${BOLD}--with-deps${NC}               Automatically install dependencies if missing"
-  echo -e "  ${BOLD}--verbose${NC}                 Show detailed output during installation"
-  echo -e "  ${BOLD}--help${NC}                    Show this help message and exit"
+  echo -e "  ${BOLD}--domain${NC} <domain>       Domain name for Keycloak (required)"
+  echo -e "  ${BOLD}--admin-email${NC} <email>   Admin email for notifications (required)"
+  echo -e "  ${BOLD}--client-id${NC} <client_id> Client ID for multi-tenant setup (optional)"
+  echo -e "  ${BOLD}--verbose${NC}               Show verbose output"
+  echo -e "  ${BOLD}--force${NC}                 Force installation even if already installed"
+  echo -e "  ${BOLD}--with-deps${NC}             Install dependencies automatically"
+  echo -e "  ${BOLD}--configure-oauth-only${NC}  Only configure OAuth providers, skip installation"
+  echo -e ""
+  echo -e "  ${BOLD}OAuth Provider Options:${NC}"
+  echo -e "  ${BOLD}--enable-oauth-google${NC}   Enable Google as an identity provider"
+  echo -e "  ${BOLD}--enable-oauth-github${NC}   Enable GitHub as an identity provider"
+  echo -e "  ${BOLD}--enable-oauth-apple${NC}    Enable Apple as an identity provider"
+  echo -e "  ${BOLD}--enable-oauth-linkedin${NC} Enable LinkedIn as an identity provider"
+  echo -e "  ${BOLD}--enable-oauth-microsoft${NC} Enable Microsoft/Azure AD as an identity provider"
   echo -e ""
   echo -e "${CYAN}Example:${NC}"
-  echo -e "  $0 --domain auth.example.com --admin-email admin@example.com --client-id acme"
+  echo -e "  $0 --domain auth.example.com --admin-email admin@example.com --enable-oauth-google"
   echo -e ""
-  echo -e "${CYAN}Notes:${NC}"
-  echo -e "  - The script requires root privileges for installation"
-  echo -e "  - Log file is saved to: ${INSTALL_LOG}"
+  echo -e "${CYAN}Post-Installation OAuth Configuration:${NC}"
+  echo -e "  $0 --domain auth.example.com --configure-oauth-only --enable-oauth-github"
   exit 0
 }
 
@@ -85,19 +124,18 @@ while [[ $# -gt 0 ]]; do
       shift
       shift
       ;;
-    --client-id)
-      CLIENT_ID="$2"
-      shift
-      shift
-      ;;
     --admin-email)
       ADMIN_EMAIL="$2"
       shift
       shift
       ;;
-    --keycloak-version)
-      KEYCLOAK_VERSION="$2"
+    --client-id)
+      CLIENT_ID="$2"
       shift
+      shift
+      ;;
+    --verbose)
+      VERBOSE=true
       shift
       ;;
     --force)
@@ -108,8 +146,28 @@ while [[ $# -gt 0 ]]; do
       WITH_DEPS=true
       shift
       ;;
-    --verbose)
-      VERBOSE=true
+    --configure-oauth-only)
+      CONFIGURE_OAUTH_ONLY=true
+      shift
+      ;;
+    --enable-oauth-google)
+      ENABLE_OAUTH_GOOGLE=true
+      shift
+      ;;
+    --enable-oauth-github)
+      ENABLE_OAUTH_GITHUB=true
+      shift
+      ;;
+    --enable-oauth-apple)
+      ENABLE_OAUTH_APPLE=true
+      shift
+      ;;
+    --enable-oauth-linkedin)
+      ENABLE_OAUTH_LINKEDIN=true
+      shift
+      ;;
+    --enable-oauth-microsoft)
+      ENABLE_OAUTH_MICROSOFT=true
       shift
       ;;
     --help|-h)
@@ -130,422 +188,618 @@ if [ -z "$DOMAIN" ]; then
   exit 1
 fi
 
-if [ -z "$ADMIN_EMAIL" ]; then
+# If we're only configuring OAuth, skip the admin email check
+if [ "$CONFIGURE_OAUTH_ONLY" = false ] && [ -z "$ADMIN_EMAIL" ]; then
   echo -e "${RED}Error: --admin-email is required${NC}"
   echo -e "Use --help for usage information"
   exit 1
 fi
 
-# Welcome message
-echo -e "${MAGENTA}${BOLD}AgencyStack Keycloak Setup${NC}"
-echo -e "=============================="
-
-# Check if running as root
-if [ "$EUID" -ne 0 ]; then
-  echo -e "${RED}Please run as root or with sudo${NC}"
-  exit 1
-fi
-
-# Run system validation
-if [ -f "${ROOT_DIR}/scripts/utils/validate_system.sh" ]; then
-  echo -e "${BLUE}Validating system requirements...${NC}"
-  bash "${ROOT_DIR}/scripts/utils/validate_system.sh" || {
-    echo -e "${RED}System validation failed. Please fix the issues and try again.${NC}"
-    exit 1
-  }
-else
-  echo -e "${YELLOW}Warning: System validation script not found. Proceeding without validation.${NC}"
-fi
-
-# Create log directories if they don't exist
-mkdir -p "$LOG_DIR"
-mkdir -p "$COMPONENTS_LOG_DIR"
-mkdir -p "$INTEGRATIONS_LOG_DIR"
-touch "$INSTALL_LOG"
-touch "$INTEGRATION_LOG"
-touch "$MAIN_INTEGRATION_LOG"
-
-# Log function
-log() {
-  echo "$(date +"%Y-%m-%d %H:%M:%S") - $1" >> "$INSTALL_LOG"
-  if [ "$VERBOSE" = true ]; then
-    echo -e "$1"
-  else
-    echo -e "$2"
-  fi
-}
-
-# Integration log function
-integration_log() {
-  echo "$(date +"%Y-%m-%d %H:%M:%S") - Keycloak - $1" >> "$INTEGRATION_LOG"
-  echo "$(date +"%Y-%m-%d %H:%M:%S") - Keycloak - $1" >> "$MAIN_INTEGRATION_LOG"
-  if [ "$VERBOSE" = true ]; then
-    echo -e "${BLUE}[Integration] ${NC}$1"
-  fi
-}
-
 log "INFO: Starting Keycloak installation validation for $DOMAIN" "${BLUE}Starting Keycloak installation validation for $DOMAIN...${NC}"
 
-# Set up site-specific variables
-SITE_NAME=${DOMAIN//./_}
-if [ -n "$CLIENT_ID" ]; then
-  KEYCLOAK_CONTAINER="${CLIENT_ID}_keycloak"
-  POSTGRES_CONTAINER="${CLIENT_ID}_keycloak_postgres"
-  NETWORK_NAME="${CLIENT_ID}_network"
-else
-  KEYCLOAK_CONTAINER="keycloak_${SITE_NAME}"
-  POSTGRES_CONTAINER="keycloak_postgres_${SITE_NAME}"
-  NETWORK_NAME="agency-network"
-fi
-
-# Check if Keycloak is already installed
-if docker ps -a --format '{{.Names}}' | grep -q "$KEYCLOAK_CONTAINER"; then
-  if [ "$FORCE" = true ]; then
-    log "WARNING: Keycloak container '$KEYCLOAK_CONTAINER' already exists, will reinstall because --force was specified" "${YELLOW}⚠️ Keycloak container '$KEYCLOAK_CONTAINER' already exists, will reinstall because --force was specified${NC}"
-    # Stop and remove existing containers
-    log "INFO: Stopping and removing existing Keycloak containers" "${CYAN}Stopping and removing existing Keycloak containers...${NC}"
-    cd "${KEYCLOAK_DIR}/${DOMAIN}" && docker-compose down 2>/dev/null || true
-  else
-    log "INFO: Keycloak container '$KEYCLOAK_CONTAINER' already exists" "${GREEN}✅ Keycloak installation for $DOMAIN already exists${NC}"
-    log "INFO: To reinstall, use --force flag" "${CYAN}To reinstall, use --force flag${NC}"
-    
-    # Check if the containers are running
-    if docker ps --format '{{.Names}}' | grep -q "$KEYCLOAK_CONTAINER"; then
-      log "INFO: Keycloak container is running" "${GREEN}✅ Keycloak is running${NC}"
-      echo -e "${GREEN}Keycloak is already installed and running for $DOMAIN${NC}"
-      echo -e "${CYAN}Admin URL: https://${DOMAIN}/admin/${NC}"
-      echo -e "${CYAN}To make changes, use --force to reinstall${NC}"
-      exit 0
-    else
-      log "WARNING: Keycloak container exists but is not running" "${YELLOW}⚠️ Keycloak container exists but is not running${NC}"
-      echo -e "${YELLOW}Keycloak is installed but not running for $DOMAIN${NC}"
-      echo -e "${CYAN}Starting Keycloak containers...${NC}"
-      cd "${KEYCLOAK_DIR}/${DOMAIN}" && docker-compose up -d
-      echo -e "${GREEN}Keycloak has been started for $DOMAIN${NC}"
-      echo -e "${CYAN}Admin URL: https://${DOMAIN}/admin/${NC}"
-      exit 0
-    fi
-  fi
-fi
-
-# Check if Docker is installed
-if ! command -v docker &> /dev/null; then
-  log "ERROR: Docker is not installed" "${RED}Docker is not installed. Please install Docker first.${NC}"
-  if [ "$WITH_DEPS" = true ]; then
-    log "INFO: Installing Docker with --with-deps flag" "${CYAN}Installing Docker with --with-deps flag...${NC}"
-    if [ -f "${ROOT_DIR}/scripts/core/install_infrastructure.sh" ]; then
-      bash "${ROOT_DIR}/scripts/core/install_infrastructure.sh" || {
-        log "ERROR: Failed to install Docker" "${RED}Failed to install Docker. Please install it manually.${NC}"
-        exit 1
-      }
-    else
-      log "ERROR: Cannot find install_infrastructure.sh script" "${RED}Cannot find install_infrastructure.sh script. Please install Docker manually.${NC}"
-      exit 1
-    fi
-  else
-    log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
-    exit 1
-  fi
-fi
-
-# Check if Docker is running
-if ! docker info &> /dev/null; then
-  log "ERROR: Docker is not running" "${RED}Docker is not running. Please start Docker first.${NC}"
-  exit 1
-fi
-
-# Check if Docker Compose is installed
-if ! command -v docker-compose &> /dev/null; then
-  log "ERROR: Docker Compose is not installed" "${RED}Docker Compose is not installed. Please install Docker Compose first.${NC}"
-  if [ "$WITH_DEPS" = true ]; then
-    log "INFO: Installing Docker Compose with --with-deps flag" "${CYAN}Installing Docker Compose with --with-deps flag...${NC}"
-    if [ -f "${ROOT_DIR}/scripts/core/install_infrastructure.sh" ]; then
-      bash "${ROOT_DIR}/scripts/core/install_infrastructure.sh" || {
-        log "ERROR: Failed to install Docker Compose" "${RED}Failed to install Docker Compose. Please install it manually.${NC}"
-        exit 1
-      }
-    else
-      log "ERROR: Cannot find install_infrastructure.sh script" "${RED}Cannot find install_infrastructure.sh script. Please install Docker Compose manually.${NC}"
-      exit 1
-    fi
-  else
-    log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
-    exit 1
-  fi
-fi
-
-# Check if network exists, create if it doesn't
-if ! docker network inspect "$NETWORK_NAME" &> /dev/null; then
-  log "INFO: Creating Docker network $NETWORK_NAME" "${CYAN}Creating Docker network $NETWORK_NAME...${NC}"
-  docker network create "$NETWORK_NAME" >> "$INSTALL_LOG" 2>&1
-  if [ $? -ne 0 ]; then
-    log "ERROR: Failed to create Docker network $NETWORK_NAME" "${RED}Failed to create Docker network $NETWORK_NAME. See log for details.${NC}"
-    exit 1
-  fi
-else
-  log "INFO: Docker network $NETWORK_NAME already exists" "${GREEN}✅ Docker network $NETWORK_NAME already exists${NC}"
-fi
-
-# Check for Traefik
-if ! docker ps --format '{{.Names}}' | grep -q "traefik"; then
-  log "WARNING: Traefik container not found" "${YELLOW}⚠️ Traefik container not found. Keycloak may not be accessible without a reverse proxy.${NC}"
-  if [ "$WITH_DEPS" = true ]; then
-    log "INFO: Installing security infrastructure with --with-deps flag" "${CYAN}Installing security infrastructure with --with-deps flag...${NC}"
-    if [ -f "${ROOT_DIR}/scripts/core/install_security_infrastructure.sh" ]; then
-      bash "${ROOT_DIR}/scripts/core/install_security_infrastructure.sh" --domain "$DOMAIN" --email "$ADMIN_EMAIL" || {
-        log "ERROR: Failed to install security infrastructure" "${RED}Failed to install security infrastructure. Please install it manually.${NC}"
-      }
-    else
-      log "ERROR: Cannot find install_security_infrastructure.sh script" "${RED}Cannot find install_security_infrastructure.sh script. Please install security infrastructure manually.${NC}"
-    fi
-  else
-    log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
-  fi
-else
-  log "INFO: Traefik container found" "${GREEN}✅ Traefik container found${NC}"
-fi
-
-log "INFO: Starting Keycloak installation for $DOMAIN" "${BLUE}Starting Keycloak installation for $DOMAIN...${NC}"
-
-# Create Keycloak directories
-log "INFO: Creating Keycloak directories" "${CYAN}Creating Keycloak directories...${NC}"
-mkdir -p "${KEYCLOAK_DIR}/${DOMAIN}"
-mkdir -p "${KEYCLOAK_DIR}/${DOMAIN}/postgres-data"
-mkdir -p "${KEYCLOAK_DIR}/${DOMAIN}/keycloak-data"
-mkdir -p "${KEYCLOAK_DIR}/${DOMAIN}/themes"
-mkdir -p "${KEYCLOAK_DIR}/${DOMAIN}/imports"
-
-# Create Docker Compose file
-log "INFO: Creating Docker Compose file" "${CYAN}Creating Docker Compose file...${NC}"
-cat > "${KEYCLOAK_DIR}/${DOMAIN}/docker-compose.yml" <<EOF
-version: '3.7'
-
-services:
-  postgres:
-    image: postgres:13-alpine
-    container_name: ${POSTGRES_CONTAINER}
-    restart: unless-stopped
-    volumes:
-      - ${KEYCLOAK_DIR}/${DOMAIN}/postgres-data:/var/lib/postgresql/data
-    environment:
-      POSTGRES_DB: keycloak
-      POSTGRES_USER: keycloak
-      POSTGRES_PASSWORD: ${KC_DB_PASSWORD}
-    networks:
-      - ${NETWORK_NAME}
-
-  keycloak:
-    image: quay.io/keycloak/keycloak:${KEYCLOAK_VERSION}
-    container_name: ${KEYCLOAK_CONTAINER}
-    restart: unless-stopped
-    command:
-      - start
-      - --hostname=${DOMAIN}
-      - --proxy=edge
-      - --db=postgres
-      - --db-url=jdbc:postgresql://postgres:5432/keycloak
-      - --db-username=keycloak
-      - --db-password=${KC_DB_PASSWORD}
-      - --health-enabled=true
-    environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: ${ADMIN_PASSWORD}
-      KC_PROXY_ADDRESS_FORWARDING: 'true'
-      KC_HOSTNAME_URL: https://${DOMAIN}
-      KC_HOSTNAME_ADMIN_URL: https://${DOMAIN}
-    volumes:
-      - ${KEYCLOAK_DIR}/${DOMAIN}/keycloak-data:/opt/keycloak/data
-      - ${KEYCLOAK_DIR}/${DOMAIN}/themes:/opt/keycloak/themes
-      - ${KEYCLOAK_DIR}/${DOMAIN}/imports:/opt/keycloak/imports
-    depends_on:
-      - postgres
-    networks:
-      - ${NETWORK_NAME}
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.keycloak_${SITE_NAME}.rule=Host(\`${DOMAIN}\`)"
-      - "traefik.http.routers.keycloak_${SITE_NAME}.entrypoints=websecure"
-      - "traefik.http.routers.keycloak_${SITE_NAME}.tls.certresolver=myresolver"
-      - "traefik.http.services.keycloak_${SITE_NAME}.loadbalancer.server.port=8080"
-      - "traefik.http.middlewares.keycloak_${SITE_NAME}_security.headers.browserXssFilter=true"
-      - "traefik.http.middlewares.keycloak_${SITE_NAME}_security.headers.contentTypeNosniff=true"
-      - "traefik.http.middlewares.keycloak_${SITE_NAME}_security.headers.forceSTSHeader=true"
-      - "traefik.http.middlewares.keycloak_${SITE_NAME}_security.headers.stsIncludeSubdomains=true"
-      - "traefik.http.middlewares.keycloak_${SITE_NAME}_security.headers.stsPreload=true"
-      - "traefik.http.middlewares.keycloak_${SITE_NAME}_security.headers.stsSeconds=31536000"
-      - "traefik.http.routers.keycloak_${SITE_NAME}.middlewares=keycloak_${SITE_NAME}_security"
-
-networks:
-  ${NETWORK_NAME}:
-    external: true
-EOF
-
-# Create a default realm configuration
-log "INFO: Creating default realm configuration" "${CYAN}Creating default realm configuration...${NC}"
-cat > "${KEYCLOAK_DIR}/${DOMAIN}/imports/agency-realm.json" <<EOF
-{
-  "realm": "agency",
-  "enabled": true,
-  "displayName": "Agency",
-  "displayNameHtml": "<div class='kc-logo-text'><span>Agency</span></div>",
-  "sslRequired": "external",
-  "registrationAllowed": false,
-  "loginWithEmailAllowed": true,
-  "duplicateEmailsAllowed": false,
-  "resetPasswordAllowed": true,
-  "editUsernameAllowed": false,
-  "bruteForceProtected": true,
-  "roles": {
-    "realm": [
-      {
-        "name": "admin",
-        "description": "Administrator role"
-      },
-      {
-        "name": "user",
-        "description": "User role"
-      },
-      {
-        "name": "client-admin",
-        "description": "Client administrator role"
-      }
-    ]
-  },
-  "users": [
-    {
-      "username": "admin",
-      "email": "${ADMIN_EMAIL}",
-      "enabled": true,
-      "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "${ADMIN_PASSWORD}",
-          "temporary": true
-        }
-      ],
-      "realmRoles": ["admin"],
-      "clientRoles": {}
-    }
-  ]
-}
-EOF
-
-# Start Keycloak
-log "INFO: Starting Keycloak" "${CYAN}Starting Keycloak...${NC}"
-cd "${KEYCLOAK_DIR}/${DOMAIN}" && docker-compose up -d
-
-if [ $? -ne 0 ]; then
-  log "ERROR: Failed to start Keycloak" "${RED}Failed to start Keycloak. See log for details.${NC}"
-  exit 1
-fi
-
-# Store credentials in a secure location
-log "INFO: Storing credentials" "${CYAN}Storing credentials...${NC}"
-mkdir -p "${CONFIG_DIR}/secrets/keycloak"
-chmod 700 "${CONFIG_DIR}/secrets/keycloak"
-
-cat > "${CONFIG_DIR}/secrets/keycloak/${DOMAIN}.env" <<EOF
-# Keycloak Credentials for ${DOMAIN}
-# Generated on $(date +"%Y-%m-%d %H:%M:%S")
-# KEEP THIS FILE SECURE
-
-KEYCLOAK_ADMIN_USER=admin
-KEYCLOAK_ADMIN_PASSWORD=${ADMIN_PASSWORD}
-KEYCLOAK_ADMIN_EMAIL=${ADMIN_EMAIL}
-
-POSTGRES_DB=keycloak
-POSTGRES_USER=keycloak
-POSTGRES_PASSWORD=${KC_DB_PASSWORD}
-
-# Docker project
-KEYCLOAK_CONTAINER=${KEYCLOAK_CONTAINER}
-POSTGRES_CONTAINER=${POSTGRES_CONTAINER}
-EOF
-
-chmod 600 "${CONFIG_DIR}/secrets/keycloak/${DOMAIN}.env"
-
-# Register the installation in components registry
-if [ -d "${CONFIG_DIR}/components" ]; then
-  log "INFO: Registering Keycloak in components registry" "${CYAN}Registering Keycloak in components registry...${NC}"
-  mkdir -p "${CONFIG_DIR}/components/keycloak"
+# Skip installation if we're only configuring OAuth
+if [ "$CONFIGURE_OAUTH_ONLY" = true ]; then
+  log "INFO: OAuth-only configuration requested, skipping installation" "${BLUE}OAuth-only configuration requested, skipping installation...${NC}"
   
-  cat > "${CONFIG_DIR}/components/keycloak/${DOMAIN}.json" <<EOF
+  # Make sure Keycloak is already installed
+  if [ ! -d "${KEYCLOAK_DIR}/${DOMAIN}" ]; then
+    log "ERROR: Keycloak installation not found for $DOMAIN" "${RED}Error: Keycloak installation not found for $DOMAIN. Please install Keycloak first.${NC}"
+    exit 1
+  fi
+  
+  # Check if Keycloak is running
+  if ! docker ps | grep -q "keycloak_${SITE_NAME}"; then
+    log "ERROR: Keycloak container not running for $DOMAIN" "${RED}Error: Keycloak container not running for $DOMAIN. Please start Keycloak first.${NC}"
+    exit 1
+  fi
+  
+  log "INFO: Proceeding with OAuth provider configuration only" "${GREEN}Proceeding with OAuth provider configuration...${NC}"
+  
+  # Set up OAuth providers
+  configure_oauth_providers
+  
+  log "INFO: OAuth configuration completed" "${GREEN}OAuth configuration completed successfully!${NC}"
+  exit 0
+fi
+
+# Main installation logic continues here for normal installation...
+# ...
+
+# Function to configure OAuth providers
+configure_oauth_providers() {
+  if [ "$ENABLE_OAUTH_GOOGLE" = true ] || [ "$ENABLE_OAUTH_GITHUB" = true ] || [ "$ENABLE_OAUTH_APPLE" = true ] || [ "$ENABLE_OAUTH_LINKEDIN" = true ] || [ "$ENABLE_OAUTH_MICROSOFT" = true ]; then
+    log "INFO: Setting up OAuth identity providers..." "${CYAN}Setting up OAuth identity providers...${NC}"
+    
+    # Wait for Keycloak to fully initialize (additional 10 seconds)
+    sleep 10
+    
+    # Get admin token for API calls
+    ADMIN_PASSWORD_FILE="${KEYCLOAK_DIR}/${DOMAIN}/admin_password.txt"
+    if [ ! -f "$ADMIN_PASSWORD_FILE" ]; then
+      log "ERROR: Admin password file not found. Cannot configure OAuth providers." "${RED}Error: Admin password file not found. Cannot configure OAuth providers.${NC}"
+      return 1
+    fi
+    
+    ADMIN_PASSWORD=$(cat "$ADMIN_PASSWORD_FILE")
+    
+    # Use the client ID as realm if provided, otherwise use 'agency'
+    REALM_NAME="agency"
+    if [ -n "$CLIENT_ID" ]; then
+      REALM_NAME="${CLIENT_ID}"
+    fi
+    
+    # Get admin token for Keycloak API
+    ADMIN_TOKEN=$(curl -s -X POST "https://${DOMAIN}/auth/realms/master/protocol/openid-connect/token" \
+      -H "Content-Type: application/x-www-form-urlencoded" \
+      -d "grant_type=password&client_id=admin-cli&username=admin&password=${ADMIN_PASSWORD}" | jq -r '.access_token')
+    
+    if [ -z "$ADMIN_TOKEN" ] || [ "$ADMIN_TOKEN" = "null" ]; then
+      log "ERROR: Failed to get admin token" "${RED}Failed to get admin token. Cannot configure OAuth providers.${NC}"
+      log "INFO: Retrying in 5 seconds..." "${YELLOW}Retrying in 5 seconds...${NC}"
+      
+      sleep 5
+      
+      ADMIN_TOKEN=$(curl -s -X POST "https://${DOMAIN}/auth/realms/master/protocol/openid-connect/token" \
+        -H "Content-Type: application/x-www-form-urlencoded" \
+        -d "grant_type=password&client_id=admin-cli&username=admin&password=${ADMIN_PASSWORD}" | jq -r '.access_token')
+      
+      if [ -z "$ADMIN_TOKEN" ] || [ "$ADMIN_TOKEN" = "null" ]; then
+        log "ERROR: Failed to get admin token after retry" "${RED}Failed to get admin token after retry. Cannot configure OAuth providers.${NC}"
+        return 1
+      fi
+    fi
+    
+    # Configure Google Identity Provider
+    if [ "$ENABLE_OAUTH_GOOGLE" = true ]; then
+      log "INFO: Configuring Google as identity provider" "${CYAN}Configuring Google as identity provider...${NC}"
+      
+      # Check if Google IdP already exists
+      IDP_EXISTS=$(curl -s -X GET "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances/google" \
+        -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+        -o /dev/null -w "%{http_code}")
+      
+      if [ "$IDP_EXISTS" = "200" ]; then
+        log "INFO: Google IdP already exists, updating configuration" "${YELLOW}Google IdP already exists, updating configuration...${NC}"
+        # Delete existing Google IdP first to avoid conflicts
+        curl -s -X DELETE "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances/google" \
+          -H "Authorization: Bearer ${ADMIN_TOKEN}" >> "$INSTALL_LOG" 2>&1
+      fi
+      
+      # Load credentials from secure storage
+      if [ -f "${SECRETS_DIR}/${DOMAIN}/google_oauth.env" ]; then
+        source "${SECRETS_DIR}/${DOMAIN}/google_oauth.env"
+      fi
+      
+      # Validate credentials again before creating IdP
+      if [ -z "${GOOGLE_CLIENT_ID}" ] || [ -z "${GOOGLE_CLIENT_SECRET}" ]; then
+        log "ERROR: Google OAuth credentials not found in secure storage" "${RED}Error: Google OAuth credentials not found in secure storage.${NC}"
+        continue
+      fi
+      
+      # Create Google IdP
+      GOOGLE_IDP=$(cat <<EOF
 {
-  "component": "keycloak",
-  "version": "${KEYCLOAK_VERSION}",
-  "domain": "${DOMAIN}",
-  "installed_at": "$(date +"%Y-%m-%d %H:%M:%S")",
-  "client_id": "${CLIENT_ID}",
-  "status": "active"
+  "alias": "google",
+  "displayName": "Google",
+  "providerId": "google",
+  "enabled": true,
+  "updateProfileFirstLoginMode": "on",
+  "trustEmail": ${OAUTH_TRUST_EMAIL},
+  "storeToken": ${OAUTH_STORE_TOKENS},
+  "addReadTokenRoleOnCreate": false,
+  "authenticateByDefault": false,
+  "linkOnly": false,
+  "firstBrokerLoginFlowAlias": "first broker login",
+  "config": {
+    "clientId": "${GOOGLE_CLIENT_ID}",
+    "clientSecret": "${GOOGLE_CLIENT_SECRET}",
+    "useJwksUrl": "${OAUTH_USE_JWKS_URL}",
+    "validateSignature": "${OAUTH_VALIDATE_SIGNATURES}",
+    "disableUserInfo": "${OAUTH_DISABLE_USER_INFO}",
+    "defaultScope": "openid email profile",
+    "guiOrder": "1",
+    "syncMode": "IMPORT"
+  }
 }
 EOF
-else
-  log "WARNING: Components registry not found" "${YELLOW}Components registry not found, skipping registration${NC}"
-fi
-
-# Add to installed_components.txt
-INSTALLED_COMPONENTS_FILE="${CONFIG_DIR}/installed_components.txt"
-log "INFO: Adding to installed components" "${CYAN}Adding to installed components...${NC}"
-
-# Create file if it doesn't exist
-if [ ! -f "$INSTALLED_COMPONENTS_FILE" ]; then
-  echo "component|domain|version|status" > "$INSTALLED_COMPONENTS_FILE"
-fi
-
-# Check if component is already in the file
-if grep -q "keycloak|${DOMAIN}|" "$INSTALLED_COMPONENTS_FILE"; then
-  # Update the entry
-  sed -i "s|keycloak|${DOMAIN}|.*|keycloak|${DOMAIN}|${KEYCLOAK_VERSION}|active|" "$INSTALLED_COMPONENTS_FILE"
-else
-  # Add new entry
-  echo "keycloak|${DOMAIN}|${KEYCLOAK_VERSION}|active" >> "$INSTALLED_COMPONENTS_FILE"
-fi
-
-# Update dashboard status
-if [ -f "${CONFIG_DIR}/dashboard/status.json" ]; then
-  log "INFO: Updating dashboard status" "${CYAN}Updating dashboard status...${NC}"
-  # This is a placeholder for dashboard status update logic
-  # In a real implementation, this would modify the dashboard status JSON
-  # to include information about the Keycloak installation
-else
-  log "WARNING: Dashboard status file not found" "${YELLOW}Dashboard status file not found, skipping update${NC}"
-fi
-
-# Add integration information for other components
-log "INFO: Creating integration information" "${CYAN}Creating integration information...${NC}"
-mkdir -p "${CONFIG_DIR}/integrations/keycloak"
-
-cat > "${CONFIG_DIR}/integrations/keycloak/info.json" <<EOF
+)
+      
+      # Create Google IdP
+      HTTP_STATUS=$(curl -s -X POST "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances" \
+        -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d "$GOOGLE_IDP" \
+        -o /dev/null -w "%{http_code}")
+      
+      if [ "$HTTP_STATUS" = "201" ]; then
+        log "INFO: Google IdP successfully configured" "${GREEN}✅ Google IdP successfully configured${NC}"
+        # Update component registry with oauth_idp_configured flag
+        if [ -f "${ROOT_DIR}/scripts/utils/update_component_registry.sh" ]; then
+          ${ROOT_DIR}/scripts/utils/update_component_registry.sh --update-component keycloak --update-flag oauth_idp_configured --update-value true >> "$INSTALL_LOG" 2>&1
+        fi
+        
+        # Configure mappers for Google IdP
+        MAPPER_EMAIL=$(cat <<EOF
 {
-  "keycloak_url": "https://${DOMAIN}/auth",
-  "admin_url": "https://${DOMAIN}/auth/admin/",
-  "realm": "agency",
-  "integration_date": "$(date +"%Y-%m-%d %H:%M:%S")",
-  "status": "active"
+  "name": "email",
+  "identityProviderAlias": "google",
+  "identityProviderMapper": "oidc-user-attribute-idp-mapper",
+  "config": {
+    "claim": "email",
+    "user.attribute": "email"
+  }
 }
 EOF
+)
+        
+        curl -s -X POST "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances/google/mappers" \
+          -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+          -H "Content-Type: application/json" \
+          -d "$MAPPER_EMAIL" >> "$INSTALL_LOG" 2>&1
+        
+        log "INFO: Google email mapper configured" "${GREEN}✅ Google email mapper configured${NC}"
+        
+      else
+        log "ERROR: Failed to configure Google IdP, HTTP status: ${HTTP_STATUS}" "${RED}Failed to configure Google IdP, HTTP status: ${HTTP_STATUS}${NC}"
+      fi
+    fi
+    
+    # Configure GitHub Identity Provider
+    if [ "$ENABLE_OAUTH_GITHUB" = true ]; then
+      log "INFO: Configuring GitHub as identity provider" "${CYAN}Configuring GitHub as identity provider...${NC}"
+      
+      # Check if GitHub IdP already exists
+      IDP_EXISTS=$(curl -s -X GET "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances/github" \
+        -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+        -o /dev/null -w "%{http_code}")
+      
+      if [ "$IDP_EXISTS" = "200" ]; then
+        log "INFO: GitHub IdP already exists, updating configuration" "${YELLOW}GitHub IdP already exists, updating configuration...${NC}"
+        # Delete existing GitHub IdP first to avoid conflicts
+        curl -s -X DELETE "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances/github" \
+          -H "Authorization: Bearer ${ADMIN_TOKEN}" >> "$INSTALL_LOG" 2>&1
+      fi
+      
+      # Load credentials from secure storage
+      if [ -f "${SECRETS_DIR}/${DOMAIN}/github_oauth.env" ]; then
+        source "${SECRETS_DIR}/${DOMAIN}/github_oauth.env"
+      fi
+      
+      # Validate credentials again before creating IdP
+      if [ -z "${GITHUB_CLIENT_ID}" ] || [ -z "${GITHUB_CLIENT_SECRET}" ]; then
+        log "ERROR: GitHub OAuth credentials not found in secure storage" "${RED}Error: GitHub OAuth credentials not found in secure storage.${NC}"
+        continue
+      fi
+      
+      # Create GitHub IdP
+      GITHUB_IDP=$(cat <<EOF
+{
+  "alias": "github",
+  "displayName": "GitHub",
+  "providerId": "github",
+  "enabled": true,
+  "updateProfileFirstLoginMode": "on",
+  "trustEmail": ${OAUTH_TRUST_EMAIL},
+  "storeToken": ${OAUTH_STORE_TOKENS},
+  "addReadTokenRoleOnCreate": false,
+  "authenticateByDefault": false,
+  "linkOnly": false,
+  "firstBrokerLoginFlowAlias": "first broker login",
+  "config": {
+    "clientId": "${GITHUB_CLIENT_ID}",
+    "clientSecret": "${GITHUB_CLIENT_SECRET}",
+    "defaultScope": "user:email",
+    "guiOrder": "2",
+    "syncMode": "IMPORT"
+  }
+}
+EOF
+)
+      
+      # Create GitHub IdP
+      HTTP_STATUS=$(curl -s -X POST "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances" \
+        -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d "$GITHUB_IDP" \
+        -o /dev/null -w "%{http_code}")
+      
+      if [ "$HTTP_STATUS" = "201" ]; then
+        log "INFO: GitHub IdP successfully configured" "${GREEN}✅ GitHub IdP successfully configured${NC}"
+        # Update component registry with oauth_idp_configured flag
+        if [ -f "${ROOT_DIR}/scripts/utils/update_component_registry.sh" ]; then
+          ${ROOT_DIR}/scripts/utils/update_component_registry.sh --update-component keycloak --update-flag oauth_idp_configured --update-value true >> "$INSTALL_LOG" 2>&1
+        fi
+        
+        # Configure mappers for GitHub IdP
+        MAPPER_EMAIL=$(cat <<EOF
+{
+  "name": "email",
+  "identityProviderAlias": "github",
+  "identityProviderMapper": "github-user-attribute-mapper",
+  "config": {
+    "jsonField": "email",
+    "userAttribute": "email"
+  }
+}
+EOF
+)
+        
+        curl -s -X POST "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances/github/mappers" \
+          -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+          -H "Content-Type: application/json" \
+          -d "$MAPPER_EMAIL" >> "$INSTALL_LOG" 2>&1
+        
+        log "INFO: GitHub email mapper configured" "${GREEN}✅ GitHub email mapper configured${NC}"
+        
+      else
+        log "ERROR: Failed to configure GitHub IdP, HTTP status: ${HTTP_STATUS}" "${RED}Failed to configure GitHub IdP, HTTP status: ${HTTP_STATUS}${NC}"
+      fi
+    fi
+    
+    # Configure Apple Identity Provider
+    if [ "$ENABLE_OAUTH_APPLE" = true ]; then
+      log "INFO: Configuring Apple as identity provider" "${CYAN}Configuring Apple as identity provider...${NC}"
+      
+      # Check if Apple IdP already exists
+      IDP_EXISTS=$(curl -s -X GET "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances/apple" \
+        -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+        -o /dev/null -w "%{http_code}")
+      
+      if [ "$IDP_EXISTS" = "200" ]; then
+        log "INFO: Apple IdP already exists, updating configuration" "${YELLOW}Apple IdP already exists, updating configuration...${NC}"
+        # Delete existing Apple IdP first to avoid conflicts
+        curl -s -X DELETE "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances/apple" \
+          -H "Authorization: Bearer ${ADMIN_TOKEN}" >> "$INSTALL_LOG" 2>&1
+      fi
+      
+      # Load credentials from secure storage
+      if [ -f "${SECRETS_DIR}/${DOMAIN}/apple_oauth.env" ]; then
+        source "${SECRETS_DIR}/${DOMAIN}/apple_oauth.env"
+      fi
+      
+      # Validate credentials again before creating IdP
+      if [ -z "${APPLE_CLIENT_ID}" ] || [ -z "${APPLE_CLIENT_SECRET}" ]; then
+        log "ERROR: Apple OAuth credentials not found in secure storage" "${RED}Error: Apple OAuth credentials not found in secure storage.${NC}"
+        continue
+      fi
+      
+      # Create Apple IdP
+      APPLE_IDP=$(cat <<EOF
+{
+  "alias": "apple",
+  "displayName": "Apple",
+  "providerId": "apple",
+  "enabled": true,
+  "updateProfileFirstLoginMode": "on",
+  "trustEmail": ${OAUTH_TRUST_EMAIL},
+  "storeToken": ${OAUTH_STORE_TOKENS},
+  "addReadTokenRoleOnCreate": false,
+  "authenticateByDefault": false,
+  "linkOnly": false,
+  "firstBrokerLoginFlowAlias": "first broker login",
+  "config": {
+    "clientId": "${APPLE_CLIENT_ID}",
+    "clientSecret": "${APPLE_CLIENT_SECRET}",
+    "defaultScope": "email name",
+    "guiOrder": "3",
+    "syncMode": "IMPORT",
+    "validateSignature": "${OAUTH_VALIDATE_SIGNATURES}",
+    "useJwksUrl": "${OAUTH_USE_JWKS_URL}"
+  }
+}
+EOF
+)
+      
+      # Create Apple IdP
+      HTTP_STATUS=$(curl -s -X POST "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances" \
+        -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d "$APPLE_IDP" \
+        -o /dev/null -w "%{http_code}")
+      
+      if [ "$HTTP_STATUS" = "201" ]; then
+        log "INFO: Apple IdP successfully configured" "${GREEN}✅ Apple IdP successfully configured${NC}"
+        # Update component registry with oauth_idp_configured flag
+        if [ -f "${ROOT_DIR}/scripts/utils/update_component_registry.sh" ]; then
+          ${ROOT_DIR}/scripts/utils/update_component_registry.sh --update-component keycloak --update-flag oauth_idp_configured --update-value true >> "$INSTALL_LOG" 2>&1
+        fi
+        
+        # Configure mappers for Apple IdP
+        MAPPER_EMAIL=$(cat <<EOF
+{
+  "name": "apple-email",
+  "identityProviderAlias": "apple",
+  "identityProviderMapper": "oidc-user-attribute-idp-mapper",
+  "config": {
+    "claim": "email",
+    "user.attribute": "email"
+  }
+}
+EOF
+)
+        
+        curl -s -X POST "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances/apple/mappers" \
+          -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+          -H "Content-Type: application/json" \
+          -d "$MAPPER_EMAIL" >> "$INSTALL_LOG" 2>&1
+        
+        log "INFO: Apple email mapper configured" "${GREEN}✅ Apple email mapper configured${NC}"
+        
+      else
+        log "ERROR: Failed to configure Apple IdP, HTTP status: ${HTTP_STATUS}" "${RED}Failed to configure Apple IdP, HTTP status: ${HTTP_STATUS}${NC}"
+      fi
+    fi
+    
+    # Configure LinkedIn Identity Provider
+    if [ "$ENABLE_OAUTH_LINKEDIN" = true ]; then
+      log "INFO: Configuring LinkedIn as identity provider" "${CYAN}Configuring LinkedIn as identity provider...${NC}"
+      
+      # Check if LinkedIn IdP already exists
+      IDP_EXISTS=$(curl -s -X GET "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances/linkedin" \
+        -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+        -o /dev/null -w "%{http_code}")
+      
+      if [ "$IDP_EXISTS" = "200" ]; then
+        log "INFO: LinkedIn IdP already exists, updating configuration" "${YELLOW}LinkedIn IdP already exists, updating configuration...${NC}"
+        # Delete existing LinkedIn IdP first to avoid conflicts
+        curl -s -X DELETE "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances/linkedin" \
+          -H "Authorization: Bearer ${ADMIN_TOKEN}" >> "$INSTALL_LOG" 2>&1
+      fi
+      
+      # Load credentials from secure storage
+      if [ -f "${SECRETS_DIR}/${DOMAIN}/linkedin_oauth.env" ]; then
+        source "${SECRETS_DIR}/${DOMAIN}/linkedin_oauth.env"
+      fi
+      
+      # Validate credentials again before creating IdP
+      if [ -z "${LINKEDIN_CLIENT_ID}" ] || [ -z "${LINKEDIN_CLIENT_SECRET}" ]; then
+        log "ERROR: LinkedIn OAuth credentials not found in secure storage" "${RED}Error: LinkedIn OAuth credentials not found in secure storage.${NC}"
+        continue
+      fi
+      
+      # Create LinkedIn IdP
+      LINKEDIN_IDP=$(cat <<EOF
+{
+  "alias": "linkedin",
+  "displayName": "LinkedIn",
+  "providerId": "linkedin",
+  "enabled": true,
+  "updateProfileFirstLoginMode": "on",
+  "trustEmail": ${OAUTH_TRUST_EMAIL},
+  "storeToken": ${OAUTH_STORE_TOKENS},
+  "addReadTokenRoleOnCreate": false,
+  "authenticateByDefault": false,
+  "linkOnly": false,
+  "firstBrokerLoginFlowAlias": "first broker login",
+  "config": {
+    "clientId": "${LINKEDIN_CLIENT_ID}",
+    "clientSecret": "${LINKEDIN_CLIENT_SECRET}",
+    "defaultScope": "r_liteprofile r_emailaddress",
+    "guiOrder": "4",
+    "syncMode": "IMPORT"
+  }
+}
+EOF
+)
+      
+      # Create LinkedIn IdP
+      HTTP_STATUS=$(curl -s -X POST "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances" \
+        -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d "$LINKEDIN_IDP" \
+        -o /dev/null -w "%{http_code}")
+      
+      if [ "$HTTP_STATUS" = "201" ]; then
+        log "INFO: LinkedIn IdP successfully configured" "${GREEN}✅ LinkedIn IdP successfully configured${NC}"
+        # Update component registry with oauth_idp_configured flag
+        if [ -f "${ROOT_DIR}/scripts/utils/update_component_registry.sh" ]; then
+          ${ROOT_DIR}/scripts/utils/update_component_registry.sh --update-component keycloak --update-flag oauth_idp_configured --update-value true >> "$INSTALL_LOG" 2>&1
+        fi
+        
+        # Configure mappers for LinkedIn IdP
+        MAPPER_EMAIL=$(cat <<EOF
+{
+  "name": "linkedin-email",
+  "identityProviderAlias": "linkedin",
+  "identityProviderMapper": "oidc-user-attribute-idp-mapper",
+  "config": {
+    "claim": "emailAddress",
+    "user.attribute": "email"
+  }
+}
+EOF
+)
+        
+        curl -s -X POST "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances/linkedin/mappers" \
+          -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+          -H "Content-Type: application/json" \
+          -d "$MAPPER_EMAIL" >> "$INSTALL_LOG" 2>&1
+        
+        log "INFO: LinkedIn email mapper configured" "${GREEN}✅ LinkedIn email mapper configured${NC}"
+        
+      else
+        log "ERROR: Failed to configure LinkedIn IdP, HTTP status: ${HTTP_STATUS}" "${RED}Failed to configure LinkedIn IdP, HTTP status: ${HTTP_STATUS}${NC}"
+      fi
+    fi
+    
+    # Configure Microsoft Identity Provider
+    if [ "$ENABLE_OAUTH_MICROSOFT" = true ]; then
+      log "INFO: Configuring Microsoft as identity provider" "${CYAN}Configuring Microsoft as identity provider...${NC}"
+      
+      # Check if Microsoft IdP already exists
+      IDP_EXISTS=$(curl -s -X GET "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances/microsoft" \
+        -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+        -o /dev/null -w "%{http_code}")
+      
+      if [ "$IDP_EXISTS" = "200" ]; then
+        log "INFO: Microsoft IdP already exists, updating configuration" "${YELLOW}Microsoft IdP already exists, updating configuration...${NC}"
+        # Delete existing Microsoft IdP first to avoid conflicts
+        curl -s -X DELETE "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances/microsoft" \
+          -H "Authorization: Bearer ${ADMIN_TOKEN}" >> "$INSTALL_LOG" 2>&1
+      fi
+      
+      # Load credentials from secure storage
+      if [ -f "${SECRETS_DIR}/${DOMAIN}/microsoft_oauth.env" ]; then
+        source "${SECRETS_DIR}/${DOMAIN}/microsoft_oauth.env"
+      fi
+      
+      # Validate credentials again before creating IdP
+      if [ -z "${MICROSOFT_CLIENT_ID}" ] || [ -z "${MICROSOFT_CLIENT_SECRET}" ]; then
+        log "ERROR: Microsoft OAuth credentials not found in secure storage" "${RED}Error: Microsoft OAuth credentials not found in secure storage.${NC}"
+        continue
+      fi
+      
+      # Create Microsoft IdP
+      MICROSOFT_IDP=$(cat <<EOF
+{
+  "alias": "microsoft",
+  "displayName": "Microsoft",
+  "providerId": "microsoft",
+  "enabled": true,
+  "updateProfileFirstLoginMode": "on",
+  "trustEmail": ${OAUTH_TRUST_EMAIL},
+  "storeToken": ${OAUTH_STORE_TOKENS},
+  "addReadTokenRoleOnCreate": false,
+  "authenticateByDefault": false,
+  "linkOnly": false,
+  "firstBrokerLoginFlowAlias": "first broker login",
+  "config": {
+    "clientId": "${MICROSOFT_CLIENT_ID}",
+    "clientSecret": "${MICROSOFT_CLIENT_SECRET}",
+    "defaultScope": "openid profile email",
+    "guiOrder": "5",
+    "syncMode": "IMPORT",
+    "validateSignature": "${OAUTH_VALIDATE_SIGNATURES}",
+    "useJwksUrl": "${OAUTH_USE_JWKS_URL}"
+  }
+}
+EOF
+)
+      
+      # Create Microsoft IdP
+      HTTP_STATUS=$(curl -s -X POST "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances" \
+        -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d "$MICROSOFT_IDP" \
+        -o /dev/null -w "%{http_code}")
+      
+      if [ "$HTTP_STATUS" = "201" ]; then
+        log "INFO: Microsoft IdP successfully configured" "${GREEN}✅ Microsoft IdP successfully configured${NC}"
+        # Update component registry with oauth_idp_configured flag
+        if [ -f "${ROOT_DIR}/scripts/utils/update_component_registry.sh" ]; then
+          ${ROOT_DIR}/scripts/utils/update_component_registry.sh --update-component keycloak --update-flag oauth_idp_configured --update-value true >> "$INSTALL_LOG" 2>&1
+        fi
+        
+        # Configure mappers for Microsoft IdP
+        MAPPER_EMAIL=$(cat <<EOF
+{
+  "name": "microsoft-email",
+  "identityProviderAlias": "microsoft",
+  "identityProviderMapper": "oidc-user-attribute-idp-mapper",
+  "config": {
+    "claim": "email",
+    "user.attribute": "email"
+  }
+}
+EOF
+)
+        
+        curl -s -X POST "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances/microsoft/mappers" \
+          -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+          -H "Content-Type: application/json" \
+          -d "$MAPPER_EMAIL" >> "$INSTALL_LOG" 2>&1
+        
+        log "INFO: Microsoft email mapper configured" "${GREEN}✅ Microsoft email mapper configured${NC}"
+        
+      else
+        log "ERROR: Failed to configure Microsoft IdP, HTTP status: ${HTTP_STATUS}" "${RED}Failed to configure Microsoft IdP, HTTP status: ${HTTP_STATUS}${NC}"
+      fi
+    fi
+    
+    # Create authentication browser flow overrides if any IdPs were configured successfully
+    if curl -s -X GET "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/identity-provider/instances" \
+      -H "Authorization: Bearer ${ADMIN_TOKEN}" | jq -e 'length > 0' > /dev/null; then
+      
+      log "INFO: Setting up authentication flow with IdP redirector" "${CYAN}Setting up authentication flow with IdP redirector...${NC}"
+      
+      # Get the current browser flow
+      BROWSER_FLOW=$(curl -s -X GET "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/authentication/flows/browser" \
+        -H "Authorization: Bearer ${ADMIN_TOKEN}")
+      
+      if [ -n "$BROWSER_FLOW" ]; then
+        log "INFO: Browser flow retrieved successfully" "${GREEN}Browser flow retrieved successfully${NC}"
+        
+        # Copy the browser flow to create a custom one
+        CUSTOM_FLOW_NAME="browser-with-idp-redirector"
+        COPY_FLOW=$(cat <<EOF
+{
+  "newName": "${CUSTOM_FLOW_NAME}"
+}
+EOF
+)
+        
+        # Create the copy
+        curl -s -X POST "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}/authentication/flows/browser/copy" \
+          -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+          -H "Content-Type: application/json" \
+          -d "$COPY_FLOW" >> "$INSTALL_LOG" 2>&1
+        
+        log "INFO: Created custom browser flow: ${CUSTOM_FLOW_NAME}" "${GREEN}Created custom browser flow: ${CUSTOM_FLOW_NAME}${NC}"
+        
+        # Set the new flow as the browser flow
+        FLOW_UPDATE=$(cat <<EOF
+{
+  "alias": "browser",
+  "flows": ["${CUSTOM_FLOW_NAME}"]
+}
+EOF
+)
+        
+        curl -s -X PUT "https://${DOMAIN}/auth/admin/realms/${REALM_NAME}" \
+          -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+          -H "Content-Type: application/json" \
+          -d "$FLOW_UPDATE" >> "$INSTALL_LOG" 2>&1
+        
+        log "INFO: Set custom flow as default browser flow" "${GREEN}Set custom flow as default browser flow${NC}"
+        
+        log "INFO: Identity provider configuration completed" "${GREEN}Identity provider configuration completed${NC}"
+      else
+        log "ERROR: Failed to retrieve browser flow" "${RED}Failed to retrieve browser flow${NC}"
+      fi
+    fi
+  fi
+}
 
-integration_log "INFO: Created integration information at ${CONFIG_DIR}/integrations/keycloak/info.json"
+# Main installation logic...
+# ...
 
-# Wait for Keycloak to be ready
-log "INFO: Waiting for Keycloak to be ready" "${CYAN}Waiting for Keycloak to be ready...${NC}"
-sleep 10
+# Configure OAuth providers if requested (moved to function)
+if [ "$ENABLE_OAUTH_GOOGLE" = true ] || [ "$ENABLE_OAUTH_GITHUB" = true ] || [ "$ENABLE_OAUTH_APPLE" = true ] || [ "$ENABLE_OAUTH_LINKEDIN" = true ] || [ "$ENABLE_OAUTH_MICROSOFT" = true ]; then
+  configure_oauth_providers
+fi
 
-# Final message
-log "INFO: Keycloak installation completed successfully" "${GREEN}${BOLD}✅ Keycloak installed successfully!${NC}"
-echo -e "${CYAN}Keycloak URL: https://${DOMAIN}/auth${NC}"
-echo -e "${CYAN}Admin Console: https://${DOMAIN}/auth/admin/${NC}"
-echo -e "${YELLOW}Admin Username: admin${NC}"
-echo -e "${YELLOW}Admin Password: ${ADMIN_PASSWORD}${NC}"
-echo -e "${YELLOW}IMPORTANT: Please save these credentials safely and change the password!${NC}"
-echo -e ""
-echo -e "${CYAN}Credentials saved to: ${CONFIG_DIR}/secrets/keycloak/${DOMAIN}.env${NC}"
-echo -e ""
-echo -e "${YELLOW}Integration Information:${NC}"
-echo -e "${CYAN}To integrate other services with Keycloak, use the following:${NC}"
-echo -e "${CYAN}- Auth URL: https://${DOMAIN}/auth${NC}"
-echo -e "${CYAN}- Realm: agency${NC}"
-echo -e "${CYAN}For each client, you'll need to register it in the Keycloak admin console.${NC}"
-
-exit 0
+# Update component registry
+if [ "$ENABLE_OAUTH_GOOGLE" = true ] || [ "$ENABLE_OAUTH_GITHUB" = true ] || [ "$ENABLE_OAUTH_APPLE" = true ] || [ "$ENABLE_OAUTH_LINKEDIN" = true ] || [ "$ENABLE_OAUTH_MICROSOFT" = true ]; then
+  log "INFO: Updating component registry with OAuth IDP flag" "${BLUE}Updating component registry...${NC}"
+  ${ROOT_DIR}/scripts/utils/update_component_registry.sh --update-component keycloak --update-flag oauth_idp_configured --update-value true
+fi
