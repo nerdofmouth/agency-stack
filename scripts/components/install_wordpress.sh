@@ -254,6 +254,12 @@ if docker ps -a --format '{{.Names}}' | grep -q "$WORDPRESS_CONTAINER_NAME"; the
   fi
 fi
 
+# Explicitly cleanup all data directories if --force was specified
+if [ "$FORCE" = true ]; then
+  log "INFO: Cleaning up data directories due to --force option" "${CYAN}Cleaning up data directories...${NC}"
+  rm -rf "${WP_DIR}/${DOMAIN}/mariadb" "${WP_DIR}/${DOMAIN}/wordpress" "${WP_DIR}/${DOMAIN}/redis"
+fi
+
 # Check if Docker is installed
 if ! command -v docker &> /dev/null; then
   log "ERROR: Docker is not installed" "${RED}Docker is not installed. Please install Docker first.${NC}"
@@ -527,6 +533,59 @@ EOL
 # Create PHP-FPM configuration
 log "INFO: Creating PHP-FPM configuration" "${CYAN}Creating PHP-FPM configuration...${NC}"
 mkdir -p "${WP_DIR}/${DOMAIN}/php-fpm"
+
+# Add a comprehensive database connection testing function
+test_database_connection() {
+  local host="$1"
+  local user="$2"
+  local password="$3"
+  local database="$4"
+  local container="$5"
+  
+  log "INFO: Testing database connection - Host: $host, User: $user, Database: $database" "==========================================
+DATABASE CONNECTION TEST
+Target: $host
+User: $user
+Database: $database
+=========================================="
+  
+  # Test connection
+  docker exec "$container" bash -c "MYSQL_PWD='$password' mysql -h $host -u$user $database -e 'SELECT 1;'" &> /dev/null
+  if [ $? -eq 0 ]; then
+    log "INFO: Database connection test passed" "${GREEN}SUCCESS: Connected to database${NC}"
+    return 0
+  else
+    log "WARNING: Database connection test failed" "${YELLOW}FAILURE: Could not connect to database${NC}"
+    echo "Testing root connection as diagnostic:"
+    docker exec "$container" bash -c "MYSQL_PWD='$WP_ROOT_PASSWORD' mysql -h $host -uroot -e 'SELECT 1;'" || echo "Root connection failed"
+    
+    # Test hostname resolution
+    echo "Testing IP resolution:"
+    docker exec "$container" bash -c "getent hosts $host" || echo "Hostname resolution failed"
+    
+    # Test network connectivity
+    echo "Testing network connectivity:"
+    docker exec "$container" bash -c "ping -c 1 $host" &> /dev/null || echo "Ping failed"
+    
+    # Show container networks
+    echo "Container networks:"
+    docker inspect --format='{{range $net,$v := .NetworkSettings.Networks}}{{$net}}{{end}}' "$container"
+    
+    # Show host address in networks
+    echo "Database host networks:"
+    docker inspect --format='{{range $net,$v := .NetworkSettings.Networks}}{{$net}}{{end}}' "${MARIADB_CONTAINER_NAME}"
+    
+    # Internal IP addresses
+    echo "Container IP addresses:"
+    docker inspect --format='{{range $net,$v := .NetworkSettings.Networks}}{{$net}}: {{$v.IPAddress}}{{printf "\n"}}{{end}}' "$container"
+    echo "Database IP addresses:"
+    docker inspect --format='{{range $net,$v := .NetworkSettings.Networks}}{{$net}}: {{$v.IPAddress}}{{printf "\n"}}{{end}}' "${MARIADB_CONTAINER_NAME}"
+    
+    return 1
+  fi
+}
+
+# Create config files
 cat > "${WP_DIR}/${DOMAIN}/php-fpm/www.conf" <<EOL
 [www]
 user = www-data
@@ -605,86 +664,34 @@ docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "apt-get update && apt-get insta
 # Improve database initialization with a direct approach that properly escapes special characters
 log "INFO: Ensuring database is properly initialized" "${CYAN}Ensuring database is properly initialized...${NC}"
 
-# Wait for MariaDB to be fully initialized (important for fresh installs)
-sleep 10
+# Wait for MariaDB to fully initialize (more time for first run)
+sleep 20
 
-# Use the environment variables already specified in the docker-compose file
-log "INFO: Checking database connection" "${CYAN}Checking database connection...${NC}"
-docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_DB_PASSWORD} mysql -h mariadb -u${WP_DB_USER} -e 'SELECT 1;'" && {
-  log "INFO: Database connection successful with WordPress user" "${GREEN}✅ Database connection successful with WordPress user${NC}"
-} || {
-  log "WARNING: Database connection with WordPress user failed, initializing database" "${YELLOW}⚠️ Database connection with WordPress user failed, initializing database${NC}"
-  
-  # Try with root
-  docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysql -h mariadb -uroot -e 'SELECT 1;'" && {
-    log "INFO: Database connection successful with root user" "${GREEN}✅ Database connection successful with root user${NC}"
-    
-    # These direct SQL commands handle initialization without relying on potentially problematic heredoc escaping
-    docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysql -h mariadb -uroot -e \"CREATE DATABASE IF NOT EXISTS ${WP_DB_NAME};\"" || log "WARNING: Unable to create database" "${YELLOW}⚠️ Unable to create database${NC}"
-    
-    docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysql -h mariadb -uroot -e \"CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'localhost' IDENTIFIED BY '${WP_DB_PASSWORD}';\"" || log "WARNING: Unable to create localhost user" "${YELLOW}⚠️ Unable to create localhost user${NC}"
-    
-    docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysql -h mariadb -uroot -e \"CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'%' IDENTIFIED BY '${WP_DB_PASSWORD}';\"" || log "WARNING: Unable to create wildcard user" "${YELLOW}⚠️ Unable to create wildcard user${NC}"
-    
-    docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysql -h mariadb -uroot -e \"GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'localhost';\"" || log "WARNING: Unable to grant privileges to localhost user" "${YELLOW}⚠️ Unable to grant privileges to localhost user${NC}"
-    
-    docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysql -h mariadb -uroot -e \"GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'%';\"" || log "WARNING: Unable to grant privileges to wildcard user" "${YELLOW}⚠️ Unable to grant privileges to wildcard user${NC}"
-    
-    docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysql -h mariadb -uroot -e \"FLUSH PRIVILEGES;\"" || log "WARNING: Unable to flush privileges" "${YELLOW}⚠️ Unable to flush privileges${NC}"
-  } || {
-    log "WARNING: Database connection with root user failed" "${YELLOW}⚠️ Database connection with root user failed${NC}"
+# First ensure our database initialization script was applied
+log "INFO: Verifying database initialization" "${CYAN}Verifying database initialization...${NC}"
+docker exec ${MARIADB_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysql -uroot -e \"SHOW DATABASES; SELECT User, Host FROM mysql.user WHERE User='${WP_DB_USER}';\"" || {
+  log "WARNING: Database initialization verification failed" "${YELLOW}⚠️ Database initialization verification failed${NC}"
+  # Attempt to manually initialize the database with our configuration
+  docker exec ${MARIADB_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysql -uroot < /docker-entrypoint-initdb.d/init.sql" || {
+    log "WARNING: Manual database initialization failed" "${YELLOW}⚠️ Manual database initialization failed${NC}"
   }
 }
 
-# Run a brief verification
-log "INFO: Verifying database setup" "${CYAN}Verifying database setup...${NC}"
-docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysql -h mariadb -uroot -e \"SHOW DATABASES; SELECT User, Host FROM mysql.user WHERE User='${WP_DB_USER}' OR User='root';\"" || log "WARNING: Unable to verify database setup" "${YELLOW}⚠️ Unable to verify database setup${NC}"
+# Run comprehensive database connection test
+test_database_connection "mariadb" "${WP_DB_USER}" "${WP_DB_PASSWORD}" "${WP_DB_NAME}" "${WORDPRESS_CONTAINER_NAME}"
 
-# Create a better test_db script that demonstrates proper service discovery and connectivity checks
-# This approach can be reused for connecting to shared services in the future
-cat > "${WP_DIR}/${DOMAIN}/test_db.sh" <<EOL
-#!/bin/bash
-# Technology Reuse Database Connection Test Script
-# This script demonstrates proper service discovery and connection validation
-# that could be reused across components in AgencyStack
+# Now try to create a WordPress database backup in case we need it
+log "INFO: Creating WordPress database backup" "${CYAN}Creating WordPress database backup (if database exists)...${NC}"
+docker exec ${MARIADB_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysqldump -uroot ${WP_DB_NAME} > /var/lib/mysql/${WP_DB_NAME}_backup.sql" || {
+  log "WARNING: Unable to create database backup" "${YELLOW}⚠️ Unable to create database backup (database may not exist yet)${NC}"
+}
 
-echo "=========================================="
-echo "DATABASE CONNECTION TEST"
-echo "Target: mariadb"
-echo "User: ${WP_DB_USER}"
-echo "Database: ${WP_DB_NAME}"
-echo "=========================================="
-
-# Try the connection with environment variables
-export MYSQL_PWD="${WP_DB_PASSWORD}"
-if mysql -h mariadb -u${WP_DB_USER} -e "USE ${WP_DB_NAME}; SELECT 'Database connection successful!' as Status;" 2>/dev/null; then
-    echo "SUCCESS: Connected to database mariadb"
-    exit 0
-else
-    echo "FAILURE: Could not connect to database"
-    echo "Testing root connection as diagnostic:"
-    export MYSQL_PWD="${WP_ROOT_PASSWORD}"
-    mysql -h mariadb -uroot -e "SHOW DATABASES;" 2>&1 || echo "Root connection failed"
-    echo "Testing IP resolution:"
-    getent hosts mariadb || echo "Host lookup failed"
-    exit 1
-fi
-EOL
-
-chmod +x "${WP_DIR}/${DOMAIN}/test_db.sh"
-
-# Copy test_db.sh to the WordPress container
-docker cp "${WP_DIR}/${DOMAIN}/test_db.sh" ${WORDPRESS_CONTAINER_NAME}:/tmp/test_db.sh
-
-# Run test_db.sh
-docker exec ${WORDPRESS_CONTAINER_NAME} /tmp/test_db.sh || log "WARNING: Database connection test failed, but continuing..." "${YELLOW}⚠️ Database connection test failed, but continuing...${NC}"
+# Ensure database is ready with additional wait time
+log "INFO: Ensuring database is ready" "${CYAN}Ensuring database is ready...${NC}"
+sleep 10
 
 # Install WP-CLI inside the container
 docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar && chmod +x wp-cli.phar && mv wp-cli.phar /usr/local/bin/wp"
-
-# Ensure database is ready
-log "INFO: Ensuring database is ready" "${CYAN}Ensuring database is ready...${NC}"
-sleep 10
 
 # Configure WordPress using WP-CLI
 log "INFO: Configuring WordPress site" "${CYAN}Configuring WordPress site...${NC}"
