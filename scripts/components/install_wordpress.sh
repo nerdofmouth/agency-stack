@@ -704,8 +704,10 @@ log "INFO: Ensuring database is properly initialized" "${CYAN}Ensuring database 
 cat > "${WP_DIR}/${DOMAIN}/direct_init.sql" <<EOL
 -- Direct initialization script to bypass permission issues
 CREATE DATABASE IF NOT EXISTS ${WP_DB_NAME};
-CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'%' IDENTIFIED BY '${WP_DB_PASSWORD}';
-GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'%';
+CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'172.18.0.%' IDENTIFIED BY '${WP_DB_PASSWORD}';
+CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'localhost' IDENTIFIED BY '${WP_DB_PASSWORD}';
+GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'172.18.0.%';
+GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'localhost';
 FLUSH PRIVILEGES;
 EOL
 
@@ -716,7 +718,7 @@ docker exec ${MARIADB_CONTAINER_NAME} bash -c "mysql -uroot -p${WP_ROOT_PASSWORD
 
 # Run a brief verification
 log "INFO: Verifying database setup" "${CYAN}Verifying database setup...${NC}"
-docker exec ${MARIADB_CONTAINER_NAME} bash -c "mysql -uroot -p${WP_ROOT_PASSWORD} -e \"SHOW DATABASES; SELECT User, Host FROM mysql.user WHERE User='${WP_DB_USER}';\""
+docker exec ${MARIADB_CONTAINER_NAME} bash -c "mysql -uroot -p${WP_ROOT_PASSWORD} -e \"SHOW DATABASES; SELECT User, Host FROM mysql.user WHERE User='${WP_DB_USER}' OR User='root';\""
 
 # Copy test_db.sh to the WordPress container
 docker cp "${WP_DIR}/${DOMAIN}/test_db.sh" ${WORDPRESS_CONTAINER_NAME}:/tmp/test_db.sh
