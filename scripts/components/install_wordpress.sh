@@ -711,11 +711,26 @@ cd "${WP_DIR}/${DOMAIN}/wordpress" || {
   exit 1
 }
 
-# Install WordPress if not already installed
-log "INFO: Installing WordPress core" "${CYAN}Installing WordPress core...${NC}"
-docker exec -w /var/www/html ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI core install --url=https://${DOMAIN} --title='WordPress on AgencyStack' --admin_user=${WP_ADMIN_USER} --admin_password=${WP_ADMIN_PASSWORD} --admin_email=${ADMIN_EMAIL} --skip-email" || log "WARNING: WordPress may already be installed" "${YELLOW}WordPress is already installed.${NC}"
+# Setup WP-CLI commands but ensure we always run with --allow-root flag
+WP_CLI="wp --allow-root"
 
-# Install essential plugins
+# Ensure database schema is properly initialized
+log "INFO: Ensuring database schema is initialized" "${CYAN}Ensuring database schema is initialized...${NC}"
+docker exec -w /var/www/html ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI core is-installed" || { 
+  log "INFO: WordPress needs to be installed" "${CYAN}WordPress needs to be installed, running core installation...${NC}"
+  # Force database schema creation even if already partially initialized
+  docker exec -w /var/www/html ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI db reset --yes" || log "WARNING: Failed to reset database" "${YELLOW}⚠️ Failed to reset database${NC}"
+  
+  # Install WordPress if not already installed
+  log "INFO: Installing WordPress core" "${CYAN}Installing WordPress core...${NC}"
+  docker exec -w /var/www/html ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI core install --url=https://${DOMAIN} --title='WordPress on AgencyStack' --admin_user=${WP_ADMIN_USER} --admin_password=${WP_ADMIN_PASSWORD} --admin_email=${ADMIN_EMAIL} --skip-email" || log "WARNING: WordPress core installation failed" "${YELLOW}⚠️ WordPress core installation failed${NC}"
+}
+
+# Verify the database schema
+log "INFO: Verifying database tables" "${CYAN}Verifying database tables...${NC}"
+docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI db tables" || log "WARNING: Cannot list database tables" "${YELLOW}⚠️ Cannot list database tables${NC}"
+
+# Install essential plugins 
 log "INFO: Installing essential plugins" "${CYAN}Installing essential plugins...${NC}"
 docker exec -w /var/www/html ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI plugin install redis-cache wordfence sucuri-scanner wordpress-seo duplicate-post --activate" || log "WARNING: Failed to install plugins" "${YELLOW}⚠️ Failed to install plugins${NC}"
 
