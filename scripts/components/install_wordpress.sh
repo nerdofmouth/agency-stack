@@ -410,6 +410,7 @@ version: '3'
 networks:
   wordpress_network:
     name: ${CLIENT_ID}_wordpress_${SITE_NAME}_network
+    driver: bridge
   ${CLIENT_ID}_network:
     external: true
 
@@ -422,8 +423,11 @@ services:
       - mariadb
       - redis
     networks:
-      - wordpress_network
-      - ${CLIENT_ID}_network
+      wordpress_network:
+        aliases:
+          - wordpress
+          - wp
+      ${CLIENT_ID}_network: {}
     volumes:
       - ${WP_DIR}/${DOMAIN}/wordpress:/var/www/html
       - ${WP_DIR}/${DOMAIN}/php-fpm/www.conf:/usr/local/etc/php-fpm.d/www.conf
@@ -452,8 +456,11 @@ services:
       wordpress:
         condition: service_healthy
     networks:
-      - wordpress_network
-      - ${CLIENT_ID}_network
+      wordpress_network:
+        aliases:
+          - nginx
+          - web
+      ${CLIENT_ID}_network: {}
     volumes:
       - ${WP_DIR}/${DOMAIN}/wordpress:/var/www/html
       - ${WP_DIR}/${DOMAIN}/nginx/default.conf:/etc/nginx/conf.d/default.conf
@@ -481,7 +488,11 @@ services:
       - MYSQL_ROOT_HOST=%
       - MYSQL_ALLOW_EMPTY_PASSWORD=no
     networks:
-      - wordpress_network
+      wordpress_network:
+        aliases:
+          - mariadb
+          - db
+      ${CLIENT_ID}_network: {}
     labels:
       - "traefik.enable=false"
   
@@ -490,7 +501,11 @@ services:
     image: redis:alpine
     restart: unless-stopped
     networks:
-      - wordpress_network
+      wordpress_network:
+        aliases:
+          - redis
+          - cache
+      ${CLIENT_ID}_network: {}
     labels:
       - "traefik.enable=false"
 EOL
@@ -559,6 +574,14 @@ fi
 # Wait for WordPress stack to initialize
 log "INFO: Waiting for WordPress to start" "${CYAN}Waiting for WordPress to start...${NC}"
 sleep 15
+
+# Add network diagnostics to help troubleshoot connectivity issues
+log "INFO: Running network diagnostics" "${CYAN}Running network diagnostics...${NC}"
+docker network inspect ${CLIENT_ID}_wordpress_${SITE_NAME}_network
+echo "Testing connectivity between containers:"
+# Install ping utility for network diagnostics
+docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "apt-get update && apt-get install -y iputils-ping" || log "WARNING: Unable to install ping utilities" "${YELLOW}⚠️ Unable to install ping utilities${NC}"
+docker exec ${WORDPRESS_CONTAINER_NAME} ping -c 2 ${MARIADB_CONTAINER_NAME} || log "WARNING: Ping failed between WordPress and MariaDB" "${YELLOW}⚠️ Ping failed between WordPress and MariaDB${NC}"
 
 # Install MySQL client for diagnostics
 log "INFO: Installing MySQL client for diagnostics" "${CYAN}Installing MySQL client for diagnostics...${NC}"
