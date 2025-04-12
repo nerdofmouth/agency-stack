@@ -119,6 +119,7 @@ help:
 	@echo "  $(BOLD)make peertube-start$(RESET)           Start PeerTube"
 	@echo "  $(BOLD)make peertube-restart$(RESET)         Restart PeerTube"
 	@echo "  $(BOLD)make peertube-upgrade$(RESET)         Upgrade PeerTube to v7.0"
+	@echo "  $(BOLD)make install-mirotalk-sfu$(RESET)     Install MiroTalk SFU - Video Conferencing"
 
 # Install AgencyStack
 install: validate
@@ -1684,3 +1685,93 @@ sync-oauth-dashboard:
 		$(if $(FORCE),--force,) \
 		$(if $(VERBOSE),--verbose,) \
 		$(if $(DRY_RUN),--dry-run,)
+
+# MiroTalk SFU - Video Conferencing
+install-mirotalk-sfu: validate
+	@echo "$(MAGENTA)$(BOLD)🎥 Installing MiroTalk SFU...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_mirotalk_sfu.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(ENABLE_CLOUD),--enable-cloud,) $(if $(ENABLE_METRICS),--enable-metrics,) $(if $(VERBOSE),--verbose,)
+
+mirotalk-sfu: install-mirotalk-sfu
+
+mirotalk-sfu-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking MiroTalk SFU Status...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make mirotalk-sfu-status DOMAIN=video.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	CLIENT_DIR=""; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		CLIENT_DIR="/clients/$(CLIENT_ID)"; \
+	fi; \
+	if [ -d "/opt/agency_stack$${CLIENT_DIR}/mirotalk_sfu/$(DOMAIN)" ]; then \
+		echo "$(GREEN)✅ MiroTalk SFU installation found for $(DOMAIN)$(RESET)"; \
+		cd /opt/agency_stack$${CLIENT_DIR}/mirotalk_sfu/$(DOMAIN) && docker-compose ps; \
+	else \
+		echo "$(RED)❌ MiroTalk SFU installation not found for $(DOMAIN)$(RESET)"; \
+	fi
+
+mirotalk-sfu-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing MiroTalk SFU Logs...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make mirotalk-sfu-logs DOMAIN=video.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	CLIENT_DIR=""; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		CLIENT_DIR="/clients/$(CLIENT_ID)"; \
+	fi; \
+	if [ -d "/opt/agency_stack$${CLIENT_DIR}/mirotalk_sfu/$(DOMAIN)" ]; then \
+		cd /opt/agency_stack$${CLIENT_DIR}/mirotalk_sfu/$(DOMAIN) && docker-compose logs -f | tee -a /var/log/agency_stack/components/mirotalk_sfu.log; \
+	else \
+		echo "$(RED)❌ MiroTalk SFU installation not found for $(DOMAIN)$(RESET)"; \
+		echo "$(CYAN)To install: make mirotalk-sfu DOMAIN=$(DOMAIN) ADMIN_EMAIL=your-email@example.com$(RESET)"; \
+		if [ -f "/var/log/agency_stack/components/mirotalk_sfu.log" ]; then \
+			echo "$(YELLOW)Last logs from mirotalk_sfu.log:$(RESET)"; \
+			tail -n 20 /var/log/agency_stack/components/mirotalk_sfu.log; \
+		fi \
+	fi
+
+mirotalk-sfu-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting MiroTalk SFU Services...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make mirotalk-sfu-restart DOMAIN=video.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	CLIENT_DIR=""; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		CLIENT_DIR="/clients/$(CLIENT_ID)"; \
+	fi; \
+	if [ -d "/opt/agency_stack$${CLIENT_DIR}/mirotalk_sfu/$(DOMAIN)" ]; then \
+		cd /opt/agency_stack$${CLIENT_DIR}/mirotalk_sfu/$(DOMAIN) && docker-compose restart; \
+		echo "$(GREEN)✅ MiroTalk SFU services restarted successfully$(RESET)"; \
+	else \
+		echo "$(RED)❌ MiroTalk SFU installation not found for $(DOMAIN)$(RESET)"; \
+	fi
+
+mirotalk-sfu-update:
+	@echo "$(MAGENTA)$(BOLD)🔄 Updating MiroTalk SFU...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make mirotalk-sfu-update DOMAIN=video.example.com [CLIENT_ID=tenant1] [VERSION=latest]"; \
+		exit 1; \
+	fi; \
+	CLIENT_DIR=""; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		CLIENT_DIR="/clients/$(CLIENT_ID)"; \
+	fi; \
+	VERSION="latest"; \
+	if [ -n "$(VERSION)" ]; then \
+		VERSION="$(VERSION)"; \
+	fi; \
+	if [ -d "/opt/agency_stack$${CLIENT_DIR}/mirotalk_sfu/$(DOMAIN)" ]; then \
+		cd /opt/agency_stack$${CLIENT_DIR}/mirotalk_sfu/$(DOMAIN) && \
+		sed -i "s|image: mirotalk/sfu:.*|image: mirotalk/sfu:$${VERSION}|g" docker-compose.yml && \
+		docker-compose pull && \
+		docker-compose up -d; \
+		echo "$(GREEN)✅ MiroTalk SFU updated to version $${VERSION}$(RESET)"; \
+	else \
+		echo "$(RED)❌ MiroTalk SFU installation not found for $(DOMAIN)$(RESET)"; \
+	fi
