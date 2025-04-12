@@ -528,25 +528,30 @@
       "mailu": {
         "name": "Mailu",
         "category": "Email & Communication",
-        "version": "2.0.0",
+        "version": "1.9",
         "integration_status": {
           "installed": true,
           "hardened": true,
           "makefile": true,
-          "sso": true,
+          "sso": false,
           "dashboard": true,
           "logs": true,
           "docs": true,
           "auditable": true,
           "traefik_tls": true,
-          "multi_tenant": true
+          "multi_tenant": true,
+          "monitoring": true
         },
-        "description": "Self-hosted email solution",
+        "description": "Self-hosted email stack with SMTP, IMAP, Webmail, and Antispam",
         "ports": {
           "smtp": 25,
+          "smtps": 465,
+          "submission": 587,
           "imap": 143,
           "imaps": 993,
-          "web": 8020
+          "pop3s": 995,
+          "web": 80,
+          "https": 443
         }
       },
       "mattermost": {
