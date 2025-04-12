@@ -36,6 +36,7 @@ INTEGRATION_STATE_DIR="/opt/agency_stack/integrations/state"
 PORTS_FILE="/opt/agency_stack/ports/ports.json"
 LOG_DIR="/var/log/agency_stack"
 LOG_FILE="${LOG_DIR}/dashboard_update-$(date +%Y%m%d-%H%M%S).log"
+SCRIPT_DIR="/opt/agency_stack/scripts"
 
 # Create log directory if it doesn't exist
 mkdir -p "$LOG_DIR"
@@ -202,7 +203,10 @@ get_port_assignments() {
 generate_dashboard_data() {
   log "${BLUE}Generating dashboard data...${NC}"
   
-  # Ensure service status file exists
+  # Ensure service directory exists
+  sudo mkdir -p "$DASHBOARD_DIR"
+  
+  # Call service status generator to get up-to-date info
   ensure_service_status
   
   # Get service status
@@ -214,20 +218,35 @@ generate_dashboard_data() {
   # Get port assignments
   local port_assignments=$(get_port_assignments)
   
-  # Combine everything into dashboard data
-  local dashboard_data=$(echo "$service_status" | jq --argjson integration "$integration_status" \
-                                                  --argjson ports "$port_assignments" \
-                                                  '. += {"integration": $integration, "ports": $ports}')
-  
-  # Write dashboard data to file
-  echo "$dashboard_data" | sudo tee "$DASHBOARD_DATA_FILE" > /dev/null
-  
-  # Also write to the scripts/dashboard directory for development
-  if [ -d "/home/revelationx/CascadeProjects/foss-server-stack/scripts/dashboard" ]; then
-    echo "$dashboard_data" > "/home/revelationx/CascadeProjects/foss-server-stack/scripts/dashboard/dashboard_data.json"
+  # Get Keycloak OAuth/IDP status
+  log "${BLUE}Collecting Keycloak OAuth/IDP status...${NC}"
+  local oauth_status
+  if [ -f "${SCRIPT_DIR}/keycloak_oauth_status.sh" ]; then
+    oauth_status=$(bash "${SCRIPT_DIR}/keycloak_oauth_status.sh" --quiet)
+  else
+    oauth_status='{"keycloak_oauth": {}}'
   fi
   
-  log "${GREEN}Dashboard data generated at ${DASHBOARD_DATA_FILE}${NC}"
+  # Combine everything into dashboard data
+  local timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  local server=$(hostname)
+  
+  local dashboard_data='{
+    "timestamp": "'$timestamp'",
+    "server": "'$server'",
+    "domain": "'$PRIMARY_DOMAIN'",
+    "service_status": '$service_status',
+    "integration_status": '$integration_status',
+    "port_assignments": '$port_assignments',
+    "components": {
+      "security_identity": '$(echo "$oauth_status" | jq .keycloak_oauth)'
+    }
+  }'
+  
+  # Write to file
+  echo "$dashboard_data" | sudo tee "$DASHBOARD_DATA_FILE" > /dev/null
+  
+  log "${GREEN}Dashboard data updated successfully!${NC}"
 }
 
 # Main function
