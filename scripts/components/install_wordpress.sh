@@ -692,15 +692,37 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# Wait for WordPress to start
-log "INFO: Waiting for WordPress to start" "${YELLOW}Waiting for WordPress to start...${NC}"
+# Wait for WordPress stack to initialize
+log "INFO: Waiting for WordPress to start" "${CYAN}Waiting for WordPress to start...${NC}"
 sleep 10
 
-# Configure WordPress using WP-CLI
-log "INFO: Configuring WordPress site" "${CYAN}Configuring WordPress site...${NC}"
+# Manually initialize the database with proper permissions to ensure connectivity
+# This is a key pattern for technology reuse - ensuring database initialization works reliably
+log "INFO: Ensuring database is properly initialized" "${CYAN}Ensuring database is properly initialized...${NC}"
 
-# Wait for WordPress to be ready
-sleep 10
+# Create a direct initialization script to bypass potential permission issues
+cat > "${WP_DIR}/${DOMAIN}/direct_init.sql" <<EOL
+-- Direct initialization script to bypass permission issues
+CREATE DATABASE IF NOT EXISTS ${WP_DB_NAME};
+CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'%' IDENTIFIED BY '${WP_DB_PASSWORD}';
+GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'%';
+FLUSH PRIVILEGES;
+EOL
+
+# Execute with root user which should always work
+docker exec ${MARIADB_CONTAINER_NAME} bash -c "mysql -uroot -p${WP_ROOT_PASSWORD} < /docker-entrypoint-initdb.d/init.sql || echo 'Initial import failed, trying direct method...'"
+docker cp "${WP_DIR}/${DOMAIN}/direct_init.sql" ${MARIADB_CONTAINER_NAME}:/tmp/direct_init.sql
+docker exec ${MARIADB_CONTAINER_NAME} bash -c "mysql -uroot -p${WP_ROOT_PASSWORD} < /tmp/direct_init.sql || echo 'Direct initialization failed...'"
+
+# Run a brief verification
+log "INFO: Verifying database setup" "${CYAN}Verifying database setup...${NC}"
+docker exec ${MARIADB_CONTAINER_NAME} bash -c "mysql -uroot -p${WP_ROOT_PASSWORD} -e \"SHOW DATABASES; SELECT User, Host FROM mysql.user WHERE User='${WP_DB_USER}';\""
+
+# Copy test_db.sh to the WordPress container
+docker cp "${WP_DIR}/${DOMAIN}/test_db.sh" ${WORDPRESS_CONTAINER_NAME}:/tmp/test_db.sh
+
+# Run test_db.sh
+docker exec ${WORDPRESS_CONTAINER_NAME} /tmp/test_db.sh
 
 # Install WP-CLI inside the container
 docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar && chmod +x wp-cli.phar && mv wp-cli.phar /usr/local/bin/wp"
@@ -712,11 +734,11 @@ docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "apt-get update && apt-get insta
 log "INFO: Ensuring database is ready" "${CYAN}Ensuring database is ready...${NC}"
 sleep 10
 
-# Copy test_db.sh to the WordPress container
-docker cp "${WP_DIR}/${DOMAIN}/test_db.sh" ${WORDPRESS_CONTAINER_NAME}:/tmp/test_db.sh
+# Configure WordPress using WP-CLI
+log "INFO: Configuring WordPress site" "${CYAN}Configuring WordPress site...${NC}"
 
-# Run test_db.sh
-docker exec ${WORDPRESS_CONTAINER_NAME} /tmp/test_db.sh
+# Wait for WordPress to be ready
+sleep 10
 
 # Run WP-CLI
 docker exec ${WORDPRESS_CONTAINER_NAME} wp --allow-root --path=/var/www/html core install \
