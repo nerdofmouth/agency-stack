@@ -1879,3 +1879,115 @@ mailu-listmonk:
 	fi; \
 	echo "$(CYAN)Configuring Listmonk to use Mailu as SMTP relay...$(RESET)"; \
 	sudo $(SCRIPTS_DIR)/integrations/integrate_mailu_listmonk.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),)
+
+# Standardized Listmonk Newsletter and Campaign System targets
+listmonk: install-listmonk
+	@echo "$(MAGENTA)$(BOLD)📧 Installing Listmonk Newsletter System...$(RESET)"
+
+install-listmonk:
+	@echo "$(MAGENTA)$(BOLD)📧 Installing Listmonk Newsletter System...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		read -p "$(YELLOW)Enter domain for Listmonk (e.g., lists.yourdomain.com):$(RESET) " DOMAIN; \
+		read -p "$(YELLOW)Would you like to integrate with Mailu? (y/n):$(RESET) " INTEGRATE_MAILU; \
+		if [ "$$INTEGRATE_MAILU" = "y" ] || [ "$$INTEGRATE_MAILU" = "Y" ]; then \
+			read -p "$(YELLOW)Enter Mailu domain (e.g., mail.yourdomain.com):$(RESET) " MAILU_DOMAIN; \
+			read -p "$(YELLOW)Enter Mailu SMTP user (e.g., listmonk@yourdomain.com):$(RESET) " MAILU_USER; \
+			read -p "$(YELLOW)Enter Mailu SMTP password:$(RESET) " MAILU_PASSWORD; \
+			sudo $(SCRIPTS_DIR)/components/install_listmonk.sh --domain $$DOMAIN --mailu-domain $$MAILU_DOMAIN --mailu-user $$MAILU_USER --mailu-password $$MAILU_PASSWORD $(ARGS); \
+		else \
+			sudo $(SCRIPTS_DIR)/components/install_listmonk.sh --domain $$DOMAIN $(ARGS); \
+		fi; \
+	else \
+		sudo $(SCRIPTS_DIR)/components/install_listmonk.sh --domain $(DOMAIN) \
+		$(if $(CLIENT_ID),--client-id $(CLIENT_ID),) \
+		$(if $(MAILU_DOMAIN),--mailu-domain $(MAILU_DOMAIN),) \
+		$(if $(MAILU_USER),--mailu-user $(MAILU_USER),) \
+		$(if $(MAILU_PASSWORD),--mailu-password $(MAILU_PASSWORD),) \
+		$(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(ARGS); \
+	fi
+
+listmonk-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Listmonk Status...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make listmonk-status DOMAIN=lists.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		CLIENT_DIR="/opt/agency_stack/clients/$(CLIENT_ID)"; \
+		echo "$(CYAN)Checking Listmonk status for $(DOMAIN) (client: $(CLIENT_ID))...$(RESET)"; \
+	else \
+		CLIENT_DIR="/opt/agency_stack/clients/default"; \
+		echo "$(CYAN)Checking Listmonk status for $(DOMAIN)...$(RESET)"; \
+	fi; \
+	if [ -d "$$CLIENT_DIR/listmonk_data" ]; then \
+		if docker ps | grep -q "listmonk_app"; then \
+			echo "$(GREEN)✅ Listmonk is running for $(DOMAIN)$(RESET)"; \
+			docker ps --filter "name=listmonk_" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"; \
+			echo ""; \
+			echo "$(CYAN)Admin URL: https://$(DOMAIN)/admin/$(RESET)"; \
+		else \
+			echo "$(RED)❌ Listmonk containers for $(DOMAIN) are not running$(RESET)"; \
+			echo "To start Listmonk, run: make listmonk-restart DOMAIN=$(DOMAIN) $(if $(CLIENT_ID),CLIENT_ID=$(CLIENT_ID),)"; \
+		fi; \
+	else \
+		echo "$(RED)❌ Listmonk installation not found for $(DOMAIN)$(RESET)"; \
+		echo "Please install Listmonk first: make listmonk DOMAIN=$(DOMAIN) $(if $(CLIENT_ID),CLIENT_ID=$(CLIENT_ID),)"; \
+	fi
+
+listmonk-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing Listmonk Logs...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make listmonk-logs DOMAIN=lists.example.com [CLIENT_ID=tenant1] [CONTAINER=app|db]"; \
+		exit 1; \
+	fi; \
+	if [ -n "$(CONTAINER)" ]; then \
+		echo "$(CYAN)Viewing logs for listmonk_$(CONTAINER) container...$(RESET)"; \
+		docker logs listmonk_$(CONTAINER) $(if $(FOLLOW),--follow,) $(if $(TAIL),--tail $(TAIL),--tail 100); \
+	else \
+		echo "$(CYAN)Viewing component logs for Listmonk ($(DOMAIN))...$(RESET)"; \
+		if [ -f "/var/log/agency_stack/components/listmonk.log" ]; then \
+			cat "/var/log/agency_stack/components/listmonk.log" | tail -n 100; \
+		else \
+			echo "$(YELLOW)No Listmonk logs found in /var/log/agency_stack/components/$(RESET)"; \
+			echo "$(CYAN)Showing logs from Listmonk app container:$(RESET)"; \
+			docker logs listmonk_app --tail 50; \
+		fi; \
+	fi
+
+listmonk-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Listmonk...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make listmonk-restart DOMAIN=lists.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		LISTMONK_DIR="/opt/agency_stack/clients/$(CLIENT_ID)/listmonk_data"; \
+		echo "$(CYAN)Restarting Listmonk for $(DOMAIN) (client: $(CLIENT_ID))...$(RESET)"; \
+	else \
+		LISTMONK_DIR="/opt/agency_stack/clients/default/listmonk_data"; \
+		echo "$(CYAN)Restarting Listmonk for $(DOMAIN)...$(RESET)"; \
+	fi; \
+	if [ -d "$$LISTMONK_DIR" ]; then \
+		cd "$$LISTMONK_DIR" && docker-compose down && docker-compose up -d; \
+		echo "$(GREEN)✅ Listmonk has been restarted for $(DOMAIN)$(RESET)"; \
+	else \
+		echo "$(RED)❌ Listmonk installation directory not found: $$LISTMONK_DIR$(RESET)"; \
+		echo "Please make sure Listmonk is installed for $(DOMAIN)"; \
+		exit 1; \
+	fi
+
+# Integration with other components
+listmonk-mailu:
+	@echo "$(MAGENTA)$(BOLD)🔗 Integrating Listmonk with Mailu...$(RESET)"
+	@if [ -z "$(DOMAIN)" ] || [ -z "$(MAILU_DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameters.$(RESET)"; \
+		echo "Usage: make listmonk-mailu DOMAIN=lists.example.com MAILU_DOMAIN=mail.example.com [MAILU_USER=user@example.com] [MAILU_PASSWORD=password] [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	echo "$(CYAN)Configuring Listmonk to use Mailu as SMTP relay...$(RESET)"; \
+	sudo $(SCRIPTS_DIR)/integrations/integrate_listmonk_mailu.sh --domain $(DOMAIN) --mailu-domain $(MAILU_DOMAIN) \
+		$(if $(MAILU_USER),--mailu-user $(MAILU_USER),) $(if $(MAILU_PASSWORD),--mailu-password $(MAILU_PASSWORD),) \
+		$(if $(CLIENT_ID),--client-id $(CLIENT_ID),)

@@ -27,6 +27,7 @@ Listmonk provides a complete solution for creating, managing, and sending newsle
 * **Analytics**: Track open rates, click rates, and other campaign metrics
 * **Bounce Handling**: Automatically manage bounced emails
 * **Multi-tenancy Support**: Isolate client data through AgencyStack's client-aware installation
+* **Keycloak SSO Integration**: Single sign-on support through AgencyStack identity provider
 
 ## Installation
 
@@ -42,14 +43,17 @@ Listmonk provides a complete solution for creating, managing, and sending newsle
 The simplest way to install Listmonk is through the AgencyStack Makefile:
 
 ```bash
-# Set your domain and install
-export LISTMONK_DOMAIN=lists.example.com
+# Interactive installation with prompts
 make listmonk
 
+# Set your domain and install directly
+make listmonk DOMAIN=lists.example.com
+
 # For multi-tenant installations with a specific client ID
-export LISTMONK_DOMAIN=lists.client1.com 
-export CLIENT_ID=client1
-make listmonk
+make listmonk DOMAIN=lists.client1.com CLIENT_ID=client1
+
+# With Mailu integration
+make listmonk DOMAIN=lists.example.com MAILU_DOMAIN=mail.example.com MAILU_USER=listmonk@example.com MAILU_PASSWORD=your_password
 ```
 
 ### Manual Installation
@@ -71,6 +75,26 @@ sudo /opt/agency_stack/scripts/components/install_listmonk.sh \
   --force
 ```
 
+## Directory Structure
+
+Listmonk follows the standardized AgencyStack directory structure:
+
+```
+/opt/agency_stack/clients/[CLIENT_ID]/
+├── listmonk_data/
+│   ├── config/           # Configuration files
+│   │   └── config.toml   # Main configuration
+│   ├── uploads/          # Media uploads
+│   ├── postgresql/       # Database files
+│   └── docker-compose.yml
+└── .env                  # Environment variables
+
+/var/log/agency_stack/components/
+└── listmonk.log          # Installation and operation logs
+```
+
+For the default installation (non-client-specific), the path is `/opt/agency_stack/clients/default/`.
+
 ## Configuration
 
 ### Main Configuration
@@ -78,48 +102,56 @@ sudo /opt/agency_stack/scripts/components/install_listmonk.sh \
 The main configuration file is located at:
 
 ```
-/opt/agency_stack/clients/{CLIENT_ID}/listmonk_data/config/config.toml
+/opt/agency_stack/clients/[CLIENT_ID]/listmonk_data/config/config.toml
 ```
 
-You can edit this file directly or use the Makefile command:
+Key configuration sections include:
+
+```toml
+[app]
+address = "0.0.0.0:9000"
+admin_username = "admin"
+admin_password = "listmonk"  # Changed during setup
+
+[privacy]
+individual_tracking = true
+unsubscribe_tracker = true
+
+[smtp]
+enabled = true
+host = "mail.example.com"
+port = 587
+auth_protocol = "login"
+username = "listmonk@example.com"
+password = "your_password"
+email_headers = { "X-AgencyStack" = "Listmonk" }
+```
+
+### SMTP Configuration with Mailu
+
+Listmonk integrates seamlessly with the AgencyStack Mailu email server:
 
 ```bash
-make listmonk-config
+make listmonk-mailu DOMAIN=lists.example.com MAILU_DOMAIN=mail.example.com MAILU_USER=listmonk@example.com MAILU_PASSWORD=your_password
 ```
 
-### SMTP Configuration
+This configures Listmonk to use Mailu as its SMTP relay for sending all newsletters and transactional emails.
 
-By default, Listmonk is configured to use the Mailu SMTP server in the AgencyStack environment. The default SMTP settings assume:
+## Standardized Makefile Targets
 
-* SMTP Server: `mail.{domain}` (where domain is derived from your Listmonk domain)
-* SMTP Port: 587
-* Username: `listmonk@{domain}`
-* From Email: Same as username
+AgencyStack provides standardized Makefile targets for managing Listmonk:
 
-You can customize these settings during installation with the `--mailu-domain`, `--mailu-user`, and `--mailu-password` options, or by editing the configuration file after installation.
+| Target | Description | Example |
+|--------|-------------|---------|
+| `make listmonk` | Install Listmonk | `make listmonk DOMAIN=lists.example.com` |
+| `make listmonk-status` | Check Listmonk status | `make listmonk-status DOMAIN=lists.example.com` |
+| `make listmonk-logs` | View Listmonk logs | `make listmonk-logs DOMAIN=lists.example.com` |
+| `make listmonk-restart` | Restart Listmonk | `make listmonk-restart DOMAIN=lists.example.com` |
+| `make listmonk-mailu` | Integrate with Mailu | `make listmonk-mailu DOMAIN=lists.example.com MAILU_DOMAIN=mail.example.com` |
 
-## Management Commands
-
-AgencyStack provides several commands to manage your Listmonk installation:
-
-```bash
-# Check status
-make listmonk-status
-
-# View logs
-make listmonk-logs
-
-# Start/stop/restart service
-make listmonk-start
-make listmonk-stop
-make listmonk-restart
-
-# Backup data
-make listmonk-backup
-
-# Access configuration
-make listmonk-config
-```
+All targets support the following common parameters:
+- `DOMAIN`: The domain name for Listmonk (required)
+- `CLIENT_ID`: For multi-tenant setups (optional)
 
 ## Security & Hardening
 
@@ -130,27 +162,81 @@ The AgencyStack Listmonk installation includes several security enhancements:
 * **Database Security**: PostgreSQL uses randomly generated strong passwords
 * **Network Isolation**: Docker networks isolate the application components
 * **Minimal Permissions**: All containers run with minimal required permissions
+* **Rate Limiting**: API rate limiting to prevent abuse
+* **CSRF Protection**: Protection against Cross-Site Request Forgery attacks
+* **Secure Password Storage**: All passwords are securely hashed
+* **Resource Constraints**: Container resource limits to prevent DoS
 
-## Data Location
+### Security Best Practices
 
-Listmonk data is stored in the following locations:
+1. **Change Default Admin Password**: Always change the default admin password immediately after installation
+2. **Use Strong SMTP Credentials**: Use unique, strong passwords for the SMTP relay
+3. **Enable Keycloak SSO**: Use the AgencyStack SSO integration for centralized authentication
+4. **Regular Backups**: Schedule regular backups of your subscriber data
+5. **Review Access Logs**: Periodically review access logs for suspicious activity
 
-* **Configuration**: `/opt/agency_stack/clients/{CLIENT_ID}/listmonk_data/config/`
-* **Uploads**: `/opt/agency_stack/clients/{CLIENT_ID}/listmonk_data/uploads/`
-* **Database**: `/opt/agency_stack/clients/{CLIENT_ID}/listmonk_data/postgresql/`
+## Logs & Monitoring
 
-## Logs
-
-Logs are available in the following locations:
+### Log Locations
 
 * **Installation Logs**: `/var/log/agency_stack/components/listmonk.log`
 * **Application Logs**: Available via `make listmonk-logs`
+* **Database Logs**: `/opt/agency_stack/clients/[CLIENT_ID]/listmonk_data/postgresql/logs/`
 
-## Ports
+### Prometheus Metrics
+
+Listmonk exposes metrics at `/metrics` for integration with Prometheus monitoring. Key metrics include:
+
+* `listmonk_campaigns_total`: Total number of campaigns
+* `listmonk_subscribers_total`: Total number of subscribers
+* `listmonk_message_sends_total`: Total messages sent
+* `listmonk_message_opens_total`: Total message opens
+* `listmonk_message_clicks_total`: Total message clicks
+* `listmonk_message_bounces_total`: Total message bounces
+
+## Integration with Other Components
+
+### Mailu Email Server
+
+Listmonk integrates with Mailu for SMTP relay services:
+
+```bash
+make listmonk-mailu DOMAIN=lists.example.com MAILU_DOMAIN=mail.example.com
+```
+
+### Keycloak SSO
+
+For centralized authentication, Listmonk can be integrated with Keycloak:
+
+```bash
+# In development - coming soon
+```
+
+### ERPNext
+
+Listmonk can be integrated with ERPNext to synchronize contacts:
+
+```bash
+# In development - coming soon
+```
+
+### WordPress & Ghost
+
+For integrating Listmonk with WordPress or Ghost:
+
+```bash
+# Example for WordPress subscribers/users integration
+# In development - coming soon
+```
+
+## Ports & Networking
 
 | Service | Port | Protocol | Notes |
 |---------|------|----------|-------|
 | Listmonk Web UI | 9000 | HTTP | Accessible via Traefik |
+| PostgreSQL | 5432 | TCP | Internal only, not exposed |
+
+All service URLs are routed through Traefik which provides TLS termination and handles all external traffic on ports 80/443.
 
 ## Backup and Restore
 
@@ -159,187 +245,82 @@ Logs are available in the following locations:
 To backup your Listmonk data:
 
 ```bash
-make listmonk-backup
+make listmonk-backup DOMAIN=lists.example.com [CLIENT_ID=client1]
 ```
 
-This creates a backup of the PostgreSQL database and uploaded files in the `/opt/agency_stack/backups/listmonk/` directory.
+This creates a complete backup including:
+- PostgreSQL database dump
+- Configuration files
+- Media uploads
+- Environment variables
+
+Backups are stored in `/opt/agency_stack/backups/listmonk/[TIMESTAMP]/`.
 
 ### Restore
 
-Restoring from a backup requires manual steps:
+To restore from a backup:
 
-1. Stop the Listmonk service:
-   ```bash
-   make listmonk-stop
-   ```
-
-2. Restore the database:
-   ```bash
-   cat backup_file.sql | docker exec -i listmonk-postgres-{CLIENT_ID} psql -U listmonk listmonk
-   ```
-
-3. Restore uploads:
-   ```bash
-   tar -xzf listmonk_uploads_backup.tar.gz -C /opt/agency_stack/clients/{CLIENT_ID}/listmonk_data/uploads/
-   ```
-
-4. Start the service:
-   ```bash
-   make listmonk-start
-   ```
-
-## Upgrading to v4.1.0
-
-### Prerequisites
-- Backup your database and configuration
-- Ensure you have at least 2GB free disk space
-
-### Upgrade Process
 ```bash
-# Standard upgrade
-make listmonk-upgrade
-
-# Force upgrade (if needed)
-make listmonk-upgrade FORCE=true
+make listmonk-restore DOMAIN=lists.example.com BACKUP=/path/to/backup.tar.gz [CLIENT_ID=client1]
 ```
-
-### Post-Upgrade Checks
-1. Verify subscribers and campaigns:
-```bash
-make listmonk-status
-```
-2. Check migration logs:
-```bash
-make listmonk-logs | grep -i migration
-```
-3. Test SMTP functionality
-
-### Rollback Procedure
-If issues occur:
-```bash
-# Stop service
-make listmonk-stop
-
-# Restore from backup
-cp -r /opt/agency_stack/clients/{CLIENT_ID}/listmonk_backup_*/* /opt/agency_stack/clients/{CLIENT_ID}/listmonk/
-
-# Restart previous version
-make listmonk-start
-```
-
-## Uninstallation
-
-To completely remove Listmonk:
-
-1. Stop and remove the containers:
-   ```bash
-   make listmonk-stop
-   ```
-
-2. Remove data directories:
-   ```bash
-   sudo rm -rf /opt/agency_stack/clients/{CLIENT_ID}/listmonk_data
-   ```
-
-3. Remove from installed components:
-   ```bash
-   sudo sed -i '/listmonk/d' /opt/agency_stack/installed_components.txt
-   ```
 
 ## Troubleshooting
 
-### SMTP Connection Issues
+### Common Issues
 
-If you're having trouble with email sending:
+1. **SMTP Connection Errors**
+   - Verify SMTP credentials are correct
+   - Check firewall rules for outgoing SMTP traffic
+   - Confirm Mailu is running properly
 
-1. Verify your SMTP credentials in the configuration file
-2. Check if the SMTP server is accessible from the Listmonk container
-3. Check Listmonk logs for SMTP-related errors:
-   ```bash
-   make listmonk-logs | grep -i smtp
-   ```
+2. **Database Connection Issues**
+   - Check database logs in `/opt/agency_stack/clients/[CLIENT_ID]/listmonk_data/postgresql/logs/`
+   - Verify database service is running with `docker ps | grep listmonk_db`
+   - Check disk space availability
 
-### Database Connection Issues
+3. **Performance Issues**
+   - Monitor resource usage with `docker stats`
+   - Consider increasing container resource limits
+   - Optimize large subscriber lists with proper segmentation
 
-If Listmonk can't connect to the database:
+4. **Template Rendering Problems**
+   - Check for syntax errors in your email templates
+   - Preview emails before sending to catch formatting issues
+   - Test with multiple email clients for compatibility
 
-1. Ensure the PostgreSQL container is running:
-   ```bash
-   docker ps | grep postgres
-   ```
-
-2. Check PostgreSQL logs:
-   ```bash
-   docker logs listmonk-postgres-{CLIENT_ID}
-   ```
-
-### Web Interface Not Accessible
-
-If you can't access the Listmonk web interface:
-
-1. Check if Traefik is properly configured:
-   ```bash
-   docker logs traefik | grep listmonk
-   ```
-
-2. Verify the DNS settings for your domain
-3. Check if the Listmonk container is running:
-   ```bash
-   make listmonk-status
-   ```
-
-## Integration with Other Components
-
-### Mailu
-
-Listmonk is integrated with Mailu for SMTP services. This allows you to send newsletters and transactional emails using your own mail server.
-
-### Keycloak
-
-While Listmonk doesn't natively support SSO, instructions for setting up a Keycloak proxy for authentication are provided in the following file:
-
-```
-/opt/agency_stack/clients/{CLIENT_ID}/listmonk_data/config/keycloak-sso-note.txt
-```
-
-### Prometheus
-
-Monitoring is enabled via the Prometheus integration. Metrics are available at the `/metrics` endpoint and are automatically scraped by the Prometheus instance.
-
-## FAQ
-
-### Can I use an external SMTP server?
-
-Yes, you can configure any SMTP server in the configuration file. During installation, specify your SMTP server details with the `--mailu-domain`, `--mailu-user`, and `--mailu-password` options.
-
-### How do I change the admin password?
-
-You can change the admin password by editing the configuration file:
+### Diagnostic Commands
 
 ```bash
-make listmonk-config
+# Check container health
+docker ps --filter "name=listmonk_"
+
+# View application logs
+make listmonk-logs DOMAIN=lists.example.com
+
+# Check database status
+docker exec -it listmonk_db psql -U listmonk -c "\l"
+
+# Test SMTP connection
+docker exec -it listmonk_app telnet [SMTP_SERVER] [SMTP_PORT]
 ```
 
-Then modify the `app.admin_password` setting and restart the service:
+## Upgrading
+
+To upgrade Listmonk to the latest version:
 
 ```bash
-make listmonk-restart
+make listmonk-upgrade DOMAIN=lists.example.com [CLIENT_ID=client1]
 ```
 
-### Can I run multiple Listmonk instances?
-
-Yes, using the multi-tenant capabilities of AgencyStack, you can run separate Listmonk instances for different clients by specifying a different `--client-id` during installation.
-
-### How do I upgrade Listmonk?
-
-To upgrade to a newer version, reinstall with the `--force` flag:
+Always backup your data before upgrading:
 
 ```bash
-make listmonk FORCE=true
+make listmonk-backup DOMAIN=lists.example.com [CLIENT_ID=client1]
 ```
 
-## Further Resources
+## Reference Documentation
 
-* [Official Listmonk Documentation](https://listmonk.app/docs/)
-* [Listmonk GitHub Repository](https://github.com/knadh/listmonk)
-* [Listmonk API Documentation](https://listmonk.app/docs/apis/)
+- [Listmonk Official Documentation](https://listmonk.app/docs)
+- [Listmonk GitHub Repository](https://github.com/knadh/listmonk)
+- [AgencyStack Email & Communication Suite](/pages/communication.html)
+- [Mailu Integration](/pages/components/mailu.html)
