@@ -664,6 +664,13 @@ docker exec ${WORDPRESS_CONTAINER_NAME} ping -c 2 ${MARIADB_CONTAINER_NAME} || l
 log "INFO: Installing MySQL client for diagnostics" "${CYAN}Installing MySQL client for diagnostics...${NC}"
 docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "apt-get update && apt-get install -y default-mysql-client" || log "WARNING: Unable to install MySQL client" "${YELLOW}⚠️ Unable to install MySQL client${NC}"
 
+# Install WP-CLI inside the container first - this must happen before we use it
+log "INFO: Installing WP-CLI" "${CYAN}Installing WP-CLI...${NC}"
+docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar && chmod +x wp-cli.phar && mv wp-cli.phar /usr/local/bin/wp" || log "WARNING: Failed to install WP-CLI" "${YELLOW}⚠️ Failed to install WP-CLI${NC}"
+
+# Test WP-CLI installation
+docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "wp --info || echo 'WP-CLI not properly installed'" || log "WARNING: WP-CLI not properly installed" "${YELLOW}⚠️ WP-CLI not properly installed${NC}"
+
 # Define WP-CLI with --allow-root flag for consistent usage
 WP_CLI="wp --allow-root"
 
@@ -743,9 +750,6 @@ fi
 # Verify the database schema
 log "INFO: Verifying database tables" "${CYAN}Verifying database tables...${NC}"
 docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI db tables" || log "WARNING: Cannot list database tables" "${YELLOW}⚠️ Cannot list database tables${NC}"
-
-# Install WP-CLI inside the container
-docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar && chmod +x wp-cli.phar && mv wp-cli.phar /usr/local/bin/wp"
 
 # Configure WordPress using WP-CLI
 log "INFO: Configuring WordPress site" "${CYAN}Configuring WordPress site...${NC}"
