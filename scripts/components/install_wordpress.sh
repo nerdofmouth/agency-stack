@@ -671,28 +671,79 @@ log "INFO: Ensuring database is properly initialized" "${CYAN}Ensuring database 
 # Wait for MariaDB to fully initialize (more time for first run)
 sleep 20
 
-# First ensure our database initialization script was applied
-log "INFO: Verifying database initialization" "${CYAN}Verifying database initialization...${NC}"
-docker exec ${MARIADB_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysql -uroot -e \"SHOW DATABASES; SELECT User, Host FROM mysql.user WHERE User='${WP_DB_USER}';\"" || {
-  log "WARNING: Database initialization verification failed" "${YELLOW}⚠️ Database initialization verification failed${NC}"
-  # Attempt to manually initialize the database with our configuration
-  docker exec ${MARIADB_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysql -uroot < /docker-entrypoint-initdb.d/init.sql" || {
-    log "WARNING: Manual database initialization failed" "${YELLOW}⚠️ Manual database initialization failed${NC}"
-  }
+# Check if all required WordPress tables exist
+log "INFO: Checking for required WordPress tables" "${CYAN}Checking for required WordPress tables...${NC}"
+REQUIRED_TABLES=0
+docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD='${WP_DB_PASSWORD}' mysql -h mariadb -u${WP_DB_USER} -e 'SHOW TABLES FROM ${WP_DB_NAME}'" > /tmp/wp_tables.txt || REQUIRED_TABLES=1
+grep -q "wp_posts" /tmp/wp_tables.txt || REQUIRED_TABLES=1
+grep -q "wp_users" /tmp/wp_tables.txt || REQUIRED_TABLES=1
+grep -q "wp_comments" /tmp/wp_tables.txt || REQUIRED_TABLES=1
+
+if [ $REQUIRED_TABLES -eq 1 ]; then
+  log "INFO: Required WordPress tables not found, performing complete installation" "${CYAN}Required WordPress tables not found, performing complete installation...${NC}"
+  
+  # Reset WordPress database files to ensure clean state
+  log "INFO: Resetting WordPress files and database" "${CYAN}Resetting WordPress files and database...${NC}"
+  docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "rm -rf /var/www/html/wp-config.php /var/www/html/wp-config-docker.php"
+  docker exec ${MARIADB_CONTAINER_NAME} bash -c "MYSQL_PWD='${WP_ROOT_PASSWORD}' mysql -uroot -e 'DROP DATABASE IF EXISTS ${WP_DB_NAME}; CREATE DATABASE ${WP_DB_NAME}; GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO \"${WP_DB_USER}\"@\"%\"; FLUSH PRIVILEGES;'"
+  
+  # Recreate wp-config.php
+  log "INFO: Creating WordPress configuration file" "${CYAN}Creating WordPress configuration file...${NC}"
+  docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "cat > /var/www/html/wp-config.php << EOL
+<?php
+define('DB_NAME', '${WP_DB_NAME}');
+define('DB_USER', '${WP_DB_USER}');
+define('DB_PASSWORD', '${WP_DB_PASSWORD}');
+define('DB_HOST', 'mariadb');
+define('DB_CHARSET', 'utf8');
+define('DB_COLLATE', '');
+
+define('AUTH_KEY',         '$(openssl rand -base64 48)');
+define('SECURE_AUTH_KEY',  '$(openssl rand -base64 48)');
+define('LOGGED_IN_KEY',    '$(openssl rand -base64 48)');
+define('NONCE_KEY',        '$(openssl rand -base64 48)');
+define('AUTH_SALT',        '$(openssl rand -base64 48)');
+define('SECURE_AUTH_SALT', '$(openssl rand -base64 48)');
+define('LOGGED_IN_SALT',   '$(openssl rand -base64 48)');
+define('NONCE_SALT',       '$(openssl rand -base64 48)');
+
+\$table_prefix = 'wp_';
+
+define('WP_DEBUG', true);
+define('WP_DEBUG_LOG', true);
+define('WP_DEBUG_DISPLAY', false);
+
+define('WP_HOME', 'https://${DOMAIN}');
+define('WP_SITEURL', 'https://${DOMAIN}');
+
+if ( ! defined( 'ABSPATH' ) ) {
+    define( 'ABSPATH', dirname( __FILE__ ) . '/' );
 }
 
-# Run comprehensive database connection test
-test_database_connection "mariadb" "${WP_DB_USER}" "${WP_DB_PASSWORD}" "${WP_DB_NAME}" "${WORDPRESS_CONTAINER_NAME}"
+require_once ABSPATH . 'wp-settings.php';
+EOL"
 
-# Now try to create a WordPress database backup in case we need it
-log "INFO: Creating WordPress database backup" "${CYAN}Creating WordPress database backup (if database exists)...${NC}"
-docker exec ${MARIADB_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysqldump -uroot ${WP_DB_NAME} > /var/lib/mysql/${WP_DB_NAME}_backup.sql" || {
-  log "WARNING: Unable to create database backup" "${YELLOW}⚠️ Unable to create database backup (database may not exist yet)${NC}"
-}
+  # Ensure proper permissions
+  docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "chown www-data:www-data /var/www/html/wp-config.php && chmod 0644 /var/www/html/wp-config.php"
+  
+  # Create empty index.php to trigger WordPress installation
+  docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "touch /var/www/html/index.php && chown www-data:www-data /var/www/html/index.php"
+  
+  # Wait for database to be ready
+  log "INFO: Waiting for database to be ready" "${CYAN}Waiting for database to be ready...${NC}"
+  sleep 10
+  
+  # Run WordPress installation
+  log "INFO: Installing WordPress core" "${CYAN}Installing WordPress core...${NC}"
+  docker exec -w /var/www/html ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI core install --url=https://${DOMAIN} --title='WordPress on AgencyStack' --admin_user=${WP_ADMIN_USER} --admin_password=${WP_ADMIN_PASSWORD} --admin_email=${ADMIN_EMAIL} --skip-email" || log "WARNING: WordPress core installation failed" "${YELLOW}⚠️ WordPress core installation failed${NC}"
 
-# Ensure database is ready with additional wait time
-log "INFO: Ensuring database is ready" "${CYAN}Ensuring database is ready...${NC}"
-sleep 10
+  # Verify tables again
+  docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "MYSQL_PWD='${WP_DB_PASSWORD}' mysql -h mariadb -u${WP_DB_USER} -e 'SHOW TABLES FROM ${WP_DB_NAME}'" || log "WARNING: Could not verify tables after installation" "${YELLOW}⚠️ Could not verify tables after installation${NC}"
+fi
+
+# Verify the database schema
+log "INFO: Verifying database tables" "${CYAN}Verifying database tables...${NC}"
+docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI db tables" || log "WARNING: Cannot list database tables" "${YELLOW}⚠️ Cannot list database tables${NC}"
 
 # Install WP-CLI inside the container
 docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar && chmod +x wp-cli.phar && mv wp-cli.phar /usr/local/bin/wp"
@@ -716,19 +767,19 @@ WP_CLI="wp --allow-root"
 
 # Ensure database schema is properly initialized
 log "INFO: Ensuring database schema is initialized" "${CYAN}Ensuring database schema is initialized...${NC}"
-docker exec -w /var/www/html ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI core is-installed" || { 
-  log "INFO: WordPress needs to be installed" "${CYAN}WordPress needs to be installed, running core installation...${NC}"
-  # Force database schema creation even if already partially initialized
-  docker exec -w /var/www/html ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI db reset --yes" || log "WARNING: Failed to reset database" "${YELLOW}⚠️ Failed to reset database${NC}"
-  
-  # Install WordPress if not already installed
-  log "INFO: Installing WordPress core" "${CYAN}Installing WordPress core...${NC}"
-  docker exec -w /var/www/html ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI core install --url=https://${DOMAIN} --title='WordPress on AgencyStack' --admin_user=${WP_ADMIN_USER} --admin_password=${WP_ADMIN_PASSWORD} --admin_email=${ADMIN_EMAIL} --skip-email" || log "WARNING: WordPress core installation failed" "${YELLOW}⚠️ WordPress core installation failed${NC}"
+
+# Run comprehensive database connection test
+test_database_connection "mariadb" "${WP_DB_USER}" "${WP_DB_PASSWORD}" "${WP_DB_NAME}" "${WORDPRESS_CONTAINER_NAME}"
+
+# Now try to create a WordPress database backup in case we need it
+log "INFO: Creating WordPress database backup" "${CYAN}Creating WordPress database backup (if database exists)...${NC}"
+docker exec ${MARIADB_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysqldump -uroot ${WP_DB_NAME} > /var/lib/mysql/${WP_DB_NAME}_backup.sql" || {
+  log "WARNING: Unable to create database backup" "${YELLOW}⚠️ Unable to create database backup (database may not exist yet)${NC}"
 }
 
-# Verify the database schema
-log "INFO: Verifying database tables" "${CYAN}Verifying database tables...${NC}"
-docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI db tables" || log "WARNING: Cannot list database tables" "${YELLOW}⚠️ Cannot list database tables${NC}"
+# Ensure database is ready with additional wait time
+log "INFO: Ensuring database is ready" "${CYAN}Ensuring database is ready...${NC}"
+sleep 10
 
 # Install essential plugins 
 log "INFO: Installing essential plugins" "${CYAN}Installing essential plugins...${NC}"
