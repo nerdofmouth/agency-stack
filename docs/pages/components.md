@@ -130,6 +130,24 @@ For detailed Grafana setup and integration information, see our [Monitoring Guid
 |-----------|-------------|-------------|
 | **VoIP System** | Complete Voice over IP telephony service | https://voip.yourdomain.com |
 | **Mailu** | Complete email server with webmail, SMTP, and IMAP | https://mail.yourdomain.com |
+| **[MiroTalk SFU](components/mirotalk_sfu.md)** | Self-hosted video conferencing platform | https://video.yourdomain.com |
+
+### MiroTalk SFU Video Conferencing
+
+AgencyStack includes MiroTalk SFU, a secure and privacy-respecting video conferencing solution:
+
+**Features:**
+- Group video conferencing (SFU architecture)
+- Screen sharing and file sharing
+- Built-in text chat
+- Room-based meeting system
+- No installation required (browser-based)
+- Self-hosted with no external dependencies
+- Prometheus metrics integration (optional)
+
+**Default URLs:**
+- Video conferences: https://video.yourdomain.com
+- Metrics endpoint: https://video.yourdomain.com:3001/metrics (if enabled)
 
 ### Mailu Email Server
 
