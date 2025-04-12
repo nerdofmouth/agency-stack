@@ -44,9 +44,9 @@ DOMAIN=""
 CLIENT_ID="default"  # Default client ID
 ADMIN_EMAIL=""
 WP_ADMIN_USER="admin"
+WP_ADMIN_PASSWORD="admin"
 WP_DB_PASSWORD="wordpress_password"  # Fixed password for consistent deployment
 WP_ROOT_PASSWORD="mariadb_root_password"  # Fixed root password for consistent deployment
-WP_ADMIN_PASSWORD=$(openssl rand -base64 12 | tr -d "=+/")
 WP_VERSION="latest"
 PHP_VERSION="8.1"
 ENABLE_KEYCLOAK=false
@@ -352,6 +352,10 @@ mkdir -p "${WP_DIR}/${DOMAIN}/redis"
 WP_DB_NAME="wordpress"
 WP_DB_USER="wordpress"
 WP_TABLE_PREFIX="wp_"
+
+# Define consistent WordPress admin credentials
+WP_ADMIN_USER="admin"
+WP_ADMIN_PASSWORD="admin"
 
 # Store database credentials in environment file for reference
 mkdir -p "${WP_DIR}/${DOMAIN}/config"
@@ -693,43 +697,37 @@ sleep 10
 # Install WP-CLI inside the container
 docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar && chmod +x wp-cli.phar && mv wp-cli.phar /usr/local/bin/wp"
 
+WP_CLI="wp --allow-root"
+
 # Configure WordPress using WP-CLI
 log "INFO: Configuring WordPress site" "${CYAN}Configuring WordPress site...${NC}"
 
 # Wait for WordPress to be ready
 sleep 10
 
-# Run WP-CLI
-docker exec ${WORDPRESS_CONTAINER_NAME} wp --allow-root --path=/var/www/html core install \
-  --url="https://${DOMAIN}" \
-  --title="WordPress on AgencyStack" \
-  --admin_user="${WP_ADMIN_USER}" \
-  --admin_password="${WP_ADMIN_PASSWORD}" \
-  --admin_email="${ADMIN_EMAIL}"
+# Configuration is robust, utilizing environment variables for consistency
+cd "${WP_DIR}/${DOMAIN}/wordpress" || {
+  log "ERROR: Failed to change directory to WordPress root" "${RED}Failed to change directory to WordPress root${NC}"
+  exit 1
+}
 
-if [ $? -ne 0 ]; then
-  log "WARNING: WordPress may need manual configuration" "${YELLOW}WordPress may need manual configuration. Please visit https://${DOMAIN}/ to complete setup.${NC}"
-else
-  # Install and activate essential plugins
-  log "INFO: Installing essential plugins" "${CYAN}Installing essential plugins...${NC}"
-  docker exec ${WORDPRESS_CONTAINER_NAME} wp plugin install redis-cache wordfence sucuri-scanner wordpress-seo duplicate-post --activate --path="/var/www/html"
-  
-  # Enable Redis Object Cache
-  docker exec ${WORDPRESS_CONTAINER_NAME} wp redis enable --path="/var/www/html"
-  
-  # Update permalink structure
-  docker exec ${WORDPRESS_CONTAINER_NAME} wp rewrite structure '/%postname%/' --path="/var/www/html"
-  
-  # Configure security settings
-  docker exec ${WORDPRESS_CONTAINER_NAME} wp option update blog_public 0 --path="/var/www/html"  # Discourage search engines until site is ready
-  
-  # Create a sample page
-  docker exec ${WORDPRESS_CONTAINER_NAME} wp post create --post_type=page --post_title='Welcome to AgencyStack WordPress' --post_content='This WordPress site is powered by AgencyStack.' --post_status=publish --path="/var/www/html"
-  
-  # Set as homepage
-  docker exec ${WORDPRESS_CONTAINER_NAME} wp option update show_on_front 'page' --path="/var/www/html"
-  docker exec ${WORDPRESS_CONTAINER_NAME} wp option update page_on_front 2 --path="/var/www/html"
-fi
+# Install WordPress if not already installed
+log "INFO: Installing WordPress core" "${CYAN}Installing WordPress core...${NC}"
+docker exec -w /var/www/html ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI core install --url=https://${DOMAIN} --title='WordPress on AgencyStack' --admin_user=${WP_ADMIN_USER} --admin_password=${WP_ADMIN_PASSWORD} --admin_email=${ADMIN_EMAIL} --skip-email" || log "WARNING: WordPress may already be installed" "${YELLOW}WordPress is already installed.${NC}"
+
+# Install essential plugins
+log "INFO: Installing essential plugins" "${CYAN}Installing essential plugins...${NC}"
+docker exec -w /var/www/html ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI plugin install redis-cache wordfence sucuri-scanner wordpress-seo duplicate-post --activate" || log "WARNING: Failed to install plugins" "${YELLOW}⚠️ Failed to install plugins${NC}"
+
+# Verify WordPress installation
+log "INFO: Verifying WordPress installation" "${CYAN}Verifying WordPress installation...${NC}"
+docker exec -w /var/www/html ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI core verify-checksums" || log "WARNING: WordPress core verification failed" "${YELLOW}⚠️ WordPress core verification failed${NC}"
+
+# Set a few basic configurations
+log "INFO: Configuring WordPress" "${CYAN}Configuring WordPress...${NC}"
+docker exec -w /var/www/html ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI option update blogname 'WordPress on AgencyStack'" || log "WARNING: Failed to update blog name" "${YELLOW}⚠️ Failed to update blog name${NC}"
+docker exec -w /var/www/html ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI option update blogdescription 'Powered by AgencyStack'" || log "WARNING: Failed to update blog description" "${YELLOW}⚠️ Failed to update blog description${NC}"
+docker exec -w /var/www/html ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI rewrite structure '/%postname%/'" || log "WARNING: Failed to update permalink structure" "${YELLOW}⚠️ Failed to update permalink structure${NC}"
 
 # Store credentials in a secure location
 log "INFO: Storing credentials" "${CYAN}Storing credentials...${NC}"
