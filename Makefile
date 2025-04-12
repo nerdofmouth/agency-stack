@@ -639,6 +639,160 @@ install-erpnext: validate
 	@echo "Installing ERPNext..."
 	@sudo $(SCRIPTS_DIR)/components/install_erpnext.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
+erpnext: install-erpnext
+
+erpnext-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking ERPNext Status...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make erpnext-status DOMAIN=erp.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	CLIENT_DIR=""; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		CLIENT_DIR="/clients/$(CLIENT_ID)"; \
+	fi; \
+	if [ -d "/opt/agency_stack$${CLIENT_DIR}/erpnext/$(DOMAIN)" ]; then \
+		echo "$(GREEN)✅ ERPNext installation found for $(DOMAIN)$(RESET)"; \
+		cd /opt/agency_stack$${CLIENT_DIR}/erpnext/$(DOMAIN) && docker-compose ps; \
+	else \
+		echo "$(RED)❌ ERPNext installation not found for $(DOMAIN)$(RESET)"; \
+	fi
+
+erpnext-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing ERPNext Logs...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make erpnext-logs DOMAIN=erp.example.com [CLIENT_ID=tenant1] [SERVICE=erpnext]"; \
+		exit 1; \
+	fi; \
+	CLIENT_DIR=""; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		CLIENT_DIR="/clients/$(CLIENT_ID)"; \
+	fi; \
+	SERVICE=""; \
+	if [ -n "$(SERVICE)" ]; then \
+		SERVICE="$(SERVICE)"; \
+	else \
+		SERVICE="erpnext"; \
+	fi; \
+	if [ -d "/opt/agency_stack$${CLIENT_DIR}/erpnext/$(DOMAIN)" ]; then \
+		cd /opt/agency_stack$${CLIENT_DIR}/erpnext/$(DOMAIN) && \
+		docker-compose logs -f --tail=100 $${SERVICE} | tee -a $(LOG_DIR)/components/erpnext.log; \
+	else \
+		echo "$(RED)❌ ERPNext installation not found for $(DOMAIN)$(RESET)"; \
+		echo "$(CYAN)To install: make erpnext DOMAIN=$(DOMAIN) ADMIN_EMAIL=your-email@example.com$(RESET)"; \
+		if [ -f "$(LOG_DIR)/components/erpnext.log" ]; then \
+			echo "$(YELLOW)Last logs from erpnext.log:$(RESET)"; \
+			tail -n 20 $(LOG_DIR)/components/erpnext.log; \
+		fi \
+	fi
+
+erpnext-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting ERPNext Services...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make erpnext-restart DOMAIN=erp.example.com [CLIENT_ID=tenant1] [SERVICE=all]"; \
+		exit 1; \
+	fi; \
+	CLIENT_DIR=""; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		CLIENT_DIR="/clients/$(CLIENT_ID)"; \
+	fi; \
+	SERVICE=""; \
+	if [ -n "$(SERVICE)" ] && [ "$(SERVICE)" != "all" ]; then \
+		SERVICE="$(SERVICE)"; \
+		echo "$(CYAN)Restarting $(SERVICE) service...$(RESET)"; \
+	fi; \
+	if [ -d "/opt/agency_stack$${CLIENT_DIR}/erpnext/$(DOMAIN)" ]; then \
+		cd /opt/agency_stack$${CLIENT_DIR}/erpnext/$(DOMAIN) && docker-compose restart $${SERVICE}; \
+		echo "$(GREEN)✅ ERPNext services restarted successfully$(RESET)"; \
+	else \
+		echo "$(RED)❌ ERPNext installation not found for $(DOMAIN)$(RESET)"; \
+	fi
+
+erpnext-backup:
+	@echo "$(MAGENTA)$(BOLD)💾 Creating ERPNext Backup...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make erpnext-backup DOMAIN=erp.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	CLIENT_DIR=""; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		CLIENT_DIR="/clients/$(CLIENT_ID)"; \
+	fi; \
+	if [ -d "/opt/agency_stack$${CLIENT_DIR}/erpnext/$(DOMAIN)" ]; then \
+		BACKUP_DIR="$(BACKUP_DIR)/erpnext/$(DOMAIN)"; \
+		mkdir -p $${BACKUP_DIR}; \
+		TIMESTAMP=$$(date +%Y%m%d_%H%M%S); \
+		echo "$(CYAN)Creating database backup...$(RESET)"; \
+		cd /opt/agency_stack$${CLIENT_DIR}/erpnext/$(DOMAIN) && \
+		SITE_NAME="$$(docker-compose exec -T erpnext bash -c 'echo $$SITE_NAME')"; \
+		docker-compose exec -T erpnext bench --site $${SITE_NAME} backup --with-files && \
+		docker-compose exec -T erpnext bash -c "cp -r /home/frappe/frappe-bench/sites/$${SITE_NAME}/private/backups/* /home/frappe/frappe-bench/sites/$${SITE_NAME}/private/backups_archive/" && \
+		echo "$(CYAN)Copying backup files to $(BACKUP_DIR)...$(RESET)" && \
+		docker cp $$(docker-compose ps -q erpnext):/home/frappe/frappe-bench/sites/$${SITE_NAME}/private/backups_archive/ $${BACKUP_DIR}/$${TIMESTAMP}; \
+		echo "$(GREEN)✅ ERPNext backup completed successfully$(RESET)"; \
+		echo "$(CYAN)Backup saved to: $${BACKUP_DIR}/$${TIMESTAMP}$(RESET)"; \
+	else \
+		echo "$(RED)❌ ERPNext installation not found for $(DOMAIN)$(RESET)"; \
+	fi
+
+erpnext-config:
+	@echo "$(MAGENTA)$(BOLD)⚙️ Opening ERPNext Configuration Shell...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make erpnext-config DOMAIN=erp.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	CLIENT_DIR=""; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		CLIENT_DIR="/clients/$(CLIENT_ID)"; \
+	fi; \
+	if [ -d "/opt/agency_stack$${CLIENT_DIR}/erpnext/$(DOMAIN)" ]; then \
+		cd /opt/agency_stack$${CLIENT_DIR}/erpnext/$(DOMAIN) && \
+		SITE_NAME="$$(docker-compose exec -T erpnext bash -c 'echo $$SITE_NAME')"; \
+		echo "$(CYAN)Opening ERPNext Bench console for $${SITE_NAME}...$(RESET)"; \
+		docker-compose exec erpnext bench --site $${SITE_NAME} console; \
+	else \
+		echo "$(RED)❌ ERPNext installation not found for $(DOMAIN)$(RESET)"; \
+	fi
+
+erpnext-test:
+	@echo "$(MAGENTA)$(BOLD)🧪 Testing ERPNext API...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make erpnext-test DOMAIN=erp.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	CLIENT_DIR=""; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		CLIENT_DIR="/clients/$(CLIENT_ID)"; \
+	fi; \
+	if [ -d "/opt/agency_stack$${CLIENT_DIR}/erpnext/$(DOMAIN)" ]; then \
+		echo "$(CYAN)Testing ERPNext API health...$(RESET)"; \
+		curl -s https://$(DOMAIN)/api/method/ping | grep -q "message.*pong" && \
+		echo "$(GREEN)✅ ERPNext API is healthy (responded with pong)$(RESET)" || \
+		echo "$(RED)❌ ERPNext API health check failed$(RESET)"; \
+		\
+		echo "$(CYAN)Checking ERPNext site status...$(RESET)"; \
+		cd /opt/agency_stack$${CLIENT_DIR}/erpnext/$(DOMAIN) && \
+		SITE_NAME="$$(docker-compose exec -T erpnext bash -c 'echo $$SITE_NAME')"; \
+		docker-compose exec -T erpnext bench --site $${SITE_NAME} status | tee -a $(LOG_DIR)/components/erpnext.log; \
+	else \
+		echo "$(RED)❌ ERPNext installation not found for $(DOMAIN)$(RESET)"; \
+	fi
+
+erpnext-sso:
+	@echo "$(MAGENTA)$(BOLD)🔑 Configuring ERPNext SSO with Keycloak...$(RESET)"
+	@if [ -z "$(DOMAIN)" ] || [ -z "$(KEYCLOAK_DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameters.$(RESET)"; \
+		echo "Usage: make erpnext-sso DOMAIN=erp.example.com KEYCLOAK_DOMAIN=auth.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	sudo $(SCRIPTS_DIR)/components/install_erpnext.sh --domain $(DOMAIN) --keycloak-domain $(KEYCLOAK_DOMAIN) --enable-sso $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(VERBOSE),--verbose,)
+
 # PostHog
 install-posthog: validate
 	@echo "Installing PostHog..."
