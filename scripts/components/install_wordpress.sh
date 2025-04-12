@@ -369,14 +369,130 @@ password=${WP_DB_PASSWORD}
 EOL
 chmod 600 "${WP_DIR}/${DOMAIN}/.my.cnf"
 
-# Define MySQL initialization script for proper user permissions
+# Define a better MySQL initialization script for proper user permissions
+# This demonstrates the approach we should take for shared database services
 mkdir -p "${WP_DIR}/${DOMAIN}/mariadb-init"
 cat > "${WP_DIR}/${DOMAIN}/mariadb-init/init.sql" <<EOL
+-- Initialization script that creates and configures database for WordPress
+-- This demonstrates proper database initialization that could be used for technology reuse
+
+-- Create database if it doesn't exist
 CREATE DATABASE IF NOT EXISTS ${WP_DB_NAME};
+
+-- Create WordPress user with proper host wildcard to allow container networking
 CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'%' IDENTIFIED BY '${WP_DB_PASSWORD}';
+CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'localhost' IDENTIFIED BY '${WP_DB_PASSWORD}';
+CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'172.%.%.%' IDENTIFIED BY '${WP_DB_PASSWORD}';
+
+-- Grant permissions to the user from any host
 GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'%';
+GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'localhost';
+GRANT ALL PRIVILEGES ON ${WP_DB_NAME}.* TO '${WP_DB_USER}'@'172.%.%.%';
+
+-- Allow root access from any host (for admin purposes, would be restricted in production)
+CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED BY '${WP_ROOT_PASSWORD}';
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;
+
 FLUSH PRIVILEGES;
+
+-- Create wp_options table with proper defaults
+USE ${WP_DB_NAME};
+CREATE TABLE IF NOT EXISTS wp_options (
+  option_id bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+  option_name varchar(191) NOT NULL DEFAULT '',
+  option_value longtext NOT NULL,
+  autoload varchar(20) NOT NULL DEFAULT 'yes',
+  PRIMARY KEY (option_id),
+  UNIQUE KEY option_name (option_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO wp_options (option_name, option_value, autoload) 
+VALUES ('siteurl', 'https://${DOMAIN}', 'yes')
+ON DUPLICATE KEY UPDATE option_value = 'https://${DOMAIN}';
+
+INSERT INTO wp_options (option_name, option_value, autoload) 
+VALUES ('home', 'https://${DOMAIN}', 'yes')
+ON DUPLICATE KEY UPDATE option_value = 'https://${DOMAIN}';
 EOL
+
+# Create a better test_db script that demonstrates proper service discovery and connectivity checks
+# This approach can be reused for connecting to shared services in the future
+cat > "${WP_DIR}/${DOMAIN}/test_db.sh" <<EOL
+#!/bin/bash
+# Technology Reuse Database Connection Test Script
+# This script demonstrates proper service discovery and connection validation
+# that could be reused across components in AgencyStack
+
+max_attempts=30
+attempt=1
+db_host="${MARIADB_CONTAINER_NAME}"
+db_user="${WP_DB_USER}"
+db_pass="${WP_DB_PASSWORD}"
+db_name="${WP_DB_NAME}"
+
+echo "=========================================="
+echo "DATABASE CONNECTION TEST"
+echo "Target: \$db_host"
+echo "User: \$db_user"
+echo "Database: \$db_name"
+echo "=========================================="
+
+# Check if mysql client is installed
+if ! command -v mysql &> /dev/null; then
+    echo "MySQL client not installed. Installing..."
+    apt-get update -q && apt-get install -y default-mysql-client
+fi
+
+# Network diagnostics functions
+check_host() {
+    getent hosts \$db_host || echo "Host \$db_host not found in hosts file"
+}
+
+# Try connection with increasing wait times
+while [ \$attempt -le \$max_attempts ]; do
+    echo "Connection attempt \$attempt of \$max_attempts..."
+    
+    # On every 5th attempt, run diagnostics
+    if (( \$attempt % 5 == 1 )); then
+        echo "Running network diagnostics:"
+        check_host
+        echo ""
+    fi
+    
+    # Try the connection
+    if mysql -h\$db_host -u\$db_user -p\$db_pass -e "SHOW DATABASES;" 2>/dev/null; then
+        echo "SUCCESS: Connected to database \$db_host"
+        echo "Available databases:"
+        mysql -h\$db_host -u\$db_user -p\$db_pass -e "SHOW DATABASES;"
+        exit 0
+    fi
+    
+    wait_time=\$(( 2 + \$attempt / 5 ))
+    echo "Failed connection attempt. Waiting \$wait_time seconds before retry..."
+    sleep \$wait_time
+    attempt=\$((attempt+1))
+done
+
+echo "FAILURE: Could not connect to database after \$max_attempts attempts"
+echo "Final connection diagnostics:"
+
+# Try different credential combinations as last resort diagnostics
+echo "Testing different connection methods:"
+echo "1. Connection without database selection:"
+mysql -h\$db_host -u\$db_user -p\$db_pass -e "SELECT 1;" 2>&1 || echo "Basic connection failed"
+
+echo "2. Connection using root credentials:"
+mysql -h\$db_host -uroot -p${WP_ROOT_PASSWORD} -e "SHOW DATABASES;" 2>&1 || echo "Root connection failed"
+
+echo "3. Connection using socket instead of TCP:"
+mysql -u\$db_user -p\$db_pass -e "SHOW DATABASES;" 2>&1 || echo "Socket connection failed"
+
+exit 1
+EOL
+
+chmod +x "${WP_DIR}/${DOMAIN}/test_db.sh"
+docker cp "${WP_DIR}/${DOMAIN}/test_db.sh" ${WORDPRESS_CONTAINER_NAME}:/tmp/test_db.sh
+docker exec ${WORDPRESS_CONTAINER_NAME} /tmp/test_db.sh
 
 # Create WordPress Docker Compose file
 log "INFO: Creating WordPress Docker Compose file" "${CYAN}Creating WordPress Docker Compose file...${NC}"
@@ -586,41 +702,6 @@ docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "apt-get update && apt-get insta
 # Improve connection reliability by waiting for MariaDB to be fully initialized
 log "INFO: Ensuring database is ready" "${CYAN}Ensuring database is ready...${NC}"
 sleep 10
-
-# Create a script to test database connectivity
-cat > "${WP_DIR}/${DOMAIN}/test_db.sh" <<EOL
-#!/bin/bash
-max_attempts=30
-attempt=1
-echo "Testing database connection to ${MARIADB_CONTAINER_NAME}..."
-
-# Basic network diagnostics
-echo "Network diagnostics:"
-ping -c 2 ${MARIADB_CONTAINER_NAME} || echo "Cannot ping database container"
-
-while [ \$attempt -le \$max_attempts ]; do
-  echo "Attempt \$attempt of \$max_attempts..."
-  if mysql -h${MARIADB_CONTAINER_NAME} -u${WP_DB_USER} -p${WP_DB_PASSWORD} -e "SHOW DATABASES;" 2>/dev/null; then
-    echo "Database connection successful!"
-    exit 0
-  fi
-  
-  # Try root connection on failure
-  if [ \$attempt -eq 10 ]; then
-    echo "Trying with root credentials:"
-    mysql -h${MARIADB_CONTAINER_NAME} -uroot -p${WP_ROOT_PASSWORD} -e "SHOW DATABASES;" || echo "Root connection failed too"
-  fi
-  
-  sleep 3
-  attempt=\$((attempt+1))
-done
-echo "Failed to connect to database after \$max_attempts attempts"
-exit 1
-EOL
-
-chmod +x "${WP_DIR}/${DOMAIN}/test_db.sh"
-docker cp "${WP_DIR}/${DOMAIN}/test_db.sh" ${WORDPRESS_CONTAINER_NAME}:/tmp/test_db.sh
-docker exec ${WORDPRESS_CONTAINER_NAME} /tmp/test_db.sh
 
 # Run WP-CLI
 docker exec ${WORDPRESS_CONTAINER_NAME} wp --allow-root --path=/var/www/html core install \
