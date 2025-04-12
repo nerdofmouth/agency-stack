@@ -1775,3 +1775,107 @@ mirotalk-sfu-update:
 	else \
 		echo "$(RED)❌ MiroTalk SFU installation not found for $(DOMAIN)$(RESET)"; \
 	fi
+
+# Standardized Mailu Email Server targets
+mailu: install-mailu
+	@echo "$(MAGENTA)$(BOLD)📧 Installing Mailu Email Server...$(RESET)"
+
+install-mailu:
+	@echo "$(MAGENTA)$(BOLD)📧 Installing Mailu Email Server...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		read -p "$(YELLOW)Enter domain for Mailu (e.g., mail.yourdomain.com):$(RESET) " DOMAIN; \
+		read -p "$(YELLOW)Enter email domain (e.g., yourdomain.com):$(RESET) " EMAIL_DOMAIN; \
+		read -p "$(YELLOW)Enter admin email (e.g., admin@yourdomain.com):$(RESET) " ADMIN_EMAIL; \
+		sudo $(SCRIPTS_DIR)/components/install_mailu.sh --domain $$DOMAIN --email-domain $$EMAIL_DOMAIN --admin-email $$ADMIN_EMAIL $(ARGS); \
+	else \
+		sudo $(SCRIPTS_DIR)/components/install_mailu.sh --domain $(DOMAIN) $(if $(EMAIL_DOMAIN),--email-domain $(EMAIL_DOMAIN),) \
+		$(if $(ADMIN_EMAIL),--admin-email $(ADMIN_EMAIL),) $(if $(ADMIN_PASSWORD),--admin-password $(ADMIN_PASSWORD),) \
+		$(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(ARGS); \
+	fi
+
+mailu-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Mailu Status...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make mailu-status DOMAIN=mail.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		echo "$(CYAN)Checking Mailu status for $(DOMAIN) (client: $(CLIENT_ID))...$(RESET)"; \
+		CONTAINER_PREFIX="mailu_$(CLIENT_ID)"; \
+	else \
+		echo "$(CYAN)Checking Mailu status for $(DOMAIN)...$(RESET)"; \
+		CONTAINER_PREFIX="mailu"; \
+	fi; \
+	if docker ps | grep -q "$${CONTAINER_PREFIX}_admin"; then \
+		echo "$(GREEN)✅ Mailu is running for $(DOMAIN)$(RESET)"; \
+		docker ps --filter "name=$${CONTAINER_PREFIX}_" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"; \
+		echo ""; \
+		echo "$(CYAN)Webmail: https://$(DOMAIN)/webmail/$(RESET)"; \
+		echo "$(CYAN)Admin: https://$(DOMAIN)/admin/$(RESET)"; \
+	else \
+		echo "$(RED)❌ Mailu containers for $(DOMAIN) are not running$(RESET)"; \
+		echo "To start Mailu, run: make mailu-restart DOMAIN=$(DOMAIN) $(if $(CLIENT_ID),CLIENT_ID=$(CLIENT_ID),)"; \
+	fi
+
+mailu-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing Mailu Logs...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make mailu-logs DOMAIN=mail.example.com [CLIENT_ID=tenant1] [CONTAINER=admin|smtp|imap|webmail|redis|postfix]"; \
+		exit 1; \
+	fi; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		CONTAINER_PREFIX="mailu_$(CLIENT_ID)"; \
+	else \
+		CONTAINER_PREFIX="mailu"; \
+	fi; \
+	if [ -n "$(CONTAINER)" ]; then \
+		echo "$(CYAN)Viewing logs for $${CONTAINER_PREFIX}_$(CONTAINER) container...$(RESET)"; \
+		docker logs $${CONTAINER_PREFIX}_$(CONTAINER) $(if $(FOLLOW),--follow,) $(if $(TAIL),--tail $(TAIL),--tail 100); \
+	else \
+		echo "$(CYAN)Viewing component logs for Mailu ($(DOMAIN))...$(RESET)"; \
+		if [ -f "/var/log/agency_stack/components/mailu.log" ]; then \
+			cat "/var/log/agency_stack/components/mailu.log" | tail -n 100; \
+		elif [ -f "/var/log/agency_stack/components/install_mailu-"* ]; then \
+			ls -t /var/log/agency_stack/components/install_mailu-* | head -n 1 | xargs cat | tail -n 100; \
+		else \
+			echo "$(YELLOW)No Mailu logs found in /var/log/agency_stack/components/$(RESET)"; \
+			echo "$(CYAN)Showing logs from all Mailu containers:$(RESET)"; \
+			docker logs $${CONTAINER_PREFIX}_admin --tail 50; \
+		fi; \
+	fi
+
+mailu-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Mailu...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make mailu-restart DOMAIN=mail.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		MAILU_DIR="/opt/agency_stack/mailu/clients/$(CLIENT_ID)/$(DOMAIN)"; \
+		echo "$(CYAN)Restarting Mailu for $(DOMAIN) (client: $(CLIENT_ID))...$(RESET)"; \
+	else \
+		MAILU_DIR="/opt/agency_stack/mailu/$(DOMAIN)"; \
+		echo "$(CYAN)Restarting Mailu for $(DOMAIN)...$(RESET)"; \
+	fi; \
+	if [ -d "$$MAILU_DIR" ]; then \
+		cd "$$MAILU_DIR" && docker-compose down && docker-compose up -d; \
+		echo "$(GREEN)✅ Mailu has been restarted for $(DOMAIN)$(RESET)"; \
+	else \
+		echo "$(RED)❌ Mailu installation directory not found: $$MAILU_DIR$(RESET)"; \
+		echo "Please make sure Mailu is installed for $(DOMAIN)"; \
+		exit 1; \
+	fi
+
+# Make targets for integration with other components
+mailu-listmonk:
+	@echo "$(MAGENTA)$(BOLD)🔗 Integrating Mailu with Listmonk...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make mailu-listmonk DOMAIN=mail.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	echo "$(CYAN)Configuring Listmonk to use Mailu as SMTP relay...$(RESET)"; \
+	sudo $(SCRIPTS_DIR)/integrations/integrate_mailu_listmonk.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),)
