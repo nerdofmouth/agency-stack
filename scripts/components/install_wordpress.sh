@@ -388,12 +388,12 @@ services:
       - WORDPRESS_DB_PASSWORD=${WP_DB_PASSWORD}
       - WORDPRESS_DB_NAME=${WP_DB_NAME}
       - WORDPRESS_TABLE_PREFIX=${WP_TABLE_PREFIX}
+      - WORDPRESS_CONFIG_EXTRA=define('WP_DEBUG', true); define('WP_DEBUG_LOG', true);
     networks:
       - wordpress_network
       - ${NETWORK_NAME}
     depends_on:
-      mariadb:
-        condition: service_healthy
+      - mariadb
     healthcheck:
       test: ["CMD", "php", "-r", "if(!file_exists('/var/www/html/wp-config.php')) {exit(1);} else {exit(0);}" ]
       interval: 5s
@@ -434,6 +434,8 @@ services:
       - MYSQL_USER=${WP_DB_USER}
       - MYSQL_PASSWORD=${WP_DB_PASSWORD}
       - MYSQL_ROOT_PASSWORD=${WP_ROOT_PASSWORD}
+      - MYSQL_ROOT_HOST=%
+      - MYSQL_HOST=%
     networks:
       - wordpress_network
       - ${NETWORK_NAME}
@@ -442,6 +444,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
 
   redis:
     container_name: ${REDIS_CONTAINER_NAME}
@@ -570,10 +573,32 @@ docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "curl -O https://raw.githubuserc
 # Install MySQL client for database verification
 docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "apt-get update && apt-get install -y default-mysql-client"
 
-# Wait for database to be fully ready (important for container networking)
+# Improve connection reliability by waiting for MariaDB to be fully initialized
 log "INFO: Ensuring database is ready" "${CYAN}Ensuring database is ready...${NC}"
-sleep 5
-docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "until mysql -h ${MARIADB_CONTAINER_NAME} -u ${WP_DB_USER} -p${WP_DB_PASSWORD} -e 'SELECT 1'; do echo 'Waiting for database connection...'; sleep 2; done"
+sleep 10
+
+# Create a script to test database connectivity
+cat > "${WP_DIR}/${DOMAIN}/test_db.sh" <<EOL
+#!/bin/bash
+max_attempts=30
+attempt=1
+echo "Testing database connection to ${MARIADB_CONTAINER_NAME}..."
+while [ \$attempt -le \$max_attempts ]; do
+  echo "Attempt \$attempt of \$max_attempts..."
+  if mysql -h${MARIADB_CONTAINER_NAME} -u${WP_DB_USER} -p${WP_DB_PASSWORD} -e "SELECT 1" ${WP_DB_NAME} 2>/dev/null; then
+    echo "Database connection successful!"
+    exit 0
+  fi
+  sleep 3
+  attempt=\$((attempt+1))
+done
+echo "Failed to connect to database after \$max_attempts attempts"
+exit 1
+EOL
+
+chmod +x "${WP_DIR}/${DOMAIN}/test_db.sh"
+docker cp "${WP_DIR}/${DOMAIN}/test_db.sh" ${WORDPRESS_CONTAINER_NAME}:/tmp/test_db.sh
+docker exec ${WORDPRESS_CONTAINER_NAME} /tmp/test_db.sh
 
 # Run WP-CLI
 docker exec ${WORDPRESS_CONTAINER_NAME} wp --allow-root --path=/var/www/html core install \
