@@ -339,8 +339,7 @@ services:
       - postgres
     environment:
       KC_DB: postgres
-      KC_DB_URL_HOST: postgres
-      KC_DB_URL_DATABASE: ${DB_NAME}
+      KC_DB_URL: jdbc:postgresql://postgres/${DB_NAME}
       KC_DB_USERNAME: ${DB_USER}
       KC_DB_PASSWORD: ${DB_PASSWORD}
       KC_HOSTNAME: ${DOMAIN}
