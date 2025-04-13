@@ -45,6 +45,7 @@ CLIENT_ID="default"  # Default client ID
 ADMIN_EMAIL=""
 WP_ADMIN_USER="admin"
 WP_ADMIN_PASSWORD="admin"
+ADMIN_PASSWORD="${ADMIN_PASSWORD:-$(openssl rand -base64 12)}"
 WP_DB_PASSWORD="wordpress_password"  # Fixed password for consistent deployment
 WP_ROOT_PASSWORD="mariadb_root_password"  # Fixed root password for consistent deployment
 WP_VERSION="latest"
@@ -700,7 +701,7 @@ wp --info
 
 # Install WordPress core
 echo "Installing WordPress core..."
-wp --allow-root core install --url="https://${DOMAIN}" --title="WordPress on AgencyStack" --admin_user="${WP_ADMIN_USER}" --admin_password="${WP_ADMIN_PASSWORD}" --admin_email="${ADMIN_EMAIL}" --skip-email
+wp --allow-root core install --url="https://${DOMAIN}" --title="WordPress on AgencyStack" --admin_user="${WP_ADMIN_USER}" --admin_password="${ADMIN_PASSWORD}" --admin_email="${ADMIN_EMAIL}" --skip-email
 
 # Install essential plugins
 echo "Installing essential plugins..."
@@ -840,7 +841,7 @@ cat > "${CONFIG_DIR}/secrets/wordpress/${DOMAIN}.env" <<EOF
 
 WP_ADMIN_URL=https://${DOMAIN}/wp-admin/
 WP_ADMIN_USER=${WP_ADMIN_USER}
-WP_ADMIN_PASSWORD=${WP_ADMIN_PASSWORD}
+WP_ADMIN_PASSWORD=${ADMIN_PASSWORD}
 WP_ADMIN_EMAIL=${ADMIN_EMAIL}
 
 DB_ROOT_PASSWORD=${WP_ROOT_PASSWORD}
@@ -965,13 +966,13 @@ log "INFO: WordPress installation completed successfully" "${GREEN}WordPress ins
 log "INFO: WordPress is now accessible at https://${DOMAIN}" "${GREEN}WordPress is now accessible at:${NC} https://${DOMAIN}"
 log "INFO: Admin URL: https://${DOMAIN}/wp-admin/" "${GREEN}Admin URL:${NC} https://${DOMAIN}/wp-admin/"
 log "INFO: Admin username: ${WP_ADMIN_USER}" "${GREEN}Admin username:${NC} ${WP_ADMIN_USER}"
-log "INFO: Admin password: ${WP_ADMIN_PASSWORD}" "${GREEN}Admin password:${NC} ${WP_ADMIN_PASSWORD}"
+log "INFO: Admin password: ${ADMIN_PASSWORD}" "${GREEN}Admin password:${NC} ${ADMIN_PASSWORD}"
 
 log "INFO: Installation complete" "${GREEN}Installation complete!${NC}"
 echo -e "${CYAN}WordPress URL: https://${DOMAIN}/${NC}"
 echo -e "${CYAN}Admin URL: https://${DOMAIN}/wp-admin/${NC}"
 echo -e "${YELLOW}Admin Username: ${WP_ADMIN_USER}${NC}"
-echo -e "${YELLOW}Admin Password: ${WP_ADMIN_PASSWORD}${NC}"
+echo -e "${YELLOW}Admin Password: ${ADMIN_PASSWORD}${NC}"
 echo -e "${YELLOW}IMPORTANT: Please save these credentials safely and change the password!${NC}"
 echo -e ""
 echo -e "${CYAN}Credentials saved to: ${CONFIG_DIR}/secrets/wordpress/${DOMAIN}.env${NC}"
