@@ -280,15 +280,24 @@ mkdir -p "${KEYCLOAK_DIR}/${DOMAIN}/data"
 mkdir -p "${KEYCLOAK_DIR}/${DOMAIN}/postgres-data"
 mkdir -p "${KEYCLOAK_DIR}/${DOMAIN}/themes"
 mkdir -p "${KEYCLOAK_DIR}/${DOMAIN}/config"
+mkdir -p "${KEYCLOAK_DIR}/${DOMAIN}/init-db"
 
 # Save admin password to a file for later use
 echo "${ADMIN_PASSWORD}" > "${KEYCLOAK_DIR}/${DOMAIN}/admin_password.txt"
 chmod 600 "${KEYCLOAK_DIR}/${DOMAIN}/admin_password.txt"
 
 # Generate random passwords for database
-DB_PASSWORD=$(openssl rand -base64 12)
+DB_PASSWORD=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-16)
 DB_USER="keycloak"
 DB_NAME="keycloak"
+
+# Save DB password to a file for reference
+echo "${DB_PASSWORD}" > "${KEYCLOAK_DIR}/${DOMAIN}/db_password.txt"
+chmod 600 "${KEYCLOAK_DIR}/${DOMAIN}/db_password.txt"
+
+# Create database initialization script - not needed since we use environment variables
+# Instead, we'll remove the previous init script attempt if it exists
+rm -f "${KEYCLOAK_DIR}/${DOMAIN}/init-db/init-keycloak-db.sh"
 
 # Create docker-compose.yml file
 cat > "${KEYCLOAK_DIR}/${DOMAIN}/docker-compose.yml" <<EOL
@@ -322,7 +331,8 @@ services:
       - postgres
     environment:
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME}
+      KC_DB_URL_HOST: postgres
+      KC_DB_URL_DATABASE: ${DB_NAME}
       KC_DB_USERNAME: ${DB_USER}
       KC_DB_PASSWORD: ${DB_PASSWORD}
       KC_HOSTNAME: ${DOMAIN}
@@ -338,6 +348,7 @@ services:
       - --proxy=edge
       - --hostname-strict=false
       - --hostname-strict-https=false
+      - --import-realm
     volumes:
       - ${KEYCLOAK_DIR}/${DOMAIN}/data:/opt/keycloak/data
       - ${KEYCLOAK_DIR}/${DOMAIN}/themes:/opt/keycloak/themes
