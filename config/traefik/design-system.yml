@@ -1,0 +1,15 @@
+http:
+  routers:
+    design-system:
+      rule: "Host(`proto001.alpha.nerdofmouth.com`)"
+      service: "design-system"
+      entryPoints:
+        - "websecure"
+      tls:
+        certResolver: "letsencrypt"
+  
+  services:
+    design-system:
+      loadBalancer:
+        servers:
+          - url: "http://localhost:3333"
