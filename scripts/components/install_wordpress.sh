@@ -79,6 +79,7 @@ show_help() {
   echo -e "  ${BOLD}--with-deps${NC}            Automatically install dependencies if missing"
   echo -e "  ${BOLD}--verbose${NC}              Show detailed output during installation"
   echo -e "  ${BOLD}--enable-keycloak${NC}      Enable Keycloak SSO integration"
+  echo -e "  ${BOLD}--keycloak-domain${NC} DOMAIN  Keycloak domain for SSO integration (default: keycloak.proto001.alpha.nerdofmouth.com)"
   echo -e "  ${BOLD}--enforce-https${NC}        Enforce HTTPS for WordPress (default: true)"
   echo -e "  ${BOLD}--use-host-network${NC}     Use host network mode (default: true)"
   echo -e "  ${BOLD}--help${NC}                 Show this help message and exit"
@@ -134,6 +135,11 @@ while [[ $# -gt 0 ]]; do
       ;;
     --enable-keycloak)
       ENABLE_KEYCLOAK=true
+      shift
+      ;;
+    --keycloak-domain)
+      KEYCLOAK_DOMAIN="$2"
+      shift
       shift
       ;;
     --enforce-https)
