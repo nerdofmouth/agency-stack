@@ -136,3 +136,11 @@ When adding new components to AgencyStack, please follow these guidelines:
 - **2000-3000**: Reserved for development and testing
 - **8000-8999**: General web services
 - **9000-9999**: Administrative interfaces and metrics endpoints
+
+## Design System (Bit.dev Integration)
+
+| Component | Port | Protocol | Purpose |
+|-----------|------|----------|---------|
+| Design System Dashboard | 3333 | HTTP | Dashboard for design system components and integration |
+| Bit Dev Server | 3000 | HTTP | Component development and live preview environment |
+
