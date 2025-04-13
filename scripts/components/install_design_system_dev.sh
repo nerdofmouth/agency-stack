@@ -14,7 +14,7 @@ DESIGN_SYSTEM_PORT=3333
 BIT_DEV_PORT=3000
 LOG_FILE="/var/log/agency_stack/components/design-system.log"
 INSTALL_DIR="/opt/agency_stack/clients/${CLIENT_ID}/design-system"
-DESIGN_SYSTEM_REPO_DIR="$(cd "$(dirname "$0")/../../" && pwd)/design-system-bit"
+DESIGN_SYSTEM_REPO_DIR="/opt/agency_stack/repo/design-system-bit"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
