@@ -1772,3 +1772,36 @@ dns-status:
 	else \
 		echo "No DNS configurations found."; \
 	fi
+
+# SSL Certificate Management
+ssl-certificates:
+	@echo "$(MAGENTA)$(BOLD)🔒 Configuring SSL certificates with Let's Encrypt...$(RESET)"
+	@read -p "$(YELLOW)Enter domain name (e.g., proto001.alpha.nerdofmouth.com):$(RESET) " domain; \
+	read -p "$(YELLOW)Enter admin email for certificate notifications:$(RESET) " email; \
+	$(SCRIPTS_DIR)/utils/update_traefik_certs.sh --domain $$domain --admin-email $$email --force
+
+ssl-certificates-status:
+	@echo "$(MAGENTA)$(BOLD)🔒 SSL Certificate Status...$(RESET)"
+	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/traefik/data/acme/acme.json" ]; then \
+		echo "$(CYAN)Certificate file exists. Checking content...$(RESET)"; \
+		cat /opt/agency_stack/clients/$(CLIENT_ID)/traefik/data/acme/acme.json | jq -r 'if . == {} then "No certificates issued yet." else "Certificates exist." end' 2>/dev/null || echo "Empty or invalid certificate file."; \
+		echo "$(CYAN)For detailed certificate information, run:$(RESET)"; \
+		echo "cat /opt/agency_stack/clients/$(CLIENT_ID)/traefik/data/acme/acme.json | jq"; \
+	else \
+		echo "$(RED)Certificate file not found.$(RESET)"; \
+		echo "$(CYAN)To configure certificates, run: make ssl-certificates$(RESET)"; \
+	fi
+
+traefik-ssl:
+	@echo "$(MAGENTA)$(BOLD)🔒 Configuring SSL certificates for Traefik...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make traefik-ssl DOMAIN=proto001.alpha.nerdofmouth.com [ADMIN_EMAIL=admin@example.com]"; \
+		exit 1; \
+	fi; \
+	email="$(ADMIN_EMAIL)"; \
+	if [ -z "$$email" ]; then \
+		email="admin@$(DOMAIN)"; \
+	fi; \
+	echo "$(CYAN)Configuring SSL certificates for $(DOMAIN) with admin email: $$email$(RESET)"; \
+	$(SCRIPTS_DIR)/utils/update_traefik_certs.sh --domain $(DOMAIN) --admin-email $$email --force
