@@ -362,34 +362,36 @@ keycloak_create_role_mapper() {
 # Function to update component registry for SSO configuration
 keycloak_update_sso_configured() {
   local component="$1"
+  local client_id="$2"
   
-  if [ -z "$component" ]; then
-    log_error "Component name is required for updating SSO configuration"
-    return 1
+  # Create registry directory if it doesn't exist
+  local registry_dir=$(dirname "$COMPONENT_REGISTRY")
+  if [ ! -d "$registry_dir" ]; then
+    mkdir -p "$registry_dir"
+    log_info "Created component registry directory: $registry_dir"
   fi
   
-  # Check if component registry exists
-  if [ ! -f "${COMPONENT_REGISTRY}" ]; then
-    log_warning "Component registry not found at ${COMPONENT_REGISTRY}"
-    return 0
+  # Create empty registry file if it doesn't exist
+  if [ ! -f "$COMPONENT_REGISTRY" ]; then
+    echo '{"components":{}}' > "$COMPONENT_REGISTRY"
+    log_info "Created empty component registry file"
   fi
   
-  # Update component registry with SSO configuration status
-  if command -v jq &>/dev/null; then
-    # Use jq to update the registry if available
-    if ! jq --arg component "$component" '.components[$component].sso_configured = true' "${COMPONENT_REGISTRY}" > "${COMPONENT_REGISTRY}.tmp"; then
-      log_error "Failed to update component registry for $component"
-      return 1
-    fi
-    mv "${COMPONENT_REGISTRY}.tmp" "${COMPONENT_REGISTRY}"
-  else
-    # Simple sed replacement if jq is not available
-    if ! sed -i "s/\"${component}\":{/\"${component}\":{\"sso_configured\":true,/g" "${COMPONENT_REGISTRY}"; then
-      log_warning "Failed to update component registry for $component using sed"
-    fi
+  # Check if component exists in registry
+  if ! jq -e ".components.\"$component\"" "$COMPONENT_REGISTRY" > /dev/null 2>&1; then
+    # Component doesn't exist, create it
+    jq --arg component "$component" '.components[$component] = {}' "$COMPONENT_REGISTRY" > "${COMPONENT_REGISTRY}.tmp"
+    mv "${COMPONENT_REGISTRY}.tmp" "$COMPONENT_REGISTRY"
+    log_info "Added component $component to registry"
   fi
   
-  log_success "Updated component registry for $component with SSO configuration status"
+  # Update component with SSO configuration
+  jq --arg component "$component" --arg client_id "$client_id" \
+    '.components[$component].sso_configured = true | .components[$component].sso_client_id = $client_id' \
+    "$COMPONENT_REGISTRY" > "${COMPONENT_REGISTRY}.tmp"
+  mv "${COMPONENT_REGISTRY}.tmp" "$COMPONENT_REGISTRY"
+  
+  log_success "Updated component registry for $component"
   return 0
 }
 
