@@ -120,6 +120,9 @@ help:
 	@echo "  $(BOLD)make peertube-restart$(RESET)         Restart PeerTube"
 	@echo "  $(BOLD)make peertube-upgrade$(RESET)         Upgrade PeerTube to v7.0"
 	@echo "  $(BOLD)make install-mirotalk-sfu$(RESET)     Install MiroTalk SFU - Video Conferencing"
+	@echo "  $(BOLD)make ssl-certificates$(RESET)         Interactively configure SSL certificates with Let's Encrypt"
+	@echo "  $(BOLD)make ssl-certificates-status$(RESET)  Check status of SSL certificates"
+	@echo "  $(BOLD)make traefik-ssl$(RESET)              Configure SSL certificates for Traefik (non-interactive)"
 
 # Install AgencyStack
 install: validate
