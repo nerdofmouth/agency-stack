@@ -248,7 +248,214 @@ if [ "$CONFIGURE_OAUTH_ONLY" = true ]; then
 fi
 
 # Main installation logic continues here for normal installation...
-# ...
+log "INFO: Starting Keycloak installation for ${DOMAIN}" "${CYAN}Starting Keycloak installation for ${DOMAIN}...${NC}"
+
+# Check if docker is installed
+if ! command -v docker &> /dev/null; then
+  log "ERROR: Docker is not installed" "${RED}Error: Docker is not installed. Please install Docker first.${NC}"
+  exit 1
+fi
+
+if ! command -v docker-compose &> /dev/null; then
+  log "ERROR: Docker Compose is not installed" "${RED}Error: Docker Compose is not installed. Please install Docker Compose first.${NC}"
+  exit 1
+fi
+
+# Generate a secure admin password if not provided
+ADMIN_PASSWORD=$(openssl rand -base64 12)
+
+# Create required directories
+KEYCLOAK_DIR="${INSTALL_BASE_DIR}/keycloak"
+mkdir -p "${KEYCLOAK_DIR}/${DOMAIN}/data"
+mkdir -p "${KEYCLOAK_DIR}/${DOMAIN}/postgres-data"
+mkdir -p "${KEYCLOAK_DIR}/${DOMAIN}/themes"
+mkdir -p "${KEYCLOAK_DIR}/${DOMAIN}/config"
+
+# Save admin password to a file for later use
+echo "${ADMIN_PASSWORD}" > "${KEYCLOAK_DIR}/${DOMAIN}/admin_password.txt"
+chmod 600 "${KEYCLOAK_DIR}/${DOMAIN}/admin_password.txt"
+
+# Generate random passwords for database
+DB_PASSWORD=$(openssl rand -base64 12)
+DB_USER="keycloak"
+DB_NAME="keycloak"
+
+# Create docker-compose.yml file
+cat > "${KEYCLOAK_DIR}/${DOMAIN}/docker-compose.yml" <<EOL
+version: '3'
+
+networks:
+  keycloak_network:
+    name: ${CLIENT_ID}_keycloak_${SITE_NAME}_network
+  ${CLIENT_ID}_network:
+    external: true
+
+services:
+  postgres:
+    container_name: ${CLIENT_ID}_keycloak_postgres_${SITE_NAME}
+    image: postgres:13
+    restart: unless-stopped
+    volumes:
+      - ${KEYCLOAK_DIR}/${DOMAIN}/postgres-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    networks:
+      - keycloak_network
+
+  keycloak:
+    container_name: ${CLIENT_ID}_keycloak_${SITE_NAME}
+    image: quay.io/keycloak/keycloak:21.1.1
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME}
+      KC_DB_USERNAME: ${DB_USER}
+      KC_DB_PASSWORD: ${DB_PASSWORD}
+      KC_HOSTNAME: ${DOMAIN}
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      PROXY_ADDRESS_FORWARDING: "true"
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+      KC_HTTP_ENABLED: "true"
+      KC_HTTPS_REQUIRED: "none"
+    command:
+      - start
+      - --optimized
+      - --proxy=edge
+      - --hostname-strict=false
+      - --hostname-strict-https=false
+    volumes:
+      - ${KEYCLOAK_DIR}/${DOMAIN}/data:/opt/keycloak/data
+      - ${KEYCLOAK_DIR}/${DOMAIN}/themes:/opt/keycloak/themes
+    networks:
+      - keycloak_network
+      - ${CLIENT_ID}_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.keycloak_${SITE_NAME}.rule=Host(\`${DOMAIN}\`)"
+      - "traefik.http.routers.keycloak_${SITE_NAME}.entrypoints=websecure"
+      - "traefik.http.routers.keycloak_${SITE_NAME}.tls=true"
+      - "traefik.http.routers.keycloak_${SITE_NAME}.tls.certresolver=myresolver"
+      - "traefik.http.services.keycloak_${SITE_NAME}.loadbalancer.server.port=8080"
+      # HTTP to HTTPS redirect for Keycloak
+      - "traefik.http.routers.keycloak_${SITE_NAME}_http.rule=Host(\`${DOMAIN}\`)"
+      - "traefik.http.routers.keycloak_${SITE_NAME}_http.entrypoints=web"
+      - "traefik.http.middlewares.redirect_https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirect_https.redirectscheme.permanent=true"
+      - "traefik.http.routers.keycloak_${SITE_NAME}_http.middlewares=redirect_https"
+EOL
+
+log "INFO: Starting Keycloak containers" "${CYAN}Starting Keycloak containers...${NC}"
+cd "${KEYCLOAK_DIR}/${DOMAIN}" && docker-compose up -d
+
+# Wait for Keycloak to start
+log "INFO: Waiting for Keycloak to start..." "${CYAN}Waiting for Keycloak to start...${NC}"
+
+RETRIES=0
+MAX_RETRIES=30
+
+while [ $RETRIES -lt $MAX_RETRIES ]; do
+  if curl -s -k https://${DOMAIN} | grep -q "Keycloak"; then
+    log "INFO: Keycloak is running" "${GREEN}✓ Keycloak is running${NC}"
+    break
+  fi
+  
+  log "INFO: Waiting for Keycloak to start (attempt $((RETRIES+1))/${MAX_RETRIES})..." "${CYAN}Waiting for Keycloak to start (attempt $((RETRIES+1))/${MAX_RETRIES})...${NC}"
+  sleep 10
+  RETRIES=$((RETRIES+1))
+done
+
+if [ $RETRIES -eq $MAX_RETRIES ]; then
+  log "ERROR: Keycloak failed to start after ${MAX_RETRIES} attempts" "${RED}Error: Keycloak failed to start after ${MAX_RETRIES} attempts.${NC}"
+  exit 1
+fi
+
+# Create initial realm
+log "INFO: Creating initial realm" "${CYAN}Creating initial realm...${NC}"
+
+# Wait an additional 30 seconds for Keycloak to fully initialize before configuring
+sleep 30
+
+# Create default 'agency' realm
+ADMIN_TOKEN=$(curl -s -k -X POST "https://${DOMAIN}/realms/master/protocol/openid-connect/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=password&client_id=admin-cli&username=admin&password=${ADMIN_PASSWORD}" | jq -r '.access_token')
+
+if [ -z "$ADMIN_TOKEN" ] || [ "$ADMIN_TOKEN" = "null" ]; then
+  log "WARNING: Failed to get admin token, retrying in 10 seconds..." "${YELLOW}Warning: Failed to get admin token, retrying in 10 seconds...${NC}"
+  sleep 10
+  
+  ADMIN_TOKEN=$(curl -s -k -X POST "https://${DOMAIN}/realms/master/protocol/openid-connect/token" \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    -d "grant_type=password&client_id=admin-cli&username=admin&password=${ADMIN_PASSWORD}" | jq -r '.access_token')
+  
+  if [ -z "$ADMIN_TOKEN" ] || [ "$ADMIN_TOKEN" = "null" ]; then
+    log "ERROR: Failed to get admin token after retry" "${RED}Error: Failed to get admin token after retry.${NC}"
+    log "INFO: Continuing with installation, but realm setup failed" "${YELLOW}Continuing with installation, but realm setup failed. You'll need to manually set up the realm.${NC}"
+  fi
+else
+  # Create agency realm
+  REALM_NAME="agency"
+  if [ -n "$CLIENT_ID" ] && [ "$CLIENT_ID" != "default" ]; then
+    REALM_NAME="${CLIENT_ID}"
+  fi
+  
+  REALM_JSON='{
+    "realm": "'"${REALM_NAME}"'",
+    "enabled": true,
+    "displayName": "AgencyStack",
+    "displayNameHtml": "<div class=\"kc-logo-text\"><span>AgencyStack</span></div>",
+    "bruteForceProtected": true,
+    "permanentLockout": false,
+    "failureFactor": 5,
+    "sslRequired": "external",
+    "registrationAllowed": false,
+    "registrationEmailAsUsername": false,
+    "rememberMe": true,
+    "verifyEmail": true,
+    "loginWithEmailAllowed": true,
+    "duplicateEmailsAllowed": false,
+    "resetPasswordAllowed": true,
+    "editUsernameAllowed": false,
+    "defaultSignatureAlgorithm": "RS256",
+    "browserSecurityHeaders": {
+      "contentSecurityPolicy": "frame-src 'self'; frame-ancestors 'self'; object-src 'none';",
+      "xContentTypeOptions": "nosniff",
+      "xRobotsTag": "none",
+      "xFrameOptions": "SAMEORIGIN",
+      "contentSecurityPolicyReportOnly": "",
+      "xXSSProtection": "1; mode=block",
+      "strictTransportSecurity": "max-age=31536000; includeSubDomains"
+    }
+  }'
+  
+  curl -s -k -X POST "https://${DOMAIN}/admin/realms" \
+    -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d "${REALM_JSON}" > /dev/null 2>&1
+  
+  if [ $? -eq 0 ]; then
+    log "INFO: Created '${REALM_NAME}' realm" "${GREEN}✓ Created '${REALM_NAME}' realm${NC}"
+  else
+    log "WARNING: Failed to create realm" "${YELLOW}Warning: Failed to create realm. You may need to manually set up the realm.${NC}"
+  fi
+fi
+
+# Success message
+log "INFO: Keycloak installation completed successfully" "${GREEN}Keycloak installation completed successfully!${NC}"
+log "INFO: Keycloak is now accessible at https://${DOMAIN}" "${GREEN}Keycloak is now accessible at:${NC} https://${DOMAIN}"
+log "INFO: Admin username: admin" "${GREEN}Admin username:${NC} admin"
+log "INFO: Admin password: ${ADMIN_PASSWORD}" "${GREEN}Admin password:${NC} ${ADMIN_PASSWORD}"
+log "INFO: Admin credentials saved to: ${KEYCLOAK_DIR}/${DOMAIN}/admin_password.txt" "${GREEN}Admin credentials saved to:${NC} ${KEYCLOAK_DIR}/${DOMAIN}/admin_password.txt"
+
+# Mark installation as complete
+echo "1.0.0" > "${KEYCLOAK_DIR}/${DOMAIN}/.version"
+touch "${KEYCLOAK_DIR}/${DOMAIN}/.installed_ok"
 
 # Function to configure OAuth providers
 configure_oauth_providers() {
