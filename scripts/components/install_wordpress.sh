@@ -55,6 +55,7 @@ ENFORCE_HTTPS=true
 USE_HOST_NETWORK=true
 MARIADB_CONTAINER="default_mariadb"
 KEYCLOAK_DOMAIN="keycloak.proto001.alpha.nerdofmouth.com"
+CONFIGURE_DNS=false
 
 # Source the component_sso_helper.sh if available
 if [ -f "${SCRIPT_DIR}/../utils/component_sso_helper.sh" ]; then
@@ -82,6 +83,7 @@ show_help() {
   echo -e "  ${BOLD}--keycloak-domain${NC} DOMAIN  Keycloak domain for SSO integration (default: keycloak.proto001.alpha.nerdofmouth.com)"
   echo -e "  ${BOLD}--enforce-https${NC}        Enforce HTTPS for WordPress (default: true)"
   echo -e "  ${BOLD}--use-host-network${NC}     Use host network mode (default: true)"
+  echo -e "  ${BOLD}--configure-dns${NC}        Configure DNS automatically"
   echo -e "  ${BOLD}--help${NC}                 Show this help message and exit"
   echo -e ""
   echo -e "${CYAN}Example:${NC}"
@@ -148,6 +150,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --use-host-network)
       USE_HOST_NETWORK=true
+      shift
+      ;;
+    --configure-dns)
+      CONFIGURE_DNS=true
       shift
       ;;
     --help|-h)
@@ -1022,5 +1028,28 @@ echo -e "${YELLOW}Admin Password: ${ADMIN_PASSWORD}${NC}"
 echo -e "${YELLOW}IMPORTANT: Please save these credentials safely and change the password!${NC}"
 echo -e ""
 echo -e "${CYAN}Credentials saved to: ${CONFIG_DIR}/secrets/wordpress/${DOMAIN}.env${NC}"
+
+# Configure DNS if requested
+if [ "$CONFIGURE_DNS" = true ]; then
+  log "INFO: Configuring DNS for ${DOMAIN}" "${CYAN}Configuring DNS for ${DOMAIN}...${NC}"
+  
+  # Get public IP
+  PUBLIC_IP=$(curl -s https://ipinfo.io/ip)
+  if [ -z "$PUBLIC_IP" ]; then
+    log "WARNING: Failed to detect public IP" "${YELLOW}⚠️ Failed to detect public IP, DNS configuration skipped${NC}"
+  else
+    # Configure DNS using the configure_dns.sh utility
+    if [ -f "${SCRIPT_DIR}/../utils/configure_dns.sh" ]; then
+      bash "${SCRIPT_DIR}/../utils/configure_dns.sh" --domain "${DOMAIN}" --public-ip "${PUBLIC_IP}" --force
+      if [ $? -eq 0 ]; then
+        log "SUCCESS: DNS configured successfully" "${GREEN}✅ DNS configured successfully for ${DOMAIN} -> ${PUBLIC_IP}${NC}"
+      else
+        log "ERROR: Failed to configure DNS" "${RED}❌ Failed to configure DNS for ${DOMAIN}${NC}"
+      fi
+    else
+      log "ERROR: configure_dns.sh script not found" "${RED}❌ configure_dns.sh script not found, DNS configuration skipped${NC}"
+    fi
+  fi
+fi
 
 exit 0
