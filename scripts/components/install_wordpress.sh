@@ -939,8 +939,40 @@ if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
         "support_state": 1
       }'
       
-      # Execute with proper quoting to avoid shell interpretation issues
-      docker exec -w /var/www/html ${WORDPRESS_CONTAINER_NAME} bash -c "wp --allow-root option update openid_connect_generic_settings '${OC_CONFIG}'" || log "WARNING: Failed to configure OpenID Connect plugin" "${YELLOW}⚠️ Failed to configure OpenID Connect plugin${NC}"
+      # Update OpenID Connect Generic settings
+      KEYCLOAK_CLIENT_ID=$(jq -r '.client_id' "$SSO_CREDENTIALS_FILE")
+      KEYCLOAK_CLIENT_SECRET=$(jq -r '.client_secret' "$SSO_CREDENTIALS_FILE")
+
+      # Configure OpenID Connect plugin with correct settings
+      docker exec -u www-data "${WORDPRESS_CONTAINER_NAME}" wp option set openid_connect_generic_settings --format=json '{
+        "login_type": "auto",
+        "client_id": "'${KEYCLOAK_CLIENT_ID}'",
+        "client_secret": "'${KEYCLOAK_CLIENT_SECRET}'",
+        "scope": "openid email profile",
+        "endpoint_login": "https://'${KEYCLOAK_DOMAIN}'/realms/agency_stack/protocol/openid-connect/auth",
+        "endpoint_userinfo": "https://'${KEYCLOAK_DOMAIN}'/realms/agency_stack/protocol/openid-connect/userinfo",
+        "endpoint_token": "https://'${KEYCLOAK_DOMAIN}'/realms/agency_stack/protocol/openid-connect/token",
+        "endpoint_end_session": "https://'${KEYCLOAK_DOMAIN}'/realms/agency_stack/protocol/openid-connect/logout",
+        "identity_key": "preferred_username",
+        "no_sslverify": 1,
+        "http_request_timeout": 5,
+        "redirect_user_back": 1,
+        "redirect_on_logout": 1,
+        "link_existing_users": 1,
+        "create_if_does_not_exist": 1,
+        "enforce_privacy": 0,
+        "nickname_key": "nickname",
+        "email_format": "{email}",
+        "displayname_format": "{given_name} {family_name}",
+        "identify_with_username": true,
+        "state_time_limit": 180,
+        "token_refresh_enable": 1,
+        "nickname_format": "{preferred_username}",
+        "support_state": 1
+      }'
+
+      # Add login button to the login page
+      docker exec -u www-data "${WORDPRESS_CONTAINER_NAME}" wp option add openid-connect-generic-login-button-text "Login with Keycloak SSO" --autoload=yes
       
       # Create a marker file for the SSO configuration
       touch "${WP_DIR}/${DOMAIN}/sso/.sso_configured"
