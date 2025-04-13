@@ -337,6 +337,8 @@ services:
     restart: unless-stopped
     depends_on:
       - postgres
+    command:
+      - start-dev
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres/${DB_NAME}
@@ -349,13 +351,6 @@ services:
       KC_HEALTH_ENABLED: "true"
       KC_METRICS_ENABLED: "true"
       KC_HTTP_ENABLED: "true"
-    command:
-      - start-dev
-      - --db=postgres
-      - --proxy=edge
-      - --hostname-strict=false
-      - --hostname-strict-https=false
-      - --import-realm
     volumes:
       - ${KEYCLOAK_DIR}/${DOMAIN}/data:/opt/keycloak/data
       - ${KEYCLOAK_DIR}/${DOMAIN}/themes:/opt/keycloak/themes
