@@ -1,7 +1,32 @@
 #!/bin/bash
 # Source common utilities
 source "$(dirname "$0")/../utils/common.sh"
-        
+
+# Alias log to log_info for compatibility with existing code
+log() {
+  level="$1"
+  message="$2"
+  display="${3:-$message}"
+  
+  case $level in
+    "INFO")
+      log_info "$message" "$display"
+      ;;
+    "SUCCESS")
+      log_success "$message" "$display"
+      ;;
+    "WARNING")
+      log_warning "$message" "$display"
+      ;;
+    "ERROR")
+      log_error "$message" "$display"
+      ;;
+    *)
+      log_info "$message" "$display"
+      ;;
+  esac
+}
+
 # install_keycloak.sh - Install and configure Keycloak for AgencyStack
 # https://stack.nerdofmouth.com
 #
