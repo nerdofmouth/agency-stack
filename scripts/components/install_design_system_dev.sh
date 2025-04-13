@@ -29,11 +29,11 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --bit-port=*)
-    --domain=*)
-      DOMAIN="${1#*=}"
+      BIT_DEV_PORT="${1#*=}"
       shift
       ;;
-      BIT_DEV_PORT="${1#*=}"
+    --domain=*)
+      DOMAIN="${1#*=}"
       shift
       ;;
     --enable-cloud)
@@ -41,9 +41,20 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --help)
-      echo "Usage: $0 [--client-id=<client-id>] [--port=<port> --domain=<domain>] [--bit-port=<bit-port>] [--enable-cloud]"
+      echo "Usage: $0 [--client-id=<client-id>] [--port=<port>] [--bit-port=<bit-port>] [--domain=<domain>] [--enable-cloud]"
       echo "  --domain        Domain name (default: localhost)"
       echo "  --client-id    Client ID for multi-tenant deployments (default: default)"
+      echo "  --port         Port for design system dashboard (default: 3333)"
+      echo "  --bit-port     Port for Bit dev server (default: 3000)"
+      echo "  --enable-cloud Enable Bit.dev cloud features (default: off/sovereign mode)"
+      exit 0
+      ;;
+    *)
+      log_error "Unknown argument: $1"
+      exit 1
+      ;;
+  esac
+done
       echo "  --port         Port for design system dashboard (default: 3333)"
       echo "  --bit-port     Port for Bit dev server (default: 3000)"
       echo "  --enable-cloud Enable Bit.dev cloud features (default: off/sovereign mode)"
