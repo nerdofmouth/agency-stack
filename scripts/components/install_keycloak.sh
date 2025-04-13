@@ -70,23 +70,24 @@ DOMAIN=""
 ADMIN_EMAIL=""
 KEYCLOAK_VERSION="latest"
 DB_ROOT_PASSWORD=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-16)
-KC_DB_PASSWORD=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-16)
-ADMIN_PASSWORD=$(openssl rand -base64 12 | tr -d "=+/")
-CONFIGURE_OAUTH_ONLY=false
+ADMIN_PASSWORD=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-16)
+FORCE="${FORCE:-false}"
+WITH_DEPS="${WITH_DEPS:-false}"
+CONFIGURE_OAUTH_ONLY="${CONFIGURE_OAUTH_ONLY:-false}"
 
-# OAuth Identity Provider flags
-ENABLE_OAUTH_GOOGLE=false
-ENABLE_OAUTH_GITHUB=false
-ENABLE_OAUTH_APPLE=false
-ENABLE_OAUTH_LINKEDIN=false
-ENABLE_OAUTH_MICROSOFT=false
+# OAuth provider flags
+ENABLE_OAUTH_GOOGLE="${ENABLE_OAUTH_GOOGLE:-false}"
+ENABLE_OAUTH_GITHUB="${ENABLE_OAUTH_GITHUB:-false}"
+ENABLE_OAUTH_APPLE="${ENABLE_OAUTH_APPLE:-false}"
+ENABLE_OAUTH_LINKEDIN="${ENABLE_OAUTH_LINKEDIN:-false}"
+ENABLE_OAUTH_MICROSOFT="${ENABLE_OAUTH_MICROSOFT:-false}"
 
 # OAuth security settings
-OAUTH_STORE_TOKENS=false
-OAUTH_VALIDATE_SIGNATURES=true
-OAUTH_USE_JWKS_URL=true
-OAUTH_DISABLE_USER_INFO=false
-OAUTH_TRUST_EMAIL=false
+OAUTH_STORE_TOKENS="${OAUTH_STORE_TOKENS:-false}"
+OAUTH_VALIDATE_SIGNATURES="${OAUTH_VALIDATE_SIGNATURES:-true}"
+OAUTH_USE_JWKS_URL="${OAUTH_USE_JWKS_URL:-true}"
+OAUTH_DISABLE_USER_INFO="${OAUTH_DISABLE_USER_INFO:-false}"
+OAUTH_TRUST_EMAIL="${OAUTH_TRUST_EMAIL:-false}"
 
 # Check if log directories are writable, use local paths for development if not
 if [ ! -w "$LOG_DIR" ] && [ ! -w "/var/log" ]; then
@@ -205,6 +206,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Parse the domain to create a normalized site name for Docker
+parse_domain() {
+  local domain="$1"
+  # Replace dots with underscores and remove any special characters
+  echo "${domain//[^a-zA-Z0-9]/_}"
+}
+
 # Check required parameters
 if [ -z "$DOMAIN" ]; then
   echo -e "${RED}Error: --domain is required${NC}"
@@ -245,6 +253,9 @@ if [ "$CONFIGURE_OAUTH_ONLY" = true ]; then
   log "INFO: OAuth configuration completed" "${GREEN}OAuth configuration completed successfully!${NC}"
   exit 0
 fi
+
+# Set normalized site name for Docker container naming
+SITE_NAME=$(parse_domain "$DOMAIN")
 
 # Main installation logic continues here for normal installation...
 log "INFO: Starting Keycloak installation for ${DOMAIN}" "${CYAN}Starting Keycloak installation for ${DOMAIN}...${NC}"
