@@ -714,6 +714,7 @@ if [ "\${ENABLE_KEYCLOAK}" = "true" ]; then
   # Install the OpenID Connect Generic plugin directly from GitHub
   cd /tmp
   curl -L -O https://github.com/daggerhart/openid-connect-generic/archive/refs/heads/master.zip
+  cd /var/www/html
   wp --allow-root plugin install /tmp/master.zip --activate
   rm /tmp/master.zip
   
@@ -876,7 +877,7 @@ if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
       
       # Install and configure the OpenID Connect plugin
       log "INFO: Installing OpenID Connect plugin for WordPress" "${CYAN}Installing OpenID Connect plugin for WordPress...${NC}"
-      docker exec -w /var/www/html ${WORDPRESS_CONTAINER_NAME} bash -c "cd /tmp && curl -L -O https://github.com/daggerhart/openid-connect-generic/archive/refs/heads/master.zip && wp --allow-root plugin install /tmp/master.zip --activate && rm /tmp/master.zip" || log "WARNING: Failed to install OpenID Connect plugin" "${YELLOW}⚠️ Failed to install OpenID Connect plugin${NC}"
+      docker exec -w /var/www/html ${WORDPRESS_CONTAINER_NAME} bash -c "cd /tmp && curl -L -O https://github.com/daggerhart/openid-connect-generic/archive/refs/heads/master.zip && cd /var/www/html && wp --allow-root plugin install /tmp/master.zip --activate && rm /tmp/master.zip" || log "WARNING: Failed to install OpenID Connect plugin" "${YELLOW}⚠️ Failed to install OpenID Connect plugin${NC}"
       
       # Configure OpenID Connect plugin
       log "INFO: Configuring OpenID Connect plugin" "${CYAN}Configuring OpenID Connect plugin...${NC}"
