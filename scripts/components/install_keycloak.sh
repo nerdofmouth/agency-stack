@@ -332,10 +332,9 @@ services:
       KC_HEALTH_ENABLED: "true"
       KC_METRICS_ENABLED: "true"
       KC_HTTP_ENABLED: "true"
-      KC_HTTPS_REQUIRED: "none"
     command:
-      - start
-      - --optimized
+      - start-dev
+      - --db=postgres
       - --proxy=edge
       - --hostname-strict=false
       - --hostname-strict-https=false
