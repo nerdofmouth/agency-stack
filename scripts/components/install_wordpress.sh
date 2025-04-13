@@ -463,7 +463,7 @@ services:
       - mariadb
       - redis
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost || exit 1"]
+      test: ["CMD", "php", "-r", "if(!file_exists('/var/www/html/wp-includes/version.php')) exit(1);"]
       interval: 10s
       timeout: 5s
       retries: 3
