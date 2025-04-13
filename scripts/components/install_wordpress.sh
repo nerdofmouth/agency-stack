@@ -771,54 +771,62 @@ docker cp "${WP_DIR}/${DOMAIN}/scripts/install_wp.sh" ${WORDPRESS_CONTAINER_NAME
 log "INFO: Running WordPress installation script" "${CYAN}Running WordPress installation script...${NC}"
 docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "chmod +x /tmp/install_wp.sh && /tmp/install_wp.sh" || log "WARNING: WordPress installation script failed" "${YELLOW}⚠️ WordPress installation script failed${NC}"
 
-# Verify the database schema
-log "INFO: Verifying database tables" "${CYAN}Verifying database tables...${NC}"
-docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "wp --allow-root db tables" || log "WARNING: Cannot list database tables" "${YELLOW}⚠️ Cannot list database tables${NC}"
-
-# Configure WordPress using WP-CLI
-log "INFO: Configuring WordPress site" "${CYAN}Configuring WordPress site...${NC}"
-
-# Wait for WordPress to be ready
-sleep 10
-
-# Configuration is robust, utilizing environment variables for consistency
-cd "${WP_DIR}/${DOMAIN}/wordpress" || {
-  log "ERROR: Failed to change directory to WordPress root" "${RED}Failed to change directory to WordPress root${NC}"
-  exit 1
-}
-
-# Setup WP-CLI commands but ensure we always run with --allow-root flag
-WP_CLI="wp --allow-root"
-
-# Ensure database schema is properly initialized
+# Check if WordPress database tables exist and install if needed
 log "INFO: Ensuring database schema is initialized" "${CYAN}Ensuring database schema is initialized...${NC}"
-
-# Run comprehensive database connection test
-test_database_connection "mariadb" "${WP_DB_USER}" "${WP_DB_PASSWORD}" "${WP_DB_NAME}" "${WORDPRESS_CONTAINER_NAME}"
-
-# Now try to create a WordPress database backup in case we need it
-log "INFO: Creating WordPress database backup" "${CYAN}Creating WordPress database backup (if database exists)...${NC}"
-docker exec ${MARIADB_CONTAINER_NAME} bash -c "MYSQL_PWD=${WP_ROOT_PASSWORD} mysqldump -uroot ${WP_DB_NAME} > /var/lib/mysql/${WP_DB_NAME}_backup.sql" || {
-  log "WARNING: Unable to create database backup" "${YELLOW}⚠️ Unable to create database backup (database may not exist yet)${NC}"
-}
-
-# Ensure database is ready with additional wait time
-log "INFO: Ensuring database is ready" "${CYAN}Ensuring database is ready...${NC}"
-sleep 10
-
-# Install essential plugins 
-log "INFO: Installing essential plugins" "${CYAN}Installing essential plugins...${NC}"
-docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI plugin install redis-cache wordfence sucuri-scanner wordpress-seo duplicate-post --activate" || log "WARNING: Failed to install plugins" "${YELLOW}⚠️ Failed to install plugins${NC}"
+  
+# Test database connection
+echo "=========================================="
+echo "DATABASE CONNECTION TEST"
+echo "Target: mariadb"
+echo "User: ${WP_DB_USER}"
+echo "Database: ${WP_DB_NAME}"
+echo "=========================================="
+  
+if docker exec "${MARIADB_CONTAINER_NAME}" mysql -u"${WP_DB_USER}" -p"${WP_DB_PASSWORD}" -e "SELECT 1" "${WP_DB_NAME}" > /dev/null 2>&1; then
+  echo "SUCCESS: Connected to database"
+else
+  log "ERROR: Failed to connect to database" "${RED}❌ Failed to connect to database${NC}"
+  exit 1
+fi
+  
+# Create database backup if exists
+log "INFO: Creating database backup" "${CYAN}Creating WordPress database backup (if database exists)...${NC}"
+BACKUP_FILE="${WP_DIR}/${DOMAIN}/mariadb/backup_$(date +%Y%m%d%H%M%S).sql"
+docker exec "${MARIADB_CONTAINER_NAME}" mysqldump -u"${WP_DB_USER}" -p"${WP_DB_PASSWORD}" "${WP_DB_NAME}" > "${BACKUP_FILE}" 2>/dev/null || true
+  
+# Check if wp_posts table exists
+if ! docker exec "${MARIADB_CONTAINER_NAME}" mysql -u"${WP_DB_USER}" -p"${WP_DB_PASSWORD}" -e "SHOW TABLES LIKE 'wp_posts'" "${WP_DB_NAME}" | grep -q "wp_posts"; then
+  log "INFO: WordPress tables not found, initializing database" "${CYAN}WordPress tables not found, initializing database...${NC}"
+  
+  # Run WordPress installation to create necessary tables
+  docker exec -u www-data "${WORDPRESS_CONTAINER_NAME}" wp core install \
+    --url="https://${DOMAIN}" \
+    --title="WordPress on AgencyStack" \
+    --admin_user=admin \
+    --admin_password="${ADMIN_PASSWORD}" \
+    --admin_email="${ADMIN_EMAIL}" \
+    --skip-email
+  
+  # Verify tables were created
+  if docker exec "${MARIADB_CONTAINER_NAME}" mysql -u"${WP_DB_USER}" -p"${WP_DB_PASSWORD}" -e "SHOW TABLES LIKE 'wp_posts'" "${WP_DB_NAME}" | grep -q "wp_posts"; then
+    log "INFO: Database schema initialized successfully" "${GREEN}✅ WordPress database tables created successfully${NC}"
+  else
+    log "ERROR: Failed to initialize WordPress database schema" "${RED}❌ Failed to initialize WordPress database schema${NC}"
+    exit 1
+  fi
+else
+  log "INFO: WordPress database schema already initialized" "${GREEN}✅ WordPress database schema already initialized${NC}"
+fi
 
 # Verify WordPress installation
 log "INFO: Verifying WordPress installation" "${CYAN}Verifying WordPress installation...${NC}"
-docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI core verify-checksums" || log "WARNING: WordPress core verification failed" "${YELLOW}⚠️ WordPress core verification failed${NC}"
+docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "wp --allow-root core verify-checksums" || log "WARNING: WordPress core verification failed" "${YELLOW}⚠️ WordPress core verification failed${NC}"
 
 # Set a few basic configurations
 log "INFO: Configuring WordPress" "${CYAN}Configuring WordPress...${NC}"
-docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI option update blogname 'WordPress on AgencyStack'" || log "WARNING: Failed to update blog name" "${YELLOW}⚠️ Failed to update blog name${NC}"
-docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI option update blogdescription 'Powered by AgencyStack'" || log "WARNING: Failed to update blog description" "${YELLOW}⚠️ Failed to update blog description${NC}"
-docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "$WP_CLI rewrite structure '/%postname%/'" || log "WARNING: Failed to update permalink structure" "${YELLOW}⚠️ Failed to update permalink structure${NC}"
+docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "wp --allow-root option update blogname 'WordPress on AgencyStack'" || log "WARNING: Failed to update blog name" "${YELLOW}⚠️ Failed to update blog name${NC}"
+docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "wp --allow-root option update blogdescription 'Powered by AgencyStack'" || log "WARNING: Failed to update blog description" "${YELLOW}⚠️ Failed to update blog description${NC}"
+docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "wp --allow-root rewrite structure '/%postname%/'" || log "WARNING: Failed to update permalink structure" "${YELLOW}⚠️ Failed to update permalink structure${NC}"
 
 # Store credentials in a secure location
 log "INFO: Storing credentials" "${CYAN}Storing credentials...${NC}"
