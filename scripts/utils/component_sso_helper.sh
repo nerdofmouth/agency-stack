@@ -24,6 +24,7 @@ COMPONENT_REGISTRY="/opt/agency_stack/config/registry/component_registry.json"
 #   3. client_id - Keycloak client ID (defaults to component name if not provided)
 #   4. redirect_uris - JSON array of redirect URIs (e.g., '["https://domain.com/*"]')
 #   5. client_id - Optional client ID override (defaults to $component_name)
+#   6. keycloak_domain - Optional Keycloak domain override (defaults to "keycloak.proto001.alpha.nerdofmouth.com")
 enable_component_sso() {
     local component_name="$1"
     local domain="$2"
@@ -31,6 +32,7 @@ enable_component_sso() {
     local redirect_uris="$3"
     local client_id="${4:-$component_name}"
     local realm="${5:-agency_stack}"
+    local keycloak_domain="${6:-keycloak.proto001.alpha.nerdofmouth.com}"
     local client_id_path="${client_id// /_}"
     local component_dir="${CLIENT_REGISTRY_DIR}/${CLIENT_ID:-default}/apps/${component_name}"
     local sso_dir="${component_dir}/sso"
@@ -41,17 +43,17 @@ enable_component_sso() {
     mkdir -p "${sso_dir}"
     
     # Check if Keycloak is available
-    if ! keycloak_is_available "${domain}"; then
-        log_warning "Keycloak is not available at https://${domain}/auth"
+    if ! keycloak_is_available "${keycloak_domain}"; then
+        log_warning "Keycloak is not available at https://${keycloak_domain}/auth"
         log_warning "SSO integration will be configured but may not work until Keycloak becomes available"
         echo "pending" > "${sso_dir}/status"
         return 0
     fi
     
     # Verify realm exists
-    if ! keycloak_realm_exists "${domain}" "${realm}"; then
+    if ! keycloak_realm_exists "${keycloak_domain}" "${realm}"; then
         log_info "Creating realm '${realm}' for domain ${domain}"
-        if ! keycloak_create_realm "${domain}" "${realm}" "AgencyStack ${realm^} Realm"; then
+        if ! keycloak_create_realm "${keycloak_domain}" "${realm}" "AgencyStack ${realm^} Realm"; then
             log_error "Failed to create realm '${realm}' for domain ${domain}"
             echo "failed" > "${sso_dir}/status"
             return 1
@@ -60,7 +62,7 @@ enable_component_sso() {
     
     # Register the client
     log_info "Registering client '${client_id}' for component '${component_name}'"
-    local client_secret=$(keycloak_register_client "${domain}" "${realm}" "${client_id}" "${client_name}" "${redirect_uris}")
+    local client_secret=$(keycloak_register_client "${keycloak_domain}" "${realm}" "${client_id}" "${client_name}" "${redirect_uris}")
     
     if [ $? -ne 0 ]; then
         log_error "Failed to register client for component '${component_name}'"
@@ -74,8 +76,8 @@ enable_component_sso() {
 KEYCLOAK_REALM=${realm}
 KEYCLOAK_CLIENT_ID=${client_id}
 KEYCLOAK_CLIENT_SECRET=${client_secret}
-KEYCLOAK_URL=https://${domain}/auth
-KEYCLOAK_ISSUER=https://${domain}/auth/realms/${realm}
+KEYCLOAK_URL=https://${keycloak_domain}/auth
+KEYCLOAK_ISSUER=https://${keycloak_domain}/auth/realms/${realm}
 EOF
     
     # Mark SSO as configured
