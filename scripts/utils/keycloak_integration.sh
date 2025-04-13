@@ -19,6 +19,7 @@ set -eo pipefail
 # Variables
 KEYCLOAK_CONFIG_DIR="/opt/agency_stack/keycloak"
 KEYCLOAK_SECRETS_DIR="/opt/agency_stack/secrets/keycloak"
+COMPONENT_REGISTRY="/opt/agency_stack/config/registry/component_registry.json"
 
 # Check for required dependencies
 check_dependencies() {
@@ -147,30 +148,36 @@ get_keycloak_admin_token() {
 keycloak_realm_exists() {
   local domain="$1"
   local realm="$2"
-  local token="$3"
+  local token="${3:-$(get_keycloak_admin_token "$domain")}"
   
-  local response=$(curl -s -X GET \
-    -H "Authorization: Bearer $token" \
-    "https://$domain/admin/realms/$realm")
-  
-  if [ -z "$response" ] || echo "$response" | grep -q "error"; then
+  if [ -z "$token" ]; then
+    log_error "Failed to obtain admin token for realm check"
     return 1
   fi
   
-  return 0
+  local response=$(curl -s -k -o /dev/null -w '%{http_code}' "https://$domain/admin/realms/$realm" \
+    -H "Authorization: Bearer $token")
+  
+  [ "$response" = "200" ]
 }
 
 # Function to create a realm
 keycloak_create_realm() {
   local domain="$1"
   local realm="$2"
-  local token="$3"
+  local realm_name="${3:-$realm}"
+  local token="${4:-$(get_keycloak_admin_token "$domain")}"
+  
+  if [ -z "$token" ]; then
+    log_error "Failed to obtain admin token for creating realm"
+    return 1
+  fi
   
   local realm_json='{
-    "realm": "'$realm'",
+    "realm": "'$realm_name'",
     "enabled": true,
-    "displayName": "'$realm'",
-    "displayNameHtml": "<div class=\"kc-logo-text\"><span>'$realm'</span></div>",
+    "displayName": "'$realm_name'",
+    "displayNameHtml": "<div class=\"kc-logo-text\"><span>'$realm_name'</span></div>",
     "sslRequired": "external",
     "registrationAllowed": false,
     "loginWithEmailAllowed": true,
@@ -180,7 +187,7 @@ keycloak_create_realm() {
     "bruteForceProtected": true
   }'
   
-  local response=$(curl -s -X POST \
+  local response=$(curl -s -k -X POST \
     -H "Authorization: Bearer $token" \
     -H "Content-Type: application/json" \
     -d "$realm_json" \
@@ -200,17 +207,17 @@ keycloak_client_exists() {
   local domain="$1"
   local realm="$2"
   local client_id="$3"
-  local token="$4"
+  local token="${4:-$(get_keycloak_admin_token "$domain")}"
   
-  local response=$(curl -s -X GET \
-    -H "Authorization: Bearer $token" \
-    "https://$domain/admin/realms/$realm/clients?clientId=$client_id")
-  
-  if [ -z "$response" ] || echo "$response" | grep -q "error" || [ "$response" = "[]" ]; then
+  if [ -z "$token" ]; then
+    log_error "Failed to obtain admin token for client check"
     return 1
   fi
   
-  return 0
+  local response=$(curl -s -k "https://$domain/admin/realms/$realm/clients?clientId=$client_id" \
+    -H "Authorization: Bearer $token")
+  
+  echo "$response" | grep -q "\"clientId\":\"$client_id\""
 }
 
 # Function to delete a client
@@ -218,7 +225,12 @@ keycloak_delete_client() {
   local domain="$1"
   local realm="$2"
   local client_id="$3"
-  local token="$4"
+  local token="${4:-$(get_keycloak_admin_token "$domain")}"
+  
+  if [ -z "$token" ]; then
+    log_error "Failed to obtain admin token for client deletion"
+    return 1
+  fi
   
   # Get client UUID
   local client_uuid=$(keycloak_get_client_id "$domain" "$realm" "$client_id" "$token")
@@ -228,16 +240,16 @@ keycloak_delete_client() {
     return 1
   fi
   
-  local response=$(curl -s -X DELETE \
-    -H "Authorization: Bearer $token" \
-    "https://$domain/admin/realms/$realm/clients/$client_uuid")
+  # Delete the client
+  local response=$(curl -s -k -X DELETE "https://$domain/admin/realms/$realm/clients/$client_uuid" \
+    -H "Authorization: Bearer $token")
   
-  if [ -n "$response" ] && echo "$response" | grep -q "error"; then
-    log_error "Failed to delete client $client_id: $response"
+  if [ $? -ne 0 ]; then
+    log_error "Failed to delete client $client_id"
     return 1
   fi
   
-  log_success "Deleted client: $client_id"
+  log_success "Successfully deleted client $client_id"
   return 0
 }
 
@@ -246,21 +258,27 @@ keycloak_get_client_id() {
   local domain="$1"
   local realm="$2"
   local client_id="$3"
-  local token="$4"
+  local token="${4:-$(get_keycloak_admin_token "$domain")}"
   
-  local response=$(curl -s -X GET \
-    -H "Authorization: Bearer $token" \
-    "https://$domain/admin/realms/$realm/clients?clientId=$client_id")
-  
-  if [ -z "$response" ] || echo "$response" | grep -q "error" || [ "$response" = "[]" ]; then
-    log_error "Client $client_id not found"
+  if [ -z "$token" ]; then
+    log_error "Failed to obtain admin token for getting client ID"
     return 1
   fi
   
-  local uuid=$(echo "$response" | jq -r '.[0].id')
+  # Get list of clients
+  local response=$(curl -s -k "https://$domain/admin/realms/$realm/clients?clientId=$client_id" \
+    -H "Authorization: Bearer $token")
   
-  if [ -z "$uuid" ] || [ "$uuid" = "null" ]; then
-    log_error "Failed to parse client UUID"
+  if [ -z "$response" ] || echo "$response" | grep -q "error"; then
+    log_error "Failed to get clients list"
+    return 1
+  fi
+  
+  # Extract UUID from response
+  local uuid=$(echo "$response" | grep -o "\"id\":\"[^\"]*\"" | head -1 | cut -d'"' -f4)
+  
+  if [ -z "$uuid" ]; then
+    log_error "Client $client_id not found"
     return 1
   fi
   
@@ -273,7 +291,7 @@ keycloak_create_client_from_file() {
   local domain="$1"
   local realm="$2"
   local client_file="$3"
-  local token="$4"
+  local token="${4:-$(get_keycloak_admin_token "$domain")}"
   
   if [ ! -f "$client_file" ]; then
     log_error "Client configuration file not found: $client_file"
@@ -282,7 +300,7 @@ keycloak_create_client_from_file() {
   
   local client_json=$(cat "$client_file")
   
-  local response=$(curl -s -X POST \
+  local response=$(curl -s -k -X POST \
     -H "Authorization: Bearer $token" \
     -H "Content-Type: application/json" \
     -d "$client_json" \
@@ -304,7 +322,7 @@ keycloak_create_role_mapper() {
   local client_uuid="$3"
   local role_name="$4"
   local role_display_name="$5"
-  local token="$6"
+  local token="${6:-$(get_keycloak_admin_token "$domain")}"
   
   # Create role
   local role_json='{
@@ -314,7 +332,7 @@ keycloak_create_role_mapper() {
     "clientRole": true
   }'
   
-  local response=$(curl -s -X POST \
+  local response=$(curl -s -k -X POST \
     -H "Authorization: Bearer $token" \
     -H "Content-Type: application/json" \
     -d "$role_json" \
