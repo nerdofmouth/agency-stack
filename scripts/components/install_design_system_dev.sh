@@ -29,6 +29,10 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --bit-port=*)
+    --domain=*)
+      DOMAIN="${1#*=}"
+      shift
+      ;;
       BIT_DEV_PORT="${1#*=}"
       shift
       ;;
