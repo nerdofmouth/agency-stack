@@ -17,7 +17,7 @@ source "${SCRIPT_DIR}/../utils/log_helpers.sh"
 # Default configuration
 CLIENT_ID="${CLIENT_ID:-default}"
 DOMAIN="${DOMAIN:-localhost}"
-ADMIN_EMAIL="${ADMIN_EMAIL:-admin@example.com}"
+ADMIN_EMAIL="${ADMIN_EMAIL:-admin@proto001.alpha.nerdofmouth.com}"
 HTTP_PORT=80
 HTTPS_PORT=443
 ENABLE_HTTPS_REDIRECT="${ENABLE_HTTPS_REDIRECT:-true}"
