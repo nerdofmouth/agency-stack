@@ -54,6 +54,7 @@ BOLD='\033[1m'
 # Variables
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
+INSTALL_BASE_DIR="/opt/agency_stack"
 CONFIG_DIR="/opt/agency_stack"
 KEYCLOAK_DIR="${CONFIG_DIR}/keycloak"
 SECRETS_DIR="${CONFIG_DIR}/secrets/keycloak"
@@ -63,11 +64,9 @@ INTEGRATIONS_LOG_DIR="${LOG_DIR}/integrations"
 INSTALL_LOG="${COMPONENTS_LOG_DIR}/keycloak.log"
 INTEGRATION_LOG="${INTEGRATIONS_LOG_DIR}/keycloak.log"
 MAIN_INTEGRATION_LOG="${INTEGRATIONS_LOG_DIR}/integration.log"
-VERBOSE=false
-FORCE=false
-WITH_DEPS=false
+VERBOSE="${VERBOSE:-false}"
+CLIENT_ID="${CLIENT_ID:-default}"
 DOMAIN=""
-CLIENT_ID=""
 ADMIN_EMAIL=""
 KEYCLOAK_VERSION="latest"
 DB_ROOT_PASSWORD=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-16)
