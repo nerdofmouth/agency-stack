@@ -8,6 +8,7 @@ SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 source "${SCRIPT_DIR}/../utils/common.sh"
 
 # Default configuration
+ENABLE_CLOUD=false
 CLIENT_ID="default"
 DESIGN_SYSTEM_PORT=3333
 BIT_DEV_PORT=3000
@@ -157,9 +158,9 @@ app.use('/design-system', createProxyMiddleware({
   }
 }));
 
-// Serve the dashboard integration UI
+// Serve the dashboard integration UI - using non-template literal to avoid JS parsing issues
 app.get('/', (req, res) => {
-  res.send(`
+  const html = `
     <!DOCTYPE html>
     <html>
     <head>
@@ -272,22 +273,23 @@ app.get('/', (req, res) => {
         //   .then(res => res.json())
         //   .then(data => {
         //     const grid = document.getElementById('components-grid');
-        //     grid.innerHTML = data.components.map(component => `
-        //       <div class="card">
-        //         <span class="tag">${component.category}</span>
-        //         <h3>${component.name}</h3>
-        //         <p>${component.description}</p>
-        //         <p>Version: ${component.version}</p>
-        //         <p>
-        //           <a href="${component.previewUrl}" class="button" target="_blank">View Component</a>
-        //         </p>
-        //       </div>
-        //     `).join('');
+        //     grid.innerHTML = data.components.map(component => {
+        //       return '<div class="card">' +
+        //         '<span class="tag">' + component.category + '</span>' +
+        //         '<h3>' + component.name + '</h3>' +
+        //         '<p>' + component.description + '</p>' +
+        //         '<p>Version: ' + component.version + '</p>' +
+        //         '<p>' +
+        //           '<a href="' + component.previewUrl + '" class="button" target="_blank">View Component</a>' +
+        //         '</p>' +
+        //       '</div>';
+        //     }).join('');
         //   });
       </script>
     </body>
     </html>
-  `);
+  `;
+  res.send(html);
 });
 
 // Start the server
