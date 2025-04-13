@@ -722,9 +722,40 @@ if [ "${ENABLE_KEYCLOAK}" = "true" ]; then
   KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET:-"client_secret"}
   
   # Prepare Keycloak configuration with proper escaping
-  OPENID_CONFIG="{\"login_type\":\"auto\",\"client_id\":\"wordpress-${CLIENT_ID}\",\"client_secret\":\"${KEYCLOAK_CLIENT_SECRET}\",\"scope\":\"openid email profile\",\"endpoint_login\":\"${KEYCLOAK_BASE_URL}/protocol/openid-connect/auth\",\"endpoint_userinfo\":\"${KEYCLOAK_BASE_URL}/protocol/openid-connect/userinfo\",\"endpoint_token\":\"${KEYCLOAK_BASE_URL}/protocol/openid-connect/token\",\"endpoint_end_session\":\"${KEYCLOAK_BASE_URL}/protocol/openid-connect/logout\",\"identity_key\":\"preferred_username\",\"no_sslverify\":1,\"http_request_timeout\":5,\"redirect_user_back\":1,\"redirect_on_logout\":1,\"link_existing_users\":1,\"create_if_does_not_exist\":1,\"enforce_privacy\":0,\"nickname_key\":\"nickname\",\"email_format\":\"{email}\",\"displayname_format\":\"{given_name} {family_name}\",\"identify_with_username\":true,\"state_time_limit\":180,\"token_refresh_enable\":1,\"nickname_format\":\"{preferred_username}\",\"support_state\":1}"
-  
-  wp --allow-root option update openid_connect_generic_settings "${OPENID_CONFIG}"
+  OPENID_CONFIG=$(cat <<EOF
+{
+  "login_type": "auto",
+  "client_id": "wordpress-${CLIENT_ID}",
+  "client_secret": "${KEYCLOAK_CLIENT_SECRET}",
+  "scope": "openid email profile",
+  "endpoint_login": "${KEYCLOAK_BASE_URL}/protocol/openid-connect/auth",
+  "endpoint_userinfo": "${KEYCLOAK_BASE_URL}/protocol/openid-connect/userinfo",
+  "endpoint_token": "${KEYCLOAK_BASE_URL}/protocol/openid-connect/token",
+  "endpoint_end_session": "${KEYCLOAK_BASE_URL}/protocol/openid-connect/logout",
+  "identity_key": "preferred_username",
+  "no_sslverify": 1,
+  "http_request_timeout": 5,
+  "redirect_user_back": 1,
+  "redirect_on_logout": 1,
+  "link_existing_users": 1,
+  "create_if_does_not_exist": 1,
+  "enforce_privacy": 0,
+  "nickname_key": "nickname",
+  "email_format": "{email}",
+  "displayname_format": "{given_name} {family_name}",
+  "identify_with_username": true,
+  "state_time_limit": 180,
+  "token_refresh_enable": 1,
+  "nickname_format": "{preferred_username}",
+  "support_state": 1
+}
+EOF
+)
+
+  # Escape JSON for WordPress configuration
+  OPENID_CONFIG_ESCAPED=$(echo "$OPENID_CONFIG" | sed 's/"/\\"/g' | tr -d '\n')
+
+  wp --allow-root option update openid_connect_generic_settings "$OPENID_CONFIG_ESCAPED"
 fi
 
 echo "WordPress installation complete."
@@ -859,10 +890,41 @@ if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
       KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET:-"client_secret"}
       
       # Prepare Keycloak configuration with proper escaping
-      OPENID_CONFIG="{\"login_type\":\"auto\",\"client_id\":\"wordpress-${CLIENT_ID}\",\"client_secret\":\"${KEYCLOAK_CLIENT_SECRET}\",\"scope\":\"openid email profile\",\"endpoint_login\":\"${KEYCLOAK_BASE_URL}/protocol/openid-connect/auth\",\"endpoint_userinfo\":\"${KEYCLOAK_BASE_URL}/protocol/openid-connect/userinfo\",\"endpoint_token\":\"${KEYCLOAK_BASE_URL}/protocol/openid-connect/token\",\"endpoint_end_session\":\"${KEYCLOAK_BASE_URL}/protocol/openid-connect/logout\",\"identity_key\":\"preferred_username\",\"no_sslverify\":1,\"http_request_timeout\":5,\"redirect_user_back\":1,\"redirect_on_logout\":1,\"link_existing_users\":1,\"create_if_does_not_exist\":1,\"enforce_privacy\":0,\"nickname_key\":\"nickname\",\"email_format\":\"{email}\",\"displayname_format\":\"{given_name} {family_name}\",\"identify_with_username\":true,\"state_time_limit\":180,\"token_refresh_enable\":1,\"nickname_format\":\"{preferred_username}\",\"support_state\":1}"
-      
+      OPENID_CONFIG=$(cat <<EOF
+{
+  "login_type": "auto",
+  "client_id": "wordpress-${CLIENT_ID}",
+  "client_secret": "${KEYCLOAK_CLIENT_SECRET}",
+  "scope": "openid email profile",
+  "endpoint_login": "${KEYCLOAK_BASE_URL}/protocol/openid-connect/auth",
+  "endpoint_userinfo": "${KEYCLOAK_BASE_URL}/protocol/openid-connect/userinfo",
+  "endpoint_token": "${KEYCLOAK_BASE_URL}/protocol/openid-connect/token",
+  "endpoint_end_session": "${KEYCLOAK_BASE_URL}/protocol/openid-connect/logout",
+  "identity_key": "preferred_username",
+  "no_sslverify": 1,
+  "http_request_timeout": 5,
+  "redirect_user_back": 1,
+  "redirect_on_logout": 1,
+  "link_existing_users": 1,
+  "create_if_does_not_exist": 1,
+  "enforce_privacy": 0,
+  "nickname_key": "nickname",
+  "email_format": "{email}",
+  "displayname_format": "{given_name} {family_name}",
+  "identify_with_username": true,
+  "state_time_limit": 180,
+  "token_refresh_enable": 1,
+  "nickname_format": "{preferred_username}",
+  "support_state": 1
+}
+EOF
+)
+
+      # Escape JSON for WordPress configuration
+      OPENID_CONFIG_ESCAPED=$(echo "$OPENID_CONFIG" | sed 's/"/\\"/g' | tr -d '\n')
+
       # Execute with proper quoting to avoid shell interpretation issues
-      docker exec -w /var/www/html ${WORDPRESS_CONTAINER_NAME} bash -c "wp --allow-root option update openid_connect_generic_settings '${OPENID_CONFIG}'" || log "WARNING: Failed to configure OpenID Connect plugin" "${YELLOW}⚠️ Failed to configure OpenID Connect plugin${NC}"
+      docker exec -w /var/www/html ${WORDPRESS_CONTAINER_NAME} bash -c "wp --allow-root option update openid_connect_generic_settings '${OPENID_CONFIG_ESCAPED}'" || log "WARNING: Failed to configure OpenID Connect plugin" "${YELLOW}⚠️ Failed to configure OpenID Connect plugin${NC}"
       
       # Create a marker file for the SSO configuration
       touch "${WP_DIR}/${DOMAIN}/sso/.sso_configured"
