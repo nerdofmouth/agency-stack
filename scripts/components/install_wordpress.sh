@@ -799,15 +799,19 @@ docker exec "${MARIADB_CONTAINER_NAME}" mysqldump -u"${WP_DB_USER}" -p"${WP_DB_P
 if ! docker exec "${MARIADB_CONTAINER_NAME}" mysql -u"${WP_DB_USER}" -p"${WP_DB_PASSWORD}" -e "SHOW TABLES LIKE 'wp_posts'" "${WP_DB_NAME}" | grep -q "wp_posts"; then
   log "INFO: WordPress tables not found, initializing database" "${CYAN}WordPress tables not found, initializing database...${NC}"
   
-  # Run WordPress installation to create necessary tables
+  # Run WordPress database creation directly
+  docker exec -u www-data "${WORDPRESS_CONTAINER_NAME}" wp db reset --yes
+  
+  # Force WordPress core installation
   docker exec -u www-data "${WORDPRESS_CONTAINER_NAME}" wp core install \
     --url="https://${DOMAIN}" \
     --title="WordPress on AgencyStack" \
     --admin_user=admin \
     --admin_password="${ADMIN_PASSWORD}" \
     --admin_email="${ADMIN_EMAIL}" \
-    --skip-email
-  
+    --skip-email \
+    --force
+      
   # Verify tables were created
   if docker exec "${MARIADB_CONTAINER_NAME}" mysql -u"${WP_DB_USER}" -p"${WP_DB_PASSWORD}" -e "SHOW TABLES LIKE 'wp_posts'" "${WP_DB_NAME}" | grep -q "wp_posts"; then
     log "INFO: Database schema initialized successfully" "${GREEN}✅ WordPress database tables created successfully${NC}"
