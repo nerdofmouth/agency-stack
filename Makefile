@@ -632,8 +632,13 @@ prerequisites-restart:
 
 # WordPress
 install-wordpress: validate
-	@echo "Installing WordPress..."
+	@echo "$(MAGENTA)$(BOLD)🌐 Installing WordPress...$(RESET)"
 	@sudo $(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+# WordPress with SSO integration (convenience target)
+wordpress-sso: validate
+	@echo "$(MAGENTA)$(BOLD)🌐 Installing WordPress with Keycloak SSO integration...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) --enable-keycloak $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
 # ERPNext
 install-erpnext: validate
@@ -1578,6 +1583,21 @@ component-restart:
 	@echo "TODO: Implement /home/revelationx/CascadeProjects/foss-server-stack/config/registry/component-registry.json-restart"
 	@exit 1
 
+# WordPress
+install-wordpress: validate
+	@echo "$(MAGENTA)$(BOLD)🌐 Installing WordPress...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+# WordPress with SSO integration (convenience target)
+wordpress-sso: validate
+	@echo "$(MAGENTA)$(BOLD)🌐 Installing WordPress with Keycloak SSO integration...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) --enable-keycloak $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+# Crowdsec
+crowdsec: validate
+	@echo "$(MAGENTA)$(BOLD)🔒 Installing CrowdSec security automation...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_crowdsec.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
 # Configure PeerTube Keycloak SSO integration
 peertube-sso-configure: validate
 	@echo "$(MAGENTA)$(BOLD)🔑 Configuring PeerTube SSO Integration...$(RESET)"
@@ -2170,3 +2190,258 @@ design-system-restart: ## Restart AgencyStack Design System
 
 # Add design-system to the component list
 COMPONENTS += design-system
+
+# SSO Integration targets
+sso-integrate:
+	@echo "🔒 Integrating component with Keycloak SSO..."
+	@if [ -z "$(COMPONENT)" ]; then \
+		echo "Error: COMPONENT parameter is required. Usage: make sso-integrate COMPONENT=name FRAMEWORK=nodejs COMPONENT_URL=https://example.com"; \
+		exit 1; \
+	fi
+	@if [ -z "$(FRAMEWORK)" ]; then \
+		echo "Error: FRAMEWORK parameter is required. Valid options: nodejs, python, docker"; \
+		exit 1; \
+	fi
+	@if [ -z "$(COMPONENT_URL)" ]; then \
+		echo "Error: COMPONENT_URL parameter is required."; \
+		exit 1; \
+	fi
+	@sudo $(SCRIPTS_DIR)/components/implement_sso_integration.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) --client-id $(CLIENT_ID) --component $(COMPONENT) --framework $(FRAMEWORK) --component-url $(COMPONENT_URL) $(if $(FORCE),--force,) $(if $(VERBOSE),--verbose,)
+
+# WordPress SSO integration
+wordpress-sso:
+	@echo "🔒 Integrating WordPress with Keycloak SSO..."
+	@sudo $(SCRIPTS_DIR)/components/implement_sso_integration.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) --client-id $(CLIENT_ID) --component wordpress --framework php --component-url https://wordpress.$(DOMAIN) $(if $(FORCE),--force,) $(if $(VERBOSE),--verbose,)
+
+# WordPress SSO integration (convenience target)
+wordpress-sso-configure: validate
+	@echo "$(MAGENTA)$(BOLD)🔑 Configuring WordPress SSO Integration...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/keycloak/configure_wordpress_client.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(VERBOSE),--verbose,)
+
+# Test WordPress-Keycloak SSO integration
+wordpress-sso-test: validate
+	@echo "$(MAGENTA)$(BOLD)🧪 Testing WordPress SSO Integration...$(RESET)"
+	@if [ -n "$(CLIENT_ID)" ]; then \
+		WP_CONTAINER="$(CLIENT_ID)_wordpress"; \
+	else \
+		WP_CONTAINER="wordpress"; \
+	fi; \
+	if docker ps --format '{{.Names}}' | grep -q "$$WP_CONTAINER"; then \
+		echo "$(GREEN)✅ WordPress is running$(RESET)"; \
+		echo "$(CYAN)Testing OAuth configuration...$(RESET)"; \
+		OAUTH_CONFIG="/opt/agency_stack/clients/$(or $(CLIENT_ID),default)/wordpress_data/wp-content/plugins/nextcloud-auth/config/config.json"; \
+		if [ -f "$$OAUTH_CONFIG" ]; then \
+			echo "$(GREEN)✅ OAuth configuration exists:$(RESET)"; \
+			cat "$$OAUTH_CONFIG"; \
+			echo ""; \
+			echo "$(CYAN)Testing Keycloak connection...$(RESET)"; \
+			OPENID_URL=$$(grep "openid_url" "$$OAUTH_CONFIG" | awk -F"'" '{print $$2}'); \
+			if [ -n "$$OPENID_URL" ]; then \
+				echo "$(CYAN)Checking OpenID configuration at: $$OPENID_URL$(RESET)"; \
+				curl -s "$$OPENID_URL" | grep -q "issuer" && echo "$(GREEN)✅ Keycloak OpenID configuration is accessible$(RESET)" || echo "$(RED)❌ Keycloak OpenID configuration is not accessible$(RESET)"; \
+			else \
+				echo "$(RED)❌ Could not determine OpenID configuration URL$(RESET)"; \
+			fi; \
+		else \
+			echo "$(RED)❌ OAuth configuration not found$(RESET)"; \
+			echo "$(CYAN)Run: make wordpress-sso-configure DOMAIN=$(DOMAIN)$(RESET)"; \
+		fi; \
+	else \
+		echo "$(RED)❌ WordPress is not running$(RESET)"; \
+		echo "$(CYAN)Start WordPress with: make wordpress-restart$(RESET)"; \
+	fi
+
+# Traefik
+traefik: validate
+	@echo "$(MAGENTA)$(BOLD)🔄 Installing Traefik Reverse Proxy...$(RESET)"
+	@read -p "$(YELLOW)Use host network mode? (true/false, default: true):$(RESET) " USE_HOST_NETWORK; \
+	USE_HOST_NETWORK="$${USE_HOST_NETWORK:-true}"; \
+	echo "$(CYAN)Using network mode: $${USE_HOST_NETWORK}$(RESET)"; \
+	sudo $(SCRIPTS_DIR)/components/install_traefik.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) --use-host-network=$${USE_HOST_NETWORK} $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+# Auto-generated target for traefik
+traefik-status:
+	@echo "$(MAGENTA)$(BOLD)🔍 Checking Traefik Status...$(RESET)"
+	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/traefik/.installed_ok" ]; then \
+		echo "$(GREEN)✅ Traefik is installed$(RESET)"; \
+		if docker ps | grep -q "traefik_$(CLIENT_ID)"; then \
+			echo "$(GREEN)✅ Traefik container is running$(RESET)"; \
+			docker ps | grep traefik; \
+			echo ""; \
+			echo "$(CYAN)Configuration files:$(RESET)"; \
+			ls -la /opt/agency_stack/clients/$(CLIENT_ID)/traefik/config/; \
+		else \
+			echo "$(RED)❌ Traefik container is not running$(RESET)"; \
+		fi; \
+	else \
+		echo "$(RED)❌ Traefik is not installed$(RESET)"; \
+		echo "$(CYAN)To install, run: make traefik DOMAIN=$(DOMAIN)$(RESET)"; \
+		exit 1; \
+	fi
+
+# Auto-generated target for traefik
+traefik-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing Traefik Logs...$(RESET)"
+	@if [ -f "/var/log/agency_stack/components/traefik.log" ]; then \
+		echo "$(CYAN)Installation logs:$(RESET)"; \
+		tail -n 20 /var/log/agency_stack/components/traefik.log; \
+		echo ""; \
+		echo "$(CYAN)Container logs:$(RESET)"; \
+		docker logs traefik_$(CLIENT_ID) --tail 20; \
+	else \
+		echo "$(YELLOW)Traefik logs not found.$(RESET)"; \
+		echo "$(CYAN)Container logs:$(RESET)"; \
+		docker logs traefik_$(CLIENT_ID) --tail 20 2>/dev/null || echo "$(RED)No container logs found.$(RESET)"; \
+	fi
+
+# Auto-generated target for traefik
+traefik-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Traefik...$(RESET)"
+	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/traefik/docker-compose.yml" ]; then \
+		cd /opt/agency_stack/clients/$(CLIENT_ID)/traefik && docker-compose restart; \
+		echo "$(GREEN)✅ Traefik has been restarted$(RESET)"; \
+	else \
+		echo "$(RED)❌ Traefik docker-compose.yml not found$(RESET)"; \
+		echo "$(CYAN)To install, run: make traefik DOMAIN=$(DOMAIN)$(RESET)"; \
+		exit 1; \
+	fi
+
+# Dashboard Component - installation & management
+# -------------------------------------------------------------------------------
+dashboard: validate
+	@echo "$(MAGENTA)$(BOLD)🖥️  Installing Dashboard...$(RESET)"
+	@read -p "$(YELLOW)Use host network mode? (true/false, default: true):$(RESET) " USE_HOST_NETWORK; \
+	USE_HOST_NETWORK="$${USE_HOST_NETWORK:-true}"; \
+	read -p "$(YELLOW)Enable Keycloak SSO integration? (true/false, default: false):$(RESET) " ENABLE_KEYCLOAK; \
+	ENABLE_KEYCLOAK="$${ENABLE_KEYCLOAK:-false}"; \
+	read -p "$(YELLOW)Enforce HTTPS? (true/false, default: false):$(RESET) " ENFORCE_HTTPS; \
+	ENFORCE_HTTPS="$${ENFORCE_HTTPS:-false}"; \
+	echo "$(CYAN)Using network mode: $${USE_HOST_NETWORK}$(RESET)"; \
+	echo "$(CYAN)Keycloak SSO integration: $${ENABLE_KEYCLOAK}$(RESET)"; \
+	echo "$(CYAN)HTTPS enforcement: $${ENFORCE_HTTPS}$(RESET)"; \
+	EXTRA_ARGS=""; \
+	if [ "$${ENABLE_KEYCLOAK}" = "true" ]; then EXTRA_ARGS="$${EXTRA_ARGS} --enable-keycloak"; fi; \
+	if [ "$${ENFORCE_HTTPS}" = "true" ]; then EXTRA_ARGS="$${EXTRA_ARGS} --enforce-https"; fi; \
+	sudo $(SCRIPTS_DIR)/components/install_dashboard.sh --domain $(DOMAIN) --use-host-network=$${USE_HOST_NETWORK} $${EXTRA_ARGS} $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+# Dashboard with SSO integration
+dashboard-sso: validate
+	@echo "$(MAGENTA)$(BOLD)🖥️  Installing Dashboard with Keycloak SSO integration...$(RESET)"
+	@read -p "$(YELLOW)Use host network mode? (true/false, default: true):$(RESET) " USE_HOST_NETWORK; \
+	USE_HOST_NETWORK="$${USE_HOST_NETWORK:-true}"; \
+	echo "$(CYAN)Using network mode: $${USE_HOST_NETWORK}$(RESET)"; \
+	echo "$(CYAN)Keycloak SSO integration: enabled$(RESET)"; \
+	echo "$(CYAN)HTTPS enforcement: enabled$(RESET)"; \
+	sudo $(SCRIPTS_DIR)/components/install_dashboard.sh --domain $(DOMAIN) --use-host-network=$${USE_HOST_NETWORK} --enable-keycloak --enforce-https $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+# Auto-generated target for dashboard
+dashboard-status:
+	@echo "$(MAGENTA)$(BOLD)🔍 Checking Dashboard Status...$(RESET)"
+	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/apps/dashboard/.installed_ok" ]; then \
+		echo "$(GREEN)✅ Dashboard is installed$(RESET)"; \
+		ps aux | grep -v grep | grep -q "dashboard" && echo "$(GREEN)✅ Dashboard process is running$(RESET)" || echo "$(RED)❌ Dashboard process is not running$(RESET)"; \
+		echo ""; \
+		echo "$(CYAN)SSO Status:$(RESET)"; \
+		if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/apps/dashboard/sso/.sso_configured" ]; then \
+			echo "$(GREEN)✅ SSO is configured$(RESET)"; \
+		else \
+			echo "$(YELLOW)⚠️ SSO is not configured$(RESET)"; \
+			echo "$(CYAN)To enable SSO, run: make dashboard-sso DOMAIN=$(DOMAIN)$(RESET)"; \
+		fi; \
+	else \
+		echo "$(RED)❌ Dashboard is not installed$(RESET)"; \
+		echo "$(CYAN)To install, run: make dashboard DOMAIN=$(DOMAIN)$(RESET)"; \
+		exit 1; \
+	fi
+
+# Auto-generated target for dashboard
+dashboard-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing Dashboard Logs...$(RESET)"
+	@if [ -f "/var/log/agency_stack/components/dashboard/dashboard.log" ]; then \
+		echo "$(CYAN)Installation logs:$(RESET)"; \
+		tail -n 20 /var/log/agency_stack/components/dashboard/dashboard.log; \
+		echo ""; \
+		echo "$(CYAN)Application logs:$(RESET)"; \
+		tail -n 20 /var/log/agency_stack/components/dashboard/app.log 2>/dev/null || echo "$(YELLOW)No application logs found.$(RESET)"; \
+	else \
+		echo "$(YELLOW)Dashboard logs not found.$(RESET)"; \
+	fi
+
+# Auto-generated target for dashboard
+dashboard-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Dashboard...$(RESET)"
+	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/apps/dashboard/.installed_ok" ]; then \
+		echo "$(CYAN)Stopping dashboard process...$(RESET)"; \
+		pkill -f "node.*dashboard" || echo "$(YELLOW)No dashboard process found.$(RESET)"; \
+		sleep 2; \
+		echo "$(CYAN)Starting dashboard process...$(RESET)"; \
+		cd /opt/agency_stack/apps/dashboard && nohup npm start > /var/log/agency_stack/components/dashboard/app.log 2>&1 & \
+		echo "$(GREEN)✅ Dashboard has been restarted$(RESET)"; \
+	else \
+		echo "$(RED)❌ Dashboard is not installed$(RESET)"; \
+		echo "$(CYAN)To install, run: make dashboard DOMAIN=$(DOMAIN)$(RESET)"; \
+		exit 1; \
+	fi
+
+# DNS Configuration
+dns:
+	@echo "Configuring DNS for AgencyStack components..."
+	@read -p "Enter domain name (e.g., wordpress.proto001.alpha.nerdofmouth.com): " domain; \
+	read -p "Enter DNS provider (cloudflare): " provider; \
+	provider="$${provider:-cloudflare}"; \
+	scripts/components/install_dns.sh --domain $$domain --provider $$provider --force
+
+dns-wordpress:
+	@echo "Configuring DNS for WordPress..."
+	@scripts/components/install_dns.sh --domain wordpress.proto001.alpha.nerdofmouth.com --provider cloudflare --force
+
+dns-keycloak:
+	@echo "Configuring DNS for Keycloak..."
+	@scripts/components/install_dns.sh --domain keycloak.proto001.alpha.nerdofmouth.com --provider cloudflare --force
+
+dns-status:
+	@echo "DNS Configuration Status:"
+	@if [ -d "/opt/agency_stack/dns" ]; then \
+		for config in /opt/agency_stack/dns/*.json; do \
+			if [ -f "$$config" ]; then \
+				echo "--------------------------------------"; \
+				cat "$$config" | jq -r '"Domain: \(.domain)\nIP: \(.ip)\nStatus: Configured\nLast Updated: \(.last_updated)"'; \
+			fi \
+		done; \
+		echo "--------------------------------------"; \
+	else \
+		echo "No DNS configurations found."; \
+	fi
+
+# SSL Certificate Management
+ssl-certificates:
+	@echo "$(MAGENTA)$(BOLD)🔒 Configuring SSL certificates with Let's Encrypt...$(RESET)"
+	@read -p "$(YELLOW)Enter domain name (e.g., proto001.alpha.nerdofmouth.com):$(RESET) " domain; \
+	read -p "$(YELLOW)Enter admin email for certificate notifications:$(RESET) " email; \
+	$(SCRIPTS_DIR)/utils/update_traefik_certs.sh --domain $$domain --admin-email $$email --force
+
+ssl-certificates-status:
+	@echo "$(MAGENTA)$(BOLD)🔒 SSL Certificate Status...$(RESET)"
+	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/traefik/data/acme/acme.json" ]; then \
+		echo "$(CYAN)Certificate file exists. Checking content...$(RESET)"; \
+		cat /opt/agency_stack/clients/$(CLIENT_ID)/traefik/data/acme/acme.json | jq -r 'if . == {} then "No certificates issued yet." else "Certificates exist." end' 2>/dev/null || echo "Empty or invalid certificate file."; \
+		echo "$(CYAN)For detailed certificate information, run:$(RESET)"; \
+		echo "cat /opt/agency_stack/clients/$(CLIENT_ID)/traefik/data/acme/acme.json | jq"; \
+	else \
+		echo "$(RED)Certificate file not found.$(RESET)"; \
+		echo "$(CYAN)To configure certificates, run: make ssl-certificates$(RESET)"; \
+	fi
+
+traefik-ssl:
+	@echo "$(MAGENTA)$(BOLD)🔒 Configuring SSL certificates for Traefik...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make traefik-ssl DOMAIN=proto001.alpha.nerdofmouth.com [ADMIN_EMAIL=admin@example.com]"; \
+		exit 1; \
+	fi; \
+	email="$(ADMIN_EMAIL)"; \
+	if [ -z "$$email" ]; then \
+		email="admin@$(DOMAIN)"; \
+	fi; \
+	echo "$(CYAN)Configuring SSL certificates for $(DOMAIN) with admin email: $$email$(RESET)"; \
+	$(SCRIPTS_DIR)/utils/update_traefik_certs.sh --domain $(DOMAIN) --admin-email $$email --force

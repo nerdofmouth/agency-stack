@@ -19,6 +19,7 @@ set -eo pipefail
 # Variables
 KEYCLOAK_CONFIG_DIR="/opt/agency_stack/keycloak"
 KEYCLOAK_SECRETS_DIR="/opt/agency_stack/secrets/keycloak"
+COMPONENT_REGISTRY="/opt/agency_stack/config/registry/component_registry.json"
 
 # Check for required dependencies
 check_dependencies() {
@@ -65,10 +66,11 @@ keycloak_is_available() {
   while [ $attempt -lt $max_attempts ]; do
     log_info "Waiting for Keycloak to be ready... ($attempt/$max_attempts)"
     
-    # Try both legacy and new Keycloak health endpoints
-    if curl -s -f -o /dev/null -w '%{http_code}' "https://$domain/health" | grep -q 200 || \
-       curl -s -f -o /dev/null -w '%{http_code}' "https://$domain/auth/health" | grep -q 200 || \
-       curl -s -f -o /dev/null -w '%{http_code}' "https://$domain/admin/" | grep -q 200; then
+    # Try both legacy and new Keycloak health endpoints - Keycloak 21.x no longer uses /auth path
+    if curl -s -f -k -o /dev/null -w '%{http_code}' "https://$domain/health" | grep -q 200 || \
+       curl -s -f -k -o /dev/null -w '%{http_code}' "https://$domain/auth/health" | grep -q 200 || \
+       curl -s -f -k -o /dev/null -w '%{http_code}' "https://$domain/admin/" | grep -q 200 || \
+       curl -s -f -k -o /dev/null -w '%{http_code}' "https://$domain/" | grep -q 200; then
       ready=true
       break
     fi
@@ -119,12 +121,24 @@ get_keycloak_admin_token() {
   
   eval "$credentials"
   
-  local token_response=$(curl -s -X POST \
+  # Try Keycloak 21.x first (no /auth prefix)
+  local token_response=$(curl -s -k -X POST \
     -d "client_id=admin-cli" \
     -d "username=$KEYCLOAK_ADMIN" \
     -d "password=$KEYCLOAK_ADMIN_PASSWORD" \
     -d "grant_type=password" \
     "https://$domain/realms/master/protocol/openid-connect/token")
+  
+  # If that fails, try legacy path with /auth prefix
+  if [ -z "$token_response" ] || echo "$token_response" | grep -q "error"; then
+    log_info "Trying legacy Keycloak path with /auth prefix"
+    token_response=$(curl -s -k -X POST \
+      -d "client_id=admin-cli" \
+      -d "username=$KEYCLOAK_ADMIN" \
+      -d "password=$KEYCLOAK_ADMIN_PASSWORD" \
+      -d "grant_type=password" \
+      "https://$domain/auth/realms/master/protocol/openid-connect/token")
+  fi
   
   if [ -z "$token_response" ] || echo "$token_response" | grep -q "error"; then
     log_error "Failed to obtain Keycloak admin token: $token_response"
@@ -143,33 +157,39 @@ get_keycloak_admin_token() {
 }
 
 # Function to check if realm exists
-realm_exists() {
+keycloak_realm_exists() {
   local domain="$1"
   local realm="$2"
-  local token="$3"
+  local token="${3:-$(get_keycloak_admin_token "$domain")}"
   
-  local response=$(curl -s -X GET \
-    -H "Authorization: Bearer $token" \
-    "https://$domain/admin/realms/$realm")
-  
-  if [ -z "$response" ] || echo "$response" | grep -q "error"; then
+  if [ -z "$token" ]; then
+    log_error "Failed to obtain admin token for realm check"
     return 1
   fi
   
-  return 0
+  local response=$(curl -s -k -o /dev/null -w '%{http_code}' "https://$domain/admin/realms/$realm" \
+    -H "Authorization: Bearer $token")
+  
+  [ "$response" = "200" ]
 }
 
 # Function to create a realm
-create_realm() {
+keycloak_create_realm() {
   local domain="$1"
   local realm="$2"
-  local token="$3"
+  local realm_name="${3:-$realm}"
+  local token="${4:-$(get_keycloak_admin_token "$domain")}"
+  
+  if [ -z "$token" ]; then
+    log_error "Failed to obtain admin token for creating realm"
+    return 1
+  fi
   
   local realm_json='{
-    "realm": "'$realm'",
+    "realm": "'$realm_name'",
     "enabled": true,
-    "displayName": "'$realm'",
-    "displayNameHtml": "<div class=\"kc-logo-text\"><span>'$realm'</span></div>",
+    "displayName": "'$realm_name'",
+    "displayNameHtml": "<div class=\"kc-logo-text\"><span>'$realm_name'</span></div>",
     "sslRequired": "external",
     "registrationAllowed": false,
     "loginWithEmailAllowed": true,
@@ -179,7 +199,7 @@ create_realm() {
     "bruteForceProtected": true
   }'
   
-  local response=$(curl -s -X POST \
+  local response=$(curl -s -k -X POST \
     -H "Authorization: Bearer $token" \
     -H "Content-Type: application/json" \
     -d "$realm_json" \
@@ -195,71 +215,82 @@ create_realm() {
 }
 
 # Function to check if client exists
-client_exists() {
+keycloak_client_exists() {
   local domain="$1"
   local realm="$2"
   local client_id="$3"
-  local token="$4"
+  local token="${4:-$(get_keycloak_admin_token "$domain")}"
   
-  local response=$(curl -s -X GET \
-    -H "Authorization: Bearer $token" \
-    "https://$domain/admin/realms/$realm/clients?clientId=$client_id")
-  
-  if [ -z "$response" ] || echo "$response" | grep -q "error" || [ "$response" = "[]" ]; then
+  if [ -z "$token" ]; then
+    log_error "Failed to obtain admin token for client check"
     return 1
   fi
   
-  return 0
+  local response=$(curl -s -k "https://$domain/admin/realms/$realm/clients?clientId=$client_id" \
+    -H "Authorization: Bearer $token")
+  
+  echo "$response" | grep -q "\"clientId\":\"$client_id\""
 }
 
 # Function to delete a client
-delete_client() {
+keycloak_delete_client() {
   local domain="$1"
   local realm="$2"
   local client_id="$3"
-  local token="$4"
+  local token="${4:-$(get_keycloak_admin_token "$domain")}"
+  
+  if [ -z "$token" ]; then
+    log_error "Failed to obtain admin token for client deletion"
+    return 1
+  fi
   
   # Get client UUID
-  local client_uuid=$(get_client_id "$domain" "$realm" "$client_id" "$token")
+  local client_uuid=$(keycloak_get_client_id "$domain" "$realm" "$client_id" "$token")
   
   if [ -z "$client_uuid" ]; then
     log_error "Failed to get UUID for client $client_id"
     return 1
   fi
   
-  local response=$(curl -s -X DELETE \
-    -H "Authorization: Bearer $token" \
-    "https://$domain/admin/realms/$realm/clients/$client_uuid")
+  # Delete the client
+  local response=$(curl -s -k -X DELETE "https://$domain/admin/realms/$realm/clients/$client_uuid" \
+    -H "Authorization: Bearer $token")
   
-  if [ -n "$response" ] && echo "$response" | grep -q "error"; then
-    log_error "Failed to delete client $client_id: $response"
+  if [ $? -ne 0 ]; then
+    log_error "Failed to delete client $client_id"
     return 1
   fi
   
-  log_success "Deleted client: $client_id"
+  log_success "Successfully deleted client $client_id"
   return 0
 }
 
 # Function to get client ID (UUID)
-get_client_id() {
+keycloak_get_client_id() {
   local domain="$1"
   local realm="$2"
   local client_id="$3"
-  local token="$4"
+  local token="${4:-$(get_keycloak_admin_token "$domain")}"
   
-  local response=$(curl -s -X GET \
-    -H "Authorization: Bearer $token" \
-    "https://$domain/admin/realms/$realm/clients?clientId=$client_id")
-  
-  if [ -z "$response" ] || echo "$response" | grep -q "error" || [ "$response" = "[]" ]; then
-    log_error "Client $client_id not found"
+  if [ -z "$token" ]; then
+    log_error "Failed to obtain admin token for getting client ID"
     return 1
   fi
   
-  local uuid=$(echo "$response" | jq -r '.[0].id')
+  # Get list of clients
+  local response=$(curl -s -k "https://$domain/admin/realms/$realm/clients?clientId=$client_id" \
+    -H "Authorization: Bearer $token")
   
-  if [ -z "$uuid" ] || [ "$uuid" = "null" ]; then
-    log_error "Failed to parse client UUID"
+  if [ -z "$response" ] || echo "$response" | grep -q "error"; then
+    log_error "Failed to get clients list"
+    return 1
+  fi
+  
+  # Extract UUID from response
+  local uuid=$(echo "$response" | grep -o "\"id\":\"[^\"]*\"" | head -1 | cut -d'"' -f4)
+  
+  if [ -z "$uuid" ]; then
+    log_error "Client $client_id not found"
     return 1
   fi
   
@@ -268,11 +299,11 @@ get_client_id() {
 }
 
 # Function to create client from file
-create_client_from_file() {
+keycloak_create_client_from_file() {
   local domain="$1"
   local realm="$2"
   local client_file="$3"
-  local token="$4"
+  local token="${4:-$(get_keycloak_admin_token "$domain")}"
   
   if [ ! -f "$client_file" ]; then
     log_error "Client configuration file not found: $client_file"
@@ -281,7 +312,7 @@ create_client_from_file() {
   
   local client_json=$(cat "$client_file")
   
-  local response=$(curl -s -X POST \
+  local response=$(curl -s -k -X POST \
     -H "Authorization: Bearer $token" \
     -H "Content-Type: application/json" \
     -d "$client_json" \
@@ -297,13 +328,13 @@ create_client_from_file() {
 }
 
 # Function to create role mapper
-create_role_mapper() {
+keycloak_create_role_mapper() {
   local domain="$1"
   local realm="$2"
   local client_uuid="$3"
   local role_name="$4"
   local role_display_name="$5"
-  local token="$6"
+  local token="${6:-$(get_keycloak_admin_token "$domain")}"
   
   # Create role
   local role_json='{
@@ -313,7 +344,7 @@ create_role_mapper() {
     "clientRole": true
   }'
   
-  local response=$(curl -s -X POST \
+  local response=$(curl -s -k -X POST \
     -H "Authorization: Bearer $token" \
     -H "Content-Type: application/json" \
     -d "$role_json" \
@@ -329,47 +360,106 @@ create_role_mapper() {
 }
 
 # Function to update component registry for SSO configuration
-update_sso_configured() {
+keycloak_update_sso_configured() {
   local component="$1"
+  local client_id="$2"
   
-  if [ -z "$component" ]; then
-    log_error "Component name is required"
-    return 1
+  # Create registry directory if it doesn't exist
+  local registry_dir=$(dirname "$COMPONENT_REGISTRY")
+  if [ ! -d "$registry_dir" ]; then
+    mkdir -p "$registry_dir"
+    log_info "Created component registry directory: $registry_dir"
   fi
   
-  local registry_file="/opt/agency_stack/repo/config/registry/component_registry.json"
-  
-  if [ ! -f "$registry_file" ]; then
-    log_error "Component registry file not found: $registry_file"
-    return 1
+  # Create empty registry file if it doesn't exist
+  if [ ! -f "$COMPONENT_REGISTRY" ]; then
+    echo '{"components":{}}' > "$COMPONENT_REGISTRY"
+    log_info "Created empty component registry file"
   fi
   
-  # Create a backup of the registry file
-  cp "$registry_file" "${registry_file}.bak"
-  
-  # Use jq to update the sso_configured flag
-  if command -v jq >/dev/null 2>&1; then
-    # Find the path to the component
-    local component_path=$(jq -r "path(.components[][\"$component\"]) | .[0], .[1]" "$registry_file")
-    
-    if [ -z "$component_path" ] || [ "$component_path" = "null" ]; then
-      log_error "Component $component not found in registry"
-      return 1
-    fi
-    
-    # Update the sso_configured flag
-    jq "(.components.${component_path}.integration_status.sso_configured) = true" "$registry_file" > "${registry_file}.tmp"
-    if [ $? -eq 0 ]; then
-      mv "${registry_file}.tmp" "$registry_file"
-      log_success "Updated component registry for $component - marked SSO as configured"
-    else
-      log_error "Failed to update component registry"
-      return 1
-    fi
-  else
-    log_error "jq is required to update component registry"
-    return 1
+  # Check if component exists in registry
+  if ! jq -e ".components.\"$component\"" "$COMPONENT_REGISTRY" > /dev/null 2>&1; then
+    # Component doesn't exist, create it
+    jq --arg component "$component" '.components[$component] = {}' "$COMPONENT_REGISTRY" > "${COMPONENT_REGISTRY}.tmp"
+    mv "${COMPONENT_REGISTRY}.tmp" "$COMPONENT_REGISTRY"
+    log_info "Added component $component to registry"
   fi
   
+  # Update component with SSO configuration
+  jq --arg component "$component" --arg client_id "$client_id" \
+    '.components[$component].sso_configured = true | .components[$component].sso_client_id = $client_id' \
+    "$COMPONENT_REGISTRY" > "${COMPONENT_REGISTRY}.tmp"
+  mv "${COMPONENT_REGISTRY}.tmp" "$COMPONENT_REGISTRY"
+  
+  log_success "Updated component registry for $component"
   return 0
 }
+
+# Function to register a client with Keycloak
+keycloak_register_client() {
+  local domain="$1"
+  local realm="$2"
+  local client_id="$3"
+  local client_name="$4"
+  local redirect_uris="$5"
+  local token=$(get_keycloak_admin_token "$domain")
+  
+  if [ -z "$token" ]; then
+    log_error "Failed to obtain admin token for registering client"
+    return 1
+  fi
+  
+  # Check if client already exists
+  if keycloak_client_exists "$domain" "$realm" "$client_id" "$token"; then
+    log_info "Client $client_id already exists, updating configuration"
+    keycloak_delete_client "$domain" "$realm" "$client_id" "$token"
+  fi
+  
+  # Generate a client secret
+  local client_secret=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-16)
+  
+  # Create client JSON
+  local client_json='{
+    "clientId": "'"$client_id"'",
+    "name": "'"$client_name"'",
+    "description": "AgencyStack auto-generated client for '"$client_name"'",
+    "enabled": true,
+    "redirectUris": '"$redirect_uris"',
+    "clientAuthenticatorType": "client-secret",
+    "secret": "'"$client_secret"'",
+    "publicClient": false,
+    "protocol": "openid-connect",
+    "attributes": {
+      "pkce.code.challenge.method": "S256"
+    }
+  }'
+  
+  # Create the client in Keycloak
+  local response=$(curl -s -k -X POST "https://$domain/admin/realms/$realm/clients" \
+    -H "Authorization: Bearer $token" \
+    -H "Content-Type: application/json" \
+    -d "$client_json")
+  
+  if [ $? -ne 0 ]; then
+    log_error "Failed to create client $client_id in Keycloak"
+    return 1
+  fi
+  
+  log_success "Successfully registered client $client_id with Keycloak"
+  echo "$client_secret"
+  return 0
+}
+
+# Export functions
+export -f keycloak_is_available
+export -f get_keycloak_admin_credentials
+export -f get_keycloak_admin_token
+export -f keycloak_realm_exists
+export -f keycloak_create_realm
+export -f keycloak_client_exists
+export -f keycloak_delete_client
+export -f keycloak_get_client_id
+export -f keycloak_create_client_from_file
+export -f keycloak_create_role_mapper
+export -f keycloak_update_sso_configured
+export -f keycloak_register_client

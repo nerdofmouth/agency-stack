@@ -29,16 +29,66 @@ make dashboard-logs
 
 The dashboard installation now automatically configures Traefik routes to ensure proper FQDN access. This includes:
 
-- Proper HTTP and HTTPS routes for root domain and /dashboard path
-- DNS resolution verification
-- Port accessibility checks
-- Automatic Traefik configuration
+- Routing for the root domain to display the dashboard on the homepage
+- A dedicated `/dashboard` path for accessing the dashboard via path-based routing
+- Support for both HTTP and HTTPS access methods
+- Automatic configuration based on your DOMAIN and CLIENT_ID settings
 
-After installation, the dashboard will be accessible via:
-- http://yourdomain.com
-- http://yourdomain.com/dashboard
-- https://yourdomain.com (if TLS is configured)
-- https://yourdomain.com/dashboard (if TLS is configured)
+## Keycloak SSO Integration
+
+The AgencyStack Dashboard supports secure authentication through Keycloak SSO integration. This provides:
+
+- Single Sign-On (SSO) for the dashboard and other AgencyStack components
+- Role-based access control through Keycloak's powerful RBAC system
+- Integration with external identity providers (OpenID Connect, SAML)
+- Secure token-based authentication with proper session management
+
+### Enabling Keycloak SSO
+
+To enable Keycloak SSO integration during dashboard installation:
+
+```bash
+# Install dashboard with Keycloak SSO integration enabled
+make dashboard DOMAIN=yourdomain.com ENABLE_KEYCLOAK=true
+
+# For more control over configuration options
+scripts/components/install_dashboard.sh --domain yourdomain.com --enable-keycloak --keycloak-realm myrealm
+```
+
+### Configuration Options
+
+The following Keycloak-related options are available:
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--enable-keycloak` | Enable Keycloak SSO integration | false |
+| `--keycloak-realm` | Keycloak realm to use | agency_stack |
+| `--keycloak-client-id` | Client ID for dashboard | dashboard |
+| `--enforce-https` | Force HTTPS redirection for secure access | false |
+
+### Verification
+
+After installation with Keycloak SSO enabled, you can verify the configuration:
+
+1. The component registry will show `sso_configured: true` for the dashboard
+2. The dashboard login should redirect to the Keycloak login page
+3. Authentication tokens will be properly managed for secure sessions
+
+If Keycloak is not available during installation, the dashboard will still be configured for SSO but will fall back to local authentication until Keycloak becomes available.
+
+## HTTPS Enforcement
+
+For production deployments, it's recommended to enforce HTTPS to ensure secure access to the dashboard:
+
+```bash
+# Install dashboard with enforced HTTPS
+make dashboard DOMAIN=yourdomain.com ENFORCE_HTTPS=true
+
+# Combined with Keycloak SSO for maximum security
+make dashboard DOMAIN=yourdomain.com ENABLE_KEYCLOAK=true ENFORCE_HTTPS=true
+```
+
+When HTTPS enforcement is enabled, all HTTP traffic will be automatically redirected to HTTPS for secure access.
 
 ## Paths
 

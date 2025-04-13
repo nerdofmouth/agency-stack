@@ -67,15 +67,26 @@ This document provides a comprehensive list of all port assignments used by Agen
 | **Mastodon** | Streaming | 4000 | HTTP | Streaming API |
 | **Etebase** | Web API | 8732 | HTTP | Encrypted CalDAV/CardDAV server |
 
-## Communication Systems
+## Communication & Collaboration
 
 | Component | Service | Port | Protocol | Notes |
 |-----------|---------|------|----------|-------|
+| **Jitsi Meet** | Web UI | 443 | HTTPS | Video conferencing (via Traefik) |
+| **Jitsi Meet** | XMPP | 5222 | TCP | XMPP signaling |
+| **Jitsi Meet** | Video Bridge | 10000 | UDP | Media stream |
+| **Jitsi Meet** | Conference Focus | 5347 | TCP | Jicofo component |
+| **FusionPBX/VOIP** | Web UI | 8082 | HTTP | Administration interface |
+| **FusionPBX/VOIP** | SIP | 5060 | UDP/TCP | SIP signaling |
+| **FusionPBX/VOIP** | SIP-TLS | 5061 | TLS | Secure SIP signaling |
+| **FusionPBX/VOIP** | RTP | 16384-32768 | UDP | Voice/media traffic |
+| **Mailu** | SMTP | 25 | TCP | Mail server (incoming) |
+| **Mailu** | SMTP Submission | 587 | TCP | Mail submission (outgoing) |
+| **Mailu** | IMAP | 143 | TCP | Mail access |
+| **Mailu** | IMAPS | 993 | TCP | Secure mail access |
+| **Mailu** | Web UI | 8081 | HTTP | Administration interface |
+| **Chatwoot** | Web UI | 3002 | HTTP | Customer service platform |
 | **VoIP** | SIP | 5060 | TCP/UDP | Session Initiation Protocol |
 | **VoIP** | RTP | 10000-20000 | UDP | Real-time audio streams |
-| **Mailu** | SMTP | 25 | TCP | Mail server (receiving) |
-| **Mailu** | Submission | 587 | TCP | Mail server (sending) |
-| **Mailu** | IMAP | 143/993 | TCP | Mail access |
 | **Mailu** | Admin UI | 8080 | HTTP | Admin interface |
 | **MiroTalk SFU** | Web UI | 3000 | HTTP | Video conferencing interface |
 | **MiroTalk SFU** | Metrics | 3001 | HTTP | Prometheus metrics endpoint |
@@ -89,6 +100,15 @@ This document provides a comprehensive list of all port assignments used by Agen
 | **Vault** | Web UI | 8200 | HTTP | Secret management |
 | **Crowdsec** | API | 8080 | HTTP | Security automation |
 | **OWASP ZAP** | UI | 8090 | HTTP | Security scanning |
+
+## Analytics & Monitoring
+
+| Component | Service | Port | Protocol | Notes |
+|-----------|---------|------|----------|-------|
+| **PostHog** | Web UI | 8000 | HTTP | Analytics platform |
+| **PostHog** | API | 8000 | HTTP | Data collection endpoint |
+| **Matomo** | Web UI | 8084 | HTTP | Alternative analytics |
+| **Uptime Kuma** | Web UI | 3001 | HTTP | Monitoring dashboard |
 
 ## Email & Communication
 
