@@ -286,6 +286,14 @@ mkdir -p "${KEYCLOAK_DIR}/${DOMAIN}/init-db"
 echo "${ADMIN_PASSWORD}" > "${KEYCLOAK_DIR}/${DOMAIN}/admin_password.txt"
 chmod 600 "${KEYCLOAK_DIR}/${DOMAIN}/admin_password.txt"
 
+# Create admin credentials file for integration scripts
+mkdir -p "${SECRETS_DIR}/${DOMAIN}"
+cat > "${SECRETS_DIR}/${DOMAIN}/admin.env" <<EOL
+KEYCLOAK_ADMIN=admin
+KEYCLOAK_ADMIN_PASSWORD=${ADMIN_PASSWORD}
+EOL
+chmod 600 "${SECRETS_DIR}/${DOMAIN}/admin.env"
+
 # Generate random passwords for database
 DB_PASSWORD=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-16)
 DB_USER="keycloak"
