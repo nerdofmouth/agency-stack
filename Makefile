@@ -2133,3 +2133,40 @@ killbill-mailu:
 	fi; \
 	echo "$(CYAN)Configuring Kill Bill to use Mailu as SMTP relay...$(RESET)"; \
 	sudo $(SCRIPTS_DIR)/components/install_killbill.sh --domain $(DOMAIN) --mailu-domain $(MAILU_DOMAIN) --force $(if $(CLIENT_ID),--client-id $(CLIENT_ID),)
+
+# ========================================
+# Design System Integration with Bit.dev
+# ========================================
+.PHONY: design-system design-system-status design-system-logs design-system-restart
+
+design-system: ## Install AgencyStack Design System with Bit.dev integration
+	@echo "$(MAGENTA)$(BOLD)🎨 Installing AgencyStack Design System (Bit.dev)...$(RESET)"
+	@sudo ./scripts/components/install_design_system_dev.sh $(if $(CLIENT_ID),--client-id=$(CLIENT_ID),) $(if $(DOMAIN),--domain=$(DOMAIN),) $(if $(PORT),--port=$(PORT),) $(if $(BIT_PORT),--bit-port=$(BIT_PORT),) $(if $(ENABLE_CLOUD),--enable-cloud,)
+
+design-system-status: ## Check status of AgencyStack Design System
+	@echo "$(BLUE)$(BOLD)Checking AgencyStack Design System status...$(RESET)"
+	@systemctl status agencystack-design-system.service || true
+	@echo "Bit.dev server status:"
+	@ps aux | grep "bit dev" | grep -v grep || echo "Bit dev server is not running"
+	@echo "$(BLUE)Dashboard URL: http://localhost:$${PORT:-3333}$(RESET)"
+	@echo "$(BLUE)Bit Dev URL: http://localhost:$${BIT_PORT:-3000}$(RESET)"
+
+design-system-logs: ## View AgencyStack Design System logs
+	@echo "$(BLUE)$(BOLD)Viewing AgencyStack Design System logs...$(RESET)"
+	@if [ -f "/var/log/agency_stack/components/design-system.log" ]; then \
+		tail -n 50 /var/log/agency_stack/components/design-system.log; \
+	else \
+		echo "$(RED)Log file not found. Is Design System installed?$(RESET)"; \
+	fi
+
+design-system-restart: ## Restart AgencyStack Design System
+	@echo "$(YELLOW)$(BOLD)Restarting AgencyStack Design System...$(RESET)"
+	@sudo systemctl restart agencystack-design-system.service
+	@echo "$(GREEN)Dashboard service restarted.$(RESET)"
+	@echo "$(YELLOW)Restarting Bit dev server...$(RESET)"
+	@ps aux | grep "bit dev" | grep -v grep | awk '{print $$2}' | xargs -r kill -9
+	@cd /opt/agency_stack/clients/$${CLIENT_ID:-default}/design-system && nohup bit dev --port $${BIT_PORT:-3000} > /var/log/agency_stack/components/design-system.log.bit-dev 2>&1 &
+	@echo "$(GREEN)Bit dev server restarted.$(RESET)"
+
+# Add design-system to the component list
+COMPONENTS += design-system
