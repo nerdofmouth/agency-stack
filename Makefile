@@ -2007,7 +2007,7 @@ listmonk-mailu:
 	@echo "$(MAGENTA)$(BOLD)🔗 Integrating Listmonk with Mailu...$(RESET)"
 	@if [ -z "$(DOMAIN)" ] || [ -z "$(MAILU_DOMAIN)" ]; then \
 		echo "$(RED)Error: Missing required parameters.$(RESET)"; \
-		echo "Usage: make listmonk-mailu DOMAIN=lists.example.com MAILU_DOMAIN=mail.example.com [MAILU_USER=user@example.com] [MAILU_PASSWORD=password] [CLIENT_ID=tenant1]"; \
+		echo "Usage: make listmonk-mailu DOMAIN=lists.example.com MAILU_DOMAIN=mail.example.com [CLIENT_ID=tenant1]"; \
 		exit 1; \
 	fi; \
 	echo "$(CYAN)Configuring Listmonk to use Mailu as SMTP relay...$(RESET)"; \
@@ -2448,3 +2448,33 @@ traefik-ssl:
 	fi; \
 	echo "$(CYAN)Configuring SSL certificates for $(DOMAIN) with admin email: $$email$(RESET)"; \
 	$(SCRIPTS_DIR)/utils/update_traefik_certs.sh --domain $(DOMAIN) --admin-email $$email --force
+
+configure-dev-sudo:
+	@echo "$(MAGENTA)$(BOLD)🔑 Configuring passwordless sudo for development...$(RESET)"
+	@if [ "$$(id -u)" -ne 0 ]; then \
+		echo "$(YELLOW)Creating sudoers configuration for current user...$(RESET)"; \
+		USER=$$(whoami); \
+		echo "$$USER ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/$$USER-nopasswd > /dev/null; \
+		sudo chmod 0440 /etc/sudoers.d/$$USER-nopasswd; \
+		echo "$(GREEN)✓ Passwordless sudo configured for user $$USER$(RESET)"; \
+		echo "$(YELLOW)Note: This is for DEVELOPMENT environments only!$(RESET)"; \
+		echo "$(YELLOW)Warning: Remove this configuration for production environments with 'make remove-dev-sudo'$(RESET)"; \
+	else \
+		echo "$(RED)This command should not be run as root.$(RESET)"; \
+		exit 1; \
+	fi
+
+remove-dev-sudo:
+	@echo "$(MAGENTA)$(BOLD)🔑 Removing passwordless sudo configuration...$(RESET)"
+	@if [ "$$(id -u)" -ne 0 ]; then \
+		USER=$$(whoami); \
+		if [ -f "/etc/sudoers.d/$$USER-nopasswd" ]; then \
+			sudo rm -f /etc/sudoers.d/$$USER-nopasswd; \
+			echo "$(GREEN)✓ Passwordless sudo configuration removed for user $$USER$(RESET)"; \
+		else \
+			echo "$(YELLOW)No passwordless sudo configuration found for user $$USER$(RESET)"; \
+		fi; \
+	else \
+		echo "$(RED)This command should not be run as root.$(RESET)"; \
+		exit 1; \
+	fi
