@@ -433,39 +433,37 @@ version: '3'
 
 networks:
   wordpress_network:
-    name: ${CLIENT_ID}_wordpress_${SITE_NAME}_network
-    driver: bridge
-  ${CLIENT_ID}_network:
+    name: default_wordpress_${DOMAIN_UNDERSCORE}_network
+  default_network:
     external: true
+    name: ${NETWORK_NAME}
 
 services:
   wordpress:
     container_name: ${WORDPRESS_CONTAINER_NAME}
     image: wordpress:php8.2-fpm
     restart: unless-stopped
-    depends_on:
-      - mariadb
-      - redis
+    volumes:
+      - ${WP_DIR}/${DOMAIN}/wordpress:/var/www/html
+      - ${WP_DIR}/${DOMAIN}/php/custom.ini:/usr/local/etc/php/conf.d/custom.ini
+    environment:
+      - WORDPRESS_DB_HOST=mariadb
+      - WORDPRESS_DB_USER=${WP_DB_USER}
+      - WORDPRESS_DB_PASSWORD=${WP_DB_PASSWORD}
+      - WORDPRESS_DB_NAME=${WP_DB_NAME}
+      - WORDPRESS_DEBUG=1
+      - WORDPRESS_CONFIG_EXTRA=define('WP_HOME', 'https://${DOMAIN}'); define('WP_SITEURL', 'https://${DOMAIN}');
     networks:
       wordpress_network:
         aliases:
           - wordpress
           - wp
-      ${CLIENT_ID}_network: {}
-    volumes:
-      - ${WP_DIR}/${DOMAIN}/wordpress:/var/www/html
-      - ${WP_DIR}/${DOMAIN}/php-fpm/www.conf:/usr/local/etc/php-fpm.d/www.conf
-      - ${WP_DIR}/${DOMAIN}/php-fpm/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini
-    environment:
-      - WORDPRESS_DB_HOST=mariadb
-      - WORDPRESS_DB_NAME=${WP_DB_NAME}
-      - WORDPRESS_DB_USER=${WP_DB_USER}
-      - WORDPRESS_DB_PASSWORD=${WP_DB_PASSWORD}
-      - WORDPRESS_TABLE_PREFIX=wp_
-      - WORDPRESS_DEBUG=true
-      - WORDPRESS_CONFIG_EXTRA=define('WP_HOME', 'https://${DOMAIN}');define('WP_SITEURL', 'https://${DOMAIN}');
+      default_network: {}
+    depends_on:
+      - mariadb
+      - redis
     healthcheck:
-      test: ["CMD", "php", "-r", "if(!file_exists('/var/www/html/wp-includes/version.php')) exit(1);"]
+      test: ["CMD-SHELL", "curl -f http://localhost || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -484,7 +482,7 @@ services:
         aliases:
           - nginx
           - web
-      ${CLIENT_ID}_network: {}
+      default_network: {}
     volumes:
       - ${WP_DIR}/${DOMAIN}/wordpress:/var/www/html
       - ${WP_DIR}/${DOMAIN}/nginx/default.conf:/etc/nginx/conf.d/default.conf
@@ -495,6 +493,12 @@ services:
       - "traefik.http.routers.wordpress_${SITE_NAME}.tls=true"
       - "traefik.http.routers.wordpress_${SITE_NAME}.tls.certresolver=myresolver"
       - "traefik.http.services.wordpress_${SITE_NAME}.loadbalancer.server.port=80"
+      # HTTP to HTTPS redirect
+      - "traefik.http.routers.wordpress_${SITE_NAME}_http.rule=Host(\`${DOMAIN}\`)"
+      - "traefik.http.routers.wordpress_${SITE_NAME}_http.entrypoints=web"
+      - "traefik.http.middlewares.redirect_https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirect_https.redirectscheme.permanent=true"
+      - "traefik.http.routers.wordpress_${SITE_NAME}_http.middlewares=redirect_https"
   
   mariadb:
     container_name: ${MARIADB_CONTAINER_NAME}
@@ -516,7 +520,7 @@ services:
         aliases:
           - mariadb
           - db
-      ${CLIENT_ID}_network: {}
+      default_network: {}
     labels:
       - "traefik.enable=false"
   
@@ -529,7 +533,7 @@ services:
         aliases:
           - redis
           - cache
-      ${CLIENT_ID}_network: {}
+      default_network: {}
     labels:
       - "traefik.enable=false"
 EOL
@@ -654,7 +658,7 @@ sleep 15
 
 # Add network diagnostics to help troubleshoot connectivity issues
 log "INFO: Running network diagnostics" "${CYAN}Running network diagnostics...${NC}"
-docker network inspect ${CLIENT_ID}_wordpress_${SITE_NAME}_network
+docker network inspect default_wordpress_${DOMAIN_UNDERSCORE}_network
 echo "Testing connectivity between containers:"
 # Install ping utility for network diagnostics
 docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "apt-get update && apt-get install -y iputils-ping" || log "WARNING: Unable to install ping utilities" "${YELLOW}⚠️ Unable to install ping utilities${NC}"
@@ -724,13 +728,13 @@ if [ "\${ENABLE_KEYCLOAK}" = "true" ]; then
   # Create JSON configuration
   OC_CONFIG='{
     "login_type": "auto",
-    "client_id": "wordpress-${CLIENT_ID}",
-    "client_secret": "${KEYCLOAK_CLIENT_SECRET}",
+    "client_id": "wordpress-'"${CLIENT_ID}"'",
+    "client_secret": "'"${KEYCLOAK_CLIENT_SECRET}"'",
     "scope": "openid email profile",
-    "endpoint_login": "${KEYCLOAK_BASE_URL}/protocol/openid-connect/auth",
-    "endpoint_userinfo": "${KEYCLOAK_BASE_URL}/protocol/openid-connect/userinfo",
-    "endpoint_token": "${KEYCLOAK_BASE_URL}/protocol/openid-connect/token",
-    "endpoint_end_session": "${KEYCLOAK_BASE_URL}/protocol/openid-connect/logout",
+    "endpoint_login": "'"${KEYCLOAK_BASE_URL}"'/protocol/openid-connect/auth",
+    "endpoint_userinfo": "'"${KEYCLOAK_BASE_URL}"'/protocol/openid-connect/userinfo",
+    "endpoint_token": "'"${KEYCLOAK_BASE_URL}"'/protocol/openid-connect/token",
+    "endpoint_end_session": "'"${KEYCLOAK_BASE_URL}"'/protocol/openid-connect/logout",
     "identity_key": "preferred_username",
     "no_sslverify": 1,
     "http_request_timeout": 5,
