@@ -688,7 +688,7 @@ set -e
 # Set default values for variables to prevent unbound variable errors
 CLIENT_ID="${CLIENT_ID:-default}"
 KEYCLOAK_CLIENT_SECRET="${KEYCLOAK_CLIENT_SECRET:-client_secret}" 
-KEYCLOAK_BASE_URL="${KEYCLOAK_BASE_URL:-https://${DOMAIN}/auth/realm/agency-stack}"
+KEYCLOAK_BASE_URL="${KEYCLOAK_BASE_URL:-https://${DOMAIN}/realms/agency-stack}"
 ENABLE_KEYCLOAK="${ENABLE_KEYCLOAK:-false}"
 
 cd /var/www/html
@@ -902,7 +902,7 @@ if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
       
       # Configure OpenID Connect plugin
       log "INFO: Configuring OpenID Connect plugin" "${CYAN}Configuring OpenID Connect plugin...${NC}"
-      KEYCLOAK_BASE_URL=${KEYCLOAK_BASE_URL:-"https://${DOMAIN}/auth/realms/agency-stack"}
+      KEYCLOAK_BASE_URL=${KEYCLOAK_BASE_URL:-"https://${KEYCLOAK_DOMAIN}/realms/agency-stack"}
       KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET:-"client_secret"}
       
       # Prepare Keycloak configuration with proper escaping

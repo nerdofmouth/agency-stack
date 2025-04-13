@@ -65,10 +65,11 @@ keycloak_is_available() {
   while [ $attempt -lt $max_attempts ]; do
     log_info "Waiting for Keycloak to be ready... ($attempt/$max_attempts)"
     
-    # Try both legacy and new Keycloak health endpoints
-    if curl -s -f -o /dev/null -w '%{http_code}' "https://$domain/health" | grep -q 200 || \
-       curl -s -f -o /dev/null -w '%{http_code}' "https://$domain/auth/health" | grep -q 200 || \
-       curl -s -f -o /dev/null -w '%{http_code}' "https://$domain/admin/" | grep -q 200; then
+    # Try both legacy and new Keycloak health endpoints - Keycloak 21.x no longer uses /auth path
+    if curl -s -f -k -o /dev/null -w '%{http_code}' "https://$domain/health" | grep -q 200 || \
+       curl -s -f -k -o /dev/null -w '%{http_code}' "https://$domain/auth/health" | grep -q 200 || \
+       curl -s -f -k -o /dev/null -w '%{http_code}' "https://$domain/admin/" | grep -q 200 || \
+       curl -s -f -k -o /dev/null -w '%{http_code}' "https://$domain/" | grep -q 200; then
       ready=true
       break
     fi
