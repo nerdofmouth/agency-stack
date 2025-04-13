@@ -144,7 +144,7 @@ get_keycloak_admin_token() {
 }
 
 # Function to check if realm exists
-realm_exists() {
+keycloak_realm_exists() {
   local domain="$1"
   local realm="$2"
   local token="$3"
@@ -161,7 +161,7 @@ realm_exists() {
 }
 
 # Function to create a realm
-create_realm() {
+keycloak_create_realm() {
   local domain="$1"
   local realm="$2"
   local token="$3"
@@ -196,7 +196,7 @@ create_realm() {
 }
 
 # Function to check if client exists
-client_exists() {
+keycloak_client_exists() {
   local domain="$1"
   local realm="$2"
   local client_id="$3"
@@ -214,14 +214,14 @@ client_exists() {
 }
 
 # Function to delete a client
-delete_client() {
+keycloak_delete_client() {
   local domain="$1"
   local realm="$2"
   local client_id="$3"
   local token="$4"
   
   # Get client UUID
-  local client_uuid=$(get_client_id "$domain" "$realm" "$client_id" "$token")
+  local client_uuid=$(keycloak_get_client_id "$domain" "$realm" "$client_id" "$token")
   
   if [ -z "$client_uuid" ]; then
     log_error "Failed to get UUID for client $client_id"
@@ -242,7 +242,7 @@ delete_client() {
 }
 
 # Function to get client ID (UUID)
-get_client_id() {
+keycloak_get_client_id() {
   local domain="$1"
   local realm="$2"
   local client_id="$3"
@@ -269,7 +269,7 @@ get_client_id() {
 }
 
 # Function to create client from file
-create_client_from_file() {
+keycloak_create_client_from_file() {
   local domain="$1"
   local realm="$2"
   local client_file="$3"
@@ -298,7 +298,7 @@ create_client_from_file() {
 }
 
 # Function to create role mapper
-create_role_mapper() {
+keycloak_create_role_mapper() {
   local domain="$1"
   local realm="$2"
   local client_uuid="$3"
@@ -330,47 +330,104 @@ create_role_mapper() {
 }
 
 # Function to update component registry for SSO configuration
-update_sso_configured() {
+keycloak_update_sso_configured() {
   local component="$1"
   
   if [ -z "$component" ]; then
-    log_error "Component name is required"
+    log_error "Component name is required for updating SSO configuration"
     return 1
   fi
   
-  local registry_file="/opt/agency_stack/repo/config/registry/component_registry.json"
-  
-  if [ ! -f "$registry_file" ]; then
-    log_error "Component registry file not found: $registry_file"
-    return 1
+  # Check if component registry exists
+  if [ ! -f "${COMPONENT_REGISTRY}" ]; then
+    log_warning "Component registry not found at ${COMPONENT_REGISTRY}"
+    return 0
   fi
   
-  # Create a backup of the registry file
-  cp "$registry_file" "${registry_file}.bak"
-  
-  # Use jq to update the sso_configured flag
-  if command -v jq >/dev/null 2>&1; then
-    # Find the path to the component
-    local component_path=$(jq -r "path(.components[][\"$component\"]) | .[0], .[1]" "$registry_file")
-    
-    if [ -z "$component_path" ] || [ "$component_path" = "null" ]; then
-      log_error "Component $component not found in registry"
+  # Update component registry with SSO configuration status
+  if command -v jq &>/dev/null; then
+    # Use jq to update the registry if available
+    if ! jq --arg component "$component" '.components[$component].sso_configured = true' "${COMPONENT_REGISTRY}" > "${COMPONENT_REGISTRY}.tmp"; then
+      log_error "Failed to update component registry for $component"
       return 1
     fi
-    
-    # Update the sso_configured flag
-    jq "(.components.${component_path}.integration_status.sso_configured) = true" "$registry_file" > "${registry_file}.tmp"
-    if [ $? -eq 0 ]; then
-      mv "${registry_file}.tmp" "$registry_file"
-      log_success "Updated component registry for $component - marked SSO as configured"
-    else
-      log_error "Failed to update component registry"
-      return 1
-    fi
+    mv "${COMPONENT_REGISTRY}.tmp" "${COMPONENT_REGISTRY}"
   else
-    log_error "jq is required to update component registry"
-    return 1
+    # Simple sed replacement if jq is not available
+    if ! sed -i "s/\"${component}\":{/\"${component}\":{\"sso_configured\":true,/g" "${COMPONENT_REGISTRY}"; then
+      log_warning "Failed to update component registry for $component using sed"
+    fi
   fi
   
+  log_success "Updated component registry for $component with SSO configuration status"
   return 0
 }
+
+# Function to register a client with Keycloak
+keycloak_register_client() {
+  local domain="$1"
+  local realm="$2"
+  local client_id="$3"
+  local client_name="$4"
+  local redirect_uris="$5"
+  local token=$(get_keycloak_admin_token "$domain")
+  
+  if [ -z "$token" ]; then
+    log_error "Failed to obtain admin token for registering client"
+    return 1
+  fi
+  
+  # Check if client already exists
+  if keycloak_client_exists "$domain" "$realm" "$client_id" "$token"; then
+    log_info "Client $client_id already exists, updating configuration"
+    keycloak_delete_client "$domain" "$realm" "$client_id" "$token"
+  fi
+  
+  # Generate a client secret
+  local client_secret=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-16)
+  
+  # Create client JSON
+  local client_json='{
+    "clientId": "'"$client_id"'",
+    "name": "'"$client_name"'",
+    "description": "AgencyStack auto-generated client for '"$client_name"'",
+    "enabled": true,
+    "redirectUris": '"$redirect_uris"',
+    "clientAuthenticatorType": "client-secret",
+    "secret": "'"$client_secret"'",
+    "publicClient": false,
+    "protocol": "openid-connect",
+    "attributes": {
+      "pkce.code.challenge.method": "S256"
+    }
+  }'
+  
+  # Create the client in Keycloak
+  local response=$(curl -s -k -X POST "https://$domain/admin/realms/$realm/clients" \
+    -H "Authorization: Bearer $token" \
+    -H "Content-Type: application/json" \
+    -d "$client_json")
+  
+  if [ $? -ne 0 ]; then
+    log_error "Failed to create client $client_id in Keycloak"
+    return 1
+  fi
+  
+  log_success "Successfully registered client $client_id with Keycloak"
+  echo "$client_secret"
+  return 0
+}
+
+# Export functions
+export -f keycloak_is_available
+export -f get_keycloak_admin_credentials
+export -f get_keycloak_admin_token
+export -f keycloak_realm_exists
+export -f keycloak_create_realm
+export -f keycloak_client_exists
+export -f keycloak_delete_client
+export -f keycloak_get_client_id
+export -f keycloak_create_client_from_file
+export -f keycloak_create_role_mapper
+export -f keycloak_update_sso_configured
+export -f keycloak_register_client
