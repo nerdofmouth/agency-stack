@@ -54,6 +54,7 @@ ENABLE_KEYCLOAK=false
 ENFORCE_HTTPS=true
 USE_HOST_NETWORK=true
 MARIADB_CONTAINER="default_mariadb"
+KEYCLOAK_DOMAIN="keycloak.proto001.alpha.nerdofmouth.com"
 
 # Source the component_sso_helper.sh if available
 if [ -f "${SCRIPT_DIR}/../utils/component_sso_helper.sh" ]; then
@@ -889,7 +890,7 @@ if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
     WP_REDIRECT_URIS='["https://'"${DOMAIN}"'/*", "https://'"${DOMAIN}"'/wp-login.php", "https://'"${DOMAIN}"'/wp-admin/*"]'
     
     # Enable SSO for WordPress
-    if enable_component_sso "wordpress" "${DOMAIN}" "${WP_REDIRECT_URIS}" "wordpress" "agency_stack"; then
+    if enable_component_sso "wordpress" "${DOMAIN}" "${WP_REDIRECT_URIS}" "wordpress" "agency_stack" "${KEYCLOAK_DOMAIN}"; then
       log "INFO: Successfully registered WordPress with Keycloak" "${GREEN}Successfully registered WordPress with Keycloak${NC}"
       
       # Create SSO configuration directory
