@@ -1742,3 +1742,33 @@ dashboard-restart:
 		echo "$(CYAN)To install, run: make dashboard DOMAIN=$(DOMAIN)$(RESET)"; \
 		exit 1; \
 	fi
+
+# DNS Configuration
+dns:
+	@echo "Configuring DNS for AgencyStack components..."
+	@read -p "Enter domain name (e.g., wordpress.proto001.alpha.nerdofmouth.com): " domain; \
+	read -p "Enter DNS provider (cloudflare): " provider; \
+	provider="$${provider:-cloudflare}"; \
+	scripts/components/install_dns.sh --domain $$domain --provider $$provider --force
+
+dns-wordpress:
+	@echo "Configuring DNS for WordPress..."
+	@scripts/components/install_dns.sh --domain wordpress.proto001.alpha.nerdofmouth.com --provider cloudflare --force
+
+dns-keycloak:
+	@echo "Configuring DNS for Keycloak..."
+	@scripts/components/install_dns.sh --domain keycloak.proto001.alpha.nerdofmouth.com --provider cloudflare --force
+
+dns-status:
+	@echo "DNS Configuration Status:"
+	@if [ -d "/opt/agency_stack/dns" ]; then \
+		for config in /opt/agency_stack/dns/*.json; do \
+			if [ -f "$$config" ]; then \
+				echo "--------------------------------------"; \
+				cat "$$config" | jq -r '"Domain: \(.domain)\nIP: \(.ip)\nStatus: Configured\nLast Updated: \(.last_updated)"'; \
+			fi \
+		done; \
+		echo "--------------------------------------"; \
+	else \
+		echo "No DNS configurations found."; \
+	fi
