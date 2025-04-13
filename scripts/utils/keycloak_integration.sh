@@ -121,12 +121,24 @@ get_keycloak_admin_token() {
   
   eval "$credentials"
   
-  local token_response=$(curl -s -X POST \
+  # Try Keycloak 21.x first (no /auth prefix)
+  local token_response=$(curl -s -k -X POST \
     -d "client_id=admin-cli" \
     -d "username=$KEYCLOAK_ADMIN" \
     -d "password=$KEYCLOAK_ADMIN_PASSWORD" \
     -d "grant_type=password" \
     "https://$domain/realms/master/protocol/openid-connect/token")
+  
+  # If that fails, try legacy path with /auth prefix
+  if [ -z "$token_response" ] || echo "$token_response" | grep -q "error"; then
+    log_info "Trying legacy Keycloak path with /auth prefix"
+    token_response=$(curl -s -k -X POST \
+      -d "client_id=admin-cli" \
+      -d "username=$KEYCLOAK_ADMIN" \
+      -d "password=$KEYCLOAK_ADMIN_PASSWORD" \
+      -d "grant_type=password" \
+      "https://$domain/auth/realms/master/protocol/openid-connect/token")
+  fi
   
   if [ -z "$token_response" ] || echo "$token_response" | grep -q "error"; then
     log_error "Failed to obtain Keycloak admin token: $token_response"
