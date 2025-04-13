@@ -181,9 +181,15 @@
           "docs": true,
           "auditable": true,
           "traefik_tls": true,
-          "multi_tenant": true
+          "multi_tenant": true,
+          "monitoring": true
         },
-        "description": "Open-source subscription billing"
+        "description": "Open-source subscription billing, invoicing, and contract management",
+        "ports": {
+          "killbill": 8080,
+          "kaui": 9090,
+          "metrics": 9092
+        }
       },
       "calcom": {
         "name": "Cal.com",
