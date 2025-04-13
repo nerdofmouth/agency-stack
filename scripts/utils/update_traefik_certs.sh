@@ -202,7 +202,7 @@ http:
     auth:
       basicAuth:
         users:
-          - "admin:$2y$12$Hv3CiWIGVHGy8aUUxF1jHu7MmXnhkjf61f9X.t9iZXJ5QCHAjyumu"  # admin:adminpassword
+          - "admin:\$2y\$12\$Hv3CiWIGVHGy8aUUxF1jHu7MmXnhkjf61f9X.t9iZXJ5QCHAjyumu"  # admin:adminpassword
 EOL
 
 # Reset ACME file to force certificate regeneration if needed
