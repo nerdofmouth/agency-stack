@@ -8,6 +8,7 @@ SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 source "${SCRIPT_DIR}/../utils/common.sh"
 
 # Default configuration
+DOMAIN="localhost"
 ENABLE_CLOUD=false
 CLIENT_ID="default"
 DESIGN_SYSTEM_PORT=3333
@@ -36,7 +37,8 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --help)
-      echo "Usage: $0 [--client-id=<client-id>] [--port=<port>] [--bit-port=<bit-port>] [--enable-cloud]"
+      echo "Usage: $0 [--client-id=<client-id>] [--port=<port> --domain=<domain>] [--bit-port=<bit-port>] [--enable-cloud]"
+      echo "  --domain        Domain name (default: localhost)"
       echo "  --client-id    Client ID for multi-tenant deployments (default: default)"
       echo "  --port         Port for design system dashboard (default: 3333)"
       echo "  --bit-port     Port for Bit dev server (default: 3000)"
@@ -377,6 +379,44 @@ log_info "Starting Bit dev server..."
 cd "${INSTALL_DIR}"
 nohup bit dev --port ${BIT_DEV_PORT} > "${LOG_FILE}.bit-dev" 2>&1 &
 
+
+# Create Traefik configuration for external access
+log_info "Creating Traefik configuration for ${DOMAIN}..."
+TRAEFIK_DIR="/opt/agency_stack/traefik/conf.d"
+mkdir -p "${TRAEFIK_DIR}"
+
+# Create Traefik configuration file for design system
+cat > "${TRAEFIK_DIR}/design-system.yml" << EOFTRAEFIK
+http:
+  routers:
+    design-system:
+      rule: "Host(\`${DOMAIN}\`)"
+      service: "design-system"
+      entryPoints:
+        - "websecure"
+      tls:
+        certResolver: "letsencrypt"
+  
+  services:
+    design-system:
+      loadBalancer:
+        servers:
+          - url: "http://localhost:${DESIGN_SYSTEM_PORT}"
+EOFTRAEFIK
+
+# Update URLs in dashboard data to use proper domain
+log_info "Updating dashboard data with domain configuration..."
+# Update the dashboard data to use the domain
+if [ "${DOMAIN}" != "localhost" ]; then
+  sed -i "s|http://localhost:${DESIGN_SYSTEM_PORT}|https://${DOMAIN}|g" "${DASHBOARD_DATA_DIR}/design-system.json"
+  sed -i "s|http://localhost:${BIT_DEV_PORT}|https://${DOMAIN}/design-system|g" "${DASHBOARD_DATA_DIR}/design-system.json"
+fi
+
+# Restart Traefik if it's running
+if systemctl is-active --quiet traefik; then
+  log_info "Restarting Traefik to apply configuration..."
+  systemctl restart traefik
+fi
 log_success "AgencyStack Design System has been installed and integrated with the dashboard"
 log_info "Access the dashboard at: http://localhost:${DESIGN_SYSTEM_PORT}"
 log_info "Access Bit dev directly at: http://localhost:${BIT_DEV_PORT}"
