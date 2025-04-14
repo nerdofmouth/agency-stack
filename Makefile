@@ -713,7 +713,7 @@ erpnext-restart:
 	fi
 
 erpnext-backup:
-	@echo "$(MAGENTA)$(BOLD)💾 Creating ERPNext Backup...$(RESET)"
+	@echo "Backing up ERPNext data..."
 	@if [ -z "$(DOMAIN)" ]; then \
 		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
 		echo "Usage: make erpnext-backup DOMAIN=erp.example.com [CLIENT_ID=tenant1]"; \
@@ -734,8 +734,7 @@ erpnext-backup:
 		docker-compose exec -T erpnext bash -c "cp -r /home/frappe/frappe-bench/sites/$${SITE_NAME}/private/backups/* /home/frappe/frappe-bench/sites/$${SITE_NAME}/private/backups_archive/" && \
 		echo "$(CYAN)Copying backup files to $(BACKUP_DIR)...$(RESET)" && \
 		docker cp $$(docker-compose ps -q erpnext):/home/frappe/frappe-bench/sites/$${SITE_NAME}/private/backups_archive/ $${BACKUP_DIR}/$${TIMESTAMP}; \
-		echo "$(GREEN)✅ ERPNext backup completed successfully$(RESET)"; \
-		echo "$(CYAN)Backup saved to: $${BACKUP_DIR}/$${TIMESTAMP}$(RESET)"; \
+		echo "$(GREEN)Backup completed: $(BACKUP_DIR)/$${TIMESTAMP}$(RESET)"; \
 	else \
 		echo "$(RED)❌ ERPNext installation not found for $(DOMAIN)$(RESET)"; \
 	fi
@@ -1726,11 +1725,6 @@ mirotalk-sfu-logs:
 		cd /opt/agency_stack$${CLIENT_DIR}/mirotalk_sfu/$(DOMAIN) && docker-compose logs -f | tee -a /var/log/agency_stack/components/mirotalk_sfu.log; \
 	else \
 		echo "$(RED)❌ MiroTalk SFU installation not found for $(DOMAIN)$(RESET)"; \
-		echo "$(CYAN)To install: make mirotalk-sfu DOMAIN=$(DOMAIN) ADMIN_EMAIL=your-email@example.com$(RESET)"; \
-		if [ -f "/var/log/agency_stack/components/mirotalk_sfu.log" ]; then \
-			echo "$(YELLOW)Last logs from mirotalk_sfu.log:$(RESET)"; \
-			tail -n 20 /var/log/agency_stack/components/mirotalk_sfu.log; \
-		fi \
 	fi
 
 mirotalk-sfu-restart:
@@ -1984,13 +1978,11 @@ listmonk-mailu:
 	@echo "$(MAGENTA)$(BOLD)🔗 Integrating Listmonk with Mailu...$(RESET)"
 	@if [ -z "$(DOMAIN)" ] || [ -z "$(MAILU_DOMAIN)" ]; then \
 		echo "$(RED)Error: Missing required parameters.$(RESET)"; \
-		echo "Usage: make listmonk-mailu DOMAIN=lists.example.com MAILU_DOMAIN=mail.example.com [MAILU_USER=user@example.com] [MAILU_PASSWORD=password] [CLIENT_ID=tenant1]"; \
+		echo "Usage: make listmonk-mailu DOMAIN=lists.example.com MAILU_DOMAIN=mail.example.com [CLIENT_ID=tenant1]"; \
 		exit 1; \
 	fi; \
 	echo "$(CYAN)Configuring Listmonk to use Mailu as SMTP relay...$(RESET)"; \
-	sudo $(SCRIPTS_DIR)/integrations/integrate_listmonk_mailu.sh --domain $(DOMAIN) --mailu-domain $(MAILU_DOMAIN) \
-		$(if $(MAILU_USER),--mailu-user $(MAILU_USER),) $(if $(MAILU_PASSWORD),--mailu-password $(MAILU_PASSWORD),) \
-		$(if $(CLIENT_ID),--client-id $(CLIENT_ID),)
+	sudo $(SCRIPTS_DIR)/components/install_listmonk.sh --domain $(DOMAIN) --mailu-domain $(MAILU_DOMAIN) --force $(if $(CLIENT_ID),--client-id $(CLIENT_ID),)
 
 # Standardized Kill Bill subscription and billing targets
 killbill: install-killbill
@@ -2133,3 +2125,60 @@ killbill-mailu:
 	fi; \
 	echo "$(CYAN)Configuring Kill Bill to use Mailu as SMTP relay...$(RESET)"; \
 	sudo $(SCRIPTS_DIR)/components/install_killbill.sh --domain $(DOMAIN) --mailu-domain $(MAILU_DOMAIN) --force $(if $(CLIENT_ID),--client-id $(CLIENT_ID),)
+
+killbill-validate:
+	@echo "$(MAGENTA)$(BOLD)🔍 Validating KillBill TLS/SSO/Metrics...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make killbill-validate DOMAIN=billing.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		echo "$(CYAN)Validating KillBill for $(DOMAIN) (client: $(CLIENT_ID))...$(RESET)"; \
+		sudo $(SCRIPTS_DIR)/utils/killbill_validation.sh --domain $(DOMAIN) --client-id $(CLIENT_ID) || echo "$(RED)✗ KillBill validation failed$(RESET)"; \
+	else \
+		echo "$(CYAN)Validating KillBill for $(DOMAIN)...$(RESET)"; \
+		sudo $(SCRIPTS_DIR)/utils/killbill_validation.sh --domain $(DOMAIN) || echo "$(RED)✗ KillBill validation failed$(RESET)"; \
+	fi
+
+billing-alpha-check: killbill-validate
+	@echo "$(MAGENTA)$(BOLD)🧮 Running Billing Alpha Check...$(RESET)"
+	@echo "$(CYAN)Verifying billing component registry entries...$(RESET)"
+	@if [ -f "$(CONFIG_DIR)/config/registry/component_registry.json" ]; then \
+		if jq -e '.business_applications.killbill' $(CONFIG_DIR)/config/registry/component_registry.json > /dev/null 2>&1; then \
+			echo "$(GREEN)✓ KillBill found in component registry$(RESET)"; \
+			if jq -e '.business_applications.killbill.integration_status.sso == true' $(CONFIG_DIR)/config/registry/component_registry.json > /dev/null 2>&1; then \
+				echo "$(GREEN)✓ KillBill SSO integration flag is set$(RESET)"; \
+			else \
+				echo "$(YELLOW)⚠️ KillBill SSO integration flag is not set$(RESET)"; \
+			fi; \
+			if jq -e '.business_applications.killbill.integration_status.traefik_tls == true' $(CONFIG_DIR)/config/registry/component_registry.json > /dev/null 2>&1; then \
+				echo "$(GREEN)✓ KillBill TLS integration flag is set$(RESET)"; \
+			else \
+				echo "$(YELLOW)⚠️ KillBill TLS integration flag is not set$(RESET)"; \
+			fi; \
+			if jq -e '.business_applications.killbill.integration_status.monitoring == true' $(CONFIG_DIR)/config/registry/component_registry.json > /dev/null 2>&1; then \
+				echo "$(GREEN)✓ KillBill monitoring integration flag is set$(RESET)"; \
+			else \
+				echo "$(YELLOW)⚠️ KillBill monitoring integration flag is not set$(RESET)"; \
+			fi; \
+		else \
+			echo "$(RED)✗ KillBill not found in component registry$(RESET)"; \
+		fi; \
+	else \
+		echo "$(RED)✗ Component registry not found$(RESET)"; \
+	fi; \
+	echo ""; \
+	echo "$(GREEN)✓ Billing alpha check complete$(RESET)"
+	@echo "$(CYAN)Review $(PWD)/component_validation_report.md for full details$(RESET)"
+	@echo "$(CYAN)Run 'make alpha-fix' to attempt repairs for common issues$(RESET)"
+
+killbill-prometheus:
+	@echo "$(MAGENTA)$(BOLD)📊 Updating Prometheus for KillBill Metrics...$(RESET)"
+	@if [ -n "$(CLIENT_ID)" ]; then \
+		echo "$(CYAN)Configuring Prometheus for KillBill metrics (client: $(CLIENT_ID))...$(RESET)"; \
+		sudo $(SCRIPTS_DIR)/utils/update_prometheus_killbill.sh --client-id $(CLIENT_ID) $(if $(FORCE),--force,); \
+	else \
+		echo "$(CYAN)Configuring Prometheus for KillBill metrics...$(RESET)"; \
+		sudo $(SCRIPTS_DIR)/utils/update_prometheus_killbill.sh $(if $(FORCE),--force,); \
+	fi

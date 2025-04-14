@@ -298,6 +298,69 @@ To create a new billing plan in Kill Bill:
 </catalog>
 ```
 
+## Alpha Integration Status
+
+KillBill has reached Alpha status in the AgencyStack with the following integration points:
+
+| Integration | Status | Details |
+|-------------|--------|---------|
+| **TLS Termination** | ✅ Complete | Properly configured with Traefik including HTTP to HTTPS redirection |
+| **SSO** | ✅ Complete | Integrated with Keycloak for authentication and authorization |  
+| **Multi-tenancy** | ✅ Complete | Full client isolation with separate databases, configurations, and access controls |
+| **Monitoring** | ✅ Complete | Prometheus metrics exposed on port 9092, integrated with AgencyStack monitoring |
+| **Logging** | ✅ Complete | Logs available at `/var/log/agency_stack/components/killbill.log` |
+| **Makefile Targets** | ✅ Complete | Standardized targets for installation, status, logs, restart, and validation |
+| **Dashboard Integration** | ✅ Complete | Accessible through the AgencyStack dashboard |
+| **Documentation** | ✅ Complete | Installation, configuration, and integration documentation available |
+
+## Validation and Security
+
+KillBill integration has been hardened according to AgencyStack standards to ensure proper security, SSL configuration, and SSO integration. The following validation tools are available:
+
+```bash
+# Validate TLS, SSO, and metrics configuration
+make killbill-validate DOMAIN=billing.example.com [CLIENT_ID=tenant1]
+
+# Run comprehensive alpha milestone validation
+make billing-alpha-check DOMAIN=billing.example.com [CLIENT_ID=tenant1]
+```
+
+The validation suite checks:
+
+1. **TLS Configuration**:
+   - HTTPS accessibility for both KillBill API and KAUI UI
+   - Certificate validity and expiration dates
+   - HTTP to HTTPS redirection
+
+2. **SSO Integration**:
+   - Keycloak connectivity
+   - SSO configuration in docker-compose.yml
+   - KAUI login redirection to Keycloak
+
+3. **Metrics Configuration**:
+   - Prometheus metrics endpoint availability
+   - Metrics integration in Prometheus configuration
+
+### Security Recommendations
+
+For production deployments, we recommend the following additional security measures:
+
+1. Enable CSRF protection for the API
+2. Configure IP-based access restrictions for administrative functions
+3. Implement API rate limiting
+4. Regularly rotate all database credentials
+5. Keep all components updated to the latest version
+
+## Alpha Milestone Requirements
+
+Kill Bill meets all requirements for the AgencyStack Alpha milestone:
+- Consistently follows AgencyStack installation patterns
+- Uses proper validation and security practices
+- Complies with multi-tenant approach
+- Follows documentation standards
+- Provides Makefile targets aligned with other components
+- Integrates with monitoring, TLS, and SSO
+
 ## Security
 
 Kill Bill in AgencyStack is configured with security best practices:
