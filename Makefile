@@ -2182,3 +2182,162 @@ killbill-prometheus:
 		echo "$(CYAN)Configuring Prometheus for KillBill metrics...$(RESET)"; \
 		sudo $(SCRIPTS_DIR)/utils/update_prometheus_killbill.sh $(if $(FORCE),--force,); \
 	fi
+
+# -----------------------------------------------------------------------------
+# Beta Phase Targets
+# -----------------------------------------------------------------------------
+
+.PHONY: beta-check beta-check-local beta-check-remote beta-deployment beta-status beta-fix
+
+beta-check: validate
+	@echo "$(MAGENTA)$(BOLD)🧪 Running Beta Readiness Check...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make beta-check DOMAIN=agency.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	echo "$(CYAN)Running comprehensive beta validation for $(DOMAIN)...$(RESET)"; \
+	sudo $(SCRIPTS_DIR)/beta_deployment_check.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(VERBOSE),--verbose,) || \
+		echo "$(RED)✗ Beta validation found issues that need to be addressed$(RESET)"
+
+beta-check-local: validate
+	@echo "$(MAGENTA)$(BOLD)🔍 Running Beta Local Check...$(RESET)"
+	@echo "$(CYAN)Verifying local repository state...$(RESET)"
+	@if [ -n "$$(git status --porcelain)" ]; then \
+		echo "$(YELLOW)⚠️ Repository has uncommitted changes$(RESET)"; \
+		git status --short; \
+		echo ""; \
+		echo "$(YELLOW)⚠️ Please commit or stash changes before deployment$(RESET)"; \
+		exit 1; \
+	else \
+		echo "$(GREEN)✓ Repository is clean$(RESET)"; \
+	fi
+	@echo "$(CYAN)Checking component registry integrity...$(RESET)"
+	@if ! jq '.' $(CONFIG_DIR)/config/registry/component_registry.json > /dev/null 2>&1; then \
+		echo "$(RED)✗ Component registry JSON is invalid$(RESET)"; \
+		exit 1; \
+	else \
+		echo "$(GREEN)✓ Component registry JSON is valid$(RESET)"; \
+	fi
+	@echo "$(CYAN)Checking branch sync status...$(RESET)"
+	@if [ "$$(git rev-parse --abbrev-ref HEAD)" != "main" ]; then \
+		echo "$(YELLOW)⚠️ Not on main branch. Current branch: $$(git rev-parse --abbrev-ref HEAD)$(RESET)"; \
+		echo "$(YELLOW)⚠️ Consider switching to main branch before deployment$(RESET)"; \
+	else \
+		echo "$(GREEN)✓ On main branch$(RESET)"; \
+		if [ -n "$$(git log @{u}..)" ]; then \
+			echo "$(YELLOW)⚠️ Local commits ahead of remote$(RESET)"; \
+			echo "$(YELLOW)⚠️ Consider pushing changes before deployment$(RESET)"; \
+		else \
+			echo "$(GREEN)✓ Branch is in sync with remote$(RESET)"; \
+		fi \
+	fi
+	@echo "$(GREEN)✓ Local beta check passed!$(RESET)"
+
+beta-check-remote: validate
+	@echo "$(MAGENTA)$(BOLD)🌐 Running Beta Remote VM Check...$(RESET)"
+	@if [ -z "$(REMOTE_VM_SSH)" ]; then \
+		echo "$(RED)Error: REMOTE_VM_SSH environment variable not set$(RESET)"; \
+		echo "$(YELLOW)Set it with: export REMOTE_VM_SSH=user@vm-hostname$(RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(CYAN)Checking remote VM connectivity...$(RESET)"
+	@if ! ssh -q -o BatchMode=yes -o ConnectTimeout=5 $(REMOTE_VM_SSH) exit > /dev/null 2>&1; then \
+		echo "$(RED)✗ Cannot connect to remote VM: $(REMOTE_VM_SSH)$(RESET)"; \
+		echo "$(YELLOW)Check SSH keys and connectivity$(RESET)"; \
+		exit 1; \
+	else \
+		echo "$(GREEN)✓ Remote VM connection successful$(RESET)"; \
+	fi
+	@echo "$(CYAN)Checking remote VM requirements...$(RESET)"
+	@ssh $(REMOTE_VM_SSH) "bash -s" << 'EOF' || exit 1
+	echo "CPU cores: $$(nproc)"
+	echo "Memory: $$(free -h | grep Mem | awk '{print \$$2}')"
+	echo "Disk space: $$(df -h / | awk 'NR==2 {print \$$4}') available"
+	
+	# Check Docker
+	if command -v docker > /dev/null 2>&1; then \
+	    echo "✅ Docker is installed: $$(docker --version)"; \
+	else \
+	    echo "❌ Docker is NOT installed!"; \
+	    exit 1; \
+	fi
+	
+	# Check Docker Compose
+	if command -v docker-compose > /dev/null 2>&1; then \
+	    echo "✅ Docker Compose is installed: $$(docker-compose --version)"; \
+	else \
+	    echo "❌ Docker Compose is NOT installed!"; \
+	    exit 1; \
+	fi
+	
+	# Check AgencyStack directory
+	if [ -d "/opt/agency_stack" ]; then \
+	    echo "✅ AgencyStack directory exists"; \
+	else \
+	    echo "❌ AgencyStack directory is missing!"; \
+	    exit 1; \
+	fi
+	EOF
+	@echo "$(GREEN)✓ Remote VM beta check passed!$(RESET)"
+
+beta-deployment: beta-check-local
+	@echo "$(MAGENTA)$(BOLD)🚀 Running Beta Deployment...$(RESET)"
+	@if [ -z "$(REMOTE_VM_SSH)" ] || [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameters.$(RESET)"; \
+		echo "Usage: make beta-deployment REMOTE_VM_SSH=user@vm-hostname DOMAIN=agency.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi
+	@echo "$(CYAN)Deploying to remote VM $(REMOTE_VM_SSH)...$(RESET)"
+	@ssh $(REMOTE_VM_SSH) "mkdir -p /tmp/agency_stack_deploy"
+	@echo "$(CYAN)Creating deployment archive...$(RESET)"
+	@git archive --format=tar.gz -o /tmp/agency_stack_deploy.tar.gz HEAD
+	@echo "$(CYAN)Transferring deployment archive...$(RESET)"
+	@scp /tmp/agency_stack_deploy.tar.gz $(REMOTE_VM_SSH):/tmp/agency_stack_deploy/
+	@echo "$(CYAN)Extracting and deploying on remote VM...$(RESET)"
+	@ssh $(REMOTE_VM_SSH) "bash -s" << 'EOF' || exit 1
+	cd /tmp/agency_stack_deploy
+	tar -xzf agency_stack_deploy.tar.gz
+	sudo mkdir -p /opt/agency_stack
+	sudo cp -r * /opt/agency_stack/
+	cd /opt/agency_stack
+	echo "Starting installation..."
+	make install-all DOMAIN='$(DOMAIN)' $(if $(CLIENT_ID),CLIENT_ID='$(CLIENT_ID)',)
+	make beta-check DOMAIN='$(DOMAIN)' $(if $(CLIENT_ID),CLIENT_ID='$(CLIENT_ID)',)
+	EOF
+	@echo "$(GREEN)✓ Beta deployment completed!$(RESET)"
+	@echo "$(CYAN)Run 'make beta-status REMOTE_VM_SSH=$(REMOTE_VM_SSH) DOMAIN=$(DOMAIN)' to check status$(RESET)"
+
+beta-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Beta Deployment Status...$(RESET)"
+	@if [ -z "$(REMOTE_VM_SSH)" ] || [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameters.$(RESET)"; \
+		echo "Usage: make beta-status REMOTE_VM_SSH=user@vm-hostname DOMAIN=agency.example.com"; \
+		exit 1; \
+	fi
+	@echo "$(CYAN)Checking deployment status on $(REMOTE_VM_SSH)...$(RESET)"
+	@ssh $(REMOTE_VM_SSH) "cd /opt/agency_stack && make alpha-check DOMAIN='$(DOMAIN)' && \
+		echo '' && \
+		echo 'Component Container Status:' && \
+		docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' && \
+		echo '' && \
+		echo 'Recent Logs:' && \
+		find /var/log/agency_stack -name '*.log' -mtime -1 -exec ls -la {} \; && \
+		echo '' && \
+		if [ -f '/var/log/agency_stack/beta_check_*.log' ]; then \
+			echo 'Latest Beta Check Results:' && \
+			cat \$$(ls -t /var/log/agency_stack/beta_check_*.log | head -n1 | tail -n10); \
+		fi"
+
+beta-fix:
+	@echo "$(MAGENTA)$(BOLD)🔧 Attempting Beta Deployment Fixes...$(RESET)"
+	@if [ -z "$(REMOTE_VM_SSH)" ]; then \
+		echo "$(RED)Error: REMOTE_VM_SSH environment variable not set$(RESET)"; \
+		echo "$(YELLOW)Set it with: export REMOTE_VM_SSH=user@vm-hostname$(RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(CYAN)Running fix scripts on remote VM...$(RESET)"
+	@ssh $(REMOTE_VM_SSH) "cd /opt/agency_stack && make auto-fix && echo 'Restarting core services...' && \
+		make keycloak-restart && make traefik-restart && make prometheus-restart"
+	@echo "$(GREEN)✓ Fix operations completed$(RESET)"
+	@echo "$(CYAN)Run 'make beta-status REMOTE_VM_SSH=$(REMOTE_VM_SSH) DOMAIN=$(your-domain)' to verify fixes$(RESET)"
