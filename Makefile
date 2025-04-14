@@ -984,7 +984,7 @@ etebase-restart:
 etebase-backup:
 	@echo "$(MAGENTA)$(BOLD)💾 Backing up Etebase data...$(RESET)"
 	@$(CONFIG_DIR)/clients/$(CLIENT_ID)/etebase/scripts/backup.sh "$(CLIENT_ID)" "$(CONFIG_DIR)/backups/etebase"
-	@echo "$(GREEN)Backup completed to: $(CONFIG_DIR)/backups/etebase$(RESET)"
+	@echo "Backup completed: $(CONFIG_DIR)/backups/etebase"
 
 etebase-config:
 	@echo "$(MAGENTA)$(BOLD)⚙️ Opening Etebase configuration...$(RESET)"
@@ -1271,7 +1271,7 @@ show-dev-workflow:
 alpha-check:
 	@echo "$(MAGENTA)$(BOLD)🧪 Running AgencyStack Alpha validation...$(RESET)"
 	@echo "$(CYAN)Verifying all components against DevOps standards...$(RESET)"
-	@$(SCRIPTS_DIR)/utils/validate_components.sh --report --verbose || true
+	@bash $(SCRIPTS_DIR)/utils/validate_components.sh --report --verbose || true
 	@echo ""
 	@echo "$(CYAN)Summary from component validation:$(RESET)"
 	@if [ -f "$(PWD)/component_validation_report.md" ]; then \
@@ -1299,6 +1299,9 @@ alpha-check:
 	else \
 		echo "$(YELLOW)⚠️ Quick audit script not found. Skipping check.$(RESET)"; \
 	fi
+	
+	@echo "$(CYAN)Running TLS/SSO registry validation...$(RESET)"
+	@bash $(ROOT_DIR)/scripts/utils/tls_sso_registry_check.sh >/dev/null || echo "$(YELLOW)⚠️ TLS/SSO registry issues found - run 'make registry-tls-sso-check' for details$(RESET)"
 	
 	@echo ""
 	@echo "$(GREEN)$(BOLD)✅ Alpha validation complete!$(RESET)"
@@ -2011,9 +2014,7 @@ listmonk-mailu:
 		exit 1; \
 	fi; \
 	echo "$(CYAN)Configuring Listmonk to use Mailu as SMTP relay...$(RESET)"; \
-	sudo $(SCRIPTS_DIR)/integrations/integrate_listmonk_mailu.sh --domain $(DOMAIN) --mailu-domain $(MAILU_DOMAIN) \
-		$(if $(MAILU_USER),--mailu-user $(MAILU_USER),) $(if $(MAILU_PASSWORD),--mailu-password $(MAILU_PASSWORD),) \
-		$(if $(CLIENT_ID),--client-id $(CLIENT_ID),)
+	sudo $(SCRIPTS_DIR)/components/install_listmonk.sh --domain $(DOMAIN) --mailu-domain $(MAILU_DOMAIN) --force $(if $(CLIENT_ID),--client-id $(CLIENT_ID),)
 
 # Standardized Kill Bill subscription and billing targets
 killbill: install-killbill
@@ -2477,4 +2478,69 @@ remove-dev-sudo:
 	else \
 		echo "$(RED)This command should not be run as root.$(RESET)"; \
 		exit 1; \
+	fi
+
+# TLS/SSO Verification Targets
+tls-verify: validate
+	@echo "$(MAGENTA)$(BOLD)🔒 Verifying TLS configuration...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: DOMAIN parameter is required$(RESET)"; \
+		echo "Usage: make tls-verify DOMAIN=agency.proto002.nerdofmouth.com [VERBOSE=true]"; \
+		exit 1; \
+	fi
+	@echo "$(CYAN)Checking TLS for $(BOLD)$(DOMAIN)$(RESET)"
+	@bash $(ROOT_DIR)/scripts/utils/tls_verify.sh --domain $(DOMAIN) $(if $(filter true,$(VERBOSE)),--verbose,)
+
+tls-status: tls-verify
+
+sso-status: validate
+	@echo "$(MAGENTA)$(BOLD)🔑 Checking SSO integration status...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: DOMAIN parameter is required$(RESET)"; \
+		echo "Usage: make sso-status DOMAIN=agency.proto002.nerdofmouth.com [CLIENT_ID=default] [VERBOSE=true]"; \
+		exit 1; \
+	fi
+	@echo "$(CYAN)Checking SSO integration for $(BOLD)$(DOMAIN)$(RESET)"
+	@bash $(ROOT_DIR)/scripts/utils/sso_status.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(filter true,$(VERBOSE)),--verbose,)
+	
+dashboard-sso-check: validate
+	@echo "$(MAGENTA)$(BOLD)🔑 Checking dashboard SSO integration...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: DOMAIN parameter is required$(RESET)"; \
+		echo "Usage: make dashboard-sso-check DOMAIN=agency.proto002.nerdofmouth.com [CLIENT_ID=default]"; \
+		exit 1; \
+	fi
+	@echo "$(CYAN)Checking dashboard SSO for $(BOLD)$(DOMAIN)$(RESET)"
+	@bash $(ROOT_DIR)/scripts/utils/sso_status.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) --no-realm-check
+
+# TLS and SSO status check for alpha validation
+tls-sso-alpha-check: validate
+	@echo "$(MAGENTA)$(BOLD)🔒 Validating TLS/SSO Configuration...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: DOMAIN parameter is required$(RESET)"; \
+		echo "Usage: make tls-sso-alpha-check DOMAIN=agency.proto002.nerdofmouth.com [CLIENT_ID=default]"; \
+		exit 1; \
+	fi
+	@echo "$(CYAN)Running comprehensive TLS/SSO validation for $(BOLD)$(DOMAIN)$(RESET)"
+	@echo "$(YELLOW)⚡ TLS Certificate Verification:$(RESET)"
+	@bash $(ROOT_DIR)/scripts/utils/tls_verify.sh --domain $(DOMAIN) || echo "$(RED)✗ TLS verification failed$(RESET)"
+	@echo ""
+	@echo "$(YELLOW)⚡ SSO Integration Check:$(RESET)"
+	@bash $(ROOT_DIR)/scripts/utils/sso_status.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) || echo "$(RED)✗ SSO status check failed$(RESET)"
+	@echo ""
+	@echo "$(GREEN)✓ TLS/SSO alpha check complete$(RESET)"
+
+# TLS/SSO Registry Validation and Fixing Utility
+registry-tls-sso-check: validate
+	@echo "$(MAGENTA)$(BOLD)🔍 Validating Component Registry TLS/SSO Configuration...$(RESET)"
+	@bash $(ROOT_DIR)/scripts/utils/tls_sso_registry_check.sh $(if $(filter true,$(VERBOSE)),--verbose,)
+
+registry-tls-sso-fix: validate
+	@echo "$(MAGENTA)$(BOLD)🔧 Fixing Component Registry TLS/SSO Entries...$(RESET)"
+	@echo "$(YELLOW)⚠️ This will modify component registry entries. Continue? [y/N]$(RESET)"
+	@read -p "" CONFIRM; \
+	if [ "$${CONFIRM}" = "y" ] || [ "$${CONFIRM}" = "Y" ]; then \
+		bash $(ROOT_DIR)/scripts/utils/tls_sso_registry_check.sh --fix-issues $(if $(filter true,$(VERBOSE)),--verbose,); \
+	else \
+		echo "$(YELLOW)Operation cancelled$(RESET)"; \
 	fi

@@ -16,7 +16,7 @@ NC='\033[0m' # No Color
 
 # VM details
 VM_HOST="agency.proto002.nerdofmouth.com"
-SSH_USER=${1:-"ubuntu"}  # Default to ubuntu, but allow override
+SSH_USER=${1:-"deploy"}  # Default to deploy, but allow override
 SSH_KEY_PATH="${HOME}/.ssh/id_rsa_agencystack"
 
 # Ensure SSH directory exists
