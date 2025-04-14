@@ -25,7 +25,7 @@ The Mock Mode simulates the following components:
 To start the AI Suite Test Harness, run:
 
 ```bash
-make ai-suite-test
+make ai-mock-mode
 ```
 
 This command will:
@@ -48,7 +48,7 @@ After starting the Test Harness, you can access the various components at:
 To stop all mock containers and reset the test environment:
 
 ```bash
-make ai-suite-reset
+make ai-mock-mode-disable
 ```
 
 This will:
@@ -155,7 +155,7 @@ The following limitations are intentional in Mock Mode:
 3. **Simulation Not Working**
    - Verify the mock container for the targeted service is running
    - Check browser console for API errors
-   - Try resetting the test environment with `make ai-suite-reset`
+   - Try resetting the test environment with `make ai-mock-mode-disable`
 
 ### Logs
 

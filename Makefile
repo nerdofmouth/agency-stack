@@ -1221,7 +1221,7 @@ langchain-test:
 ## AI Dashboard Targets
 ai-dashboard:
 	@echo "Installing AI Dashboard..."
-	@./scripts/components/install_ai_dashboard.sh --client-id=$(CLIENT_ID) --domain=$(DOMAIN) $(AI_DASHBOARD_FLAGS)
+	@sudo $(SCRIPTS_DIR)/components/install_ai_dashboard.sh --client-id=$(CLIENT_ID) --domain=$(DOMAIN) $(AI_DASHBOARD_FLAGS)
 
 ai-dashboard-status:
 	@echo "Checking AI Dashboard status..."
@@ -1328,7 +1328,7 @@ resource-watcher-logs:
 	fi
 
 ## Install AI Suite Targets
-install-ai-suite:
+install-ai-suite: validate
 	@echo "$(MAGENTA)$(BOLD)🧠 Installing Complete AI Suite...$(RESET)"
 	@echo "$(YELLOW)This will install Ollama, LangChain, AI Dashboard, Agent Orchestrator, Resource Watcher, and Agent Tools.$(RESET)"
 	@read -p "$(BOLD)Continue? [y/N] $(RESET)" confirm; \
@@ -1342,8 +1342,38 @@ install-ai-suite:
 	@echo "$(GREEN)$(BOLD)✅ AI Suite installation complete!$(RESET)"
 	@echo "$(CYAN)Run 'make ai-alpha-check' to verify the installation.$(RESET)"
 
-## AI Alpha Check Targets
-ai-alpha-check:
+# Consolidated AI status check target
+ai-suite-status: validate ollama-status langchain-status ai-dashboard-status resource-watcher-status agent-orchestrator-status agent-tools-status
+	@echo "$(GREEN)$(BOLD)✅ AI Suite status check complete$(RESET)"
+
+# UI mock mode target for testing without model load
+ai-mock-mode: validate
+	@echo "$(MAGENTA)$(BOLD)🧪 Enabling AI UI Mock Mode...$(RESET)"
+	@if [ ! -f "/opt/agency_stack/config/ai/mock_mode_enabled" ]; then \
+		mkdir -p /opt/agency_stack/config/ai; \
+		echo "true" > /opt/agency_stack/config/ai/mock_mode_enabled; \
+		echo "$(GREEN)Mock mode enabled$(RESET)"; \
+	else \
+		echo "$(YELLOW)Mock mode already enabled$(RESET)"; \
+	fi
+	@$(MAKE) ai-dashboard-restart
+	@echo "$(GREEN)AI Dashboard restarted with mock mode$(RESET)"
+	@echo "$(CYAN)You can now test the UI without loading actual models$(RESET)"
+
+# Disable mock mode and return to normal operation
+ai-mock-mode-disable: validate
+	@echo "$(MAGENTA)$(BOLD)🧪 Disabling AI UI Mock Mode...$(RESET)"
+	@if [ -f "/opt/agency_stack/config/ai/mock_mode_enabled" ]; then \
+		rm -f /opt/agency_stack/config/ai/mock_mode_enabled; \
+		echo "$(GREEN)Mock mode disabled$(RESET)"; \
+	else \
+		echo "$(YELLOW)Mock mode was not enabled$(RESET)"; \
+	fi
+	@$(MAKE) ai-dashboard-restart
+	@echo "$(GREEN)AI Dashboard restarted with normal mode$(RESET)"
+
+# Comprehensive AI suite alpha readiness check target
+ai-alpha-check: validate
 	@echo "$(MAGENTA)$(BOLD)🔍 Running AI Alpha Readiness Check...$(RESET)"
 	@echo "$(CYAN)Checking installed components...$(RESET)"
 	@echo "-------------------------------------------"
@@ -1353,6 +1383,9 @@ ai-alpha-check:
 		echo "  $(GREEN)✓ Ollama is installed$(RESET)"; \
 		if curl -s http://localhost:11434/api/tags &>/dev/null; then \
 			echo "  $(GREEN)✓ Ollama API is accessible$(RESET)"; \
+			curl -s http://localhost:11435/metrics &>/dev/null && \
+			echo "  $(GREEN)✓ Prometheus metrics available$(RESET)" || \
+			echo "  $(YELLOW)⚠️ Prometheus metrics not available$(RESET)"; \
 		else \
 			echo "  $(RED)✗ Ollama API is not accessible$(RESET)"; \
 		fi \
@@ -1365,6 +1398,9 @@ ai-alpha-check:
 		echo "  $(GREEN)✓ LangChain is installed$(RESET)"; \
 		if curl -s http://localhost:5111/health &>/dev/null; then \
 			echo "  $(GREEN)✓ LangChain API is accessible$(RESET)"; \
+			curl -s http://localhost:5112/metrics &>/dev/null && \
+			echo "  $(GREEN)✓ Prometheus metrics available$(RESET)" || \
+			echo "  $(YELLOW)⚠️ Prometheus metrics not available$(RESET)"; \
 		else \
 			echo "  $(RED)✗ LangChain API is not accessible$(RESET)"; \
 		fi \
@@ -1375,10 +1411,13 @@ ai-alpha-check:
 	@echo "3. Checking AI Dashboard..."
 	@if [ -d "/opt/agency_stack/ai_dashboard" ]; then \
 		echo "  $(GREEN)✓ AI Dashboard is installed$(RESET)"; \
-		if docker ps | grep -q "ai-dashboard"; then \
-			echo "  $(GREEN)✓ AI Dashboard is running$(RESET)"; \
+		if curl -s http://localhost:5130 &>/dev/null; then \
+			echo "  $(GREEN)✓ AI Dashboard is accessible$(RESET)"; \
+			if [ -f "/opt/agency_stack/config/ai/mock_mode_enabled" ]; then \
+				echo "  $(CYAN)ℹ️ Mock mode is enabled$(RESET)"; \
+			fi \
 		else \
-			echo "  $(RED)✗ AI Dashboard is not running$(RESET)"; \
+			echo "  $(RED)✗ AI Dashboard is not accessible$(RESET)"; \
 		fi \
 	else \
 		echo "  $(RED)✗ AI Dashboard is not installed$(RESET)"; \
@@ -1389,6 +1428,9 @@ ai-alpha-check:
 		echo "  $(GREEN)✓ Agent Orchestrator is installed$(RESET)"; \
 		if curl -s http://localhost:5210/health &>/dev/null; then \
 			echo "  $(GREEN)✓ Agent Orchestrator API is accessible$(RESET)"; \
+			curl -s http://localhost:5211/metrics &>/dev/null && \
+			echo "  $(GREEN)✓ Prometheus metrics available$(RESET)" || \
+			echo "  $(YELLOW)⚠️ Prometheus metrics not available$(RESET)"; \
 		else \
 			echo "  $(RED)✗ Agent Orchestrator API is not accessible$(RESET)"; \
 		fi \
@@ -1401,6 +1443,9 @@ ai-alpha-check:
 		echo "  $(GREEN)✓ Resource Watcher is installed$(RESET)"; \
 		if curl -s http://localhost:5220/health &>/dev/null; then \
 			echo "  $(GREEN)✓ Resource Watcher API is accessible$(RESET)"; \
+			curl -s http://localhost:5221/metrics &>/dev/null && \
+			echo "  $(GREEN)✓ Prometheus metrics available$(RESET)" || \
+			echo "  $(YELLOW)⚠️ Prometheus metrics not available$(RESET)"; \
 		else \
 			echo "  $(RED)✗ Resource Watcher API is not accessible$(RESET)"; \
 		fi \
@@ -1411,41 +1456,53 @@ ai-alpha-check:
 	@echo "6. Checking Agent Tools Bridge..."
 	@if [ -d "$(ROOT_DIR)/apps/agent_tools" ]; then \
 		echo "  $(GREEN)✓ Agent Tools Bridge is installed$(RESET)"; \
-		if pgrep -f "next.*5120" > /dev/null; then \
-			echo "  $(GREEN)✓ Agent Tools Bridge is running$(RESET)"; \
+		if curl -s http://localhost:5120 &>/dev/null; then \
+			echo "  $(GREEN)✓ Agent Tools Bridge is accessible$(RESET)"; \
 		else \
-			echo "  $(RED)✗ Agent Tools Bridge is not running$(RESET)"; \
+			echo "  $(RED)✗ Agent Tools Bridge is not accessible$(RESET)"; \
 		fi \
 	else \
 		echo "  $(RED)✗ Agent Tools Bridge is not installed$(RESET)"; \
 	fi
 	
 	@echo "-------------------------------------------"
-	@echo "$(CYAN)Checking port availability...$(RESET)"
-	@echo "Ollama: $(shell if netstat -tuln | grep -q \":11434 \"; then echo \"$(GREEN)✓ Available$(RESET)\"; else echo \"$(RED)✗ Not available$(RESET)\"; fi)"
-	@echo "LangChain: $(shell if netstat -tuln | grep -q \":5111 \"; then echo \"$(GREEN)✓ Available$(RESET)\"; else echo \"$(RED)✗ Not available$(RESET)\"; fi)"
-	@echo "AI Dashboard: $(shell if netstat -tuln | grep -q \":5130 \"; then echo \"$(GREEN)✓ Available$(RESET)\"; else echo \"$(RED)✗ Not available$(RESET)\"; fi)"
-	@echo "Agent Orchestrator: $(shell if netstat -tuln | grep -q \":5210 \"; then echo \"$(GREEN)✓ Available$(RESET)\"; else echo \"$(RED)✗ Not available$(RESET)\"; fi)"
-	@echo "Resource Watcher: $(shell if netstat -tuln | grep -q \":5220 \"; then echo \"$(GREEN)✓ Available$(RESET)\"; else echo \"$(RED)✗ Not available$(RESET)\"; fi)"
-	@echo "Agent Tools Bridge: $(shell if netstat -tuln | grep -q \":5120 \"; then echo \"$(GREEN)✓ Available$(RESET)\"; else echo \"$(RED)✗ Not available$(RESET)\"; fi)"
+	@echo "$(CYAN)Checking dashboard integration...$(RESET)"
+	@if [ -f "$(CONFIG_DIR)/config/registry/component_registry.json" ]; then \
+		echo "Verifying AI components in registry..."; \
+		for comp in ollama langchain ai_dashboard agent_orchestrator resource_watcher agent_tools; do \
+			if jq -e ".ai.$$comp" $(CONFIG_DIR)/config/registry/component_registry.json > /dev/null 2>&1; then \
+				echo "  $(GREEN)✓ $$comp registered in component registry$(RESET)"; \
+			else \
+				echo "  $(RED)✗ $$comp missing from component registry$(RESET)"; \
+			fi \
+		done \
+	else \
+		echo "  $(RED)✗ Component registry not found$(RESET)"; \
+	fi
 	
 	@echo "-------------------------------------------"
-	@echo "$(CYAN)Checking dependencies...$(RESET)"
-	@echo "Docker: $(shell if command -v docker &> /dev/null; then echo \"$(GREEN)✓ Installed$(RESET)\"; else echo \"$(RED)✗ Not installed$(RESET)\"; fi)"
-	@echo "Docker Compose: $(shell if command -v docker-compose &> /dev/null; then echo \"$(GREEN)✓ Installed$(RESET)\"; else echo \"$(RED)✗ Not installed$(RESET)\"; fi)"
-	@echo "Node.js: $(shell if command -v node &> /dev/null; then echo \"$(GREEN)✓ Installed$(RESET)\"; else echo \"$(RED)✗ Not installed$(RESET)\"; fi)"
-	@echo "npm: $(shell if command -v npm &> /dev/null; then echo \"$(GREEN)✓ Installed$(RESET)\"; else echo \"$(RED)✗ Not installed$(RESET)\"; fi)"
-	
-	@echo "-------------------------------------------"
-	@echo "$(CYAN)Checking required directories...$(RESET)"
-	@echo "AI config dir: $(shell if [ -d \"/opt/agency_stack/config/ai\" ]; then echo \"$(GREEN)✓ Exists$(RESET)\"; else echo \"$(RED)✗ Missing$(RESET)\"; fi)"
-	@echo "AI logs dir: $(shell if [ -d \"/var/log/agency_stack/ai\" ]; then echo \"$(GREEN)✓ Exists$(RESET)\"; else echo \"$(RED)✗ Missing$(RESET)\"; fi)"
-	@echo "Client configs dir: $(shell if [ -d \"/opt/agency_stack/clients\" ]; then echo \"$(GREEN)✓ Exists$(RESET)\"; else echo \"$(RED)✗ Missing$(RESET)\"; fi)"
-	
+	@echo "$(CYAN)Checking Prometheus metrics integration...$(RESET)"
+	@if [ -f "$(CONFIG_DIR)/prometheus/prometheus.yml" ]; then \
+		grep -q "ollama" $(CONFIG_DIR)/prometheus/prometheus.yml && \
+		echo "  $(GREEN)✓ Ollama metrics configured in Prometheus$(RESET)" || \
+		echo "  $(YELLOW)⚠️ Ollama metrics not configured in Prometheus$(RESET)"; \
+		grep -q "langchain" $(CONFIG_DIR)/prometheus/prometheus.yml && \
+		echo "  $(GREEN)✓ LangChain metrics configured in Prometheus$(RESET)" || \
+		echo "  $(YELLOW)⚠️ LangChain metrics not configured in Prometheus$(RESET)"; \
+		grep -q "resource_watcher" $(CONFIG_DIR)/prometheus/prometheus.yml && \
+		echo "  $(GREEN)✓ Resource Watcher metrics configured in Prometheus$(RESET)" || \
+		echo "  $(YELLOW)⚠️ Resource Watcher metrics not configured in Prometheus$(RESET)"; \
+		grep -q "agent_orchestrator" $(CONFIG_DIR)/prometheus/prometheus.yml && \
+		echo "  $(GREEN)✓ Agent Orchestrator metrics configured in Prometheus$(RESET)" || \
+		echo "  $(YELLOW)⚠️ Agent Orchestrator metrics not configured in Prometheus$(RESET)"; \
+	else \
+		echo "  $(RED)✗ Prometheus configuration not found$(RESET)"; \
+	fi
+		
 	@echo "-------------------------------------------"
 	@echo "$(BOLD)$(MAGENTA)AI Alpha Status Summary:$(RESET)"
 	@echo "$(shell \
-		INSTALLED=0; \
+		INSTALLED=0; RUNNING=0; METRICS=0; \
 		for comp in ollama langchain ai_dashboard agent_orchestrator resource_watcher; do \
 			if [ -d \"/opt/agency_stack/$$comp\" ]; then \
 				INSTALLED=$$((INSTALLED+1)); \
@@ -1456,68 +1513,21 @@ ai-alpha-check:
 		fi; \
 		if [ $$INSTALLED -eq 6 ]; then \
 			echo \"$(GREEN)All components installed ($$INSTALLED/6)$(RESET)\"; \
+			ALPHA_READY=true; \
 		elif [ $$INSTALLED -ge 4 ]; then \
 			echo \"$(YELLOW)Most components installed ($$INSTALLED/6)$(RESET)\"; \
+			ALPHA_READY=false; \
 		else \
 			echo \"$(RED)Few components installed ($$INSTALLED/6)$(RESET)\"; \
+			ALPHA_READY=false; \
+		fi; \
+		echo \"\"; \
+		if [ \"$$ALPHA_READY\" = \"true\" ]; then \
+			echo \"$(GREEN)$(BOLD)✅ AI Suite is Alpha-ready!$(RESET)\"; \
+			echo \"See detailed status in: /docs/pages/ai/alpha_status.md\"; \
+		else \
+			echo \"$(RED)$(BOLD)❌ AI Suite is NOT Alpha-ready.$(RESET)\"; \
+			echo \"Run 'make install-ai-suite' to install missing components.\"; \
 		fi \
 	)"
-	@echo "See detailed status in: /docs/pages/ai/alpha_status.md"
-
-# -----------------------------------------------------------------------------
-# AI Suite Targets
-# -----------------------------------------------------------------------------
-
-install-ai-suite: install-langchain install-ollama install-agent-orchestrator install-resource-watcher install-agent-tools
-	@echo "AI Suite installation complete"
-
-ai-suite-status: langchain-status ollama-status resource-watcher-status agent-orchestrator-status agent-tools-status
-	@echo "AI Suite status check complete"
-
-ai-alpha-check:
-	@echo "Checking AI Suite Alpha readiness..."
-	@echo "Validating installation status..."
-	@jq '.ai | to_entries[] | "\(.key): \(.value.integration_status.installed)"' config/registry/component_registry.json
-	@echo "Checking for required documentation..."
-	@find docs/pages/ai -type f -name "*.md" | sort
-
-# -----------------------------------------------------------------------------
-# AI Suite Mock Test Harness
-# -----------------------------------------------------------------------------
-
-ai-suite-test: ai-suite-test-check ai-suite-test-setup ai-suite-test-start
-	@echo "AI Suite Test Harness started"
-	@echo "Access Agent Tools UI at: http://localhost:5120/?client_id=test&mock=true"
-
-ai-suite-test-check:
-	@echo "Checking prerequisites for test environment..."
-	@if ! command -v node > /dev/null; then echo "Node.js is required but not installed"; exit 1; fi
-	@if ! command -v docker > /dev/null; then echo "Docker is required but not installed"; exit 1; fi
-	@echo "All prerequisites met."
-
-ai-suite-test-setup:
-	@echo "Setting up test environment..."
-	@mkdir -p test/clients/test
-	@mkdir -p test/logs
-	@echo "Client test directories created"
-
-ai-suite-test-start:
-	@echo "Starting mock services..."
-	@cd scripts/mock && \
-		npm install express cors body-parser --quiet && \
-		(node ai_mock_server.js > ../../test/logs/mock_server.log 2>&1 &) && \
-		echo "Mock servers running (api endpoints available on ports 5210, 5111, 5220)"
-	@cd apps/agent_tools && \
-		export NEXT_PUBLIC_MOCK_MODE=true && \
-		(npm run dev > ../../test/logs/agent_tools.log 2>&1 &) && \
-		echo "Agent Tools UI running in mock mode (http://localhost:5120/?client_id=test&mock=true)"
-	@echo "Test harness is now running"
-
-ai-suite-reset:
-	@echo "Stopping all mock services..."
-	@-pkill -f "node ai_mock_server.js" || true
-	@-pkill -f "next dev" || true
-	@echo "Cleaning up test environment..."
-	@rm -rf test/clients/test
-	@rm -rf test/logs
-	@echo "Test environment has been reset"
+{{ ... }}
