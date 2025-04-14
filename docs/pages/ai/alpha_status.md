@@ -138,3 +138,57 @@ To ensure the Alpha milestone is officially reached, run the validation tool:
 ```bash
 make ai-alpha-check
 ```
+
+## Prometheus Metrics
+
+The following metrics are exposed by AI components for monitoring:
+
+| Component | Endpoint | Key Metrics |
+|-----------|----------|-------------|
+| Ollama | :11435/metrics | model_load_time, inference_latency, token_throughput |
+| LangChain | :5112/metrics | chain_execution_time, memory_usage, api_calls |
+| Resource Watcher | :5221/metrics | gpu_utilization, cpu_usage, ram_usage, api_latency |
+| Agent Orchestrator | :5211/metrics | agent_runs, task_completion_time, error_rate |
+
+## Mock Mode Support
+
+The AI Suite includes a Mock Mode feature for testing without loading actual models:
+
+- Enable: `make ai-mock-mode`
+- Disable: `make ai-mock-mode-disable`
+- Status: Indicated in `make ai-alpha-check` output
+
+Mock Mode allows:
+- Testing UI workflows without model overhead
+- Developing with minimal resources
+- Simulating responses for integration testing
+
+## Makefile Targets
+
+Each AI component follows the standardized AgencyStack target pattern:
+
+| Component | Install | Status | Logs | Restart |
+|-----------|---------|--------|------|---------|
+| Ollama | `make ollama` | `make ollama-status` | `make ollama-logs` | `make ollama-restart` |
+| LangChain | `make langchain` | `make langchain-status` | `make langchain-logs` | `make langchain-restart` |
+| AI Dashboard | `make ai-dashboard` | `make ai-dashboard-status` | `make ai-dashboard-logs` | `make ai-dashboard-restart` |
+| Agent Orchestrator | `make agent-orchestrator` | `make agent-orchestrator-status` | `make agent-orchestrator-logs` | `make agent-orchestrator-restart` |
+| Resource Watcher | `make resource-watcher` | `make resource-watcher-status` | `make resource-watcher-logs` | `make resource-watcher-restart` |
+| Agent Tools | `make ai-agent-tools` | `make agent-tools-status` | `make agent-tools-logs` | `make agent-tools-restart` |
+
+Complete AI Suite:
+- Install: `make install-ai-suite`
+- Status: `make ai-suite-status`
+- Validation: `make ai-alpha-check`
+
+## Validation
+
+The AI Suite has reached Alpha status with all core components installed and functioning together. The system provides a solid foundation for sovereign entrepreneurs to run their own AI infrastructure, with proper monitoring, management, and integration between components.
+
+To ensure the Alpha milestone is officially reached, run the validation tool:
+
+```bash
+make ai-alpha-check
+```
+
+This command performs a comprehensive check of all AI components, verifying installation status, API accessibility, Prometheus metrics configuration, and dashboard integration.
