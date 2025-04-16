@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0.0",
+  "last_updated": "2025-04-16T00:38:00-05:00",
+  "components": {
+    "security": {
+      "keycloak": {
+        "name": "Keycloak",
+        "category": "Security & Identity",
+        "version": "22.0.1",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true,
+          "sso_configured": true
+        },
+        "description": "Single sign-on and identity management via Keycloak. Provides OIDC and SAML, integrates with all sso: true components, supports multi-tenant realms and RBAC via Keycloak groups. Installation is repo-driven and validated by alpha-check workflows."
+      }
+    }
+  }
+}
