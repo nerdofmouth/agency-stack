@@ -1,0 +1,57 @@
+version: '3.7'
+
+services:
+  postgres:
+    image: postgres:13-alpine
+    container_name: keycloak_postgres_proto002.alpha.nerdofmouth.com
+    restart: unless-stopped
+    volumes:
+      - /opt/agency_stack/keycloak/proto002.alpha.nerdofmouth.com/postgres-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: oUFrndGUdPWZalGe
+    networks:
+      - agency-network
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:21.1.2
+    container_name: keycloak_proto002.alpha.nerdofmouth.com
+    restart: unless-stopped
+    command: ["start-dev", "--http-relative-path=/auth"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL_HOST: postgres
+      KC_DB_URL_DATABASE: keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: oUFrndGUdPWZalGe
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: olC1FyMuKkx9hfnn
+      KC_PROXY: edge
+      KC_HOSTNAME_URL: https://proto002.alpha.nerdofmouth.com/auth
+      KC_HOSTNAME_ADMIN_URL: https://proto002.alpha.nerdofmouth.com/auth
+    volumes:
+      - /opt/agency_stack/keycloak/proto002.alpha.nerdofmouth.com/keycloak-data:/opt/keycloak/data
+      - /opt/agency_stack/keycloak/proto002.alpha.nerdofmouth.com/themes:/opt/keycloak/themes
+      - /opt/agency_stack/keycloak/proto002.alpha.nerdofmouth.com/imports:/opt/keycloak/imports
+    depends_on:
+      - postgres
+    networks:
+      - agency-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.keycloak_proto002_alpha_nerdofmouth_com.rule=Host(`proto002.alpha.nerdofmouth.com`)"
+      - "traefik.http.routers.keycloak_proto002_alpha_nerdofmouth_com.entrypoints=websecure"
+      - "traefik.http.routers.keycloak_proto002_alpha_nerdofmouth_com.tls.certresolver=myresolver"
+      - "traefik.http.services.keycloak_proto002_alpha_nerdofmouth_com.loadbalancer.server.port=8080"
+      - "traefik.http.middlewares.keycloak_proto002_alpha_nerdofmouth_com_security.headers.browserXssFilter=true"
+      - "traefik.http.middlewares.keycloak_proto002_alpha_nerdofmouth_com_security.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.keycloak_proto002_alpha_nerdofmouth_com_security.headers.forceSTSHeader=true"
+      - "traefik.http.middlewares.keycloak_proto002_alpha_nerdofmouth_com_security.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.keycloak_proto002_alpha_nerdofmouth_com_security.headers.stsPreload=true"
+      - "traefik.http.middlewares.keycloak_proto002_alpha_nerdofmouth_com_security.headers.stsSeconds=31536000"
+      - "traefik.http.routers.keycloak_proto002_alpha_nerdofmouth_com.middlewares=keycloak_proto002_alpha_nerdofmouth_com_security"
+
+networks:
+  agency-network:
+    external: true

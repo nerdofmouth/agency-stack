@@ -1,0 +1,516 @@
+# Generated AgencyStack Component Targets
+# Date: $(date '+%Y-%m-%d')
+# 
+# This file contains auto-generated Makefile targets for all components
+# in the AgencyStack registry. These targets ensure consistent interfaces
+# for installation, status checks, logs, and restarts.
+
+# builderio component targets
+builderio:
+	@echo "🔧 Installing builderio..."
+	@$(SCRIPTS_DIR)/components/install_builderio.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(VERBOSE),--verbose,)
+
+builderio-status:
+	@echo "🔍 Checking builderio status..."
+	@if [ -f "$(SCRIPTS_DIR)/components/status_builderio.sh" ]; then \
+		$(SCRIPTS_DIR)/components/status_builderio.sh; \
+	else \
+		echo "Status script not found. Checking service..."; \
+		systemctl status builderio 2>/dev/null || docker ps -a | grep builderio || echo "builderio status check not implemented"; \
+	fi
+
+builderio-logs:
+	@echo "📜 Viewing builderio logs..."
+	@if [ -f "/var/log/agency_stack/components/builderio.log" ]; then \
+		tail -n 50 "/var/log/agency_stack/components/builderio.log"; \
+	else \
+		echo "Log file not found. Trying alternative sources..."; \
+		journalctl -u builderio 2>/dev/null || docker logs builderio-$(CLIENT_ID) 2>/dev/null || echo "No logs found for builderio"; \
+	fi
+
+builderio-restart:
+	@echo "🔄 Restarting builderio..."
+	@if [ -f "$(SCRIPTS_DIR)/components/restart_builderio.sh" ]; then \
+		$(SCRIPTS_DIR)/components/restart_builderio.sh; \
+	else \
+		echo "Restart script not found. Trying standard methods..."; \
+		systemctl restart builderio 2>/dev/null || \
+		docker restart builderio-$(CLIENT_ID) 2>/dev/null || \
+		echo "builderio restart not implemented"; \
+	fi
+
+# calcom component targets
+calcom:
+	@echo "🔧 Installing calcom..."
+	@$(SCRIPTS_DIR)/components/install_calcom.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(VERBOSE),--verbose,)
+
+calcom-status:
+	@echo "🔍 Checking calcom status..."
+	@if [ -f "$(SCRIPTS_DIR)/components/status_calcom.sh" ]; then \
+		$(SCRIPTS_DIR)/components/status_calcom.sh; \
+	else \
+		echo "Status script not found. Checking service..."; \
+		systemctl status calcom 2>/dev/null || docker ps -a | grep calcom || echo "calcom status check not implemented"; \
+	fi
+
+calcom-logs:
+	@echo "📜 Viewing calcom logs..."
+	@if [ -f "/var/log/agency_stack/components/calcom.log" ]; then \
+		tail -n 50 "/var/log/agency_stack/components/calcom.log"; \
+	else \
+		echo "Log file not found. Trying alternative sources..."; \
+		journalctl -u calcom 2>/dev/null || docker logs calcom-$(CLIENT_ID) 2>/dev/null || echo "No logs found for calcom"; \
+	fi
+
+calcom-restart:
+	@echo "🔄 Restarting calcom..."
+	@if [ -f "$(SCRIPTS_DIR)/components/restart_calcom.sh" ]; then \
+		$(SCRIPTS_DIR)/components/restart_calcom.sh; \
+	else \
+		echo "Restart script not found. Trying standard methods..."; \
+		systemctl restart calcom 2>/dev/null || \
+		docker restart calcom-$(CLIENT_ID) 2>/dev/null || \
+		echo "calcom restart not implemented"; \
+	fi
+
+# chatwoot component targets
+chatwoot:
+	@echo "🔧 Installing chatwoot..."
+	@$(SCRIPTS_DIR)/components/install_chatwoot.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(VERBOSE),--verbose,)
+
+chatwoot-status:
+	@echo "🔍 Checking chatwoot status..."
+	@if [ -f "$(SCRIPTS_DIR)/components/status_chatwoot.sh" ]; then \
+		$(SCRIPTS_DIR)/components/status_chatwoot.sh; \
+	else \
+		echo "Status script not found. Checking service..."; \
+		systemctl status chatwoot 2>/dev/null || docker ps -a | grep chatwoot || echo "chatwoot status check not implemented"; \
+	fi
+
+chatwoot-logs:
+	@echo "📜 Viewing chatwoot logs..."
+	@if [ -f "/var/log/agency_stack/components/chatwoot.log" ]; then \
+		tail -n 50 "/var/log/agency_stack/components/chatwoot.log"; \
+	else \
+		echo "Log file not found. Trying alternative sources..."; \
+		journalctl -u chatwoot 2>/dev/null || docker logs chatwoot-$(CLIENT_ID) 2>/dev/null || echo "No logs found for chatwoot"; \
+	fi
+
+chatwoot-restart:
+	@echo "🔄 Restarting chatwoot..."
+	@if [ -f "$(SCRIPTS_DIR)/components/restart_chatwoot.sh" ]; then \
+		$(SCRIPTS_DIR)/components/restart_chatwoot.sh; \
+	else \
+		echo "Restart script not found. Trying standard methods..."; \
+		systemctl restart chatwoot 2>/dev/null || \
+		docker restart chatwoot-$(CLIENT_ID) 2>/dev/null || \
+		echo "chatwoot restart not implemented"; \
+	fi
+
+# crowdsec component targets
+crowdsec:
+	@echo "🔧 Installing crowdsec..."
+	@$(SCRIPTS_DIR)/components/install_crowdsec.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(VERBOSE),--verbose,)
+
+crowdsec-status:
+	@echo "🔍 Checking crowdsec status..."
+	@if [ -f "$(SCRIPTS_DIR)/components/status_crowdsec.sh" ]; then \
+		$(SCRIPTS_DIR)/components/status_crowdsec.sh; \
+	else \
+		echo "Status script not found. Checking service..."; \
+		systemctl status crowdsec 2>/dev/null || docker ps -a | grep crowdsec || echo "crowdsec status check not implemented"; \
+	fi
+
+crowdsec-logs:
+	@echo "📜 Viewing crowdsec logs..."
+	@if [ -f "/var/log/agency_stack/components/crowdsec.log" ]; then \
+		tail -n 50 "/var/log/agency_stack/components/crowdsec.log"; \
+	else \
+		echo "Log file not found. Trying alternative sources..."; \
+		journalctl -u crowdsec 2>/dev/null || docker logs crowdsec-$(CLIENT_ID) 2>/dev/null || echo "No logs found for crowdsec"; \
+	fi
+
+crowdsec-restart:
+	@echo "🔄 Restarting crowdsec..."
+	@if [ -f "$(SCRIPTS_DIR)/components/restart_crowdsec.sh" ]; then \
+		$(SCRIPTS_DIR)/components/restart_crowdsec.sh; \
+	else \
+		echo "Restart script not found. Trying standard methods..."; \
+		systemctl restart crowdsec 2>/dev/null || \
+		docker restart crowdsec-$(CLIENT_ID) 2>/dev/null || \
+		echo "crowdsec restart not implemented"; \
+	fi
+
+# documenso component targets
+documenso:
+	@echo "🔧 Installing documenso..."
+	@$(SCRIPTS_DIR)/components/install_documenso.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(VERBOSE),--verbose,)
+
+documenso-status:
+	@echo "🔍 Checking documenso status..."
+	@if [ -f "$(SCRIPTS_DIR)/components/status_documenso.sh" ]; then \
+		$(SCRIPTS_DIR)/components/status_documenso.sh; \
+	else \
+		echo "Status script not found. Checking service..."; \
+		systemctl status documenso 2>/dev/null || docker ps -a | grep documenso || echo "documenso status check not implemented"; \
+	fi
+
+documenso-logs:
+	@echo "📜 Viewing documenso logs..."
+	@if [ -f "/var/log/agency_stack/components/documenso.log" ]; then \
+		tail -n 50 "/var/log/agency_stack/components/documenso.log"; \
+	else \
+		echo "Log file not found. Trying alternative sources..."; \
+		journalctl -u documenso 2>/dev/null || docker logs documenso-$(CLIENT_ID) 2>/dev/null || echo "No logs found for documenso"; \
+	fi
+
+documenso-restart:
+	@echo "🔄 Restarting documenso..."
+	@if [ -f "$(SCRIPTS_DIR)/components/restart_documenso.sh" ]; then \
+		$(SCRIPTS_DIR)/components/restart_documenso.sh; \
+	else \
+		echo "Restart script not found. Trying standard methods..."; \
+		systemctl restart documenso 2>/dev/null || \
+		docker restart documenso-$(CLIENT_ID) 2>/dev/null || \
+		echo "documenso restart not implemented"; \
+	fi
+
+# focalboard component targets
+focalboard:
+	@echo "🔧 Installing focalboard..."
+	@$(SCRIPTS_DIR)/components/install_focalboard.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(VERBOSE),--verbose,)
+
+focalboard-status:
+	@echo "🔍 Checking focalboard status..."
+	@if [ -f "$(SCRIPTS_DIR)/components/status_focalboard.sh" ]; then \
+		$(SCRIPTS_DIR)/components/status_focalboard.sh; \
+	else \
+		echo "Status script not found. Checking service..."; \
+		systemctl status focalboard 2>/dev/null || docker ps -a | grep focalboard || echo "focalboard status check not implemented"; \
+	fi
+
+focalboard-logs:
+	@echo "📜 Viewing focalboard logs..."
+	@if [ -f "/var/log/agency_stack/components/focalboard.log" ]; then \
+		tail -n 50 "/var/log/agency_stack/components/focalboard.log"; \
+	else \
+		echo "Log file not found. Trying alternative sources..."; \
+		journalctl -u focalboard 2>/dev/null || docker logs focalboard-$(CLIENT_ID) 2>/dev/null || echo "No logs found for focalboard"; \
+	fi
+
+focalboard-restart:
+	@echo "🔄 Restarting focalboard..."
+	@if [ -f "$(SCRIPTS_DIR)/components/restart_focalboard.sh" ]; then \
+		$(SCRIPTS_DIR)/components/restart_focalboard.sh; \
+	else \
+		echo "Restart script not found. Trying standard methods..."; \
+		systemctl restart focalboard 2>/dev/null || \
+		docker restart focalboard-$(CLIENT_ID) 2>/dev/null || \
+		echo "focalboard restart not implemented"; \
+	fi
+
+# ghost component targets
+ghost:
+	@echo "🔧 Installing ghost..."
+	@$(SCRIPTS_DIR)/components/install_ghost.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(VERBOSE),--verbose,)
+
+ghost-status:
+	@echo "🔍 Checking ghost status..."
+	@if [ -f "$(SCRIPTS_DIR)/components/status_ghost.sh" ]; then \
+		$(SCRIPTS_DIR)/components/status_ghost.sh; \
+	else \
+		echo "Status script not found. Checking service..."; \
+		systemctl status ghost 2>/dev/null || docker ps -a | grep ghost || echo "ghost status check not implemented"; \
+	fi
+
+ghost-logs:
+	@echo "📜 Viewing ghost logs..."
+	@if [ -f "/var/log/agency_stack/components/ghost.log" ]; then \
+		tail -n 50 "/var/log/agency_stack/components/ghost.log"; \
+	else \
+		echo "Log file not found. Trying alternative sources..."; \
+		journalctl -u ghost 2>/dev/null || docker logs ghost-$(CLIENT_ID) 2>/dev/null || echo "No logs found for ghost"; \
+	fi
+
+ghost-restart:
+	@echo "🔄 Restarting ghost..."
+	@if [ -f "$(SCRIPTS_DIR)/components/restart_ghost.sh" ]; then \
+		$(SCRIPTS_DIR)/components/restart_ghost.sh; \
+	else \
+		echo "Restart script not found. Trying standard methods..."; \
+		systemctl restart ghost 2>/dev/null || \
+		docker restart ghost-$(CLIENT_ID) 2>/dev/null || \
+		echo "ghost restart not implemented"; \
+	fi
+
+# gitea component targets
+gitea:
+	@echo "🔧 Installing gitea..."
+	@$(SCRIPTS_DIR)/components/install_gitea.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(VERBOSE),--verbose,)
+
+gitea-status:
+	@echo "🔍 Checking gitea status..."
+	@if [ -f "$(SCRIPTS_DIR)/components/status_gitea.sh" ]; then \
+		$(SCRIPTS_DIR)/components/status_gitea.sh; \
+	else \
+		echo "Status script not found. Checking service..."; \
+		systemctl status gitea 2>/dev/null || docker ps -a | grep gitea || echo "gitea status check not implemented"; \
+	fi
+
+gitea-logs:
+	@echo "📜 Viewing gitea logs..."
+	@if [ -f "/var/log/agency_stack/components/gitea.log" ]; then \
+		tail -n 50 "/var/log/agency_stack/components/gitea.log"; \
+	else \
+		echo "Log file not found. Trying alternative sources..."; \
+		journalctl -u gitea 2>/dev/null || docker logs gitea-$(CLIENT_ID) 2>/dev/null || echo "No logs found for gitea"; \
+	fi
+
+gitea-restart:
+	@echo "🔄 Restarting gitea..."
+	@if [ -f "$(SCRIPTS_DIR)/components/restart_gitea.sh" ]; then \
+		$(SCRIPTS_DIR)/components/restart_gitea.sh; \
+	else \
+		echo "Restart script not found. Trying standard methods..."; \
+		systemctl restart gitea 2>/dev/null || \
+		docker restart gitea-$(CLIENT_ID) 2>/dev/null || \
+		echo "gitea restart not implemented"; \
+	fi
+
+# killbill component targets
+killbill:
+	@echo "🔧 Installing killbill..."
+	@$(SCRIPTS_DIR)/components/install_killbill.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(VERBOSE),--verbose,)
+
+killbill-status:
+	@echo "🔍 Checking killbill status..."
+	@if [ -f "$(SCRIPTS_DIR)/components/status_killbill.sh" ]; then \
+		$(SCRIPTS_DIR)/components/status_killbill.sh; \
+	else \
+		echo "Status script not found. Checking service..."; \
+		systemctl status killbill 2>/dev/null || docker ps -a | grep killbill || echo "killbill status check not implemented"; \
+	fi
+
+killbill-logs:
+	@echo "📜 Viewing killbill logs..."
+	@if [ -f "/var/log/agency_stack/components/killbill.log" ]; then \
+		tail -n 50 "/var/log/agency_stack/components/killbill.log"; \
+	else \
+		echo "Log file not found. Trying alternative sources..."; \
+		journalctl -u killbill 2>/dev/null || docker logs killbill-$(CLIENT_ID) 2>/dev/null || echo "No logs found for killbill"; \
+	fi
+
+killbill-restart:
+	@echo "🔄 Restarting killbill..."
+	@if [ -f "$(SCRIPTS_DIR)/components/restart_killbill.sh" ]; then \
+		$(SCRIPTS_DIR)/components/restart_killbill.sh; \
+	else \
+		echo "Restart script not found. Trying standard methods..."; \
+		systemctl restart killbill 2>/dev/null || \
+		docker restart killbill-$(CLIENT_ID) 2>/dev/null || \
+		echo "killbill restart not implemented"; \
+	fi
+
+# mattermost component targets
+mattermost:
+	@echo "🔧 Installing mattermost..."
+	@$(SCRIPTS_DIR)/components/install_mattermost.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(VERBOSE),--verbose,)
+
+mattermost-status:
+	@echo "🔍 Checking mattermost status..."
+	@if [ -f "$(SCRIPTS_DIR)/components/status_mattermost.sh" ]; then \
+		$(SCRIPTS_DIR)/components/status_mattermost.sh; \
+	else \
+		echo "Status script not found. Checking service..."; \
+		systemctl status mattermost 2>/dev/null || docker ps -a | grep mattermost || echo "mattermost status check not implemented"; \
+	fi
+
+mattermost-logs:
+	@echo "📜 Viewing mattermost logs..."
+	@if [ -f "/var/log/agency_stack/components/mattermost.log" ]; then \
+		tail -n 50 "/var/log/agency_stack/components/mattermost.log"; \
+	else \
+		echo "Log file not found. Trying alternative sources..."; \
+		journalctl -u mattermost 2>/dev/null || docker logs mattermost-$(CLIENT_ID) 2>/dev/null || echo "No logs found for mattermost"; \
+	fi
+
+mattermost-restart:
+	@echo "🔄 Restarting mattermost..."
+	@if [ -f "$(SCRIPTS_DIR)/components/restart_mattermost.sh" ]; then \
+		$(SCRIPTS_DIR)/components/restart_mattermost.sh; \
+	else \
+		echo "Restart script not found. Trying standard methods..."; \
+		systemctl restart mattermost 2>/dev/null || \
+		docker restart mattermost-$(CLIENT_ID) 2>/dev/null || \
+		echo "mattermost restart not implemented"; \
+	fi
+
+# portainer component targets
+portainer:
+	@echo "🔧 Installing portainer..."
+	@$(SCRIPTS_DIR)/components/install_portainer.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(VERBOSE),--verbose,)
+
+portainer-status:
+	@echo "🔍 Checking portainer status..."
+	@if [ -f "$(SCRIPTS_DIR)/components/status_portainer.sh" ]; then \
+		$(SCRIPTS_DIR)/components/status_portainer.sh; \
+	else \
+		echo "Status script not found. Checking service..."; \
+		systemctl status portainer 2>/dev/null || docker ps -a | grep portainer || echo "portainer status check not implemented"; \
+	fi
+
+portainer-logs:
+	@echo "📜 Viewing portainer logs..."
+	@if [ -f "/var/log/agency_stack/components/portainer.log" ]; then \
+		tail -n 50 "/var/log/agency_stack/components/portainer.log"; \
+	else \
+		echo "Log file not found. Trying alternative sources..."; \
+		journalctl -u portainer 2>/dev/null || docker logs portainer-$(CLIENT_ID) 2>/dev/null || echo "No logs found for portainer"; \
+	fi
+
+portainer-restart:
+	@echo "🔄 Restarting portainer..."
+	@if [ -f "$(SCRIPTS_DIR)/components/restart_portainer.sh" ]; then \
+		$(SCRIPTS_DIR)/components/restart_portainer.sh; \
+	else \
+		echo "Restart script not found. Trying standard methods..."; \
+		systemctl restart portainer 2>/dev/null || \
+		docker restart portainer-$(CLIENT_ID) 2>/dev/null || \
+		echo "portainer restart not implemented"; \
+	fi
+
+# seafile component targets
+seafile:
+	@echo "🔧 Installing seafile..."
+	@$(SCRIPTS_DIR)/components/install_seafile.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(VERBOSE),--verbose,)
+
+seafile-status:
+	@echo "🔍 Checking seafile status..."
+	@if [ -f "$(SCRIPTS_DIR)/components/status_seafile.sh" ]; then \
+		$(SCRIPTS_DIR)/components/status_seafile.sh; \
+	else \
+		echo "Status script not found. Checking service..."; \
+		systemctl status seafile 2>/dev/null || docker ps -a | grep seafile || echo "seafile status check not implemented"; \
+	fi
+
+seafile-logs:
+	@echo "📜 Viewing seafile logs..."
+	@if [ -f "/var/log/agency_stack/components/seafile.log" ]; then \
+		tail -n 50 "/var/log/agency_stack/components/seafile.log"; \
+	else \
+		echo "Log file not found. Trying alternative sources..."; \
+		journalctl -u seafile 2>/dev/null || docker logs seafile-$(CLIENT_ID) 2>/dev/null || echo "No logs found for seafile"; \
+	fi
+
+seafile-restart:
+	@echo "🔄 Restarting seafile..."
+	@if [ -f "$(SCRIPTS_DIR)/components/restart_seafile.sh" ]; then \
+		$(SCRIPTS_DIR)/components/restart_seafile.sh; \
+	else \
+		echo "Restart script not found. Trying standard methods..."; \
+		systemctl restart seafile 2>/dev/null || \
+		docker restart seafile-$(CLIENT_ID) 2>/dev/null || \
+		echo "seafile restart not implemented"; \
+	fi
+
+# traefik component targets
+traefik:
+	@echo "🔧 Installing traefik..."
+	@$(SCRIPTS_DIR)/components/install_traefik.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(VERBOSE),--verbose,)
+
+traefik-status:
+	@echo "🔍 Checking traefik status..."
+	@if [ -f "$(SCRIPTS_DIR)/components/status_traefik.sh" ]; then \
+		$(SCRIPTS_DIR)/components/status_traefik.sh; \
+	else \
+		echo "Status script not found. Checking service..."; \
+		systemctl status traefik 2>/dev/null || docker ps -a | grep traefik || echo "traefik status check not implemented"; \
+	fi
+
+traefik-logs:
+	@echo "📜 Viewing traefik logs..."
+	@if [ -f "/var/log/agency_stack/components/traefik.log" ]; then \
+		tail -n 50 "/var/log/agency_stack/components/traefik.log"; \
+	else \
+		echo "Log file not found. Trying alternative sources..."; \
+		journalctl -u traefik 2>/dev/null || docker logs traefik-$(CLIENT_ID) 2>/dev/null || echo "No logs found for traefik"; \
+	fi
+
+traefik-restart:
+	@echo "🔄 Restarting traefik..."
+	@if [ -f "$(SCRIPTS_DIR)/components/restart_traefik.sh" ]; then \
+		$(SCRIPTS_DIR)/components/restart_traefik.sh; \
+	else \
+		echo "Restart script not found. Trying standard methods..."; \
+		systemctl restart traefik 2>/dev/null || \
+		docker restart traefik-$(CLIENT_ID) 2>/dev/null || \
+		echo "traefik restart not implemented"; \
+	fi
+
+# vault component targets
+vault:
+	@echo "🔧 Installing vault..."
+	@$(SCRIPTS_DIR)/components/install_vault.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(VERBOSE),--verbose,)
+
+vault-status:
+	@echo "🔍 Checking vault status..."
+	@if [ -f "$(SCRIPTS_DIR)/components/status_vault.sh" ]; then \
+		$(SCRIPTS_DIR)/components/status_vault.sh; \
+	else \
+		echo "Status script not found. Checking service..."; \
+		systemctl status vault 2>/dev/null || docker ps -a | grep vault || echo "vault status check not implemented"; \
+	fi
+
+vault-logs:
+	@echo "📜 Viewing vault logs..."
+	@if [ -f "/var/log/agency_stack/components/vault.log" ]; then \
+		tail -n 50 "/var/log/agency_stack/components/vault.log"; \
+	else \
+		echo "Log file not found. Trying alternative sources..."; \
+		journalctl -u vault 2>/dev/null || docker logs vault-$(CLIENT_ID) 2>/dev/null || echo "No logs found for vault"; \
+	fi
+
+vault-restart:
+	@echo "🔄 Restarting vault..."
+	@if [ -f "$(SCRIPTS_DIR)/components/restart_vault.sh" ]; then \
+		$(SCRIPTS_DIR)/components/restart_vault.sh; \
+	else \
+		echo "Restart script not found. Trying standard methods..."; \
+		systemctl restart vault 2>/dev/null || \
+		docker restart vault-$(CLIENT_ID) 2>/dev/null || \
+		echo "vault restart not implemented"; \
+	fi
+
+# wordpress component targets
+wordpress:
+	@echo "🔧 Installing wordpress..."
+	@$(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(VERBOSE),--verbose,)
+
+wordpress-status:
+	@echo "🔍 Checking wordpress status..."
+	@if [ -f "$(SCRIPTS_DIR)/components/status_wordpress.sh" ]; then \
+		$(SCRIPTS_DIR)/components/status_wordpress.sh; \
+	else \
+		echo "Status script not found. Checking service..."; \
+		systemctl status wordpress 2>/dev/null || docker ps -a | grep wordpress || echo "wordpress status check not implemented"; \
+	fi
+
+wordpress-logs:
+	@echo "📜 Viewing wordpress logs..."
+	@if [ -f "/var/log/agency_stack/components/wordpress.log" ]; then \
+		tail -n 50 "/var/log/agency_stack/components/wordpress.log"; \
+	else \
+		echo "Log file not found. Trying alternative sources..."; \
+		journalctl -u wordpress 2>/dev/null || docker logs wordpress-$(CLIENT_ID) 2>/dev/null || echo "No logs found for wordpress"; \
+	fi
+
+wordpress-restart:
+	@echo "🔄 Restarting wordpress..."
+	@if [ -f "$(SCRIPTS_DIR)/components/restart_wordpress.sh" ]; then \
+		$(SCRIPTS_DIR)/components/restart_wordpress.sh; \
+	else \
+		echo "Restart script not found. Trying standard methods..."; \
+		systemctl restart wordpress 2>/dev/null || \
+		docker restart wordpress-$(CLIENT_ID) 2>/dev/null || \
+		echo "wordpress restart not implemented"; \
+	fi
