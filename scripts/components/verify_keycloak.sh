@@ -17,13 +17,31 @@ VERBOSE=false
 # Parse command-line arguments
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --domain=*)
+      DOMAIN="${1#*=}"
+      shift
+      ;;
     --domain)
-      DOMAIN="$2"
-      shift 2
+      if [[ "$2" != "" ]]; then
+        DOMAIN="$2"
+        shift 2
+      else
+        log_error "Missing value for --domain option"
+        exit 1
+      fi
+      ;;
+    --client-id=*)
+      CLIENT_ID="${1#*=}"
+      shift
       ;;
     --client-id)
-      CLIENT_ID="$2"
-      shift 2
+      if [[ "$2" != "" ]]; then
+        CLIENT_ID="$2"
+        shift 2
+      else
+        log_error "Missing value for --client-id option"
+        exit 1
+      fi
       ;;
     --verbose)
       VERBOSE=true
