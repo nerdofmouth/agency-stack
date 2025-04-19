@@ -1,0 +1,82 @@
+---
+description: 'A component for displaying installation status of AgencyStack components'
+labels: ['ui', 'status', 'installation', 'card']
+---
+
+import { InstallCard } from './index';
+
+## InstallCard Component
+
+The InstallCard component displays the installation status of an AgencyStack component with actions to view logs, metrics, and manage the installation.
+
+### Component usage
+
+```tsx
+import { InstallCard } from '@nerdofmouth.design-system/ui/install-card';
+
+function MyComponent() {
+  return (
+    <InstallCard
+      name="Kill Bill"
+      status="running"
+      description="Subscription billing and invoicing"
+      version="0.24.0"
+      lastUpdated={new Date()}
+      onViewLogs={() => console.log('View logs clicked')}
+      onViewMetrics={() => console.log('View metrics clicked')}
+      onRestart={() => console.log('Restart clicked')}
+    />
+  );
+}
+```
+
+### Properties
+
+| Name          | Type                                                  | Description                                      | Required | Default     |
+|---------------|-------------------------------------------------------|--------------------------------------------------|----------|-------------|
+| name          | string                                                | Name of the component being installed            | Yes      | -           |
+| status        | 'running' \| 'failed' \| 'installing' \| 'restarting' \| 'unknown' | Current installation status        | Yes      | -           |
+| lastUpdated   | string \| Date                                        | Last updated timestamp                           | No       | -           |
+| description   | string                                                | Description of the component                     | No       | -           |
+| version       | string                                                | Version of the component                         | No       | -           |
+| onViewLogs    | () => void                                            | Callback when user clicks to view logs           | No       | -           |
+| onViewMetrics | () => void                                            | Callback when user clicks to view metrics        | No       | -           |
+| onRestart     | () => void                                            | Callback when user clicks to restart installation | No       | -           |
+| compact       | boolean                                               | Whether to display in compact mode               | No       | false       |
+| clientId      | string                                                | Client ID for multi-tenant deployments           | No       | 'default'   |
+| className     | string                                                | Additional CSS classes                           | No       | ''          |
+
+### Integration with AgencyStack
+
+The InstallCard component automatically logs usage to `/var/log/agency_stack/ui/install-card.log` and can be integrated with the AgencyStack dashboard using the component registry.
+
+#### Registry Example
+
+```json
+{
+  "component": "KillBill",
+  "ui": {
+    "installCard": {
+      "status": "running",
+      "lastUpdated": "2025-04-13T00:00:00Z",
+      "version": "0.24.0"
+    }
+  }
+}
+```
+
+### Accessibility
+
+The component meets WCAG 2.1 AA compliance standards:
+- Color contrast ratios meet AA standards (4.5:1 for normal text)
+- Actions have accessible labels and proper tab focus
+- Status indicators use both color and text to convey state
+
+### Sovereignty Integration
+
+This component is designed to work without external dependencies and can be used in offline environments. It respects AgencyStack's sovereignty principles:
+
+- No external tracking or data collection
+- Fully functional without internet access
+- All assets are self-contained
+- Logs stay on-system in designated log paths

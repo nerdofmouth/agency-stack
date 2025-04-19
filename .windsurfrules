@@ -1,4 +1,91 @@
 # 🧠 AgencyStack Alpha Phase Directives  
+# 📘 NEW PHASE DIRECTIVES: PROTOTYPE CLIENT DEPLOYMENT
+
+# 🚀 AgencyStack Prototype Phase Directives## 🧭 OBJECTIVE
+
+Deploy a fully-functional, client-ready AgencyStack VM capable of:
+
+*   Hosting client workloads securely
+*   Managing app lifecycles via dashboard
+*   Demonstrating real-time monitoring + SSO
+*   Offering agency services with integrated open-source apps
+
+* * *
+
+  
+
+## 🔁 PRIORITY COMPONENT UPGRADES### 1. Enable TLS + SSO on Dashboard- \[ \] Add `--enable-keycloak` logic to dashboard install script
+
+- [ ]     Update Traefik labels to enforce HTTPS redirect
+- [ ]     Validate login via Keycloak realm (OIDC)
+
+  
+
+### 2\. Integrate `pgvector` (AI Agent Backend Readiness)- \[ \] Finalize `install_pgvector.sh` with `docker-compose` Postgres plugin or package manager
+
+- [ ]     Update Makefile + registry flags
+- [ ]     Add AI tool dependency notes to `/docs/pages/components/pgvector.md`\### 3. Validate Cryptosync Vaults- \[ \] Mount + test encryption workflow (can be mocked in `scripts/mock/mock_cryptosync.sh`)
+- [ ]     Ensure local + remote backup logic exists
+- [ ]     Add real health status reporting to dashboard JSON (see `dashboard_data.json`)
+
+* * *
+
+  
+
+## 🧪 TESTING & VALIDATION### Full Stack Checks\`\`\`bash
+
+make install-all
+
+make alpha-check
+
+make vm-test-rich
+
+###   
+
+### Per-Com
+
+```go
+make dashboard-status
+make pgvector-test
+make portainer-status
+make erpnext-status
+```
+
+* * *
+
+## 📂 DOCUMENTATION & REGISTRY CONSISTENCY
+
+### Docs to Write/Update:
+
+*   `docs/pages/components/pgvector.md`
+*   `docs/pages/components/cryptosync.md`
+*   `docs/pages/components/dashboard.md` (update for SSO)
+
+### Registry Fixes:
+
+*   Add `sso_configured: true` to any Keycloak-integrated app post-verification
+*   Add new `monitoring: true` for all dashboard-enabled tools
+
+* * *
+
+## 🧩 NEXT FEATURE SPRINT SUGGESTIONS
+
+*   🔧 Add Backup Scheduler (`restic` or `borg` container w/ Cron)
+*   📈 Integrate Uptime Kuma into dashboard (monitoring layer)
+*   🔁 Develop `bootstrap_client.sh` to provision + configure per-client app bundles
+*   📡 Begin [Merge.dev](http://Merge.dev) connector R&D for ERP/CRM syncing
+
+* * *
+
+## 🧠 MINDSET FOR THIS PHASE
+
+You are transitioning from Alpha to live pilot — ensure **repeatability**, **auditability**, and **sovereign readiness** for:
+
+*   Small agencies
+*   Event organizers
+*   Independent creators
+*   Community-run co-ops
+
 
 # CRITICAL REMINDERS FOR AGENCY STACK DEVELOPMENT
 
@@ -784,3 +871,153 @@ Here’s a tiered rollout plan, ranked by _immediate impact + strategic value_:
 - Deploy fixed code using PROPER deployment methods
 
 REMEMBER: The repository is the single source of truth. VM state should always be reproducible from repository contents.
+
+# 🎨 AgencyStack Design System – Bit-Enabled Instructions
+
+You are working in the `design-system-bit` branch of the AgencyStack monorepo.
+
+🏗️ Goal:
+Use [Bit](https://bit.dev/) to create a sovereign, composable design system for AgencyStack components, CLI tools, dashboards, and system UIs.
+
+🧠 Philosophy:
+- Design system = infrastructure
+- Every piece of UI is testable, versioned, documented, and shareable
+- Sovereignty = self-hosted, exportable, observable components
+
+🧱 Structure:
+- All UI components live in `/design-system-bit/components/`
+- Each folder is a Bit component (w/ docs, tests, previews)
+- Playground lives in `/compositions/`
+- Docs live in `/docs/` (MDX)
+
+📦 Bit Configuration:
+- Local config is stored in `.bitmap`
+- Components are automatically versioned
+- Use `bit dev` to run the playground
+- Use `bit tag` and `bit export` for versioning
+
+🛠️ Component Lifecycle:
+
+1. `bit create react-component install-card`  
+   ⤷ Creates `/components/ui/install-card/` w/ example, test, doc
+
+2. Implement design using Tailwind, ShadCN patterns
+
+3. Document with MDX (`.docs.mdx`)
+
+4. Preview with `bit dev`
+
+5. Add system hooks or `make` bindings in `install-card/index.ts`
+
+6. Test with `vitest` or built-in Bit test runner
+
+7. Tag version: `bit tag install-card 1.0.0 --message "Alpha UI release"`
+
+8. Optionally export to cloud: `bit export nerdofmouth.design-system/install-card`
+
+9. Connect Bit component to:
+   - `/apps/control_panel/`
+   - `/docs/pages/components/`
+   - `component_registry.json`
+
+🔒 Sovereign Config:
+- Run Bit in local-only mode: `bit config set analytics_reporting false`
+- Optional: use private Bit workspace server with `bit self-host`
+
+🧪 Naming Convention:
+- Use kebab-case for folders (`install-card`)
+- Use PascalCase for React components (`InstallCard.tsx`)
+
+📝 Required Files per Component:
+- `index.tsx`: main component
+- `index.ts`: exports
+- `install-card.docs.mdx`: docs
+- `install-card.compositions.tsx`: playground test
+- `install-card.spec.tsx`: test
+
+# 📘 NEW PHASE DIRECTIVES: PROTOTYPE CLIENT DEPLOYMENT
+
+# 🚀 AgencyStack Prototype Phase Directives## 🧭 OBJECTIVE
+
+Deploy a fully-functional, client-ready AgencyStack VM capable of:
+
+*   Hosting client workloads securely
+*   Managing app lifecycles via dashboard
+*   Demonstrating real-time monitoring + SSO
+*   Offering agency services with integrated open-source apps
+
+* * *
+
+  
+
+## 🔁 PRIORITY COMPONENT UPGRADES### 1. Enable TLS + SSO on Dashboard- \[ \] Add `--enable-keycloak` logic to dashboard install script
+
+- [ ]     Update Traefik labels to enforce HTTPS redirect
+- [ ]     Validate login via Keycloak realm (OIDC)
+
+  
+
+### 2\. Integrate `pgvector` (AI Agent Backend Readiness)- \[ \] Finalize `install_pgvector.sh` with `docker-compose` Postgres plugin or package manager
+
+- [ ]     Update Makefile + registry flags
+- [ ]     Add AI tool dependency notes to `/docs/pages/components/pgvector.md`\### 3. Validate Cryptosync Vaults- \[ \] Mount + test encryption workflow (can be mocked in `scripts/mock/mock_cryptosync.sh`)
+- [ ]     Ensure local + remote backup logic exists
+- [ ]     Add real health status reporting to dashboard JSON (see `dashboard_data.json`)
+
+* * *
+
+  
+
+## 🧪 TESTING & VALIDATION### Full Stack Checks\`\`\`bash
+
+make install-all
+
+make alpha-check
+
+make vm-test-rich
+
+###   
+
+### Per-Com
+
+```go
+make dashboard-status
+make pgvector-test
+make portainer-status
+make erpnext-status
+```
+
+* * *
+
+## 📂 DOCUMENTATION & REGISTRY CONSISTENCY
+
+### Docs to Write/Update:
+
+*   `docs/pages/components/pgvector.md`
+*   `docs/pages/components/cryptosync.md`
+*   `docs/pages/components/dashboard.md` (update for SSO)
+
+### Registry Fixes:
+
+*   Add `sso_configured: true` to any Keycloak-integrated app post-verification
+*   Add new `monitoring: true` for all dashboard-enabled tools
+
+* * *
+
+## 🧩 NEXT FEATURE SPRINT SUGGESTIONS
+
+*   🔧 Add Backup Scheduler (`restic` or `borg` container w/ Cron)
+*   📈 Integrate Uptime Kuma into dashboard (monitoring layer)
+*   🔁 Develop `bootstrap_client.sh` to provision + configure per-client app bundles
+*   📡 Begin [Merge.dev](http://Merge.dev) connector R&D for ERP/CRM syncing
+
+* * *
+
+## 🧠 MINDSET FOR THIS PHASE
+
+You are transitioning from Alpha to live pilot — ensure **repeatability**, **auditability**, and **sovereign readiness** for:
+
+*   Small agencies
+*   Event organizers
+*   Independent creators
+*   Community-run co-ops

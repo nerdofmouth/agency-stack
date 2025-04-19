@@ -142,6 +142,9 @@ help:
 	@echo "  $(BOLD)make peertube-restart$(RESET)         Restart PeerTube"
 	@echo "  $(BOLD)make peertube-upgrade$(RESET)         Upgrade PeerTube to v7.0"
 	@echo "  $(BOLD)make install-mirotalk-sfu$(RESET)     Install MiroTalk SFU - Video Conferencing"
+	@echo "  $(BOLD)make ssl-certificates$(RESET)         Interactively configure SSL certificates with Let's Encrypt"
+	@echo "  $(BOLD)make ssl-certificates-status$(RESET)  Check status of SSL certificates"
+	@echo "  $(BOLD)make traefik-ssl$(RESET)              Configure SSL certificates for Traefik (non-interactive)"
 
 # Install AgencyStack
 install: validate
@@ -630,7 +633,7 @@ validate-report: validate
 # Prerequisites Component
 prerequisites: validate
 	@echo "$(MAGENTA)$(BOLD)🔧 Installing System Prerequisites...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/install_prerequisites.sh $(if $(DOMAIN),--domain $(DOMAIN),) $(if $(ADMIN_EMAIL),--admin-email $(ADMIN_EMAIL),) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+	@sudo $(SCRIPTS_DIR)/components/install_prerequisites.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
 prerequisites-status:
 	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking System Prerequisites Status...$(RESET)"
@@ -650,12 +653,17 @@ prerequisites-restart:
 	@echo "$(MAGENTA)$(BOLD)🔄 Reinstalling System Prerequisites...$(RESET)"
 	@echo "$(YELLOW)Removing Prerequisites marker file...$(RESET)"
 	@sudo rm -f /opt/agency_stack/.prerequisites_ok 
-	@sudo $(SCRIPTS_DIR)/components/install_prerequisites.sh $(if $(DOMAIN),--domain $(DOMAIN),) $(if $(ADMIN_EMAIL),--admin-email $(ADMIN_EMAIL),) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+	@sudo $(SCRIPTS_DIR)/components/install_prerequisites.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
 # WordPress
 install-wordpress: validate
-	@echo "Installing WordPress..."
+	@echo "$(MAGENTA)$(BOLD)🌐 Installing WordPress...$(RESET)"
 	@sudo $(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+# WordPress with SSO integration (convenience target)
+wordpress-sso: validate
+	@echo "$(MAGENTA)$(BOLD)🌐 Installing WordPress with Keycloak SSO integration...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) --enable-keycloak $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
 # ERPNext
 install-erpnext: validate
@@ -997,7 +1005,7 @@ etebase-restart:
 etebase-backup:
 	@echo "$(MAGENTA)$(BOLD)💾 Backing up Etebase data...$(RESET)"
 	@$(CONFIG_DIR)/clients/$(CLIENT_ID)/etebase/scripts/backup.sh "$(CLIENT_ID)" "$(CONFIG_DIR)/backups/etebase"
-	@echo "$(GREEN)Backup completed to: $(CONFIG_DIR)/backups/etebase$(RESET)"
+	@echo "Backup completed: $(CONFIG_DIR)/backups/etebase"
 
 etebase-config:
 	@echo "$(MAGENTA)$(BOLD)⚙️ Opening Etebase configuration...$(RESET)"
@@ -1284,7 +1292,7 @@ show-dev-workflow:
 alpha-check:
 	@echo "$(MAGENTA)$(BOLD)🧪 Running AgencyStack Alpha validation...$(RESET)"
 	@echo "$(CYAN)Verifying all components against DevOps standards...$(RESET)"
-	@$(SCRIPTS_DIR)/utils/validate_components.sh --report --verbose || true
+	@bash $(SCRIPTS_DIR)/utils/validate_components.sh --report --verbose || true
 	@echo ""
 	@echo "$(CYAN)Summary from component validation:$(RESET)"
 	@if [ -f "$(PWD)/component_validation_report.md" ]; then \
@@ -1312,6 +1320,9 @@ alpha-check:
 	else \
 		echo "$(YELLOW)⚠️ Quick audit script not found. Skipping check.$(RESET)"; \
 	fi
+	
+	@echo "$(CYAN)Running TLS/SSO registry validation...$(RESET)"
+	@bash $(ROOT_DIR)/scripts/utils/tls_sso_registry_check.sh >/dev/null || echo "$(YELLOW)⚠️ TLS/SSO registry issues found - run 'make registry-tls-sso-check' for details$(RESET)"
 	
 	@echo ""
 	@echo "$(GREEN)$(BOLD)✅ Alpha validation complete!$(RESET)"
@@ -1598,6 +1609,21 @@ component-restart:
 /home/revelationx/CascadeProjects/foss-server-stack/config/registry/component-registry.json-restart:
 	@echo "TODO: Implement /home/revelationx/CascadeProjects/foss-server-stack/config/registry/component-registry.json-restart"
 	@exit 1
+
+# WordPress
+install-wordpress: validate
+	@echo "$(MAGENTA)$(BOLD)🌐 Installing WordPress...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+# WordPress with SSO integration (convenience target)
+wordpress-sso: validate
+	@echo "$(MAGENTA)$(BOLD)🌐 Installing WordPress with Keycloak SSO integration...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) --enable-keycloak $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+# Crowdsec
+crowdsec: validate
+	@echo "$(MAGENTA)$(BOLD)🔒 Installing CrowdSec security automation...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_crowdsec.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
 # Configure PeerTube Keycloak SSO integration
 peertube-sso-configure: validate
@@ -2363,3 +2389,99 @@ beta-fix:
 		make keycloak-restart && make traefik-restart && make prometheus-restart"
 	@echo "$(GREEN)✓ Fix operations completed$(RESET)"
 	@echo "$(CYAN)Run 'make beta-status REMOTE_VM_SSH=$(REMOTE_VM_SSH) DOMAIN=$(your-domain)' to verify fixes$(RESET)"
+
+configure-dev-sudo:
+	@echo "$(MAGENTA)$(BOLD)🔑 Configuring passwordless sudo for development...$(RESET)"
+	@if [ "$$(id -u)" -ne 0 ]; then \
+		echo "$(YELLOW)Creating sudoers configuration for current user...$(RESET)"; \
+		USER=$$(whoami); \
+		echo "$$USER ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/$$USER-nopasswd > /dev/null; \
+		sudo chmod 0440 /etc/sudoers.d/$$USER-nopasswd; \
+		echo "$(GREEN)✓ Passwordless sudo configured for user $$USER$(RESET)"; \
+		echo "$(YELLOW)Note: This is for DEVELOPMENT environments only!$(RESET)"; \
+		echo "$(YELLOW)Warning: Remove this configuration for production environments with 'make remove-dev-sudo'$(RESET)"; \
+	else \
+		echo "$(RED)This command should not be run as root.$(RESET)"; \
+		exit 1; \
+	fi
+
+remove-dev-sudo:
+	@echo "$(MAGENTA)$(BOLD)🔑 Removing passwordless sudo configuration...$(RESET)"
+	@if [ "$$(id -u)" -ne 0 ]; then \
+		USER=$$(whoami); \
+		if [ -f "/etc/sudoers.d/$$USER-nopasswd" ]; then \
+			sudo rm -f /etc/sudoers.d/$$USER-nopasswd; \
+			echo "$(GREEN)✓ Passwordless sudo configuration removed for user $$USER$(RESET)"; \
+		else \
+			echo "$(YELLOW)No passwordless sudo configuration found for user $$USER$(RESET)"; \
+		fi; \
+	else \
+		echo "$(RED)This command should not be run as root.$(RESET)"; \
+		exit 1; \
+	fi
+
+# TLS/SSO Verification Targets
+tls-verify: validate
+	@echo "$(MAGENTA)$(BOLD)🔒 Verifying TLS configuration...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: DOMAIN parameter is required$(RESET)"; \
+		echo "Usage: make tls-verify DOMAIN=agency.proto002.nerdofmouth.com [VERBOSE=true]"; \
+		exit 1; \
+	fi
+	@echo "$(CYAN)Checking TLS for $(BOLD)$(DOMAIN)$(RESET)"
+	@bash $(ROOT_DIR)/scripts/utils/tls_verify.sh --domain $(DOMAIN) $(if $(filter true,$(VERBOSE)),--verbose,)
+
+tls-status: tls-verify
+
+sso-status: validate
+	@echo "$(MAGENTA)$(BOLD)🔑 Checking SSO integration status...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: DOMAIN parameter is required$(RESET)"; \
+		echo "Usage: make sso-status DOMAIN=agency.proto002.nerdofmouth.com [CLIENT_ID=default] [VERBOSE=true]"; \
+		exit 1; \
+	fi
+	@echo "$(CYAN)Checking SSO integration for $(BOLD)$(DOMAIN)$(RESET)"
+	@bash $(ROOT_DIR)/scripts/utils/sso_status.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(filter true,$(VERBOSE)),--verbose,)
+	
+dashboard-sso-check: validate
+	@echo "$(MAGENTA)$(BOLD)🔑 Checking dashboard SSO integration...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: DOMAIN parameter is required$(RESET)"; \
+		echo "Usage: make dashboard-sso-check DOMAIN=agency.proto002.nerdofmouth.com [CLIENT_ID=default]"; \
+		exit 1; \
+	fi
+	@echo "$(CYAN)Checking dashboard SSO for $(BOLD)$(DOMAIN)$(RESET)"
+	@bash $(ROOT_DIR)/scripts/utils/sso_status.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) --no-realm-check
+
+# TLS and SSO status check for alpha validation
+tls-sso-alpha-check: validate
+	@echo "$(MAGENTA)$(BOLD)🔒 Validating TLS/SSO Configuration...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: DOMAIN parameter is required$(RESET)"; \
+		echo "Usage: make tls-sso-alpha-check DOMAIN=agency.proto002.nerdofmouth.com [CLIENT_ID=default]"; \
+		exit 1; \
+	fi
+	@echo "$(CYAN)Running comprehensive TLS/SSO validation for $(BOLD)$(DOMAIN)$(RESET)"
+	@echo "$(YELLOW)⚡ TLS Certificate Verification:$(RESET)"
+	@bash $(ROOT_DIR)/scripts/utils/tls_verify.sh --domain $(DOMAIN) || echo "$(RED)✗ TLS verification failed$(RESET)"
+	@echo ""
+	@echo "$(YELLOW)⚡ SSO Integration Check:$(RESET)"
+	@bash $(ROOT_DIR)/scripts/utils/sso_status.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) || echo "$(RED)✗ SSO status check failed$(RESET)"
+	@echo ""
+	@echo "$(GREEN)✓ TLS/SSO alpha check complete$(RESET)"
+
+# TLS/SSO Registry Validation and Fixing Utility
+registry-tls-sso-check: validate
+	@echo "$(MAGENTA)$(BOLD)🔍 Validating Component Registry TLS/SSO Configuration...$(RESET)"
+	@bash $(ROOT_DIR)/scripts/utils/tls_sso_registry_check.sh $(if $(filter true,$(VERBOSE)),--verbose,)
+
+registry-tls-sso-fix: validate
+	@echo "$(MAGENTA)$(BOLD)🔧 Fixing Component Registry TLS/SSO Entries...$(RESET)"
+	@echo "$(YELLOW)⚠️ This will modify component registry entries. Continue? [y/N]$(RESET)"
+	@read -p "" CONFIRM; \
+	if [ "$${CONFIRM}" = "y" ] || [ "$${CONFIRM}" = "Y" ]; then \
+		bash $(ROOT_DIR)/scripts/utils/tls_sso_registry_check.sh --fix-issues $(if $(filter true,$(VERBOSE)),--verbose,); \
+	else \
+		echo "$(YELLOW)Operation cancelled$(RESET)"; \
+	fi
+```
