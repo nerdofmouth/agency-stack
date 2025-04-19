@@ -67,28 +67,27 @@ This document provides a comprehensive list of all port assignments used by Agen
 | **Mastodon** | Streaming | 4000 | HTTP | Streaming API |
 | **Etebase** | Web API | 8732 | HTTP | Encrypted CalDAV/CardDAV server |
 
-## Communication Systems
+## Communication & Collaboration
 
 | Component | Service | Port | Protocol | Notes |
 |-----------|---------|------|----------|-------|
-| **VoIP** | SIP | 5060 | TCP/UDP | Session Initiation Protocol |
-| **VoIP** | RTP | 10000-20000 | UDP | Real-time audio streams |
-| **Mailu** | SMTP | 25 | TCP | Mail server (receiving) |
-| **Mailu** | Submission | 587 | TCP | Mail server (sending) |
-| **Mailu** | IMAP | 143/993 | TCP | Mail access |
-| **Mailu** | Admin UI | 8080 | HTTP | Admin interface |
+| **Jitsi Meet** | Web UI | 443 | HTTPS | Video conferencing (via Traefik) |
+| **Jitsi Meet** | XMPP | 5222 | TCP | XMPP signaling |
+| **Jitsi Meet** | Video Bridge | 10000 | UDP | Media stream |
+| **Jitsi Meet** | Conference Focus | 5347 | TCP | Jicofo component |
+| **FusionPBX/VOIP** | Web UI | 8082 | HTTP | Administration interface |
+| **FusionPBX/VOIP** | SIP | 5060 | UDP/TCP | SIP signaling |
+| **FusionPBX/VOIP** | SIP-TLS | 5061 | TLS | Secure SIP signaling |
+| **FusionPBX/VOIP** | RTP | 16384-32768 | UDP | Voice/media traffic |
+| **Mailu** | SMTP | 25 | TCP | Mail server (incoming) |
+| **Mailu** | SMTP Submission | 587 | TCP | Mail submission (outgoing) |
+| **Mailu** | IMAP | 143 | TCP | Mail access |
+| **Mailu** | IMAPS | 993 | TCP | Secure mail access |
+| **Mailu** | Web UI | 8081 | HTTP | Administration interface |
+| **Chatwoot** | Web UI | 3002 | HTTP | Customer service platform |
 | **MiroTalk SFU** | Web UI | 3000 | HTTP | Video conferencing interface |
 | **MiroTalk SFU** | Metrics | 3001 | HTTP | Prometheus metrics endpoint |
 | **MiroTalk SFU** | WebRTC | Dynamic | UDP | Media streaming |
-
-## Security & Identity
-
-| Component | Service | Port | Protocol | Notes |
-|-----------|---------|------|----------|-------|
-| **Keycloak** | Web UI | 8080 | HTTP | SSO and IAM |
-| **Vault** | Web UI | 8200 | HTTP | Secret management |
-| **Crowdsec** | API | 8080 | HTTP | Security automation |
-| **OWASP ZAP** | UI | 8090 | HTTP | Security scanning |
 
 ## Email & Communication
 
@@ -106,6 +105,24 @@ This document provides a comprehensive list of all port assignments used by Agen
 | **VoIP** | Web UI | 8082 | HTTP | FusionPBX UI |
 | **VoIP** | Admin UI | 8445 | HTTPS | FusionPBX Admin |
 | **Listmonk** | Web UI | 9000 | HTTP | Newsletter & list management |
+
+## Security & Identity
+
+| Component | Service | Port | Protocol | Notes |
+|-----------|---------|------|----------|-------|
+| **Keycloak** | Web UI | 8080 | HTTP | SSO and IAM |
+| **Vault** | Web UI | 8200 | HTTP | Secret management |
+| **Crowdsec** | API | 8080 | HTTP | Security automation |
+| **OWASP ZAP** | UI | 8090 | HTTP | Security scanning |
+
+## Analytics & Monitoring
+
+| Component | Service | Port | Protocol | Notes |
+|-----------|---------|------|----------|-------|
+| **PostHog** | Web UI | 8000 | HTTP | Analytics platform |
+| **PostHog** | API | 8000 | HTTP | Data collection endpoint |
+| **Matomo** | Web UI | 8084 | HTTP | Alternative analytics |
+| **Uptime Kuma** | Web UI | 3001 | HTTP | Monitoring dashboard |
 
 ## Monitoring & Observability
 
@@ -136,3 +153,10 @@ When adding new components to AgencyStack, please follow these guidelines:
 - **2000-3000**: Reserved for development and testing
 - **8000-8999**: General web services
 - **9000-9999**: Administrative interfaces and metrics endpoints
+
+## Design System (Bit.dev Integration)
+
+| Component | Port | Protocol | Purpose |
+|-----------|------|----------|---------|
+| Design System Dashboard | 3333 | HTTP | Dashboard for design system components and integration |
+| Bit Dev Server | 3000 | HTTP | Component development and live preview environment |

@@ -37,17 +37,19 @@ log_success() {
 }
 
 # Default values
-DASHBOARD_PORT=3001
+DASHBOARD_PORT="${DASHBOARD_PORT:-3001}"
 DASHBOARD_DIR="/opt/agency_stack/apps/dashboard"
-CLIENT_ID=${CLIENT_ID:-default}
-DOMAIN=${DOMAIN:-localhost}
-KEYCLOAK_REALM=${KEYCLOAK_REALM:-agency_stack}
-KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-dashboard}
-DASHBOARD_LOGS_DIR="/var/log/agency_stack/components"
+CLIENT_ID="${CLIENT_ID:-default}"
+DOMAIN="${DOMAIN:-localhost}"
+KEYCLOAK_REALM="${KEYCLOAK_REALM:-agency_stack}"
+KEYCLOAK_CLIENT_ID="${KEYCLOAK_CLIENT_ID:-dashboard}"
+DASHBOARD_LOGS_DIR="/var/log/agency_stack/components/dashboard"
 DASHBOARD_REPO="https://github.com/nerdofmouth/agency-stack-dashboard.git"
 DASHBOARD_BRANCH="main"
 CONFIGURE_ONLY=false
-USE_HOST_NETWORK=${USE_HOST_NETWORK:-true}
+USE_HOST_NETWORK="${USE_HOST_NETWORK:-true}"  # Default to host network mode for better compatibility
+ENABLE_KEYCLOAK="${ENABLE_KEYCLOAK:-false}"  # Default to not using Keycloak
+ENFORCE_HTTPS="${ENFORCE_HTTPS:-false}"  # Default to not enforcing HTTPS
 
 # Parse command-line arguments
 ADMIN_EMAIL=""
@@ -59,7 +61,6 @@ ENABLE_OPENAI=false
 USE_GITHUB=false
 ENABLE_KEYCLOAK=false
 
-# Process arguments
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --domain)
@@ -104,6 +105,18 @@ while [[ $# -gt 0 ]]; do
       ;;
     --use-host-network)
       USE_HOST_NETWORK="$2"
+      shift 2
+      ;;
+    --enforce-https)
+      ENFORCE_HTTPS=true
+      shift
+      ;;
+    --keycloak-realm)
+      KEYCLOAK_REALM="$2"
+      shift 2
+      ;;
+    --keycloak-client-id)
+      KEYCLOAK_CLIENT_ID="$2"
       shift 2
       ;;
     --configure-only)
@@ -213,6 +226,143 @@ check_keycloak() {
   fi
 }
 
+# Configure Keycloak SSO integration
+configure_keycloak_sso() {
+  log_info "Configuring Keycloak SSO integration for dashboard..."
+  
+  if [[ "$ENABLE_KEYCLOAK" != "true" ]]; then
+    log_info "Keycloak SSO integration not enabled, skipping"
+    return 0
+  fi
+  
+  log_info "Checking Keycloak availability at https://${DOMAIN}/auth"
+  
+  # Check if Keycloak is accessible
+  if ! curl -s -k -m 5 "https://${DOMAIN}/auth" > /dev/null; then
+    log_warning "Keycloak is not accessible at https://${DOMAIN}/auth"
+    log_warning "SSO integration will be configured but may not work until Keycloak becomes available"
+    # Continue anyway to ensure config is in place for when Keycloak becomes available
+  else
+    log_success "Keycloak is accessible"
+    
+    # Try to register the client automatically if admin credentials are available
+    if [[ -f "/opt/agency_stack/clients/${CLIENT_ID}/keycloak/.credentials" ]]; then
+      log_info "Found Keycloak credentials, attempting automatic client registration"
+      
+      # Source credentials
+      source "/opt/agency_stack/clients/${CLIENT_ID}/keycloak/.credentials"
+      
+      # Prepare client registration JSON
+      local client_json=$(cat <<EOF
+{
+  "clientId": "${KEYCLOAK_CLIENT_ID}",
+  "name": "AgencyStack Dashboard",
+  "description": "SSO Client for AgencyStack Dashboard",
+  "enabled": true,
+  "publicClient": false,
+  "redirectUris": ["https://${DOMAIN}/*", "https://${DOMAIN}/dashboard/*"],
+  "webOrigins": ["https://${DOMAIN}"],
+  "standardFlowEnabled": true,
+  "implicitFlowEnabled": false,
+  "directAccessGrantsEnabled": true,
+  "serviceAccountsEnabled": true,
+  "authorizationServicesEnabled": true,
+  "fullScopeAllowed": true
+}
+EOF
+)
+      
+      # Try to register the client
+      log_info "Attempting to register dashboard client with Keycloak"
+      
+      # Get admin token
+      local token=$(curl -s -d "client_id=admin-cli" -d "username=$KEYCLOAK_ADMIN" -d "password=$KEYCLOAK_ADMIN_PASSWORD" -d "grant_type=password" "https://${DOMAIN}/auth/realms/master/protocol/openid-connect/token" | jq -r '.access_token')
+      
+      # Register client
+      curl -s -H "Authorization: Bearer $token" -H "Content-Type: application/json" -d "$client_json" "https://${DOMAIN}/auth/admin/realms/${KEYCLOAK_REALM}/clients" || {
+        log_error "Failed to register dashboard client with Keycloak"
+        return 1
+      }
+      
+      # Get client secret
+      local client_secret=$(curl -s -H "Authorization: Bearer $token" "https://${DOMAIN}/auth/admin/realms/${KEYCLOAK_REALM}/clients/${KEYCLOAK_CLIENT_ID}/client-secret" | jq -r '.value')
+      
+      # Update .env.local with client secret
+      sed -i "s|^KEYCLOAK_CLIENT_SECRET=.*|KEYCLOAK_CLIENT_SECRET=${client_secret}|" "${DASHBOARD_DIR}/.env.local"
+      
+      log_success "Dashboard client registration successful"
+    else
+      log_warning "No Keycloak credentials found, manual client registration will be required"
+      log_info "Please register https://${DOMAIN} as a client in Keycloak realm ${KEYCLOAK_REALM}"
+    fi
+  fi
+  
+  # Create an install marker to indicate SSO integration was configured
+  mkdir -p "/opt/agency_stack/clients/${CLIENT_ID}/apps/dashboard/sso"
+  touch "/opt/agency_stack/clients/${CLIENT_ID}/apps/dashboard/sso/.sso_configured"
+  
+  # Update component registry
+  update_component_registry
+  
+  log_success "Keycloak SSO integration configured for dashboard"
+  return 0
+}
+
+# Update component registry for dashboard
+update_component_registry() {
+  log_info "Updating component registry for dashboard..."
+  
+  # Path to component registry
+  local registry_file="/opt/agency_stack/config/registry/component_registry.json"
+  
+  # Check if registry file exists
+  if [[ ! -f "${registry_file}" ]]; then
+    log_warning "Component registry file not found at ${registry_file}"
+    return 1
+  }
+  
+  # Create a backup of the registry file
+  cp "${registry_file}" "${registry_file}.bak.$(date +%Y%m%d%H%M%S)"
+  
+  # Check if jq is installed, if not, try to install it
+  if ! command -v jq &> /dev/null; then
+    log_info "jq is required for registry updates, attempting to install..."
+    apt-get update -qq && apt-get install -y jq
+    
+    if ! command -v jq &> /dev/null; then
+      log_error "Failed to install jq, registry cannot be updated automatically"
+      return 1
+    fi
+  }
+  
+  # Update the registry file
+  if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
+    # Update SSO configuration status
+    local temp_file=$(mktemp)
+    if jq '.components.ui.dashboard.integration_status.sso = true | .components.ui.dashboard.integration_status.sso_configured = true | .components.ui.dashboard.integration_status.traefik_tls = true' "${registry_file}" > "${temp_file}"; then
+      mv "${temp_file}" "${registry_file}"
+      log_success "Component registry updated for dashboard with SSO and TLS configuration"
+    else
+      log_error "Failed to update component registry for dashboard"
+      rm -f "${temp_file}"
+      return 1
+    fi
+  else
+    # Only update installed status
+    local temp_file=$(mktemp)
+    if jq '.components.ui.dashboard.integration_status.installed = true' "${registry_file}" > "${temp_file}"; then
+      mv "${temp_file}" "${registry_file}"
+      log_success "Component registry updated for dashboard"
+    else
+      log_error "Failed to update component registry for dashboard"
+      rm -f "${temp_file}"
+      return 1
+    fi
+  }
+  
+  return 0
+}
+
 # Setup dashboard source code
 setup_dashboard_source() {
   log_info "Setting up dashboard source code..."
@@ -255,6 +405,29 @@ KEYCLOAK_REALM="${KEYCLOAK_REALM}"
 KEYCLOAK_CLIENT_ID="${KEYCLOAK_CLIENT_ID}"
 COMPONENTS_LOG_DIR="${DASHBOARD_LOGS_DIR}"
 EOF
+
+  # Add SSO configuration if Keycloak is enabled
+  if [[ "$ENABLE_KEYCLOAK" == "true" ]]; then
+    log_info "Adding SSO configuration for Keycloak integration"
+    cat >> "${DASHBOARD_DIR}/.env.local" <<EOF
+# SSO Configuration
+NEXTAUTH_URL="https://${DOMAIN}"
+NEXTAUTH_SECRET="$(openssl rand -hex 32)"
+ENFORCE_SSO=true
+SSO_PROVIDER="keycloak"
+SSO_CLIENT_ID="${KEYCLOAK_CLIENT_ID}"
+SSO_CLIENT_SECRET=""
+SSO_ISSUER="https://${DOMAIN}/auth/realms/${KEYCLOAK_REALM}"
+EOF
+    
+    # Create a record of the SSO configuration for reference
+    mkdir -p "/opt/agency_stack/clients/${CLIENT_ID}/apps/dashboard/sso"
+    cp "${DASHBOARD_DIR}/.env.local" "/opt/agency_stack/clients/${CLIENT_ID}/apps/dashboard/sso/config"
+    
+    # Update component registry to indicate SSO is configured
+    log_info "Updating component registry for SSO configuration"
+    # This will be handled in a separate function
+  fi
   
   log_success "Environment configuration generated."
 }
@@ -401,7 +574,7 @@ EOF
   return 0
 }
 
-# Create Traefik route configuration for the dashboard
+# Configure Traefik routes for the dashboard
 configure_traefik_routes() {
   log_info "Configuring Traefik routes for dashboard access..."
   log_info "Network mode: ${USE_HOST_NETWORK}"
@@ -507,6 +680,30 @@ EOL
   log_success "Dashboard routes configured successfully"
 }
 
+# Configure Traefik routing
+configure_traefik_routing() {
+  log_info "Configuring Traefik routing..."
+  
+  # Prepare arguments to pass to the route configuration script
+  route_args=("--domain" "${DOMAIN}" "--client-id" "${CLIENT_ID}" "--use-host-network" "${USE_HOST_NETWORK}")
+  
+  # Add Keycloak argument if enabled
+  if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
+    route_args+=("--enable-keycloak")
+  fi
+  
+  # Add HTTPS enforcement argument if enabled
+  if [[ "${ENFORCE_HTTPS}" == "true" ]]; then
+    route_args+=("--enforce-https")
+  fi
+  
+  # Call the route configuration script with the prepared arguments
+  "${SCRIPT_DIR}/configure_dashboard_route.sh" "${route_args[@]}" || {
+    log_error "Failed to configure Traefik routing"
+    exit 1
+  }
+}
+
 # Check DNS resolution for the dashboard domain
 check_dns_resolution() {
   log_info "Checking DNS resolution for ${DOMAIN}..."
@@ -597,8 +794,8 @@ main() {
   if [[ "${CONFIGURE_ONLY}" == "true" ]]; then
     log_info "Running in configure-only mode"
     
-    # Configure Traefik routes for dashboard access
-    configure_traefik_routes
+    # Configure Traefik routing
+    configure_traefik_routing
     
     # Check DNS resolution
     check_dns_resolution
@@ -637,6 +834,9 @@ main() {
     }
   fi
   
+  # Configure Keycloak SSO integration
+  configure_keycloak_sso
+  
   # Setup dashboard source code
   setup_dashboard_source || {
     log_error "Failed to setup dashboard source code"
@@ -655,8 +855,8 @@ main() {
     return 1
   }
   
-  # Configure Traefik routes for dashboard access
-  configure_traefik_routes
+  # Configure Traefik routing
+  configure_traefik_routing
   
   # Check DNS resolution
   check_dns_resolution

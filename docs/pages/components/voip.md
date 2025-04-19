@@ -14,6 +14,7 @@ The VoIP stack combines:
 - **FreeSWITCH**: A scalable open source telephony platform
 - **PostgreSQL**: Database for call records and configuration
 - **Traefik Integration**: Secure TLS-protected access to web interfaces
+- **Keycloak SSO**: Optional single sign-on integration for secure authentication
 
 ## Technical Specifications
 
@@ -46,6 +47,9 @@ The VoIP stack combines:
 # Basic installation
 make install-voip DOMAIN=voip.yourdomain.com ADMIN_EMAIL=admin@yourdomain.com
 
+# Installation with Keycloak SSO integration
+make install-voip DOMAIN=voip.yourdomain.com ADMIN_EMAIL=admin@yourdomain.com ENABLE_KEYCLOAK=true
+
 # With client ID for multi-tenancy
 make install-voip DOMAIN=voip.client1.com ADMIN_EMAIL=admin@client1.com CLIENT_ID=client1
 
@@ -53,7 +57,7 @@ make install-voip DOMAIN=voip.client1.com ADMIN_EMAIL=admin@client1.com CLIENT_I
 make install-voip DOMAIN=voip.yourdomain.com ADMIN_EMAIL=admin@yourdomain.com WITH_DEPS=true FORCE=true VERBOSE=true
 ```
 
-### Command Line Options
+### Installation Options
 
 The installation script (`install_voip.sh`) supports the following options:
 
@@ -64,6 +68,80 @@ The installation script (`install_voip.sh`) supports the following options:
 - `--force`: Force installation even if already installed
 - `--verbose`: Show detailed output during installation
 - `--help`: Show help message and exit
+- `--enable-keycloak`: Enable Keycloak SSO integration
+- `--enforce-https`: Enforce HTTPS redirects
+- `--fusionpbx-version`: Version of FusionPBX to install
+- `--freeswitch-version`: Version of FreeSWITCH to install
+
+## Keycloak SSO Integration
+
+The VoIP component can be integrated with Keycloak for single sign-on authentication. This provides:
+
+- Unified authentication across all AgencyStack components
+- Role-based access control for VoIP administration
+- Enhanced security with multi-factor authentication options
+- Centralized user management
+
+### Enabling SSO Integration
+
+To enable SSO integration during installation:
+
+```bash
+scripts/components/install_voip.sh \
+  --domain yourdomain.com \
+  --admin-email admin@yourdomain.com \
+  --enable-keycloak
+```
+
+Or using the Makefile:
+
+```bash
+make voip DOMAIN=yourdomain.com ADMIN_EMAIL=admin@yourdomain.com ENABLE_KEYCLOAK=true
+```
+
+### SSO Configuration
+
+When SSO is enabled, the following configurations are applied:
+
+1. A client is registered in Keycloak with appropriate redirect URIs
+2. SSO integration files are created in the VoIP directory
+3. The component registry is updated with `sso_configured: true`
+4. FusionPBX is configured to use Keycloak for authentication
+
+### Verifying SSO Integration
+
+To verify that SSO integration is correctly configured:
+
+1. Check the component registry for SSO status:
+   ```bash
+   make voip-status
+   ```
+
+2. Verify the SSO configuration files exist:
+   ```bash
+   ls -la /opt/agency_stack/clients/<CLIENT_ID>/voip/<DOMAIN>/sso/
+   ```
+
+3. Access the FusionPBX web interface and verify it redirects to Keycloak login.
+
+### Troubleshooting SSO
+
+If SSO integration is not working as expected:
+
+1. Check the VoIP installation logs:
+   ```bash
+   cat /var/log/agency_stack/components/voip.log | grep -i keycloak
+   ```
+
+2. Verify Keycloak is running and accessible:
+   ```bash
+   make keycloak-status
+   ```
+
+3. Check SSO configuration file permissions:
+   ```bash
+   ls -la /opt/agency_stack/clients/<CLIENT_ID>/voip/<DOMAIN>/sso/
+   ```
 
 ## Management
 

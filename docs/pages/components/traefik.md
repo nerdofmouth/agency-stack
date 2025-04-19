@@ -139,6 +139,7 @@ make traefik-status
 - Automatic certificate management via Let's Encrypt
 - Modern TLS protocols and ciphers configured
 - HSTS enabled for improved security
+For comprehensive information about SSL certificate management, please see the dedicated [SSL Certificates documentation](./ssl-certificates.md).
 
 ### Hardening
 - No access logs containing sensitive information
