@@ -919,7 +919,6 @@ spinner() {
 install_component() {
   local component=$1
   local script=""
-  
   case $component in
     1) script="install_prerequisites.sh" ;;
     2) script="install_docker.sh" ;;
@@ -950,144 +949,15 @@ install_component() {
     27) script="install_signing_timestamps.sh" ;;
     28) script="install_backup_strategy.sh" ;;
     29) script="install_markdown_lexical.sh" ;;
-    30) script="install_launchpad_dashboard.sh" ;;
+    30) script="install_launchpad-dashboard.sh" ;;
     31) script="install_builderio.sh" ;;
     32) script="install_loki.sh" ;;
     33) script="install_grafana.sh" ;;
     34) script="install_wordpress.sh" ;;
     35) script="install_erpnext.sh" ;;
-    40) 
-      echo -e "${BLUE}${BOLD} Installing AgencyStack Core Components...${NC}"
-      log "INFO" "Installing core components bundle"
-      install_component 1 && install_component 2 && install_component 3 && 
-      install_component 4 && install_component 5 && install_component 24 && install_component 30
-      return $?
-      ;;
-    50) 
-      script="install_all.sh" 
-      log "INFO" "Installing all AgencyStack components"
-      ;;
-    60) 
-      if [ -f "$PORT_MANAGER" ]; then
-        echo -e "${CYAN}${BOLD} Current Port Allocations:${NC}"
-        "$PORT_MANAGER" list
-      else
-        echo -e "${RED} Port manager not found${NC}"
-      fi
-      return 0
-      ;;
-    70)
-      echo -e "${CYAN}${BOLD} AgencyStack System Status:${NC}"
-      echo -e "${YELLOW} Docker Containers:${NC}"
-      docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || echo -e "${RED} Docker not running${NC}"
-      echo -e "\n${YELLOW} Disk Usage:${NC}"
-      df -h | grep -v tmpfs
-      echo -e "\n${YELLOW} Memory Usage:${NC}"
-      free -h
-      return 0
-      ;;
-    80)
-      echo -e "${CYAN}${BOLD} AgencyStack Installation Log:${NC}"
-      if [ -f "$LOGFILE" ]; then
-        tail -n 50 "$LOGFILE" | less
-      else
-        echo -e "${RED} Log file not found${NC}"
-      fi
-      return 0
-      ;;
-    *) echo -e "${RED} Invalid option${NC}"; return 1 ;;
+    *) script="install_stub.sh" ;;
   esac
-  
-  # Check if the component is already installed successfully
-  local state=$(get_state "$script")
-  if [ "$state" == "installed" ]; then
-    echo -e "${YELLOW} Component $script is already installed.${NC}"
-    read -p "Do you want to reinstall? [y/N]: " REINSTALL
-    if [[ "${REINSTALL,,}" != "y" ]]; then
-      log "INFO" "Skipping already installed component: $script"
-      echo -e "${BLUE} Skipping installation of $script${NC}"
-      return 0
-    fi
-    log "INFO" "Reinstalling component: $script"
-    echo -e "${BLUE} Reinstalling $script${NC}"
-  fi
-  
-  echo -e "\n${GREEN}${BOLD} Installing AgencyStack component: $script ${NC}"
-  log "INFO" "Installing component: $script"
-  
-  # Update component state to pending
-  update_state "$script" "pending"
-  
-  # Check if script exists in main directory or components subdirectory
-  if [ -f "$SCRIPT_DIR/$script" ]; then
-    SCRIPT_PATH="$SCRIPT_DIR/$script"
-  elif [ -f "$SCRIPT_DIR/components/$script" ]; then
-    SCRIPT_PATH="$SCRIPT_DIR/components/$script"
-  else
-    update_state "$script" "failed"
-    log "ERROR" "Script not found: $script"
-    echo -e "${RED} Script not found: $script${NC}"
-    return 1
-  fi
-  
-  # Create a progress bar
-  echo -ne "${YELLOW}Progress: [                    ] 0%${NC}\r"
-  
-  # Run the script and capture output to log
-  (bash "$SCRIPT_PATH" 2>&1 | tee -a "$LOGFILE") &
-  local pid=$!
-  
-  # Show spinner while the script is running
-  while kill -0 $pid 2>/dev/null; do
-    for i in {1..40}; do
-      if kill -0 $pid 2>/dev/null; then
-        sleep 0.1
-        percent=$((i * 100 / 40))
-        completed=$((i / 2))
-        remaining=$((20 - completed))
-        progress="["
-        for ((j=0; j<completed; j++)); do progress+="#"; done
-        for ((j=0; j<remaining; j++)); do progress+=" "; done
-        progress+="]"
-        echo -ne "${YELLOW}Progress: $progress $percent%${NC}\r"
-      else
-        break
-      fi
-    done
-  done
-  
-  wait $pid
-  local exit_code=$?
-  
-  echo -ne "${GREEN}Progress: [####################] 100%${NC}\n"
-  
-  if [ $exit_code -eq 0 ]; then
-    update_state "$script" "installed"
-    log "INFO" "Installation of $script completed successfully"
-    echo -e "${GREEN}${BOLD} AgencyStack component $script installed successfully${NC}"
-    # Record successful installation
-    echo "$(date +"%Y-%m-%d %H:%M:%S") - $script" >> /opt/agency_stack/installed_components.txt
-    
-    # Show motto after successful installation
-    source "$SCRIPT_PATH/agency_branding.sh" && random_tagline
-    echo ""
-    
-    # Show port allocation if port manager exists
-    if [ -f "$PORT_MANAGER" ]; then
-      local ports=$("$PORT_MANAGER" list 2>/dev/null)
-      if [ -n "$ports" ]; then
-        echo -e "${CYAN}Updated port allocations after installation:${NC}"
-        echo "$ports" | grep -i "$(basename "$script" .sh)" || echo "$ports" | tail -n 3
-      fi
-    fi
-    
-    return 0
-  else
-    update_state "$script" "failed"
-    log "ERROR" "Installation of $script failed with exit code $exit_code"
-    echo -e "${RED}${BOLD} AgencyStack component $script installation failed${NC}"
-    return 1
-  fi
+  bash "$(dirname "$0")/components/$script"
 }
 
 # Function to handle error recovery
