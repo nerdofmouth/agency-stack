@@ -20,6 +20,15 @@ if [ "$ONE_LINE_MODE" = true ]; then
   export APT_LISTBUGS_FRONTEND=none
 fi
 
+# Set default domain from argument or environment
+for arg in "$@"; do
+  case $arg in
+    --domain=*)
+      DOMAIN="${arg#*=}"
+      ;;
+  esac
+done
+
 # Installation variables
 SCRIPT_DIR="$(dirname "$0")/agency_stack_bootstrap_bundle_v10"
 PARENT_DIR=$(dirname "$SCRIPT_DIR")
@@ -642,11 +651,11 @@ if [ ! -f "/opt/agency_stack/config.env" ]; then
   log "INFO" "Starting initial configuration"
   
   # Gather domain information
-  if [ "$INTERACTIVE" = true ]; then
-    print_info "Please enter your primary domain name"
-    read -p "Primary domain [example.com]: " PRIMARY_DOMAIN
-  fi
-  PRIMARY_DOMAIN=${PRIMARY_DOMAIN:-example.com}
+  DEFAULT_DOMAIN="${DOMAIN:-example.com}"
+  read -p "Primary domain [${DEFAULT_DOMAIN}]: " PRIMARY_DOMAIN_INPUT
+  PRIMARY_DOMAIN="${PRIMARY_DOMAIN_INPUT:-$DEFAULT_DOMAIN}"
+  DOMAIN="$PRIMARY_DOMAIN"
+  export DOMAIN
   
   # Generate subdomain configurations
   DASHBOARD_DOMAIN="dashboard.${PRIMARY_DOMAIN}"

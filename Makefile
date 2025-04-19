@@ -149,7 +149,7 @@ help:
 # Install AgencyStack
 install: validate
 	@echo "🔧 Installing AgencyStack..."
-	@sudo $(SCRIPTS_DIR)/install.sh
+	@sudo $(SCRIPTS_DIR)/install.sh --domain=$(DOMAIN)
 
 # Update AgencyStack
 update:

@@ -292,6 +292,9 @@ check_network_requirements() {
     elif [ "$DOMAIN_IP" = "$PUBLIC_IP" ]; then
       echo "✅ Domain: $DOMAIN correctly points to $PUBLIC_IP" >> "$REPORT_FILE"
       log_success "Domain check passed: $DOMAIN points to $PUBLIC_IP"
+    elif [ "$DOMAIN_IP" = "127.0.0.1" ]; then
+      echo "⚠️  Domain: $DOMAIN resolves to 127.0.0.1 (local/dev override)" >> "$REPORT_FILE"
+      log_warning "Domain check: $DOMAIN resolves to 127.0.0.1 (allowing for local/dev)"
     else
       echo "❌ Domain: $DOMAIN points to $DOMAIN_IP, not to this server's IP ($PUBLIC_IP)" >> "$REPORT_FILE"
       log_error "Domain check failed: $DOMAIN points to $DOMAIN_IP, not to $PUBLIC_IP"
