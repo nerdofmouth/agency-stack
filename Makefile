@@ -1216,6 +1216,13 @@ vm-deploy:
 		tar xzf - && \
 		chown -R root:root . && \
 		chmod -R 755 ."
+	@echo "$(CYAN)Extracting and deploying on remote VM...$(RESET)"
+	@ssh ${REMOTE_VM_SSH} "bash -s" << 'EOF' || exit 1
+	cd /opt/agency_stack
+	echo "Starting installation..."
+	make install-all DOMAIN='$(DOMAIN)' $(if $(CLIENT_ID),CLIENT_ID='$(CLIENT_ID)',)
+	make beta-check DOMAIN='$(DOMAIN)' $(if $(CLIENT_ID),CLIENT_ID='$(CLIENT_ID)',)
+	EOF
 	@echo "$(GREEN)$(BOLD)✅ Deployment complete!$(RESET)"
 
 # Open a shell on the remote VM
@@ -2487,3 +2494,15 @@ registry-tls-sso-fix: validate
 	else \
 		echo "$(YELLOW)Operation cancelled$(RESET)"; \
 	fi
+
+# Lint all shell scripts with shellcheck
+shellcheck:
+	bash scripts/utils/lint_shell.sh
+
+# Lint only component scripts
+shellcheck-components:
+	bash scripts/utils/lint_shell.sh scripts/components
+
+# Lint only utility scripts
+shellcheck-utils:
+	bash scripts/utils/lint_shell.sh scripts/utils
