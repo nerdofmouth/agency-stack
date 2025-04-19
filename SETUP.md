@@ -6,6 +6,7 @@ This document provides step-by-step instructions for setting up AgencyStack on a
 - [System Requirements](#system-requirements)
 - [Prerequisites](#prerequisites)
 - [Installation Process](#installation-process)
+- [Remote/VM Deployment Workflow (Alpha Phase)](#remotevm-deployment-workflow-alpha-phase)
 - [Post-Installation Configuration](#post-installation-configuration)
 - [Client Setup](#client-setup)
 - [Troubleshooting](#troubleshooting)
@@ -102,6 +103,60 @@ sudo ./scripts/install.sh
 ```
 
 When prompted, select option 40 for core components only.
+
+## Remote/VM Deployment Workflow (Alpha Phase)
+
+**All installations and tests must be performed inside a VM or Docker container.**
+
+### Steps:
+1. **Commit and push all local changes.**
+2. **Create a secure deploy user on the VM:**
+   ```bash
+   bash scripts/utils/create_deploy_user.sh
+   ```
+3. **Set up passwordless SSH:**
+   ```bash
+   bash scripts/utils/setup_ssh_key.sh <key_path> <remote_host> <remote_user>
+   ```
+4. **Deploy the repo or component:**
+   ```bash
+   bash scripts/utils/deploy_to_remote.sh \
+     --remote-host <VM_IP> \
+     --remote-user <deploy_user> \
+     --ssh-key <key_path> \
+     [--component <component_name>] \
+     --verbose
+   ```
+   - For full repo: omit `--component`
+   - For component-only: specify `--component pgvector`, `dashboard`, etc.
+5. **SSH into the VM/container:**
+   ```bash
+   ssh <deploy_user>@<VM_IP>
+   cd /opt/agency_stack
+   ```
+6. **Run installation or test commands:**
+   ```bash
+   make pgvector-test
+   make dashboard ENABLE_KEYCLOAK=true
+   make alpha-check
+   ```
+7. **Fix paths and permissions if needed:**
+   ```bash
+   bash scripts/utils/fix_remote_paths.sh
+   ```
+8. **Check logs and validate:**
+   - Logs: `/var/log/agency_stack/components/`
+   - Use `make vm-test-rich` for VM validation
+
+**Never install directly on the host. All deployments must be reproducible from the repository and occur inside a managed VM/container.**
+
+---
+
+### Troubleshooting/Notes
+- Ensure all changes are committed before deploying.
+- Use the provided scripts for all remote and container operations.
+- For Docker-based dev VMs, see `scripts/utils/create_base_docker_dev.sh`.
+- For more details, see `scripts/utils/deploy_to_remote.sh` and `scripts/utils/fix_remote_paths.sh`.
 
 ## Post-Installation Configuration
 
