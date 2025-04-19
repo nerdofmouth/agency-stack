@@ -49,11 +49,31 @@ To enable Keycloak SSO integration during dashboard installation:
 
 ```bash
 # Install dashboard with Keycloak SSO integration enabled
-make dashboard DOMAIN=yourdomain.com ENABLE_KEYCLOAK=true
+make dashboard DOMAIN=yourdomain.com --enable-keycloak
 
 # For more control over configuration options
 scripts/components/install_dashboard.sh --domain yourdomain.com --enable-keycloak --keycloak-realm myrealm
 ```
+
+### TLS/SSO Validation
+
+After installation with Keycloak SSO enabled, you can verify the configuration:
+
+```bash
+# Verify SSO integration status
+make dashboard-sso-check DOMAIN=yourdomain.com
+
+# Check complete SSO status including realm configuration
+make sso-status DOMAIN=yourdomain.com
+
+# Verify TLS configuration for secure access
+make tls-verify DOMAIN=yourdomain.com
+```
+
+These verification commands ensure that:
+1. The dashboard is properly registered as a Keycloak client
+2. Authentication flows work correctly
+3. TLS certificates are valid and HTTPS redirection is working
 
 ### Configuration Options
 
@@ -85,7 +105,7 @@ For production deployments, it's recommended to enforce HTTPS to ensure secure a
 make dashboard DOMAIN=yourdomain.com ENFORCE_HTTPS=true
 
 # Combined with Keycloak SSO for maximum security
-make dashboard DOMAIN=yourdomain.com ENABLE_KEYCLOAK=true ENFORCE_HTTPS=true
+make dashboard DOMAIN=yourdomain.com --enable-keycloak ENFORCE_HTTPS=true
 ```
 
 When HTTPS enforcement is enabled, all HTTP traffic will be automatically redirected to HTTPS for secure access.

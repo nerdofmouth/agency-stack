@@ -141,10 +141,10 @@ help:
 	@echo "  $(BOLD)make peertube-start$(RESET)           Start PeerTube"
 	@echo "  $(BOLD)make peertube-restart$(RESET)         Restart PeerTube"
 	@echo "  $(BOLD)make peertube-upgrade$(RESET)         Upgrade PeerTube to v7.0"
+	@echo "  $(BOLD)make install-mirotalk-sfu$(RESET)     Install MiroTalk SFU - Video Conferencing"
 	@echo "  $(BOLD)make ssl-certificates$(RESET)         Interactively configure SSL certificates with Let's Encrypt"
 	@echo "  $(BOLD)make ssl-certificates-status$(RESET)  Check status of SSL certificates"
 	@echo "  $(BOLD)make traefik-ssl$(RESET)              Configure SSL certificates for Traefik (non-interactive)"
-	@echo "  $(BOLD)make install-mirotalk-sfu$(RESET)     Install MiroTalk SFU - Video Conferencing"
 
 # Install AgencyStack
 install: validate
@@ -633,7 +633,7 @@ validate-report: validate
 # Prerequisites Component
 prerequisites: validate
 	@echo "$(MAGENTA)$(BOLD)🔧 Installing System Prerequisites...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/install_prerequisites.sh $(if $(DOMAIN),--domain $(DOMAIN),) $(if $(ADMIN_EMAIL),--admin-email $(ADMIN_EMAIL),) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+	@sudo $(SCRIPTS_DIR)/components/install_prerequisites.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
 prerequisites-status:
 	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking System Prerequisites Status...$(RESET)"
@@ -653,7 +653,7 @@ prerequisites-restart:
 	@echo "$(MAGENTA)$(BOLD)🔄 Reinstalling System Prerequisites...$(RESET)"
 	@echo "$(YELLOW)Removing Prerequisites marker file...$(RESET)"
 	@sudo rm -f /opt/agency_stack/.prerequisites_ok 
-	@sudo $(SCRIPTS_DIR)/components/install_prerequisites.sh $(if $(DOMAIN),--domain $(DOMAIN),) $(if $(ADMIN_EMAIL),--admin-email $(ADMIN_EMAIL),) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+	@sudo $(SCRIPTS_DIR)/components/install_prerequisites.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
 # WordPress
 install-wordpress: validate
@@ -1005,7 +1005,7 @@ etebase-restart:
 etebase-backup:
 	@echo "$(MAGENTA)$(BOLD)💾 Backing up Etebase data...$(RESET)"
 	@$(CONFIG_DIR)/clients/$(CLIENT_ID)/etebase/scripts/backup.sh "$(CLIENT_ID)" "$(CONFIG_DIR)/backups/etebase"
-	@echo "Backup completed to: $(CONFIG_DIR)/backups/etebase"
+	@echo "Backup completed: $(CONFIG_DIR)/backups/etebase"
 
 etebase-config:
 	@echo "$(MAGENTA)$(BOLD)⚙️ Opening Etebase configuration...$(RESET)"
@@ -1292,7 +1292,7 @@ show-dev-workflow:
 alpha-check:
 	@echo "$(MAGENTA)$(BOLD)🧪 Running AgencyStack Alpha validation...$(RESET)"
 	@echo "$(CYAN)Verifying all components against DevOps standards...$(RESET)"
-	@$(SCRIPTS_DIR)/utils/validate_components.sh --report --verbose || true
+	@bash $(SCRIPTS_DIR)/utils/validate_components.sh --report --verbose || true
 	@echo ""
 	@echo "$(CYAN)Summary from component validation:$(RESET)"
 	@if [ -f "$(PWD)/component_validation_report.md" ]; then \
@@ -1320,6 +1320,9 @@ alpha-check:
 	else \
 		echo "$(YELLOW)⚠️ Quick audit script not found. Skipping check.$(RESET)"; \
 	fi
+	
+	@echo "$(CYAN)Running TLS/SSO registry validation...$(RESET)"
+	@bash $(ROOT_DIR)/scripts/utils/tls_sso_registry_check.sh >/dev/null || echo "$(YELLOW)⚠️ TLS/SSO registry issues found - run 'make registry-tls-sso-check' for details$(RESET)"
 	
 	@echo ""
 	@echo "$(GREEN)$(BOLD)✅ Alpha validation complete!$(RESET)"
@@ -1729,262 +1732,6 @@ sync-oauth-dashboard:
 		$(if $(FORCE),--force,) \
 		$(if $(VERBOSE),--verbose,) \
 		$(if $(DRY_RUN),--dry-run,)
-
-# SSO Integration targets
-sso-integrate:
-	@echo "🔒 Integrating component with Keycloak SSO..."
-	@if [ -z "$(COMPONENT)" ]; then \
-		echo "Error: COMPONENT parameter is required. Usage: make sso-integrate COMPONENT=name FRAMEWORK=nodejs COMPONENT_URL=https://example.com"; \
-		exit 1; \
-	fi
-	@if [ -z "$(FRAMEWORK)" ]; then \
-		echo "Error: FRAMEWORK parameter is required. Valid options: nodejs, python, docker"; \
-		exit 1; \
-	fi
-	@if [ -z "$(COMPONENT_URL)" ]; then \
-		echo "Error: COMPONENT_URL parameter is required."; \
-		exit 1; \
-	fi
-	@sudo $(SCRIPTS_DIR)/components/implement_sso_integration.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) --client-id $(CLIENT_ID) --component $(COMPONENT) --framework $(FRAMEWORK) --component-url $(COMPONENT_URL) $(if $(FORCE),--force,) $(if $(VERBOSE),--verbose,)
-
-# WordPress SSO integration
-wordpress-sso:
-	@echo "🔒 Integrating WordPress with Keycloak SSO..."
-	@sudo $(SCRIPTS_DIR)/components/implement_sso_integration.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) --client-id $(CLIENT_ID) --component wordpress --framework php --component-url https://wordpress.$(DOMAIN) $(if $(FORCE),--force,) $(if $(VERBOSE),--verbose,)
-
-# WordPress SSO integration (convenience target)
-wordpress-sso-configure: validate
-	@echo "$(MAGENTA)$(BOLD)🔑 Configuring WordPress SSO Integration...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/keycloak/configure_wordpress_client.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(VERBOSE),--verbose,)
-
-# Test WordPress-Keycloak SSO integration
-wordpress-sso-test: validate
-	@echo "$(MAGENTA)$(BOLD)🧪 Testing WordPress SSO Integration...$(RESET)"
-	@if [ -n "$(CLIENT_ID)" ]; then \
-		WP_CONTAINER="$(CLIENT_ID)_wordpress"; \
-	else \
-		WP_CONTAINER="wordpress"; \
-	fi; \
-	if docker ps --format '{{.Names}}' | grep -q "$$WP_CONTAINER"; then \
-		echo "$(GREEN)✅ WordPress is running$(RESET)"; \
-		echo "$(CYAN)Testing OAuth configuration...$(RESET)"; \
-		OAUTH_CONFIG="/opt/agency_stack/clients/$(or $(CLIENT_ID),default)/wordpress_data/wp-content/plugins/nextcloud-auth/config/config.json"; \
-		if [ -f "$$OAUTH_CONFIG" ]; then \
-			echo "$(GREEN)✅ OAuth configuration exists:$(RESET)"; \
-			cat "$$OAUTH_CONFIG"; \
-			echo ""; \
-			echo "$(CYAN)Testing Keycloak connection...$(RESET)"; \
-			OPENID_URL=$$(grep "openid_url" "$$OAUTH_CONFIG" | awk -F"'" '{print $$2}'); \
-			if [ -n "$$OPENID_URL" ]; then \
-				echo "$(CYAN)Checking OpenID configuration at: $$OPENID_URL$(RESET)"; \
-				curl -s "$$OPENID_URL" | grep -q "issuer" && echo "$(GREEN)✅ Keycloak OpenID configuration is accessible$(RESET)" || echo "$(RED)❌ Keycloak OpenID configuration is not accessible$(RESET)"; \
-			else \
-				echo "$(RED)❌ Could not determine OpenID configuration URL$(RESET)"; \
-			fi; \
-		else \
-			echo "$(RED)❌ OAuth configuration not found$(RESET)"; \
-			echo "$(CYAN)Run: make wordpress-sso-configure DOMAIN=$(DOMAIN)$(RESET)"; \
-		fi; \
-	else \
-		echo "$(RED)❌ WordPress is not running$(RESET)"; \
-		echo "$(CYAN)Start WordPress with: make wordpress-restart$(RESET)"; \
-	fi
-
-# Traefik
-traefik: validate
-	@echo "$(MAGENTA)$(BOLD)🔄 Installing Traefik Reverse Proxy...$(RESET)"
-	@read -p "$(YELLOW)Use host network mode? (true/false, default: true):$(RESET) " USE_HOST_NETWORK; \
-	USE_HOST_NETWORK="$${USE_HOST_NETWORK:-true}"; \
-	echo "$(CYAN)Using network mode: $${USE_HOST_NETWORK}$(RESET)"; \
-	sudo $(SCRIPTS_DIR)/components/install_traefik.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) --use-host-network=$${USE_HOST_NETWORK} $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
-# Auto-generated target for traefik
-traefik-status:
-	@echo "$(MAGENTA)$(BOLD)🔍 Checking Traefik Status...$(RESET)"
-	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/traefik/.installed_ok" ]; then \
-		echo "$(GREEN)✅ Traefik is installed$(RESET)"; \
-		if docker ps | grep -q "traefik_$(CLIENT_ID)"; then \
-			echo "$(GREEN)✅ Traefik container is running$(RESET)"; \
-			docker ps | grep traefik; \
-			echo ""; \
-			echo "$(CYAN)Configuration files:$(RESET)"; \
-			ls -la /opt/agency_stack/clients/$(CLIENT_ID)/traefik/config/; \
-		else \
-			echo "$(RED)❌ Traefik container is not running$(RESET)"; \
-		fi; \
-	else \
-		echo "$(RED)❌ Traefik is not installed$(RESET)"; \
-		echo "$(CYAN)To install, run: make traefik DOMAIN=$(DOMAIN)$(RESET)"; \
-		exit 1; \
-	fi
-
-# Auto-generated target for traefik
-traefik-logs:
-	@echo "$(MAGENTA)$(BOLD)📜 Viewing Traefik Logs...$(RESET)"
-	@if [ -f "/var/log/agency_stack/components/traefik.log" ]; then \
-		echo "$(CYAN)Installation logs:$(RESET)"; \
-		tail -n 20 /var/log/agency_stack/components/traefik.log; \
-		echo ""; \
-		echo "$(CYAN)Container logs:$(RESET)"; \
-		docker logs traefik_$(CLIENT_ID) --tail 20; \
-	else \
-		echo "$(YELLOW)Traefik logs not found.$(RESET)"; \
-		echo "$(CYAN)Container logs:$(RESET)"; \
-		docker logs traefik_$(CLIENT_ID) --tail 20 2>/dev/null || echo "$(RED)No container logs found.$(RESET)"; \
-	fi
-
-# Auto-generated target for traefik
-traefik-restart:
-	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Traefik...$(RESET)"
-	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/traefik/docker-compose.yml" ]; then \
-		cd /opt/agency_stack/clients/$(CLIENT_ID)/traefik && docker-compose restart; \
-		echo "$(GREEN)✅ Traefik has been restarted$(RESET)"; \
-	else \
-		echo "$(RED)❌ Traefik docker-compose.yml not found$(RESET)"; \
-		echo "$(CYAN)To install, run: make traefik DOMAIN=$(DOMAIN)$(RESET)"; \
-		exit 1; \
-	fi
-
-# Dashboard Component - installation & management
-# -------------------------------------------------------------------------------
-dashboard: validate
-	@echo "$(MAGENTA)$(BOLD)🖥️  Installing Dashboard...$(RESET)"
-	@read -p "$(YELLOW)Use host network mode? (true/false, default: true):$(RESET) " USE_HOST_NETWORK; \
-	USE_HOST_NETWORK="$${USE_HOST_NETWORK:-true}"; \
-	read -p "$(YELLOW)Enable Keycloak SSO integration? (true/false, default: false):$(RESET) " ENABLE_KEYCLOAK; \
-	ENABLE_KEYCLOAK="$${ENABLE_KEYCLOAK:-false}"; \
-	read -p "$(YELLOW)Enforce HTTPS? (true/false, default: false):$(RESET) " ENFORCE_HTTPS; \
-	ENFORCE_HTTPS="$${ENFORCE_HTTPS:-false}"; \
-	echo "$(CYAN)Using network mode: $${USE_HOST_NETWORK}$(RESET)"; \
-	echo "$(CYAN)Keycloak SSO integration: $${ENABLE_KEYCLOAK}$(RESET)"; \
-	echo "$(CYAN)HTTPS enforcement: $${ENFORCE_HTTPS}$(RESET)"; \
-	EXTRA_ARGS=""; \
-	if [ "$${ENABLE_KEYCLOAK}" = "true" ]; then EXTRA_ARGS="$${EXTRA_ARGS} --enable-keycloak"; fi; \
-	if [ "$${ENFORCE_HTTPS}" = "true" ]; then EXTRA_ARGS="$${EXTRA_ARGS} --enforce-https"; fi; \
-	sudo $(SCRIPTS_DIR)/components/install_dashboard.sh --domain $(DOMAIN) --use-host-network=$${USE_HOST_NETWORK} $${EXTRA_ARGS} $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
-# Dashboard with SSO integration
-dashboard-sso: validate
-	@echo "$(MAGENTA)$(BOLD)🖥️  Installing Dashboard with Keycloak SSO integration...$(RESET)"
-	@read -p "$(YELLOW)Use host network mode? (true/false, default: true):$(RESET) " USE_HOST_NETWORK; \
-	USE_HOST_NETWORK="$${USE_HOST_NETWORK:-true}"; \
-	echo "$(CYAN)Using network mode: $${USE_HOST_NETWORK}$(RESET)"; \
-	echo "$(CYAN)Keycloak SSO integration: enabled$(RESET)"; \
-	echo "$(CYAN)HTTPS enforcement: enabled$(RESET)"; \
-	sudo $(SCRIPTS_DIR)/components/install_dashboard.sh --domain $(DOMAIN) --use-host-network=$${USE_HOST_NETWORK} --enable-keycloak --enforce-https $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
-# Auto-generated target for dashboard
-dashboard-status:
-	@echo "$(MAGENTA)$(BOLD)🔍 Checking Dashboard Status...$(RESET)"
-	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/apps/dashboard/.installed_ok" ]; then \
-		echo "$(GREEN)✅ Dashboard is installed$(RESET)"; \
-		ps aux | grep -v grep | grep -q "dashboard" && echo "$(GREEN)✅ Dashboard process is running$(RESET)" || echo "$(RED)❌ Dashboard process is not running$(RESET)"; \
-		echo ""; \
-		echo "$(CYAN)SSO Status:$(RESET)"; \
-		if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/apps/dashboard/sso/.sso_configured" ]; then \
-			echo "$(GREEN)✅ SSO is configured$(RESET)"; \
-		else \
-			echo "$(YELLOW)⚠️ SSO is not configured$(RESET)"; \
-			echo "$(CYAN)To enable SSO, run: make dashboard-sso DOMAIN=$(DOMAIN)$(RESET)"; \
-		fi; \
-	else \
-		echo "$(RED)❌ Dashboard is not installed$(RESET)"; \
-		echo "$(CYAN)To install, run: make dashboard DOMAIN=$(DOMAIN)$(RESET)"; \
-		exit 1; \
-	fi
-
-# Auto-generated target for dashboard
-dashboard-logs:
-	@echo "$(MAGENTA)$(BOLD)📜 Viewing Dashboard Logs...$(RESET)"
-	@if [ -f "/var/log/agency_stack/components/dashboard/dashboard.log" ]; then \
-		echo "$(CYAN)Installation logs:$(RESET)"; \
-		tail -n 20 /var/log/agency_stack/components/dashboard/dashboard.log; \
-		echo ""; \
-		echo "$(CYAN)Application logs:$(RESET)"; \
-		tail -n 20 /var/log/agency_stack/components/dashboard/app.log 2>/dev/null || echo "$(YELLOW)No application logs found.$(RESET)"; \
-	else \
-		echo "$(YELLOW)Dashboard logs not found.$(RESET)"; \
-	fi
-
-# Auto-generated target for dashboard
-dashboard-restart:
-	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Dashboard...$(RESET)"
-	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/apps/dashboard/.installed_ok" ]; then \
-		echo "$(CYAN)Stopping dashboard process...$(RESET)"; \
-		pkill -f "node.*dashboard" || echo "$(YELLOW)No dashboard process found.$(RESET)"; \
-		sleep 2; \
-		echo "$(CYAN)Starting dashboard process...$(RESET)"; \
-		cd /opt/agency_stack/apps/dashboard && nohup npm start > /var/log/agency_stack/components/dashboard/app.log 2>&1 & \
-		echo "$(GREEN)✅ Dashboard has been restarted$(RESET)"; \
-	else \
-		echo "$(RED)❌ Dashboard is not installed$(RESET)"; \
-		echo "$(CYAN)To install, run: make dashboard DOMAIN=$(DOMAIN)$(RESET)"; \
-		exit 1; \
-	fi
-
-# DNS Configuration
-dns:
-	@echo "Configuring DNS for AgencyStack components..."
-	@read -p "Enter domain name (e.g., wordpress.proto001.alpha.nerdofmouth.com): " domain; \
-	read -p "Enter DNS provider (cloudflare): " provider; \
-	provider="$${provider:-cloudflare}"; \
-	scripts/components/install_dns.sh --domain $$domain --provider $$provider --force
-
-dns-wordpress:
-	@echo "Configuring DNS for WordPress..."
-	@scripts/components/install_dns.sh --domain wordpress.proto001.alpha.nerdofmouth.com --provider cloudflare --force
-
-dns-keycloak:
-	@echo "Configuring DNS for Keycloak..."
-	@scripts/components/install_dns.sh --domain keycloak.proto001.alpha.nerdofmouth.com --provider cloudflare --force
-
-dns-status:
-	@echo "DNS Configuration Status:"
-	@if [ -d "/opt/agency_stack/dns" ]; then \
-		for config in /opt/agency_stack/dns/*.json; do \
-			if [ -f "$$config" ]; then \
-				echo "--------------------------------------"; \
-				cat "$$config" | jq -r '"Domain: \(.domain)\nIP: \(.ip)\nStatus: Configured\nLast Updated: \(.last_updated)"'; \
-			fi \
-		done; \
-		echo "--------------------------------------"; \
-	else \
-		echo "No DNS configurations found."; \
-	fi
-
-# SSL Certificate Management
-ssl-certificates:
-	@echo "$(MAGENTA)$(BOLD)🔒 Configuring SSL certificates with Let's Encrypt...$(RESET)"
-	@read -p "$(YELLOW)Enter domain name (e.g., proto001.alpha.nerdofmouth.com):$(RESET) " domain; \
-	read -p "$(YELLOW)Enter admin email for certificate notifications:$(RESET) " email; \
-	$(SCRIPTS_DIR)/utils/update_traefik_certs.sh --domain $$domain --admin-email $$email --force
-
-ssl-certificates-status:
-	@echo "$(MAGENTA)$(BOLD)🔒 SSL Certificate Status...$(RESET)"
-	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/traefik/data/acme/acme.json" ]; then \
-		echo "$(CYAN)Certificate file exists. Checking content...$(RESET)"; \
-		cat /opt/agency_stack/clients/$(CLIENT_ID)/traefik/data/acme/acme.json | jq -r 'if . == {} then "No certificates issued yet." else "Certificates exist." end' 2>/dev/null || echo "Empty or invalid certificate file."; \
-		echo "$(CYAN)For detailed certificate information, run:$(RESET)"; \
-		echo "cat /opt/agency_stack/clients/$(CLIENT_ID)/traefik/data/acme/acme.json | jq"; \
-	else \
-		echo "$(RED)Certificate file not found.$(RESET)"; \
-		echo "$(CYAN)To configure certificates, run: make ssl-certificates$(RESET)"; \
-	fi
-
-traefik-ssl:
-	@echo "$(MAGENTA)$(BOLD)🔒 Configuring SSL certificates for Traefik...$(RESET)"
-	@if [ -z "$(DOMAIN)" ]; then \
-		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
-		echo "Usage: make traefik-ssl DOMAIN=proto001.alpha.nerdofmouth.com [ADMIN_EMAIL=admin@example.com]"; \
-		exit 1; \
-	fi; \
-	email="$(ADMIN_EMAIL)"; \
-	if [ -z "$$email" ]; then \
-		email="admin@$(DOMAIN)"; \
-	fi; \
-	echo "$(CYAN)Configuring SSL certificates for $(DOMAIN) with admin email: $$email$(RESET)"; \
-	$(SCRIPTS_DIR)/utils/update_traefik_certs.sh --domain $(DOMAIN) --admin-email $$email --force
->>>>>>> 5caa428a190126d4494dc3373ac07bf5dba9c7cf
 
 # MiroTalk SFU - Video Conferencing
 install-mirotalk-sfu: validate
@@ -2642,3 +2389,99 @@ beta-fix:
 		make keycloak-restart && make traefik-restart && make prometheus-restart"
 	@echo "$(GREEN)✓ Fix operations completed$(RESET)"
 	@echo "$(CYAN)Run 'make beta-status REMOTE_VM_SSH=$(REMOTE_VM_SSH) DOMAIN=$(your-domain)' to verify fixes$(RESET)"
+
+configure-dev-sudo:
+	@echo "$(MAGENTA)$(BOLD)🔑 Configuring passwordless sudo for development...$(RESET)"
+	@if [ "$$(id -u)" -ne 0 ]; then \
+		echo "$(YELLOW)Creating sudoers configuration for current user...$(RESET)"; \
+		USER=$$(whoami); \
+		echo "$$USER ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/$$USER-nopasswd > /dev/null; \
+		sudo chmod 0440 /etc/sudoers.d/$$USER-nopasswd; \
+		echo "$(GREEN)✓ Passwordless sudo configured for user $$USER$(RESET)"; \
+		echo "$(YELLOW)Note: This is for DEVELOPMENT environments only!$(RESET)"; \
+		echo "$(YELLOW)Warning: Remove this configuration for production environments with 'make remove-dev-sudo'$(RESET)"; \
+	else \
+		echo "$(RED)This command should not be run as root.$(RESET)"; \
+		exit 1; \
+	fi
+
+remove-dev-sudo:
+	@echo "$(MAGENTA)$(BOLD)🔑 Removing passwordless sudo configuration...$(RESET)"
+	@if [ "$$(id -u)" -ne 0 ]; then \
+		USER=$$(whoami); \
+		if [ -f "/etc/sudoers.d/$$USER-nopasswd" ]; then \
+			sudo rm -f /etc/sudoers.d/$$USER-nopasswd; \
+			echo "$(GREEN)✓ Passwordless sudo configuration removed for user $$USER$(RESET)"; \
+		else \
+			echo "$(YELLOW)No passwordless sudo configuration found for user $$USER$(RESET)"; \
+		fi; \
+	else \
+		echo "$(RED)This command should not be run as root.$(RESET)"; \
+		exit 1; \
+	fi
+
+# TLS/SSO Verification Targets
+tls-verify: validate
+	@echo "$(MAGENTA)$(BOLD)🔒 Verifying TLS configuration...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: DOMAIN parameter is required$(RESET)"; \
+		echo "Usage: make tls-verify DOMAIN=agency.proto002.nerdofmouth.com [VERBOSE=true]"; \
+		exit 1; \
+	fi
+	@echo "$(CYAN)Checking TLS for $(BOLD)$(DOMAIN)$(RESET)"
+	@bash $(ROOT_DIR)/scripts/utils/tls_verify.sh --domain $(DOMAIN) $(if $(filter true,$(VERBOSE)),--verbose,)
+
+tls-status: tls-verify
+
+sso-status: validate
+	@echo "$(MAGENTA)$(BOLD)🔑 Checking SSO integration status...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: DOMAIN parameter is required$(RESET)"; \
+		echo "Usage: make sso-status DOMAIN=agency.proto002.nerdofmouth.com [CLIENT_ID=default] [VERBOSE=true]"; \
+		exit 1; \
+	fi
+	@echo "$(CYAN)Checking SSO integration for $(BOLD)$(DOMAIN)$(RESET)"
+	@bash $(ROOT_DIR)/scripts/utils/sso_status.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(filter true,$(VERBOSE)),--verbose,)
+	
+dashboard-sso-check: validate
+	@echo "$(MAGENTA)$(BOLD)🔑 Checking dashboard SSO integration...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: DOMAIN parameter is required$(RESET)"; \
+		echo "Usage: make dashboard-sso-check DOMAIN=agency.proto002.nerdofmouth.com [CLIENT_ID=default]"; \
+		exit 1; \
+	fi
+	@echo "$(CYAN)Checking dashboard SSO for $(BOLD)$(DOMAIN)$(RESET)"
+	@bash $(ROOT_DIR)/scripts/utils/sso_status.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) --no-realm-check
+
+# TLS and SSO status check for alpha validation
+tls-sso-alpha-check: validate
+	@echo "$(MAGENTA)$(BOLD)🔒 Validating TLS/SSO Configuration...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: DOMAIN parameter is required$(RESET)"; \
+		echo "Usage: make tls-sso-alpha-check DOMAIN=agency.proto002.nerdofmouth.com [CLIENT_ID=default]"; \
+		exit 1; \
+	fi
+	@echo "$(CYAN)Running comprehensive TLS/SSO validation for $(BOLD)$(DOMAIN)$(RESET)"
+	@echo "$(YELLOW)⚡ TLS Certificate Verification:$(RESET)"
+	@bash $(ROOT_DIR)/scripts/utils/tls_verify.sh --domain $(DOMAIN) || echo "$(RED)✗ TLS verification failed$(RESET)"
+	@echo ""
+	@echo "$(YELLOW)⚡ SSO Integration Check:$(RESET)"
+	@bash $(ROOT_DIR)/scripts/utils/sso_status.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) || echo "$(RED)✗ SSO status check failed$(RESET)"
+	@echo ""
+	@echo "$(GREEN)✓ TLS/SSO alpha check complete$(RESET)"
+
+# TLS/SSO Registry Validation and Fixing Utility
+registry-tls-sso-check: validate
+	@echo "$(MAGENTA)$(BOLD)🔍 Validating Component Registry TLS/SSO Configuration...$(RESET)"
+	@bash $(ROOT_DIR)/scripts/utils/tls_sso_registry_check.sh $(if $(filter true,$(VERBOSE)),--verbose,)
+
+registry-tls-sso-fix: validate
+	@echo "$(MAGENTA)$(BOLD)🔧 Fixing Component Registry TLS/SSO Entries...$(RESET)"
+	@echo "$(YELLOW)⚠️ This will modify component registry entries. Continue? [y/N]$(RESET)"
+	@read -p "" CONFIRM; \
+	if [ "$${CONFIRM}" = "y" ] || [ "$${CONFIRM}" = "Y" ]; then \
+		bash $(ROOT_DIR)/scripts/utils/tls_sso_registry_check.sh --fix-issues $(if $(filter true,$(VERBOSE)),--verbose,); \
+	else \
+		echo "$(YELLOW)Operation cancelled$(RESET)"; \
+	fi
+```

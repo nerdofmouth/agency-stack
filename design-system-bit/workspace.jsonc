@@ -1,0 +1,42 @@
+{
+  "$schema": "https://static.bit.dev/teambit/schemas/schema.json",
+  "teambit.workspace/workspace": {
+    "name": "agency-stack-design-system",
+    "icon": "https://static.bit.dev/bit-logo.svg",
+    "defaultDirectory": "{scope}/{name}",
+    "defaultScope": "nerdofmouth.design-system"
+  },
+  "teambit.dependencies/dependency-resolver": {
+    "packageManager": "teambit.dependencies/pnpm",
+    "policy": {
+      "dependencies": {
+        "@teambit/harmony": "^0.2.10",
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0",
+        "tailwindcss": "^3.3.0",
+        "typescript": "^5.0.0"
+      },
+      "peerDependencies": {}
+    }
+  },
+  "teambit.generator/generator": {
+    "aspects": [
+      "nerdofmouth.design-system/generators/react-component"
+    ]
+  },
+  "teambit.preview/preview": {},
+  "teambit.component/dev-files": {
+    "devFilePatterns": [
+      "**/*.spec.tsx",
+      "**/*.test.tsx",
+      "**/*.docs.mdx",
+      "**/*.composition.tsx",
+      "**/*.stories.tsx"
+    ]
+  },
+  "teambit.workspace/variants": {
+    "components/**": {
+      "teambit.react/react": {}
+    }
+  }
+}
