@@ -624,9 +624,6 @@ check_resume() {
   return 1
 }
 
-# Initialize state tracking
-check_resume
-
 # Initial configuration
 if [ ! -f "/opt/agency_stack/config.env" ]; then
   log "INFO" "Initial configuration not found, running setup"
@@ -955,9 +952,16 @@ install_component() {
     33) script="install_grafana.sh" ;;
     34) script="install_wordpress.sh" ;;
     35) script="install_erpnext.sh" ;;
+    40)
+      # Core bundle: prerequisites, docker, compose, traefik, portainer, wordpress
+      install_component 1 && install_component 2 && install_component 3 && \
+      install_component 4 && install_component 5 && install_component 34
+      return $? ;;
     *) script="install_stub.sh" ;;
   esac
-  bash "$(dirname "$0")/components/$script"
+  if [ -n "$script" ]; then
+    bash "$(dirname "$0")/components/$script"
+  fi
 }
 
 # Function to handle error recovery
@@ -1106,6 +1110,11 @@ setup_basic_utilities() {
   echo -e "${GREEN}Basic utilities setup completed${NC}"
 }
 
+# Function to cleanup install state
+cleanup_install_state() {
+  bash "$(dirname "$0")/utils/cleanup_install_state.sh"
+}
+
 # Main menu
 main_menu() {
   clear
@@ -1137,6 +1146,11 @@ main_menu() {
     install_component $choice
     echo ""
     read -p "Press enter to continue..."
+  fi
+  
+  # Call cleanup automatically after successful install (core or all)
+  if [[ $choice -eq 40 || $choice -eq 50 ]]; then
+    cleanup_install_state
   fi
   
   echo ""

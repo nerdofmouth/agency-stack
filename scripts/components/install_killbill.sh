@@ -9,6 +9,9 @@
 
 set -eo pipefail
 
+# Use robust, portable path for helpers
+source "$(dirname "$0")/../utils/log_helpers.sh"
+
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../utils/common.sh"

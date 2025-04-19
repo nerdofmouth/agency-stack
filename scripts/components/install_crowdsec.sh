@@ -12,7 +12,7 @@ set -e
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../utils/common.sh"
-source "${SCRIPT_DIR}/../utils/log_helpers.sh"
+source "$(dirname "$0")/../utils/log_helpers.sh"
 
 # Default configuration
 CLIENT_ID="${CLIENT_ID:-default}"
