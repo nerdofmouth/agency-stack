@@ -99,7 +99,7 @@ update_component_registry() {
     if [ ! -f "${COMPONENT_REGISTRY}" ]; then
         log_warning "Component registry file not found: ${COMPONENT_REGISTRY}"
         return 1
-    }
+    fi
     
     # Check if jq is installed
     if ! command -v jq &>/dev/null; then
