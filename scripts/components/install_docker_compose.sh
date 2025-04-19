@@ -22,9 +22,9 @@ AGENCY_CLIENTS_DIR="${AGENCY_ROOT}/clients"
 AGENCY_SCRIPTS_DIR="${AGENCY_ROOT}/repo/scripts"
 AGENCY_UTILS_DIR="${AGENCY_SCRIPTS_DIR}/utils"
 
-# Import common utilities
-source "${AGENCY_UTILS_DIR}/common.sh"
-source "${AGENCY_UTILS_DIR}/log_helpers.sh"
+# Use a robust, portable path for common.sh
+source "$(dirname "$0")/../utils/common.sh"
+source "$(dirname "$0")/../utils/log_helpers.sh"
 
 # Define component-specific variables
 COMPONENT="docker_compose"

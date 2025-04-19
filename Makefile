@@ -601,6 +601,9 @@ cleanup:
 		echo "$(YELLOW)Cleanup aborted.$(RESET)"; \
 	fi
 
+install-cleanup:
+	bash scripts/utils/cleanup_install_state.sh
+
 # Component Registry Management Targets
 # ------------------------------------------------------------------------------
 
