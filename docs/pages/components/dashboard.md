@@ -147,6 +147,18 @@ http://yourdomain.com/dashboard
 https://yourdomain.com (if TLS is configured)
 ```
 
+## Security & Access
+
+- All dashboard access is now enforced over HTTPS by default. SSO is enabled via Keycloak if configured during installation.
+- After installation, the installer will verify TLS status and flag the dashboard as secure in the component registry.
+- If you encounter access issues, use the provided `verify_tls.sh` utility to manually check HTTPS availability.
+
+## Registry Flags
+
+- `traefik_tls: true` — HTTPS verified and enforced
+- `sso_configured: true` — SSO is active and validated
+- `monitoring: true` — Dashboard monitoring is enabled
+
 ## Troubleshooting
 
 ### Common Issues

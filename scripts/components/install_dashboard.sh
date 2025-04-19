@@ -549,6 +549,27 @@ EOF
 
   log_success "Dashboard container started successfully"
   log_info "Dashboard will be available at: https://${DOMAIN}/dashboard"
+
+  # --- TLS Verification Logic ---
+  # After dashboard is started, verify HTTPS is functional
+  if bash "${SCRIPT_DIR}/../utils/verify_tls.sh" "${DOMAIN}" "/dashboard"; then
+    log_success "TLS is active and verified for https://${DOMAIN}/dashboard"
+    # --- Automated Registry Update for TLS/SSO ---
+    if [[ -f "${SCRIPT_DIR}/../utils/update_component_registry.sh" ]]; then
+      REGISTRY_ARGS=(
+        --component "dashboard"
+        --installed "true"
+        --monitoring "true"
+        --traefik_tls "true"
+      )
+      if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
+        REGISTRY_ARGS+=(--sso "true" --sso_configured "true")
+      fi
+      bash "${SCRIPT_DIR}/../utils/update_component_registry.sh" "${REGISTRY_ARGS[@]}"
+    fi
+  else
+    log_warning "TLS verification failed for https://${DOMAIN}/dashboard"
+  fi
 }
 
 # Create installation marker

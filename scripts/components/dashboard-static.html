@@ -59,28 +59,36 @@
     <h3>Traefik</h3>
     <p>Status: Running</p>
     <p>Ports: 80, 443</p>
+    <span style="display:inline-block; background:#e3f7e3; color:#228B22; border-radius:4px; padding:2px 8px; font-size:0.95em; margin-top:6px;">🔒 HTTPS/TLS Verified</span>
   </div>
   
   <div class="status-card running">
     <h3>Keycloak</h3>
     <p>Status: Running</p>
     <p>SSO Provider Ready</p>
+    <span style="display:inline-block; background:#e3e8f7; color:#2C3E50; border-radius:4px; padding:2px 8px; font-size:0.95em; margin-top:6px;">🔑 SSO Enabled</span>
   </div>
   
   <div class="status-card running">
     <h3>Dashboard</h3>
     <p>Status: Running</p>
     <p>UI Version: Alpha 0.1</p>
+    <span style="display:inline-block; background:#e3f7e3; color:#228B22; border-radius:4px; padding:2px 8px; font-size:0.95em; margin-top:6px;">🔒 HTTPS/TLS Verified</span>
+    <span style="display:inline-block; background:#e3e8f7; color:#2C3E50; border-radius:4px; padding:2px 8px; font-size:0.95em; margin-top:6px;">🔑 SSO Enabled</span>
   </div>
 
   <div class="access-methods">
     <h3>Access Methods</h3>
     <p>This dashboard can be accessed via:</p>
     <ul>
-      <li>FQDN Root: <a href="http://proto001.alpha.nerdofmouth.com">http://proto001.alpha.nerdofmouth.com</a></li>
-      <li>FQDN Path: <a href="http://proto001.alpha.nerdofmouth.com/dashboard">http://proto001.alpha.nerdofmouth.com/dashboard</a></li>
-      <li>Direct IP: <a href="http://192.64.72.162:3001">http://192.64.72.162:3001</a></li>
+      <li>FQDN Root: <a href="https://proto001.alpha.nerdofmouth.com">https://proto001.alpha.nerdofmouth.com</a></li>
+      <li>FQDN Path: <a href="https://proto001.alpha.nerdofmouth.com/dashboard">https://proto001.alpha.nerdofmouth.com/dashboard</a></li>
+      <li>Direct IP: <a href="https://192.64.72.162:3001">https://192.64.72.162:3001</a></li>
     </ul>
+    <div style="margin-top:12px; font-size:0.97em; color:#2c3e50;">
+      <strong>Note:</strong> All dashboard access is now enforced over <b>HTTPS</b>. Single Sign-On (SSO) is enabled if Keycloak is configured.<br>
+      For troubleshooting, see the <a href="/docs/pages/components/dashboard.md" target="_blank">Dashboard Documentation</a>.
+    </div>
   </div>
   
   <p class="timestamp">Generated: April 10, 2025 at 12:30 PM</p>

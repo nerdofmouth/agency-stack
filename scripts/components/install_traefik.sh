@@ -337,6 +337,24 @@ if [[ "$DRY_RUN" != "true" ]]; then
     timeout 5 bash -c "echo > /dev/tcp/127.0.0.1/${HTTP_PORT}" &>/dev/null && log_success "HTTP port ${HTTP_PORT} is accessible" || log_warning "HTTP port ${HTTP_PORT} is not accessible"
     timeout 5 bash -c "echo > /dev/tcp/127.0.0.1/${HTTPS_PORT}" &>/dev/null && log_success "HTTPS port ${HTTPS_PORT} is accessible" || log_warning "HTTPS port ${HTTPS_PORT} is not accessible"
     
+    # --- TLS Verification Logic ---
+    # After Traefik is started and ports are checked, verify that HTTPS is actually functional
+    if bash "${SCRIPT_DIR}/../utils/verify_tls.sh" "${DOMAIN}"; then
+      log_success "TLS is active and verified for https://${DOMAIN}"
+      # --- Automated Registry Update for TLS ---
+      if [[ -f "${SCRIPT_DIR}/../utils/update_component_registry.sh" ]]; then
+        REGISTRY_ARGS=(
+          --component "traefik"
+          --installed "true"
+          --monitoring "true"
+          --traefik_tls "true"
+        )
+        bash "${SCRIPT_DIR}/../utils/update_component_registry.sh" "${REGISTRY_ARGS[@]}"
+      fi
+    else
+      log_warning "TLS verification failed for https://${DOMAIN}"
+    fi
+    
     # Final output
     log_success "traefik installation completed successfully!"
     log_info "Traefik Dashboard: https://${DOMAIN}/dashboard/"
