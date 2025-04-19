@@ -1,0 +1,63 @@
+FROM debian:12-slim
+
+# Install essential dependencies for AgencyStack
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    wget \
+    gnupg \
+    lsb-release \
+    ca-certificates \
+    make \
+    python3 \
+    python3-pip \
+    sudo \
+    vim \
+    jq \
+    net-tools \
+    iputils-ping \
+    apt-transport-https \
+    software-properties-common \
+    ssh \
+    openssh-server
+
+# Install Docker inside the container (Docker-in-Docker setup)
+RUN curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian \
+    $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null && \
+    apt-get update && \
+    apt-get install -y docker-ce docker-ce-cli containerd.io
+
+# Create a non-root user for AgencyStack development
+RUN useradd -m -s /bin/bash developer && \
+    echo "developer ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/developer && \
+    mkdir -p /home/developer/.ssh && \
+    chmod 700 /home/developer/.ssh && \
+    chown -R developer:developer /home/developer/.ssh
+
+# Add docker group and add developer to it
+RUN groupadd -f docker && \
+    usermod -aG docker developer
+
+# Set up SSH server
+RUN mkdir -p /var/run/sshd && \
+    echo 'developer:agencystack' | chpasswd && \
+    sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config && \
+    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+
+# Expose SSH port
+EXPOSE 22
+
+# Set up working directory
+WORKDIR /home/developer/agency-stack
+
+# Switch to the developer user
+USER developer
+
+# Entry point script to start SSH and keep container running
+COPY shared_data/entrypoint.sh /entrypoint.sh
+USER root
+RUN chmod +x /entrypoint.sh
+USER developer
+
+ENTRYPOINT ["/entrypoint.sh"]
