@@ -2484,4 +2484,3 @@ registry-tls-sso-fix: validate
 	else \
 		echo "$(YELLOW)Operation cancelled$(RESET)"; \
 	fi
-```
