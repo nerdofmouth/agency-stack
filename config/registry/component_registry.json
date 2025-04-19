@@ -34,7 +34,7 @@
           "logs": true,
           "docs": true,
           "auditable": true,
-          "traefik_tls": false,
+      "traefik_tls": true,
           "multi_tenant": true
         },
         "description": "Core system packages and configurations needed for all other components"
@@ -52,7 +52,7 @@
           "logs": true,
           "docs": true,
           "auditable": true,
-          "traefik_tls": false,
+      "traefik_tls": true,
           "multi_tenant": true
         },
         "description": "Vector database extension for PostgreSQL enabling AI-powered semantic search capabilities"
@@ -124,7 +124,7 @@
           "logs": true,
           "docs": true,
           "auditable": true,
-          "traefik_tls": false,
+      "traefik_tls": true,
           "multi_tenant": true
         },
         "description": "Container runtime engine"
@@ -142,7 +142,7 @@
           "logs": true,
           "docs": true,
           "auditable": true,
-          "traefik_tls": false,
+      "traefik_tls": true,
           "multi_tenant": true
         },
         "description": "Multi-container Docker application orchestration"
@@ -428,7 +428,7 @@
           "logs": true,
           "docs": true,
           "auditable": true,
-          "traefik_tls": false,
+      "traefik_tls": true,
           "multi_tenant": true
         },
         "description": "Intrusion prevention framework"
@@ -446,7 +446,7 @@
           "logs": true,
           "docs": true,
           "auditable": true,
-          "traefik_tls": false,
+      "traefik_tls": true,
           "multi_tenant": true
         },
         "description": "System security hardening measures"
@@ -464,7 +464,7 @@
           "logs": true,
           "docs": true,
           "auditable": true,
-          "traefik_tls": false,
+      "traefik_tls": true,
           "multi_tenant": true
         },
         "description": "Document signing and timestamping service"
@@ -502,7 +502,7 @@
           "logs": true,
           "docs": true,
           "auditable": true,
-          "traefik_tls": false,
+      "traefik_tls": true,
           "multi_tenant": true
         },
         "description": "Automated backup system using Restic"
@@ -764,6 +764,28 @@
           "metrics": 11435
         }
       }
+    }
+  },
+  "design-system": {
+    "name": "Design System",
+    "category": "Development",
+    "version": "1.0.0",
+    "integration_status": {
+      "installed": true,
+      "hardened": true,
+      "makefile": true,
+      "sso": false,
+      "dashboard": true,
+      "logs": true,
+      "docs": true,
+      "auditable": true,
+      "traefik_tls": true,
+      "multi_tenant": true
+    },
+    "description": "AgencyStack Design System with Bit.dev integration for component development",
+    "ports": {
+      "dashboard": 3333,
+      "bit_dev": 3000
     }
   }
 }

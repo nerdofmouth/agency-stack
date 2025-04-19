@@ -872,6 +872,69 @@ Here’s a tiered rollout plan, ranked by _immediate impact + strategic value_:
 
 REMEMBER: The repository is the single source of truth. VM state should always be reproducible from repository contents.
 
+# 🎨 AgencyStack Design System – Bit-Enabled Instructions
+
+You are working in the `design-system-bit` branch of the AgencyStack monorepo.
+
+🏗️ Goal:
+Use [Bit](https://bit.dev/) to create a sovereign, composable design system for AgencyStack components, CLI tools, dashboards, and system UIs.
+
+🧠 Philosophy:
+- Design system = infrastructure
+- Every piece of UI is testable, versioned, documented, and shareable
+- Sovereignty = self-hosted, exportable, observable components
+
+🧱 Structure:
+- All UI components live in `/design-system-bit/components/`
+- Each folder is a Bit component (w/ docs, tests, previews)
+- Playground lives in `/compositions/`
+- Docs live in `/docs/` (MDX)
+
+📦 Bit Configuration:
+- Local config is stored in `.bitmap`
+- Components are automatically versioned
+- Use `bit dev` to run the playground
+- Use `bit tag` and `bit export` for versioning
+
+🛠️ Component Lifecycle:
+
+1. `bit create react-component install-card`  
+   ⤷ Creates `/components/ui/install-card/` w/ example, test, doc
+
+2. Implement design using Tailwind, ShadCN patterns
+
+3. Document with MDX (`.docs.mdx`)
+
+4. Preview with `bit dev`
+
+5. Add system hooks or `make` bindings in `install-card/index.ts`
+
+6. Test with `vitest` or built-in Bit test runner
+
+7. Tag version: `bit tag install-card 1.0.0 --message "Alpha UI release"`
+
+8. Optionally export to cloud: `bit export nerdofmouth.design-system/install-card`
+
+9. Connect Bit component to:
+   - `/apps/control_panel/`
+   - `/docs/pages/components/`
+   - `component_registry.json`
+
+🔒 Sovereign Config:
+- Run Bit in local-only mode: `bit config set analytics_reporting false`
+- Optional: use private Bit workspace server with `bit self-host`
+
+🧪 Naming Convention:
+- Use kebab-case for folders (`install-card`)
+- Use PascalCase for React components (`InstallCard.tsx`)
+
+📝 Required Files per Component:
+- `index.tsx`: main component
+- `index.ts`: exports
+- `install-card.docs.mdx`: docs
+- `install-card.compositions.tsx`: playground test
+- `install-card.spec.tsx`: test
+
 # 📘 NEW PHASE DIRECTIVES: PROTOTYPE CLIENT DEPLOYMENT
 
 # 🚀 AgencyStack Prototype Phase Directives## 🧭 OBJECTIVE
