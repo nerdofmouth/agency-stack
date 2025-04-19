@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "last_updated": "2025-04-10T12:35:00-05:00",
+  "last_updated": "2025-04-16T00:38:00-05:00",
   "components": {
     "infrastructure": {
       "preflight": {
@@ -181,9 +181,15 @@
           "docs": true,
           "auditable": true,
           "traefik_tls": true,
-          "multi_tenant": true
+          "multi_tenant": true,
+          "monitoring": true
         },
-        "description": "Open-source subscription billing"
+        "description": "Open-source subscription billing, invoicing, and contract management",
+        "ports": {
+          "killbill": 8080,
+          "kaui": 9090,
+          "metrics": 9092
+        }
       },
       "calcom": {
         "name": "Cal.com",
@@ -368,9 +374,10 @@
           "docs": true,
           "auditable": true,
           "traefik_tls": true,
-          "multi_tenant": true
+          "multi_tenant": true,
+          "sso_configured": true
         },
-        "description": "Single sign-on and identity management"
+        "description": "Single sign-on and identity management via Keycloak. Provides OIDC and SAML, integrates with all sso: true components, supports multi-tenant realms and RBAC via Keycloak groups. Installation is repo-driven and validated by alpha-check workflows."
       },
       "vault": {
         "name": "Vault",
@@ -528,25 +535,30 @@
       "mailu": {
         "name": "Mailu",
         "category": "Email & Communication",
-        "version": "2.0.0",
+        "version": "1.9",
         "integration_status": {
           "installed": true,
           "hardened": true,
           "makefile": true,
-          "sso": true,
+          "sso": false,
           "dashboard": true,
           "logs": true,
           "docs": true,
           "auditable": true,
           "traefik_tls": true,
-          "multi_tenant": true
+          "multi_tenant": true,
+          "monitoring": true
         },
-        "description": "Self-hosted email solution",
+        "description": "Self-hosted email stack with SMTP, IMAP, Webmail, and Antispam",
         "ports": {
           "smtp": 25,
+          "smtps": 465,
+          "submission": 587,
           "imap": 143,
           "imaps": 993,
-          "web": 8020
+          "pop3s": 995,
+          "web": 80,
+          "https": 443
         }
       },
       "mattermost": {

@@ -21,6 +21,28 @@ RESET := $(shell tput sgr0)
 
 .PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit integrate-components dashboard dashboard-refresh dashboard-enable dashboard-update dashboard-open integrate-sso integrate-email integrate-monitoring integrate-data-bridge detect-ports remap-ports scan-ports setup-cronjobs view-alerts log-summary create-client setup-roles security-audit security-fix rotate-secrets setup-log-segmentation verify-certs verify-auth multi-tenancy-status install-wordpress install-erpnext install-posthog install-voip install-mailu install-grafana install-loki install-prometheus install-keycloak install-infrastructure install-security-infrastructure install-multi-tenancy validate validate-report peertube peertube-sso peertube-with-deps peertube-reinstall peertube-status peertube-logs peertube-stop peertube-start peertube-restart demo-core demo-core-clean demo-core-status demo-core-logs
 
+# Keycloak Makefile Targets for AgencyStack Alpha
+
+keycloak:
+	@echo "🔑 Installing Keycloak..."
+	@$(SCRIPTS_DIR)/components/install_keycloak.sh --domain=$(DOMAIN) --admin-email=$(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(ENABLE_CLOUD),--enable-cloud,) $(if $(ENABLE_OPENAI),--enable-openai,) $(if $(USE_GITHUB),--use-github,) $(if $(ENABLE_KEYCLOAK),--enable-keycloak,)
+
+keycloak-status:
+	@echo "🔍 Checking Keycloak status..."
+	@$(SCRIPTS_DIR)/components/verify_keycloak.sh --domain=$(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),)
+
+keycloak-logs:
+	@echo "📜 Tailing Keycloak logs..."
+	@tail -n 50 /var/log/agency_stack/components/keycloak.log
+
+keycloak-restart:
+	@echo "♻️  Restarting Keycloak Docker container..."
+	@docker restart keycloak_$(DOMAIN)
+
+keycloak-test:
+	@echo "🧪 Testing Keycloak API endpoint..."
+	@curl -k https://$(DOMAIN)/admin/ || echo "Keycloak API test failed"
+
 # Default target
 help:
 	@echo "$(MAGENTA)$(BOLD)🚀 AgencyStack $(VERSION) - Open Source Agency Platform$(RESET)"
@@ -122,6 +144,7 @@ help:
 	@echo "  $(BOLD)make ssl-certificates$(RESET)         Interactively configure SSL certificates with Let's Encrypt"
 	@echo "  $(BOLD)make ssl-certificates-status$(RESET)  Check status of SSL certificates"
 	@echo "  $(BOLD)make traefik-ssl$(RESET)              Configure SSL certificates for Traefik (non-interactive)"
+	@echo "  $(BOLD)make install-mirotalk-sfu$(RESET)     Install MiroTalk SFU - Video Conferencing"
 
 # Install AgencyStack
 install: validate
@@ -647,6 +670,159 @@ install-erpnext: validate
 	@echo "Installing ERPNext..."
 	@sudo $(SCRIPTS_DIR)/components/install_erpnext.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
+erpnext: install-erpnext
+
+erpnext-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking ERPNext Status...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make erpnext-status DOMAIN=erp.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	CLIENT_DIR=""; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		CLIENT_DIR="/clients/$(CLIENT_ID)"; \
+	fi; \
+	if [ -d "/opt/agency_stack$${CLIENT_DIR}/erpnext/$(DOMAIN)" ]; then \
+		echo "$(GREEN)✅ ERPNext installation found for $(DOMAIN)$(RESET)"; \
+		cd /opt/agency_stack$${CLIENT_DIR}/erpnext/$(DOMAIN) && docker-compose ps; \
+	else \
+		echo "$(RED)❌ ERPNext installation not found for $(DOMAIN)$(RESET)"; \
+	fi
+
+erpnext-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing ERPNext Logs...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make erpnext-logs DOMAIN=erp.example.com [CLIENT_ID=tenant1] [SERVICE=erpnext]"; \
+		exit 1; \
+	fi; \
+	CLIENT_DIR=""; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		CLIENT_DIR="/clients/$(CLIENT_ID)"; \
+	fi; \
+	SERVICE=""; \
+	if [ -n "$(SERVICE)" ]; then \
+		SERVICE="$(SERVICE)"; \
+	else \
+		SERVICE="erpnext"; \
+	fi; \
+	if [ -d "/opt/agency_stack$${CLIENT_DIR}/erpnext/$(DOMAIN)" ]; then \
+		cd /opt/agency_stack$${CLIENT_DIR}/erpnext/$(DOMAIN) && \
+		docker-compose logs -f --tail=100 $${SERVICE} | tee -a $(LOG_DIR)/components/erpnext.log; \
+	else \
+		echo "$(RED)❌ ERPNext installation not found for $(DOMAIN)$(RESET)"; \
+		echo "$(CYAN)To install: make erpnext DOMAIN=$(DOMAIN) ADMIN_EMAIL=your-email@example.com$(RESET)"; \
+		if [ -f "$(LOG_DIR)/components/erpnext.log" ]; then \
+			echo "$(YELLOW)Last logs from erpnext.log:$(RESET)"; \
+			tail -n 20 $(LOG_DIR)/components/erpnext.log; \
+		fi \
+	fi
+
+erpnext-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting ERPNext Services...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make erpnext-restart DOMAIN=erp.example.com [CLIENT_ID=tenant1] [SERVICE=all]"; \
+		exit 1; \
+	fi; \
+	CLIENT_DIR=""; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		CLIENT_DIR="/clients/$(CLIENT_ID)"; \
+	fi; \
+	SERVICE=""; \
+	if [ -n "$(SERVICE)" ] && [ "$(SERVICE)" != "all" ]; then \
+		SERVICE="$(SERVICE)"; \
+		echo "$(CYAN)Restarting $(SERVICE) service...$(RESET)"; \
+	fi; \
+	if [ -d "/opt/agency_stack$${CLIENT_DIR}/erpnext/$(DOMAIN)" ]; then \
+		cd /opt/agency_stack$${CLIENT_DIR}/erpnext/$(DOMAIN) && docker-compose restart $${SERVICE}; \
+		echo "$(GREEN)✅ ERPNext services restarted successfully$(RESET)"; \
+	else \
+		echo "$(RED)❌ ERPNext installation not found for $(DOMAIN)$(RESET)"; \
+	fi
+
+erpnext-backup:
+	@echo "Backing up ERPNext data..."
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make erpnext-backup DOMAIN=erp.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	CLIENT_DIR=""; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		CLIENT_DIR="/clients/$(CLIENT_ID)"; \
+	fi; \
+	if [ -d "/opt/agency_stack$${CLIENT_DIR}/erpnext/$(DOMAIN)" ]; then \
+		BACKUP_DIR="$(BACKUP_DIR)/erpnext/$(DOMAIN)"; \
+		mkdir -p $${BACKUP_DIR}; \
+		TIMESTAMP=$$(date +%Y%m%d_%H%M%S); \
+		echo "$(CYAN)Creating database backup...$(RESET)"; \
+		cd /opt/agency_stack$${CLIENT_DIR}/erpnext/$(DOMAIN) && \
+		SITE_NAME="$$(docker-compose exec -T erpnext bash -c 'echo $$SITE_NAME')"; \
+		docker-compose exec -T erpnext bench --site $${SITE_NAME} backup --with-files && \
+		docker-compose exec -T erpnext bash -c "cp -r /home/frappe/frappe-bench/sites/$${SITE_NAME}/private/backups/* /home/frappe/frappe-bench/sites/$${SITE_NAME}/private/backups_archive/" && \
+		echo "$(CYAN)Copying backup files to $(BACKUP_DIR)...$(RESET)" && \
+		docker cp $$(docker-compose ps -q erpnext):/home/frappe/frappe-bench/sites/$${SITE_NAME}/private/backups_archive/ $${BACKUP_DIR}/$${TIMESTAMP}; \
+		echo "$(GREEN)Backup completed: $(BACKUP_DIR)/$${TIMESTAMP}$(RESET)"; \
+	else \
+		echo "$(RED)❌ ERPNext installation not found for $(DOMAIN)$(RESET)"; \
+	fi
+
+erpnext-config:
+	@echo "$(MAGENTA)$(BOLD)⚙️ Opening ERPNext Configuration Shell...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make erpnext-config DOMAIN=erp.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	CLIENT_DIR=""; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		CLIENT_DIR="/clients/$(CLIENT_ID)"; \
+	fi; \
+	if [ -d "/opt/agency_stack$${CLIENT_DIR}/erpnext/$(DOMAIN)" ]; then \
+		cd /opt/agency_stack$${CLIENT_DIR}/erpnext/$(DOMAIN) && \
+		SITE_NAME="$$(docker-compose exec -T erpnext bash -c 'echo $$SITE_NAME')"; \
+		echo "$(CYAN)Opening ERPNext Bench console for $${SITE_NAME}...$(RESET)"; \
+		docker-compose exec erpnext bench --site $${SITE_NAME} console; \
+	else \
+		echo "$(RED)❌ ERPNext installation not found for $(DOMAIN)$(RESET)"; \
+	fi
+
+erpnext-test:
+	@echo "$(MAGENTA)$(BOLD)🧪 Testing ERPNext API...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make erpnext-test DOMAIN=erp.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	CLIENT_DIR=""; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		CLIENT_DIR="/clients/$(CLIENT_ID)"; \
+	fi; \
+	if [ -d "/opt/agency_stack$${CLIENT_DIR}/erpnext/$(DOMAIN)" ]; then \
+		echo "$(CYAN)Testing ERPNext API health...$(RESET)"; \
+		curl -s https://$(DOMAIN)/api/method/ping | grep -q "message.*pong" && \
+		echo "$(GREEN)✅ ERPNext API is healthy (responded with pong)$(RESET)" || \
+		echo "$(RED)❌ ERPNext API health check failed$(RESET)"; \
+		\
+		echo "$(CYAN)Checking ERPNext site status...$(RESET)"; \
+		cd /opt/agency_stack$${CLIENT_DIR}/erpnext/$(DOMAIN) && \
+		SITE_NAME="$$(docker-compose exec -T erpnext bash -c 'echo $$SITE_NAME')"; \
+		docker-compose exec -T erpnext bench --site $${SITE_NAME} status | tee -a $(LOG_DIR)/components/erpnext.log; \
+	else \
+		echo "$(RED)❌ ERPNext installation not found for $(DOMAIN)$(RESET)"; \
+	fi
+
+erpnext-sso:
+	@echo "$(MAGENTA)$(BOLD)🔑 Configuring ERPNext SSO with Keycloak...$(RESET)"
+	@if [ -z "$(DOMAIN)" ] || [ -z "$(KEYCLOAK_DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameters.$(RESET)"; \
+		echo "Usage: make erpnext-sso DOMAIN=erp.example.com KEYCLOAK_DOMAIN=auth.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	sudo $(SCRIPTS_DIR)/components/install_erpnext.sh --domain $(DOMAIN) --keycloak-domain $(KEYCLOAK_DOMAIN) --enable-sso $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(VERBOSE),--verbose,)
+
 # PostHog
 install-posthog: validate
 	@echo "Installing PostHog..."
@@ -829,7 +1005,7 @@ etebase-restart:
 etebase-backup:
 	@echo "$(MAGENTA)$(BOLD)💾 Backing up Etebase data...$(RESET)"
 	@$(CONFIG_DIR)/clients/$(CLIENT_ID)/etebase/scripts/backup.sh "$(CLIENT_ID)" "$(CONFIG_DIR)/backups/etebase"
-	@echo "$(GREEN)Backup completed to: $(CONFIG_DIR)/backups/etebase$(RESET)"
+	@echo "Backup completed to: $(CONFIG_DIR)/backups/etebase"
 
 etebase-config:
 	@echo "$(MAGENTA)$(BOLD)⚙️ Opening Etebase configuration...$(RESET)"
@@ -1808,3 +1984,661 @@ traefik-ssl:
 	fi; \
 	echo "$(CYAN)Configuring SSL certificates for $(DOMAIN) with admin email: $$email$(RESET)"; \
 	$(SCRIPTS_DIR)/utils/update_traefik_certs.sh --domain $(DOMAIN) --admin-email $$email --force
+>>>>>>> 5caa428a190126d4494dc3373ac07bf5dba9c7cf
+
+# MiroTalk SFU - Video Conferencing
+install-mirotalk-sfu: validate
+	@echo "$(MAGENTA)$(BOLD)🎥 Installing MiroTalk SFU...$(RESET)"
+	@sudo $(SCRIPTS_DIR)/components/install_mirotalk_sfu.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(ENABLE_CLOUD),--enable-cloud,) $(if $(ENABLE_METRICS),--enable-metrics,) $(if $(VERBOSE),--verbose,)
+
+mirotalk-sfu: install-mirotalk-sfu
+
+mirotalk-sfu-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking MiroTalk SFU Status...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make mirotalk-sfu-status DOMAIN=video.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	CLIENT_DIR=""; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		CLIENT_DIR="/clients/$(CLIENT_ID)"; \
+	fi; \
+	if [ -d "/opt/agency_stack$${CLIENT_DIR}/mirotalk_sfu/$(DOMAIN)" ]; then \
+		echo "$(GREEN)✅ MiroTalk SFU installation found for $(DOMAIN)$(RESET)"; \
+		cd /opt/agency_stack$${CLIENT_DIR}/mirotalk_sfu/$(DOMAIN) && docker-compose ps; \
+	else \
+		echo "$(RED)❌ MiroTalk SFU installation not found for $(DOMAIN)$(RESET)"; \
+	fi
+
+mirotalk-sfu-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing MiroTalk SFU Logs...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make mirotalk-sfu-logs DOMAIN=video.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	CLIENT_DIR=""; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		CLIENT_DIR="/clients/$(CLIENT_ID)"; \
+	fi; \
+	if [ -d "/opt/agency_stack$${CLIENT_DIR}/mirotalk_sfu/$(DOMAIN)" ]; then \
+		cd /opt/agency_stack$${CLIENT_DIR}/mirotalk_sfu/$(DOMAIN) && docker-compose logs -f | tee -a /var/log/agency_stack/components/mirotalk_sfu.log; \
+	else \
+		echo "$(RED)❌ MiroTalk SFU installation not found for $(DOMAIN)$(RESET)"; \
+	fi
+
+mirotalk-sfu-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting MiroTalk SFU Services...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make mirotalk-sfu-restart DOMAIN=video.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	CLIENT_DIR=""; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		CLIENT_DIR="/clients/$(CLIENT_ID)"; \
+	fi; \
+	if [ -d "/opt/agency_stack$${CLIENT_DIR}/mirotalk_sfu/$(DOMAIN)" ]; then \
+		cd /opt/agency_stack$${CLIENT_DIR}/mirotalk_sfu/$(DOMAIN) && docker-compose restart; \
+		echo "$(GREEN)✅ MiroTalk SFU services restarted successfully$(RESET)"; \
+	else \
+		echo "$(RED)❌ MiroTalk SFU installation not found for $(DOMAIN)$(RESET)"; \
+	fi
+
+mirotalk-sfu-update:
+	@echo "$(MAGENTA)$(BOLD)🔄 Updating MiroTalk SFU...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make mirotalk-sfu-update DOMAIN=video.example.com [CLIENT_ID=tenant1] [VERSION=latest]"; \
+		exit 1; \
+	fi; \
+	CLIENT_DIR=""; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		CLIENT_DIR="/clients/$(CLIENT_ID)"; \
+	fi; \
+	VERSION="latest"; \
+	if [ -n "$(VERSION)" ]; then \
+		VERSION="$(VERSION)"; \
+	fi; \
+	if [ -d "/opt/agency_stack$${CLIENT_DIR}/mirotalk_sfu/$(DOMAIN)" ]; then \
+		cd /opt/agency_stack$${CLIENT_DIR}/mirotalk_sfu/$(DOMAIN) && \
+		sed -i "s|image: mirotalk/sfu:.*|image: mirotalk/sfu:$${VERSION}|g" docker-compose.yml && \
+		docker-compose pull && \
+		docker-compose up -d; \
+		echo "$(GREEN)✅ MiroTalk SFU updated to version $${VERSION}$(RESET)"; \
+	else \
+		echo "$(RED)❌ MiroTalk SFU installation not found for $(DOMAIN)$(RESET)"; \
+	fi
+
+# Standardized Mailu Email Server targets
+mailu: install-mailu
+	@echo "$(MAGENTA)$(BOLD)📧 Installing Mailu Email Server...$(RESET)"
+
+install-mailu:
+	@echo "$(MAGENTA)$(BOLD)📧 Installing Mailu Email Server...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		read -p "$(YELLOW)Enter domain for Mailu (e.g., mail.yourdomain.com):$(RESET) " DOMAIN; \
+		read -p "$(YELLOW)Enter email domain (e.g., yourdomain.com):$(RESET) " EMAIL_DOMAIN; \
+		read -p "$(YELLOW)Enter admin email (e.g., admin@yourdomain.com):$(RESET) " ADMIN_EMAIL; \
+		sudo $(SCRIPTS_DIR)/components/install_mailu.sh --domain $$DOMAIN --email-domain $$EMAIL_DOMAIN --admin-email $$ADMIN_EMAIL $(ARGS); \
+	else \
+		sudo $(SCRIPTS_DIR)/components/install_mailu.sh --domain $(DOMAIN) $(if $(EMAIL_DOMAIN),--email-domain $(EMAIL_DOMAIN),) \
+		$(if $(ADMIN_EMAIL),--admin-email $(ADMIN_EMAIL),) $(if $(ADMIN_PASSWORD),--admin-password $(ADMIN_PASSWORD),) \
+		$(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(ARGS); \
+	fi
+
+mailu-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Mailu Status...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make mailu-status DOMAIN=mail.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		echo "$(CYAN)Checking Mailu status for $(DOMAIN) (client: $(CLIENT_ID))...$(RESET)"; \
+		CONTAINER_PREFIX="mailu_$(CLIENT_ID)"; \
+	else \
+		echo "$(CYAN)Checking Mailu status for $(DOMAIN)...$(RESET)"; \
+		CONTAINER_PREFIX="mailu"; \
+	fi; \
+	if docker ps | grep -q "$${CONTAINER_PREFIX}_admin"; then \
+		echo "$(GREEN)✅ Mailu is running for $(DOMAIN)$(RESET)"; \
+		docker ps --filter "name=$${CONTAINER_PREFIX}_" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"; \
+		echo ""; \
+		echo "$(CYAN)Webmail: https://$(DOMAIN)/webmail/$(RESET)"; \
+		echo "$(CYAN)Admin: https://$(DOMAIN)/admin/$(RESET)"; \
+	else \
+		echo "$(RED)❌ Mailu containers for $(DOMAIN) are not running$(RESET)"; \
+		echo "To start Mailu, run: make mailu-restart DOMAIN=$(DOMAIN) $(if $(CLIENT_ID),CLIENT_ID=$(CLIENT_ID),)"; \
+	fi
+
+mailu-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing Mailu Logs...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make mailu-logs DOMAIN=mail.example.com [CLIENT_ID=tenant1] [CONTAINER=admin|smtp|imap|webmail|redis|postfix]"; \
+		exit 1; \
+	fi; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		CONTAINER_PREFIX="mailu_$(CLIENT_ID)"; \
+	else \
+		CONTAINER_PREFIX="mailu"; \
+	fi; \
+	if [ -n "$(CONTAINER)" ]; then \
+		echo "$(CYAN)Viewing logs for $${CONTAINER_PREFIX}_$(CONTAINER) container...$(RESET)"; \
+		docker logs $${CONTAINER_PREFIX}_$(CONTAINER) $(if $(FOLLOW),--follow,) $(if $(TAIL),--tail $(TAIL),--tail 100); \
+	else \
+		echo "$(CYAN)Viewing component logs for Mailu ($(DOMAIN))...$(RESET)"; \
+		if [ -f "/var/log/agency_stack/components/mailu.log" ]; then \
+			cat "/var/log/agency_stack/components/mailu.log" | tail -n 100; \
+		elif [ -f "/var/log/agency_stack/components/install_mailu-"* ]; then \
+			ls -t /var/log/agency_stack/components/install_mailu-* | head -n 1 | xargs cat | tail -n 100; \
+		else \
+			echo "$(YELLOW)No Mailu logs found in /var/log/agency_stack/components/$(RESET)"; \
+			echo "$(CYAN)Showing logs from all Mailu containers:$(RESET)"; \
+			docker logs $${CONTAINER_PREFIX}_admin --tail 50; \
+		fi; \
+	fi
+
+mailu-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Mailu...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make mailu-restart DOMAIN=mail.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		MAILU_DIR="/opt/agency_stack/mailu/clients/$(CLIENT_ID)/$(DOMAIN)"; \
+		echo "$(CYAN)Restarting Mailu for $(DOMAIN) (client: $(CLIENT_ID))...$(RESET)"; \
+	else \
+		MAILU_DIR="/opt/agency_stack/mailu/$(DOMAIN)"; \
+		echo "$(CYAN)Restarting Mailu for $(DOMAIN)...$(RESET)"; \
+	fi; \
+	if [ -d "$$MAILU_DIR" ]; then \
+		cd "$$MAILU_DIR" && docker-compose down && docker-compose up -d; \
+		echo "$(GREEN)✅ Mailu has been restarted for $(DOMAIN)$(RESET)"; \
+	else \
+		echo "$(RED)❌ Mailu installation directory not found: $$MAILU_DIR$(RESET)"; \
+		echo "Please make sure Mailu is installed for $(DOMAIN)"; \
+		exit 1; \
+	fi
+
+# Make targets for integration with other components
+mailu-listmonk:
+	@echo "$(MAGENTA)$(BOLD)🔗 Integrating Mailu with Listmonk...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make mailu-listmonk DOMAIN=mail.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	echo "$(CYAN)Configuring Listmonk to use Mailu as SMTP relay...$(RESET)"; \
+	sudo $(SCRIPTS_DIR)/integrations/integrate_mailu_listmonk.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),)
+
+# Standardized Listmonk Newsletter and Campaign System targets
+listmonk: install-listmonk
+	@echo "$(MAGENTA)$(BOLD)📧 Installing Listmonk Newsletter System...$(RESET)"
+
+install-listmonk:
+	@echo "$(MAGENTA)$(BOLD)📧 Installing Listmonk Newsletter System...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		read -p "$(YELLOW)Enter domain for Listmonk (e.g., lists.yourdomain.com):$(RESET) " DOMAIN; \
+		read -p "$(YELLOW)Would you like to integrate with Mailu? (y/n):$(RESET) " INTEGRATE_MAILU; \
+		if [ "$$INTEGRATE_MAILU" = "y" ] || [ "$$INTEGRATE_MAILU" = "Y" ]; then \
+			read -p "$(YELLOW)Enter Mailu domain (e.g., mail.yourdomain.com):$(RESET) " MAILU_DOMAIN; \
+			read -p "$(YELLOW)Enter Mailu SMTP user (e.g., listmonk@yourdomain.com):$(RESET) " MAILU_USER; \
+			read -p "$(YELLOW)Enter Mailu SMTP password:$(RESET) " MAILU_PASSWORD; \
+			sudo $(SCRIPTS_DIR)/components/install_listmonk.sh --domain $$DOMAIN --mailu-domain $$MAILU_DOMAIN --mailu-user $$MAILU_USER --mailu-password $$MAILU_PASSWORD $(ARGS); \
+		else \
+			sudo $(SCRIPTS_DIR)/components/install_listmonk.sh --domain $$DOMAIN $(ARGS); \
+		fi; \
+	else \
+		sudo $(SCRIPTS_DIR)/components/install_listmonk.sh --domain $(DOMAIN) \
+		$(if $(CLIENT_ID),--client-id $(CLIENT_ID),) \
+		$(if $(MAILU_DOMAIN),--mailu-domain $(MAILU_DOMAIN),) \
+		$(if $(MAILU_USER),--mailu-user $(MAILU_USER),) \
+		$(if $(MAILU_PASSWORD),--mailu-password $(MAILU_PASSWORD),) \
+		$(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(ARGS); \
+	fi
+
+listmonk-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Listmonk Status...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make listmonk-status DOMAIN=lists.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		CLIENT_DIR="/opt/agency_stack/clients/$(CLIENT_ID)"; \
+		echo "$(CYAN)Checking Listmonk status for $(DOMAIN) (client: $(CLIENT_ID))...$(RESET)"; \
+	else \
+		CLIENT_DIR="/opt/agency_stack/clients/default"; \
+		echo "$(CYAN)Checking Listmonk status for $(DOMAIN)...$(RESET)"; \
+	fi; \
+	if [ -d "$$CLIENT_DIR/listmonk_data" ]; then \
+		if docker ps | grep -q "listmonk_app"; then \
+			echo "$(GREEN)✅ Listmonk is running for $(DOMAIN)$(RESET)"; \
+			docker ps --filter "name=listmonk_" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"; \
+			echo ""; \
+			echo "$(CYAN)Admin URL: https://$(DOMAIN)/admin/$(RESET)"; \
+		else \
+			echo "$(RED)❌ Listmonk containers for $(DOMAIN) are not running$(RESET)"; \
+			echo "To start Listmonk, run: make listmonk-restart DOMAIN=$(DOMAIN) $(if $(CLIENT_ID),CLIENT_ID=$(CLIENT_ID),)"; \
+		fi; \
+	else \
+		echo "$(RED)❌ Listmonk installation not found for $(DOMAIN)$(RESET)"; \
+		echo "Please install Listmonk first: make listmonk DOMAIN=$(DOMAIN) $(if $(CLIENT_ID),CLIENT_ID=$(CLIENT_ID),)"; \
+	fi
+
+listmonk-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing Listmonk Logs...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make listmonk-logs DOMAIN=lists.example.com [CLIENT_ID=tenant1] [CONTAINER=app|db]"; \
+		exit 1; \
+	fi; \
+	if [ -n "$(CONTAINER)" ]; then \
+		echo "$(CYAN)Viewing logs for listmonk_$(CONTAINER) container...$(RESET)"; \
+		docker logs listmonk_$(CONTAINER) $(if $(FOLLOW),--follow,) $(if $(TAIL),--tail $(TAIL),--tail 100); \
+	else \
+		echo "$(CYAN)Viewing component logs for Listmonk ($(DOMAIN))...$(RESET)"; \
+		if [ -f "/var/log/agency_stack/components/listmonk.log" ]; then \
+			cat "/var/log/agency_stack/components/listmonk.log" | tail -n 100; \
+		else \
+			echo "$(YELLOW)No Listmonk logs found in /var/log/agency_stack/components/$(RESET)"; \
+			echo "$(CYAN)Showing logs from Listmonk app container:$(RESET)"; \
+			docker logs listmonk_app --tail 50; \
+		fi; \
+	fi
+
+listmonk-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Listmonk...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make listmonk-restart DOMAIN=lists.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		LISTMONK_DIR="/opt/agency_stack/clients/$(CLIENT_ID)/listmonk_data"; \
+		echo "$(CYAN)Restarting Listmonk for $(DOMAIN) (client: $(CLIENT_ID))...$(RESET)"; \
+	else \
+		LISTMONK_DIR="/opt/agency_stack/clients/default/listmonk_data"; \
+		echo "$(CYAN)Restarting Listmonk for $(DOMAIN)...$(RESET)"; \
+	fi; \
+	if [ -d "$$LISTMONK_DIR" ]; then \
+		cd "$$LISTMONK_DIR" && docker-compose down && docker-compose up -d; \
+		echo "$(GREEN)✅ Listmonk has been restarted for $(DOMAIN)$(RESET)"; \
+	else \
+		echo "$(RED)❌ Listmonk installation directory not found: $$LISTMONK_DIR$(RESET)"; \
+		echo "Please make sure Listmonk is installed for $(DOMAIN)"; \
+		exit 1; \
+	fi
+
+# Integration with other components
+listmonk-mailu:
+	@echo "$(MAGENTA)$(BOLD)🔗 Integrating Listmonk with Mailu...$(RESET)"
+	@if [ -z "$(DOMAIN)" ] || [ -z "$(MAILU_DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameters.$(RESET)"; \
+		echo "Usage: make listmonk-mailu DOMAIN=lists.example.com MAILU_DOMAIN=mail.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	echo "$(CYAN)Configuring Listmonk to use Mailu as SMTP relay...$(RESET)"; \
+	sudo $(SCRIPTS_DIR)/components/install_listmonk.sh --domain $(DOMAIN) --mailu-domain $(MAILU_DOMAIN) --force $(if $(CLIENT_ID),--client-id $(CLIENT_ID),)
+
+# Standardized Kill Bill subscription and billing targets
+killbill: install-killbill
+	@echo "$(MAGENTA)$(BOLD)💰 Installing Kill Bill Subscription & Billing Platform...$(RESET)"
+
+install-killbill:
+	@echo "$(MAGENTA)$(BOLD)💰 Installing Kill Bill Subscription & Billing Platform...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		read -p "$(YELLOW)Enter domain for Kill Bill (e.g., billing.yourdomain.com):$(RESET) " DOMAIN; \
+		read -p "$(YELLOW)Would you like to integrate with Mailu? (y/n):$(RESET) " INTEGRATE_MAILU; \
+		if [ "$$INTEGRATE_MAILU" = "y" ] || [ "$$INTEGRATE_MAILU" = "Y" ]; then \
+			read -p "$(YELLOW)Enter Mailu domain (e.g., mail.yourdomain.com):$(RESET) " MAILU_DOMAIN; \
+			sudo $(SCRIPTS_DIR)/components/install_killbill.sh --domain $$DOMAIN --mailu-domain $$MAILU_DOMAIN $(ARGS); \
+		else \
+			sudo $(SCRIPTS_DIR)/components/install_killbill.sh --domain $$DOMAIN $(ARGS); \
+		fi; \
+	else \
+		sudo $(SCRIPTS_DIR)/components/install_killbill.sh --domain $(DOMAIN) \
+		$(if $(ADMIN_EMAIL),--admin-email $(ADMIN_EMAIL),) \
+		$(if $(CLIENT_ID),--client-id $(CLIENT_ID),) \
+		$(if $(MAILU_DOMAIN),--mailu-domain $(MAILU_DOMAIN),) \
+		$(if $(SMTP_HOST),--smtp-host $(SMTP_HOST),) \
+		$(if $(SMTP_PORT),--smtp-port $(SMTP_PORT),) \
+		$(if $(SMTP_USER),--smtp-user $(SMTP_USER),) \
+		$(if $(SMTP_PASSWORD),--smtp-password $(SMTP_PASSWORD),) \
+		$(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(ARGS); \
+	fi
+
+killbill-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Kill Bill Status...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make killbill-status DOMAIN=billing.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		CLIENT_DIR="/opt/agency_stack/clients/$(CLIENT_ID)"; \
+		echo "$(CYAN)Checking Kill Bill status for $(DOMAIN) (client: $(CLIENT_ID))...$(RESET)"; \
+	else \
+		CLIENT_DIR="/opt/agency_stack/clients/default"; \
+		echo "$(CYAN)Checking Kill Bill status for $(DOMAIN)...$(RESET)"; \
+	fi; \
+	if [ -d "$$CLIENT_DIR/killbill" ]; then \
+		if docker ps | grep -q "killbill_app"; then \
+			echo "$(GREEN)✅ Kill Bill is running for $(DOMAIN)$(RESET)"; \
+			docker ps --filter "name=killbill_" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"; \
+			echo ""; \
+			echo "$(CYAN)Kill Bill API: https://$(DOMAIN)/api$(RESET)"; \
+			echo "$(CYAN)Kaui Admin UI: https://$(DOMAIN)$(RESET)"; \
+		else \
+			echo "$(RED)❌ Kill Bill containers for $(DOMAIN) are not running$(RESET)"; \
+			echo "To start Kill Bill, run: make killbill-restart DOMAIN=$(DOMAIN) $(if $(CLIENT_ID),CLIENT_ID=$(CLIENT_ID),)"; \
+		fi; \
+	else \
+		echo "$(RED)❌ Kill Bill installation not found for $(DOMAIN)$(RESET)"; \
+		echo "Please install Kill Bill first: make killbill DOMAIN=$(DOMAIN) $(if $(CLIENT_ID),CLIENT_ID=$(CLIENT_ID),)"; \
+	fi
+
+killbill-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing Kill Bill Logs...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make killbill-logs DOMAIN=billing.example.com [CLIENT_ID=tenant1] [CONTAINER=app|kaui|mariadb]"; \
+		exit 1; \
+	fi; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		CLIENT_ID_SUFFIX="_$(CLIENT_ID)"; \
+	else \
+		CLIENT_ID_SUFFIX="_default"; \
+	fi; \
+	if [ -n "$(CONTAINER)" ]; then \
+		echo "$(CYAN)Viewing logs for killbill_$(CONTAINER)$${CLIENT_ID_SUFFIX} container...$(RESET)"; \
+		docker logs killbill_$(CONTAINER)$${CLIENT_ID_SUFFIX} $(if $(FOLLOW),--follow,) $(if $(TAIL),--tail $(TAIL),--tail 100); \
+	else \
+		echo "$(CYAN)Viewing component logs for Kill Bill ($(DOMAIN))...$(RESET)"; \
+		if [ -f "/var/log/agency_stack/components/killbill.log" ]; then \
+			cat "/var/log/agency_stack/components/killbill.log" | tail -n 100; \
+		else \
+			echo "$(YELLOW)No Kill Bill logs found in /var/log/agency_stack/components/$(RESET)"; \
+			echo "$(CYAN)Showing logs from Kill Bill app container:$(RESET)"; \
+			docker logs killbill_app$${CLIENT_ID_SUFFIX} --tail 50; \
+		fi; \
+	fi
+
+killbill-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Kill Bill...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make killbill-restart DOMAIN=billing.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		KILLBILL_DIR="/opt/agency_stack/clients/$(CLIENT_ID)/killbill"; \
+		echo "$(CYAN)Restarting Kill Bill for $(DOMAIN) (client: $(CLIENT_ID))...$(RESET)"; \
+	else \
+		KILLBILL_DIR="/opt/agency_stack/clients/default/killbill"; \
+		echo "$(CYAN)Restarting Kill Bill for $(DOMAIN)...$(RESET)"; \
+	fi; \
+	if [ -d "$$KILLBILL_DIR" ]; then \
+		cd "$$KILLBILL_DIR" && docker-compose down && docker-compose up -d; \
+		echo "$(GREEN)✅ Kill Bill has been restarted for $(DOMAIN)$(RESET)"; \
+	else \
+		echo "$(RED)❌ Kill Bill installation directory not found: $$KILLBILL_DIR$(RESET)"; \
+		echo "Please make sure Kill Bill is installed for $(DOMAIN)"; \
+		exit 1; \
+	fi
+
+killbill-test:
+	@echo "$(MAGENTA)$(BOLD)🧪 Testing Kill Bill API...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make killbill-test DOMAIN=billing.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	echo "$(CYAN)Running basic health check test for Kill Bill...$(RESET)"; \
+	curl -v -s -o /dev/null -w "%{http_code}" https://$(DOMAIN)/api/1.0/healthcheck; \
+	if [ $$? -eq 0 ]; then \
+		echo "$(GREEN)✅ Kill Bill API health check passed for $(DOMAIN)$(RESET)"; \
+	else \
+		echo "$(RED)❌ Kill Bill API health check failed for $(DOMAIN)$(RESET)"; \
+		echo "Please check the logs with: make killbill-logs DOMAIN=$(DOMAIN) $(if $(CLIENT_ID),CLIENT_ID=$(CLIENT_ID),)"; \
+		exit 1; \
+	fi; \
+	echo "$(CYAN)Verifying Kaui admin interface...$(RESET)"; \
+	curl -v -s -o /dev/null -w "%{http_code}" https://$(DOMAIN); \
+	if [ $$? -eq 0 ]; then \
+		echo "$(GREEN)✅ Kaui admin interface check passed for $(DOMAIN)$(RESET)"; \
+	else \
+		echo "$(RED)❌ Kaui admin interface check failed for $(DOMAIN)$(RESET)"; \
+		echo "Please check the logs with: make killbill-logs DOMAIN=$(DOMAIN) CONTAINER=kaui $(if $(CLIENT_ID),CLIENT_ID=$(CLIENT_ID),)"; \
+		exit 1; \
+	fi
+
+killbill-mailu:
+	@echo "$(MAGENTA)$(BOLD)🔗 Integrating Kill Bill with Mailu...$(RESET)"
+	@if [ -z "$(DOMAIN)" ] || [ -z "$(MAILU_DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameters.$(RESET)"; \
+		echo "Usage: make killbill-mailu DOMAIN=billing.example.com MAILU_DOMAIN=mail.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	echo "$(CYAN)Configuring Kill Bill to use Mailu as SMTP relay...$(RESET)"; \
+	sudo $(SCRIPTS_DIR)/components/install_killbill.sh --domain $(DOMAIN) --mailu-domain $(MAILU_DOMAIN) --force $(if $(CLIENT_ID),--client-id $(CLIENT_ID),)
+
+killbill-validate:
+	@echo "$(MAGENTA)$(BOLD)🔍 Validating KillBill TLS/SSO/Metrics...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make killbill-validate DOMAIN=billing.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	if [ -n "$(CLIENT_ID)" ]; then \
+		echo "$(CYAN)Validating KillBill for $(DOMAIN) (client: $(CLIENT_ID))...$(RESET)"; \
+		sudo $(SCRIPTS_DIR)/utils/killbill_validation.sh --domain $(DOMAIN) --client-id $(CLIENT_ID) || echo "$(RED)✗ KillBill validation failed$(RESET)"; \
+	else \
+		echo "$(CYAN)Validating KillBill for $(DOMAIN)...$(RESET)"; \
+		sudo $(SCRIPTS_DIR)/utils/killbill_validation.sh --domain $(DOMAIN) || echo "$(RED)✗ KillBill validation failed$(RESET)"; \
+	fi
+
+billing-alpha-check: killbill-validate
+	@echo "$(MAGENTA)$(BOLD)🧮 Running Billing Alpha Check...$(RESET)"
+	@echo "$(CYAN)Verifying billing component registry entries...$(RESET)"
+	@if [ -f "$(CONFIG_DIR)/config/registry/component_registry.json" ]; then \
+		if jq -e '.business_applications.killbill' $(CONFIG_DIR)/config/registry/component_registry.json > /dev/null 2>&1; then \
+			echo "$(GREEN)✓ KillBill found in component registry$(RESET)"; \
+			if jq -e '.business_applications.killbill.integration_status.sso == true' $(CONFIG_DIR)/config/registry/component_registry.json > /dev/null 2>&1; then \
+				echo "$(GREEN)✓ KillBill SSO integration flag is set$(RESET)"; \
+			else \
+				echo "$(YELLOW)⚠️ KillBill SSO integration flag is not set$(RESET)"; \
+			fi; \
+			if jq -e '.business_applications.killbill.integration_status.traefik_tls == true' $(CONFIG_DIR)/config/registry/component_registry.json > /dev/null 2>&1; then \
+				echo "$(GREEN)✓ KillBill TLS integration flag is set$(RESET)"; \
+			else \
+				echo "$(YELLOW)⚠️ KillBill TLS integration flag is not set$(RESET)"; \
+			fi; \
+			if jq -e '.business_applications.killbill.integration_status.monitoring == true' $(CONFIG_DIR)/config/registry/component_registry.json > /dev/null 2>&1; then \
+				echo "$(GREEN)✓ KillBill monitoring integration flag is set$(RESET)"; \
+			else \
+				echo "$(YELLOW)⚠️ KillBill monitoring integration flag is not set$(RESET)"; \
+			fi; \
+		else \
+			echo "$(RED)✗ KillBill not found in component registry$(RESET)"; \
+		fi; \
+	else \
+		echo "$(RED)✗ Component registry not found$(RESET)"; \
+	fi; \
+	echo ""; \
+	echo "$(GREEN)✓ Billing alpha check complete$(RESET)"
+	@echo "$(CYAN)Review $(PWD)/component_validation_report.md for full details$(RESET)"
+	@echo "$(CYAN)Run 'make alpha-fix' to attempt repairs for common issues$(RESET)"
+
+killbill-prometheus:
+	@echo "$(MAGENTA)$(BOLD)📊 Updating Prometheus for KillBill Metrics...$(RESET)"
+	@if [ -n "$(CLIENT_ID)" ]; then \
+		echo "$(CYAN)Configuring Prometheus for KillBill metrics (client: $(CLIENT_ID))...$(RESET)"; \
+		sudo $(SCRIPTS_DIR)/utils/update_prometheus_killbill.sh --client-id $(CLIENT_ID) $(if $(FORCE),--force,); \
+	else \
+		echo "$(CYAN)Configuring Prometheus for KillBill metrics...$(RESET)"; \
+		sudo $(SCRIPTS_DIR)/utils/update_prometheus_killbill.sh $(if $(FORCE),--force,); \
+	fi
+
+# -----------------------------------------------------------------------------
+# Beta Phase Targets
+# -----------------------------------------------------------------------------
+
+.PHONY: beta-check beta-check-local beta-check-remote beta-deployment beta-status beta-fix
+
+beta-check: validate
+	@echo "$(MAGENTA)$(BOLD)🧪 Running Beta Readiness Check...$(RESET)"
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameter DOMAIN.$(RESET)"; \
+		echo "Usage: make beta-check DOMAIN=agency.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi; \
+	echo "$(CYAN)Running comprehensive beta validation for $(DOMAIN)...$(RESET)"; \
+	sudo $(SCRIPTS_DIR)/beta_deployment_check.sh --domain $(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(VERBOSE),--verbose,) || \
+		echo "$(RED)✗ Beta validation found issues that need to be addressed$(RESET)"
+
+beta-check-local: validate
+	@echo "$(MAGENTA)$(BOLD)🔍 Running Beta Local Check...$(RESET)"
+	@echo "$(CYAN)Verifying local repository state...$(RESET)"
+	@if [ -n "$$(git status --porcelain)" ]; then \
+		echo "$(YELLOW)⚠️ Repository has uncommitted changes$(RESET)"; \
+		git status --short; \
+		echo ""; \
+		echo "$(YELLOW)⚠️ Please commit or stash changes before deployment$(RESET)"; \
+		exit 1; \
+	else \
+		echo "$(GREEN)✓ Repository is clean$(RESET)"; \
+	fi
+	@echo "$(CYAN)Checking component registry integrity...$(RESET)"
+	@if ! jq '.' $(CONFIG_DIR)/config/registry/component_registry.json > /dev/null 2>&1; then \
+		echo "$(RED)✗ Component registry JSON is invalid$(RESET)"; \
+		exit 1; \
+	else \
+		echo "$(GREEN)✓ Component registry JSON is valid$(RESET)"; \
+	fi
+	@echo "$(CYAN)Checking branch sync status...$(RESET)"
+	@if [ "$$(git rev-parse --abbrev-ref HEAD)" != "main" ]; then \
+		echo "$(YELLOW)⚠️ Not on main branch. Current branch: $$(git rev-parse --abbrev-ref HEAD)$(RESET)"; \
+		echo "$(YELLOW)⚠️ Consider switching to main branch before deployment$(RESET)"; \
+	else \
+		echo "$(GREEN)✓ On main branch$(RESET)"; \
+		if [ -n "$$(git log @{u}..)" ]; then \
+			echo "$(YELLOW)⚠️ Local commits ahead of remote$(RESET)"; \
+			echo "$(YELLOW)⚠️ Consider pushing changes before deployment$(RESET)"; \
+		else \
+			echo "$(GREEN)✓ Branch is in sync with remote$(RESET)"; \
+		fi \
+	fi
+	@echo "$(GREEN)✓ Local beta check passed!$(RESET)"
+
+beta-check-remote: validate
+	@echo "$(MAGENTA)$(BOLD)🌐 Running Beta Remote VM Check...$(RESET)"
+	@if [ -z "$(REMOTE_VM_SSH)" ]; then \
+		echo "$(RED)Error: REMOTE_VM_SSH environment variable not set$(RESET)"; \
+		echo "$(YELLOW)Set it with: export REMOTE_VM_SSH=user@vm-hostname$(RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(CYAN)Checking remote VM connectivity...$(RESET)"
+	@if ! ssh -q -o BatchMode=yes -o ConnectTimeout=5 $(REMOTE_VM_SSH) exit > /dev/null 2>&1; then \
+		echo "$(RED)✗ Cannot connect to remote VM: $(REMOTE_VM_SSH)$(RESET)"; \
+		echo "$(YELLOW)Check SSH keys and connectivity$(RESET)"; \
+		exit 1; \
+	else \
+		echo "$(GREEN)✓ Remote VM connection successful$(RESET)"; \
+	fi
+	@echo "$(CYAN)Checking remote VM requirements...$(RESET)"
+	@ssh $(REMOTE_VM_SSH) "bash -s" << 'EOF' || exit 1
+	echo "CPU cores: $$(nproc)"
+	echo "Memory: $$(free -h | grep Mem | awk '{print \$$2}')"
+	echo "Disk space: $$(df -h / | awk 'NR==2 {print \$$4}') available"
+	
+	# Check Docker
+	if command -v docker > /dev/null 2>&1; then \
+	    echo "✅ Docker is installed: $$(docker --version)"; \
+	else \
+	    echo "❌ Docker is NOT installed!"; \
+	    exit 1; \
+	fi
+	
+	# Check Docker Compose
+	if command -v docker-compose > /dev/null 2>&1; then \
+	    echo "✅ Docker Compose is installed: $$(docker-compose --version)"; \
+	else \
+	    echo "❌ Docker Compose is NOT installed!"; \
+	    exit 1; \
+	fi
+	
+	# Check AgencyStack directory
+	if [ -d "/opt/agency_stack" ]; then \
+	    echo "✅ AgencyStack directory exists"; \
+	else \
+	    echo "❌ AgencyStack directory is missing!"; \
+	    exit 1; \
+	fi
+	EOF
+	@echo "$(GREEN)✓ Remote VM beta check passed!$(RESET)"
+
+beta-deployment: beta-check-local
+	@echo "$(MAGENTA)$(BOLD)🚀 Running Beta Deployment...$(RESET)"
+	@if [ -z "$(REMOTE_VM_SSH)" ] || [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameters.$(RESET)"; \
+		echo "Usage: make beta-deployment REMOTE_VM_SSH=user@vm-hostname DOMAIN=agency.example.com [CLIENT_ID=tenant1]"; \
+		exit 1; \
+	fi
+	@echo "$(CYAN)Deploying to remote VM $(REMOTE_VM_SSH)...$(RESET)"
+	@ssh $(REMOTE_VM_SSH) "mkdir -p /tmp/agency_stack_deploy"
+	@echo "$(CYAN)Creating deployment archive...$(RESET)"
+	@git archive --format=tar.gz -o /tmp/agency_stack_deploy.tar.gz HEAD
+	@echo "$(CYAN)Transferring deployment archive...$(RESET)"
+	@scp /tmp/agency_stack_deploy.tar.gz $(REMOTE_VM_SSH):/tmp/agency_stack_deploy/
+	@echo "$(CYAN)Extracting and deploying on remote VM...$(RESET)"
+	@ssh $(REMOTE_VM_SSH) "bash -s" << 'EOF' || exit 1
+	cd /tmp/agency_stack_deploy
+	tar -xzf agency_stack_deploy.tar.gz
+	sudo mkdir -p /opt/agency_stack
+	sudo cp -r * /opt/agency_stack/
+	cd /opt/agency_stack
+	echo "Starting installation..."
+	make install-all DOMAIN='$(DOMAIN)' $(if $(CLIENT_ID),CLIENT_ID='$(CLIENT_ID)',)
+	make beta-check DOMAIN='$(DOMAIN)' $(if $(CLIENT_ID),CLIENT_ID='$(CLIENT_ID)',)
+	EOF
+	@echo "$(GREEN)✓ Beta deployment completed!$(RESET)"
+	@echo "$(CYAN)Run 'make beta-status REMOTE_VM_SSH=$(REMOTE_VM_SSH) DOMAIN=$(DOMAIN)' to check status$(RESET)"
+
+beta-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Beta Deployment Status...$(RESET)"
+	@if [ -z "$(REMOTE_VM_SSH)" ] || [ -z "$(DOMAIN)" ]; then \
+		echo "$(RED)Error: Missing required parameters.$(RESET)"; \
+		echo "Usage: make beta-status REMOTE_VM_SSH=user@vm-hostname DOMAIN=agency.example.com"; \
+		exit 1; \
+	fi
+	@echo "$(CYAN)Checking deployment status on $(REMOTE_VM_SSH)...$(RESET)"
+	@ssh $(REMOTE_VM_SSH) "cd /opt/agency_stack && make alpha-check DOMAIN='$(DOMAIN)' && \
+		echo '' && \
+		echo 'Component Container Status:' && \
+		docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' && \
+		echo '' && \
+		echo 'Recent Logs:' && \
+		find /var/log/agency_stack -name '*.log' -mtime -1 -exec ls -la {} \; && \
+		echo '' && \
+		if [ -f '/var/log/agency_stack/beta_check_*.log' ]; then \
+			echo 'Latest Beta Check Results:' && \
+			cat \$$(ls -t /var/log/agency_stack/beta_check_*.log | head -n1 | tail -n10); \
+		fi"
+
+beta-fix:
+	@echo "$(MAGENTA)$(BOLD)🔧 Attempting Beta Deployment Fixes...$(RESET)"
+	@if [ -z "$(REMOTE_VM_SSH)" ]; then \
+		echo "$(RED)Error: REMOTE_VM_SSH environment variable not set$(RESET)"; \
+		echo "$(YELLOW)Set it with: export REMOTE_VM_SSH=user@vm-hostname$(RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(CYAN)Running fix scripts on remote VM...$(RESET)"
+	@ssh $(REMOTE_VM_SSH) "cd /opt/agency_stack && make auto-fix && echo 'Restarting core services...' && \
+		make keycloak-restart && make traefik-restart && make prometheus-restart"
+	@echo "$(GREEN)✓ Fix operations completed$(RESET)"
+	@echo "$(CYAN)Run 'make beta-status REMOTE_VM_SSH=$(REMOTE_VM_SSH) DOMAIN=$(your-domain)' to verify fixes$(RESET)"
