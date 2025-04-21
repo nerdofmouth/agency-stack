@@ -154,7 +154,6 @@ log_cmd "Creating installation directories..."
 mkdir -p "${INSTALL_DIR}"
 mkdir -p "${LOG_DIR}"
 mkdir -p "${SECRETS_DIR}"
-mkdir -p "${INSTALL_DIR}/config"
 mkdir -p "${INSTALL_DIR}/data/mariadb"
 
 # Check if killbill is already installed
@@ -306,6 +305,10 @@ networks:
     external: true
 EOF
 
+# Ensure required directories exist before file operations
+mkdir -p "${INSTALL_DIR}/config"
+mkdir -p "${SECRETS_DIR}"
+
 # Create database initialization script
 log_cmd "Creating database initialization script..."
 cat > "${INSTALL_DIR}/config/init.sql" << EOF
@@ -369,7 +372,6 @@ EOF
 
 # Store secrets
 log_cmd "Storing credentials securely..."
-mkdir -p "${SECRETS_DIR}"
 cat > "${SECRETS_DIR}/${DOMAIN}.env" << EOF
 # Kill Bill credentials for ${DOMAIN} (Client ID: ${CLIENT_ID})
 # Generated on $(date)

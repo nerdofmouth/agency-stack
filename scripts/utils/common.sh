@@ -240,7 +240,7 @@ preflight_check_agencystack() {
     if [ ${#MISSING_CMDS[@]} -gt 0 ]; then
         echo "[INFO] Installing missing base packages: ${MISSING_CMDS[*]}"
         if [ -f /etc/alpine-release ]; then
-            apk update && apk add --no-cache "${MISSING_CMDS[@]}"
+            apk update && apk add --no-cache jq git bash make curl sudo iproute2
         elif [ -f /etc/debian_version ] || grep -qi ubuntu /etc/os-release; then
             apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y "${MISSING_CMDS[@]}"
         else

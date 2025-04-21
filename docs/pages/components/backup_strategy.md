@@ -34,6 +34,13 @@ make backup-strategy DOMAIN=example.com ADMIN_EMAIL=admin@example.com CLIENT_ID=
 | `/var/log/agency_stack/components/backup_strategy.log` | Component installation log |
 | `/etc/cron.d/agency-stack-backup-<client_id>` | Cron job configuration |
 
+## Directory Creation and File Operation Robustness
+
+All backup scripts and file operations are protected by explicit directory creation (`mkdir -p`) before writing any configuration, log, or secret files. This ensures the backup system is robust and installation is repeatable on any target system.
+
+**Best Practice:**
+AgencyStack install scripts must always create parent directories before any file write, copy, or move operation. If you encounter file-not-found errors, verify directory creation logic in your scripts.
+
 ## Configuration
 
 The primary configuration file is located at `/opt/agency_stack/clients/<client_id>/backup_strategy/env/restic.env`. This file contains:
