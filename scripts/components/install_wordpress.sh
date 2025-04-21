@@ -4,6 +4,60 @@
 
 set -e
 
+# --- Ensure logging functions are available (source common.sh and log_helpers.sh) ---
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+if [[ "$(type -t log)" != "function" ]]; then
+  source "$REPO_ROOT/scripts/utils/common.sh"
+fi
+if [[ "$(type -t log)" != "function" ]]; then
+  source "$REPO_ROOT/scripts/utils/log_helpers.sh"
+fi
+
+# --- Ensure FORCE is always initialized to avoid unbound variable errors ---
+FORCE="${FORCE:-false}"
+
+# Accept multiple true values for FORCE
+FORCE_NORMALIZED="false"
+if [[ "$FORCE" =~ ^([Tt][Rr][Uu][Ee]|1)$ ]]; then
+  FORCE_NORMALIZED="true"
+fi
+
+# Debug: Show FORCE value
+log "INFO" "FORCE variable value: $FORCE (normalized: $FORCE_NORMALIZED)"
+
+# --- Define WordPress DB variables EARLY to avoid unbound variable errors ---
+WP_DB_NAME="wordpress"
+WP_DB_USER="wordpress"
+WP_DB_PASSWORD="${WP_DB_PASSWORD:-wordpresspass}"
+WP_ROOT_PASSWORD="${WP_ROOT_PASSWORD:-mariadb_root_password}"
+WP_TABLE_PREFIX="wp_"
+
+# --- Define admin credentials early as well ---
+WP_ADMIN_USER="admin"
+WP_ADMIN_PASSWORD="admin"
+
+# --- Define MariaDB container name early ---
+if [ -n "$CLIENT_ID" ]; then
+  MARIADB_CONTAINER_NAME="${CLIENT_ID}_mariadb"
+else
+  MARIADB_CONTAINER_NAME="mariadb"
+fi
+
+# --- MariaDB container existence check and auto-handling (robust for Compose patterns) ---
+MATCHING_CONTAINERS=$(docker ps -a --format '{{.Names}}' | grep -E "(^${MARIADB_CONTAINER_NAME}$|^${CLIENT_ID}_mariadb$|^mariadb$|^default_mariadb$)" || true)
+if [[ -n "$MATCHING_CONTAINERS" ]]; then
+  log "WARNING: MariaDB container(s) matching deployment already exist." "${YELLOW}MariaDB container(s) matching deployment already exist.${NC}"
+  log "INFO" "Matching containers: $MATCHING_CONTAINERS"
+  if [ "$FORCE_NORMALIZED" = "true" ]; then
+    log "INFO: Removing all matching MariaDB containers (FORCE enabled)" "${CYAN}Removing all matching MariaDB containers...${NC}"
+    echo "$MATCHING_CONTAINERS" | xargs -r -I {} docker rm -f "{}"
+  else
+    log "ERROR: MariaDB container name conflict. Use --force to remove the existing container(s), or rename/remove manually." "${RED}MariaDB container name conflict. Use --force to remove, or rename/remove manually.${NC}"
+    exit 1
+  fi
+fi
+
 # --- BEGIN: Preflight/Prerequisite Check ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
@@ -50,22 +104,16 @@ INSTALL_LOG="${COMPONENTS_LOG_DIR}/wordpress.log"
 INTEGRATION_LOG="${INTEGRATIONS_LOG_DIR}/wordpress.log"
 MAIN_INTEGRATION_LOG="${INTEGRATIONS_LOG_DIR}/integration.log"
 VERBOSE=false
-FORCE=false
 WITH_DEPS=false
 DOMAIN=""
 CLIENT_ID="default"  # Default client ID
 ADMIN_EMAIL=""
-WP_ADMIN_USER="admin"
-WP_ADMIN_PASSWORD="admin"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-$(openssl rand -base64 12)}"
-WP_DB_PASSWORD="wordpress_password"  # Fixed password for consistent deployment
-WP_ROOT_PASSWORD="mariadb_root_password"  # Fixed root password for consistent deployment
 WP_VERSION="latest"
 PHP_VERSION="8.1"
 ENABLE_KEYCLOAK=false
 ENFORCE_HTTPS=true
 USE_HOST_NETWORK=true
-MARIADB_CONTAINER_NAME="${CLIENT_ID}_mariadb"
 KEYCLOAK_DOMAIN="keycloak.proto001.alpha.nerdofmouth.com"
 CONFIGURE_DNS=false
 
@@ -79,11 +127,25 @@ trap_agencystack_errors
 
 # --- Set container and volume names BEFORE any pre-flight logic ---
 # (This logic should match the main container naming logic used later)
-MARIADB_CONTAINER_NAME="${CLIENT_ID}_mariadb"
-# (Add other container/volume names here if needed)
+# --- Ensure DOMAIN_UNDERSCORE and SITE_NAME are initialized BEFORE use ---
+DOMAIN="${DOMAIN:-localhost}"
+DOMAIN_UNDERSCORE="$(echo "$DOMAIN" | tr '.' '_')"
+SITE_NAME="${DOMAIN//./_}"
+
+# --- Set up network name and container names based on CLIENT_ID (must be before any use) ---
+if [ -n "$CLIENT_ID" ]; then
+  NETWORK_NAME="${CLIENT_ID}_network"
+  WORDPRESS_CONTAINER_NAME="${CLIENT_ID}_wordpress"
+  NGINX_CONTAINER_NAME="${CLIENT_ID}_nginx"
+  REDIS_CONTAINER_NAME="${CLIENT_ID}_redis"
+else
+  NETWORK_NAME="default_network"
+  WORDPRESS_CONTAINER_NAME="wordpress"
+  NGINX_CONTAINER_NAME="nginx"
+  REDIS_CONTAINER_NAME="redis"
+fi
 
 # --- Ensure Docker Compose file is generated before MariaDB pre-flight ---
-# (Move or duplicate Docker Compose file generation logic here)
 log "INFO: Creating WordPress Docker Compose file (early, for pre-flight validation)" "${CYAN}Creating WordPress Docker Compose file (early, for pre-flight validation)...${NC}"
 cat > "${WP_DIR}/${DOMAIN}/docker-compose.yml" <<EOL
 version: '3'
@@ -406,8 +468,8 @@ log "INFO: Starting WordPress installation validation for $DOMAIN" "${BLUE}Start
 # Set container names based on client ID
 log "INFO: Setting container names" "Setting container names..."
 DOMAIN=$(echo "$DOMAIN" | tr '[:upper:]' '[:lower:]')
-SITE_NAME=${DOMAIN//./_}
 DOMAIN_UNDERSCORE=$(echo "$DOMAIN" | tr '.' '_')
+SITE_NAME=${DOMAIN//./_}
 if [ -n "$CLIENT_ID" ]; then
   WORDPRESS_CONTAINER_NAME="${CLIENT_ID}_wordpress"
   NGINX_CONTAINER_NAME="${CLIENT_ID}_nginx"
@@ -422,7 +484,7 @@ fi
 
 # Check if WordPress is already installed
 if docker ps -a --format '{{.Names}}' | grep -q "$WORDPRESS_CONTAINER_NAME"; then
-  if [ "$FORCE" = true ]; then
+  if [ "$FORCE_NORMALIZED" = true ]; then
     log "WARNING: WordPress container '$WORDPRESS_CONTAINER_NAME' already exists, will reinstall because --force was specified" "${YELLOW}⚠️ WordPress container '$WORDPRESS_CONTAINER_NAME' already exists, will reinstall because --force was specified${NC}"
     # Stop and remove existing containers
     log "INFO: Stopping and removing existing WordPress containers" "${CYAN}Stopping and removing existing WordPress containers...${NC}"
@@ -451,7 +513,7 @@ if docker ps -a --format '{{.Names}}' | grep -q "$WORDPRESS_CONTAINER_NAME"; the
 fi
 
 # Explicitly cleanup all data directories if --force was specified
-if [ "$FORCE" = true ]; then
+if [ "$FORCE_NORMALIZED" = true ]; then
   log "INFO: Cleaning up data directories due to --force option" "${CYAN}Cleaning up data directories...${NC}"
   rm -rf "${WP_DIR}/${DOMAIN}/mariadb" "${WP_DIR}/${DOMAIN}/wordpress" "${WP_DIR}/${DOMAIN}/redis"
 fi
@@ -544,25 +606,21 @@ mkdir -p "${WP_DIR}/${DOMAIN}/certs"
 mkdir -p "${WP_DIR}/${DOMAIN}/logs"
 mkdir -p "${WP_DIR}/${DOMAIN}/redis"
 
-# Define consistent database variables
-WP_DB_NAME="wordpress"
-WP_DB_USER="wordpress"
-WP_TABLE_PREFIX="wp_"
-
-# Define consistent WordPress admin credentials
-WP_ADMIN_USER="admin"
-WP_ADMIN_PASSWORD="admin"
-
 # Store database credentials in environment file for reference
 mkdir -p "${WP_DIR}/${DOMAIN}/config"
+chmod 700 "${WP_DIR}/${DOMAIN}/config"
+
 cat > "${WP_DIR}/${DOMAIN}/config/.env" <<EOL
-# WordPress Database Configuration
-# Generated by AgencyStack installation script
 WP_DB_NAME=${WP_DB_NAME}
 WP_DB_USER=${WP_DB_USER}
 WP_DB_PASSWORD=${WP_DB_PASSWORD}
 WP_ROOT_PASSWORD=${WP_ROOT_PASSWORD}
+WP_TABLE_PREFIX=${WP_TABLE_PREFIX}
+WP_ADMIN_USER=${WP_ADMIN_USER}
+WP_ADMIN_PASSWORD=${WP_ADMIN_PASSWORD}
 EOL
+
+chmod 600 "${WP_DIR}/${DOMAIN}/config/.env"
 
 # Create MariaDB initialization script
 log "INFO: Creating MariaDB initialization script" "${CYAN}Creating MariaDB initialization script...${NC}"
