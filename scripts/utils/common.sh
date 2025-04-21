@@ -229,6 +229,26 @@ run_pre_installation_checks() {
 # into a single, idempotent, reusable function for all installers.
 
 preflight_check_agencystack() {
+    # Ensure required base packages are installed (idempotent, supports Alpine/Debian/Ubuntu)
+    local REQUIRED_CMDS=(jq git bash make curl sudo)
+    local MISSING_CMDS=()
+    for CMD in "${REQUIRED_CMDS[@]}"; do
+        if ! command -v "$CMD" >/dev/null 2>&1; then
+            MISSING_CMDS+=("$CMD")
+        fi
+    done
+    if [ ${#MISSING_CMDS[@]} -gt 0 ]; then
+        echo "[INFO] Installing missing base packages: ${MISSING_CMDS[*]}"
+        if [ -f /etc/alpine-release ]; then
+            apk update && apk add --no-cache "${MISSING_CMDS[@]}"
+        elif [ -f /etc/debian_version ] || grep -qi ubuntu /etc/os-release; then
+            apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y "${MISSING_CMDS[@]}"
+        else
+            echo "[ERROR] Unsupported OS. Please install: ${MISSING_CMDS[*]} manually."
+            exit 1
+        fi
+    fi
+
     log_info "[Preflight] Starting AgencyStack preflight checks..."
     local errors=0
     local warnings=0
