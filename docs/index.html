@@ -130,6 +130,16 @@
                 <li><strong>Integration</strong>: n8n, OpenIntegrationHub</li>
                 <li><strong>System Monitoring</strong>: Netdata, Fail2ban, DroneCI</li>
             </ul>
+            <p class="mt-3"><strong>Install all core components at once:</strong></p>
+            <pre><code>make install-all</code></pre>
+        </div>
+
+        <div class="section">
+            <h2>Installation Targets</h2>
+            <ul>
+                <li><code>make install-all</code>: Installs all major components (WordPress, ERPNext, PostHog, VoIP, Mailu, Listmonk, KillBill)</li>
+                <li>Individual targets: <code>make install-wordpress</code>, <code>make install-erpnext</code>, etc.</li>
+            </ul>
         </div>
 
         <div class="section">
@@ -164,7 +174,54 @@
             </ul>
         </div>
 
-        <div class="footer">
+        
+<div class="section">
+  <h2>Component List (Auto-Generated)</h2>
+  <table class="table table-striped">
+    <thead><tr><th>Name</th><th>Category</th><th>Version</th><th>Status</th><th>Docs</th></tr></thead>
+    <tbody>
+      <tr><td>Ollama</td><td>AI</td><td>0.1.27</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>Cal.com</td><td>Business Applications</td><td>2.9.4</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>Chatwoot</td><td>Business Applications</td><td>v3.5.0</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>Documenso</td><td>Business Applications</td><td>1.4.2</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>ERPNext</td><td>Business Applications</td><td>14.0.0</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>KillBill</td><td>Business Applications</td><td>0.24.0</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>Etebase</td><td>Collaboration</td><td>v0.7.0</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>Builder.io</td><td>Content Management</td><td>2.0.0</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>Focalboard</td><td>Content Management</td><td>7.8.0</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>Ghost</td><td>Content Management</td><td>5.59.0</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>PeerTube</td><td>Content Management</td><td>7.0.0</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>Seafile</td><td>Content Management</td><td>10.0.1</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>WordPress</td><td>Content Management</td><td>6.4.2</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>Docker</td><td>Core Infrastructure</td><td>latest</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>Docker Compose</td><td>Core Infrastructure</td><td>latest</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>DroneCI</td><td>Core Infrastructure</td><td>2.25.0</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>Portainer</td><td>Core Infrastructure</td><td>2.17.1</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>Pre-Flight Check</td><td>Core Infrastructure</td><td>1.0.0</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>System Prerequisites</td><td>Core Infrastructure</td><td>1.0.0</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>Traefik</td><td>Core Infrastructure</td><td>2.9.8</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>pgvector</td><td>Database</td><td>0.5.1</td><td><span class='text-danger'>Not Installed</span></td><td></td></tr>
+      <tr><td>Drone CI</td><td>DevOps</td><td>2.16.0</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>Gitea</td><td>DevOps</td><td>1.20.0</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>Listmonk</td><td>Email & Communication</td><td>4.1.0</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>Mailu</td><td>Email & Communication</td><td>1.9</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>Mattermost</td><td>Email & Communication</td><td>7.10.0</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>VoIP</td><td>Email & Communication</td><td>1.0.0</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>Grafana</td><td>Monitoring & Observability</td><td>10.1.0</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>Loki</td><td>Monitoring & Observability</td><td>2.9.0</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>Prometheus</td><td>Monitoring & Observability</td><td>2.44.0</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>CrowdSec</td><td>Security & Identity</td><td>1.5.0</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>Fail2ban</td><td>Security & Identity</td><td>latest</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>Keycloak</td><td>Security & Identity</td><td>22.0.1</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>Security Hardening</td><td>Security & Identity</td><td>1.0.0</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>Signing & Timestamps</td><td>Security & Identity</td><td>1.0.0</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>Vault</td><td>Security & Identity</td><td>1.14.0</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>Backup Strategy</td><td>Security & Storage</td><td>1.0.0</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+      <tr><td>Cryptosync</td><td>Security & Storage</td><td>v1.0.0</td><td><span class='text-success'>Installed</span></td><td></td></tr>
+    </tbody>
+  </table>
+</div>
+<div class="footer">
             <p>
                 Built by 
                 <a href="https://nerdofmouth.com">

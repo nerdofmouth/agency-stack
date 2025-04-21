@@ -9,6 +9,9 @@
 
 set -e
 
+# DEPRECATION NOTICE: This script's logic should be integrated into the appropriate install scripts (e.g., install_traefik.sh or install_dashboard.sh) as idempotent FQDN/DNS checks and fixes.
+# This script will be removed after migration is complete.
+
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 UTILS_DIR="$(cd "${SCRIPT_DIR}/../utils" && pwd)"

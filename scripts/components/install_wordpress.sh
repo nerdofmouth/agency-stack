@@ -1,7 +1,15 @@
 #!/bin/bash
 # Source common utilities
 source "$(dirname "$0")/../utils/common.sh"
-        
+
+# --- BEGIN: Preflight/Prerequisite Check ---
+source "$(dirname \"$0\")/../utils/common.sh"
+preflight_check_agencystack || {
+  echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
+  exit 1
+}
+# --- END: Preflight/Prerequisite Check ---
+
 # install_wordpress.sh - Install and configure WordPress for AgencyStack
 # https://stack.nerdofmouth.com
 #
@@ -61,6 +69,29 @@ CONFIGURE_DNS=false
 if [ -f "${SCRIPT_DIR}/../utils/component_sso_helper.sh" ]; then
   source "${SCRIPT_DIR}/../utils/component_sso_helper.sh"
 fi
+
+# --- BULLETPROOF: Always create/overwrite my.cnf as a file before any Docker logic, even for existing installs ---
+MYCNF_PATH="${WP_DIR}/${DOMAIN}/mariadb-init/my.cnf"
+if [ -d "$MYCNF_PATH" ]; then
+  echo "[FATAL] $MYCNF_PATH is a directory. Removing to allow file mount."
+  rm -rf "$MYCNF_PATH"
+fi
+# Always create/overwrite as a file
+cat > "$MYCNF_PATH" <<EOL
+[mysqld]
+character-set-server=utf8mb4
+collation-server=utf8mb4_unicode_ci
+bind-address=0.0.0.0
+max_allowed_packet=128M
+EOL
+if [ ! -f "$MYCNF_PATH" ]; then
+  echo "[FATAL] $MYCNF_PATH could not be created as a file. Aborting install."
+  exit 1
+fi
+
+# --- Ensure correct ownership/permissions for my.cnf ---
+chown ${AGENCY_USER:-developer}:${AGENCY_GROUP:-developer} "$MYCNF_PATH" 2>/dev/null || true
+chmod 644 "$MYCNF_PATH"
 
 # Show help message
 show_help() {
@@ -431,15 +462,6 @@ VALUES ('home', 'https://${DOMAIN}', 'yes')
 ON DUPLICATE KEY UPDATE option_value = 'https://${DOMAIN}';
 EOL
 
-# Create MariaDB configuration file
-cat > "${WP_DIR}/${DOMAIN}/mariadb-init/my.cnf" <<EOL
-[mysqld]
-character-set-server=utf8mb4
-collation-server=utf8mb4_unicode_ci
-bind-address=0.0.0.0
-max_allowed_packet=128M
-EOL
-
 # Create WordPress Docker Compose file
 log "INFO: Creating WordPress Docker Compose file" "${CYAN}Creating WordPress Docker Compose file...${NC}"
 cat > "${WP_DIR}/${DOMAIN}/docker-compose.yml" <<EOL
@@ -658,13 +680,34 @@ server {
 }
 EOL
 
+# --- Detect and auto-heal Docker mount errors for MariaDB ---
+start_mariadb_container() {
+  # Try to start the container
+  docker-compose -f "${WP_DIR}/${DOMAIN}/docker-compose.yml" up -d mariadb 2>start_mariadb.err
+  if grep -q 'error mounting' start_mariadb.err && grep -q 'my.cnf' start_mariadb.err; then
+    echo "[WARN] Detected Docker mount error for my.cnf. Removing and recreating MariaDB container..."
+    docker-compose -f "${WP_DIR}/${DOMAIN}/docker-compose.yml" rm -sf mariadb
+    # Remove MariaDB volume if it exists (named volume or path-based)
+    if docker volume ls --format '{{.Name}}' | grep -q "^${MARIADB_CONTAINER_NAME}_data$"; then
+      echo "[INFO] Removing MariaDB Docker volume ${MARIADB_CONTAINER_NAME}_data ..."
+      docker volume rm "${MARIADB_CONTAINER_NAME}_data"
+    fi
+    # Remove any anonymous or path-based volumes if present (optional safety)
+    docker volume prune -f
+    # Try again
+    docker-compose -f "${WP_DIR}/${DOMAIN}/docker-compose.yml" up -d mariadb
+  fi
+  rm -f start_mariadb.err
+}
+
 # Start WordPress stack
 log "INFO: Starting WordPress stack" "${CYAN}Starting WordPress stack...${NC}"
-cd "${WP_DIR}/${DOMAIN}" && docker-compose up -d
-if [ $? -ne 0 ]; then
-  log "ERROR: Failed to start WordPress stack" "${RED}Failed to start WordPress stack${NC}"
-  exit 1
-fi
+cd "${WP_DIR}/${DOMAIN}"
+# Start MariaDB container with auto-heal logic
+start_mariadb_container
+# Start other containers (WordPress, Redis, Nginx)
+docker-compose up -d wordpress redis nginx
+cd - > /dev/null
 
 # Wait for WordPress stack to initialize
 log "INFO: Waiting for WordPress to start" "${CYAN}Waiting for WordPress to start...${NC}"

@@ -2,7 +2,14 @@
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../utils/common.sh"
-        
+
+# --- BEGIN: Preflight/Prerequisite Check ---
+preflight_check_agencystack || {
+  echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
+  exit 1
+}
+# --- END: Preflight/Prerequisite Check ---
+
 # install_erpnext.sh - Install and configure ERPNext for AgencyStack
 # https://stack.nerdofmouth.com
 #

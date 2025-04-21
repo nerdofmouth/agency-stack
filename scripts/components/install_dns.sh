@@ -2,9 +2,14 @@
 # install_dns.sh - Setup DNS for AgencyStack components
 # Part of the AgencyStack Alpha Phase
 #
-# Source common utilities
+# --- BEGIN: Preflight/Prerequisite Check ---
 source "$(dirname "$0")/../utils/common.sh"
-
+preflight_check_agencystack || {
+  echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
+  exit 1
+}
+# --- END: Preflight/Prerequisite Check ---
+#
 # Default values
 DNS_PROVIDER=""
 DOMAIN=""

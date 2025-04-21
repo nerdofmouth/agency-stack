@@ -1,7 +1,14 @@
 #!/bin/bash
 # Source common utilities
 source "$(dirname "$0")/../utils/common.sh"
-        
+
+# --- BEGIN: Preflight/Prerequisite Check ---
+preflight_check_agencystack || {
+  echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
+  exit 1
+}
+# --- END: Preflight/Prerequisite Check ---
+
 # install_posthog.sh - Install and configure PostHog analytics for AgencyStack
 # https://stack.nerdofmouth.com
 #

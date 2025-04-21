@@ -3,6 +3,10 @@ layout: default
 title: Cryptosync - Encrypted Storage & Remote Sync - AgencyStack Documentation
 ---
 
+## Migration Notice (2025-04-20)
+
+> **Note:** As of April 2025, all cryptosync install and validation logic is unified under `preflight_check_agencystack` in `common.sh`. Deprecated fix scripts and manual checks have been removed. All installs are now idempotent and validated at runtime.
+
 # Cryptosync
 
 Cryptosync is an AgencyStack integration that combines encrypted local storage with flexible remote sync capabilities using gocryptfs (or CryFS) and rclone.

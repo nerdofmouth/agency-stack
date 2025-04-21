@@ -39,6 +39,17 @@ Install AgencyStack on your server with our one-line installer:
 curl -sSL https://stack.nerdofmouth.com/install.sh | sudo bash
 ```
 
+Or, to install all core components from a dev container:
+
+```bash
+make install-all
+```
+
+## Installation Targets
+
+- `make install-all`: Installs all major components (WordPress, ERPNext, PostHog, VoIP, Mailu, Listmonk, KillBill)
+- Individual targets: `make install-wordpress`, `make install-erpnext`, etc.
+
 ## What's Included
 
 AgencyStack provides a complete server solution including:
@@ -59,6 +70,8 @@ AgencyStack provides a complete server solution including:
 - [Maintenance and Backup](pages/maintenance.html)
 - [Self-Healing Setup](pages/self-healing.html)
 - [Public Demo Environment](pages/demo-setup.html)
+- [DroneCI Integration](pages/droneci-guide.html)
+- [Troubleshooting Guide](pages/troubleshooting.html)
 
 ## Requirements
 
@@ -77,3 +90,45 @@ AgencyStack provides a complete server solution including:
     <img src="/images/NerdOfMouthLogo.png" alt="Nerd of Mouth" style="height: 30px; vertical-align: middle;">
   </a> | Deploy Smart. Speak Nerd.</p>
 </div>
+## Component List (Auto-Generated from Registry)
+
+| Name | Category | Version | Status | Docs |
+|------|----------|---------|--------|------|
+| Ollama | AI | 0.1.27 | Installed |  |
+| Cal.com | Business Applications | 2.9.4 | Installed |  |
+| Chatwoot | Business Applications | v3.5.0 | Installed |  |
+| Documenso | Business Applications | 1.4.2 | Installed |  |
+| ERPNext | Business Applications | 14.0.0 | Installed |  |
+| KillBill | Business Applications | 0.24.0 | Installed |  |
+| Etebase | Collaboration | v0.7.0 | Installed |  |
+| Builder.io | Content Management | 2.0.0 | Installed |  |
+| Focalboard | Content Management | 7.8.0 | Installed |  |
+| Ghost | Content Management | 5.59.0 | Installed |  |
+| PeerTube | Content Management | 7.0.0 | Installed |  |
+| Seafile | Content Management | 10.0.1 | Installed |  |
+| WordPress | Content Management | 6.4.2 | Installed |  |
+| Docker | Core Infrastructure | latest | Installed |  |
+| Docker Compose | Core Infrastructure | latest | Installed |  |
+| DroneCI | Core Infrastructure | 2.25.0 | Installed |  |
+| Portainer | Core Infrastructure | 2.17.1 | Installed |  |
+| Pre-Flight Check | Core Infrastructure | 1.0.0 | Installed |  |
+| System Prerequisites | Core Infrastructure | 1.0.0 | Installed |  |
+| Traefik | Core Infrastructure | 2.9.8 | Installed |  |
+| pgvector | Database | 0.5.1 | Not Installed |  |
+| Drone CI | DevOps | 2.16.0 | Installed |  |
+| Gitea | DevOps | 1.20.0 | Installed |  |
+| Listmonk | Email & Communication | 4.1.0 | Installed |  |
+| Mailu | Email & Communication | 1.9 | Installed |  |
+| Mattermost | Email & Communication | 7.10.0 | Installed |  |
+| VoIP | Email & Communication | 1.0.0 | Installed |  |
+| Grafana | Monitoring & Observability | 10.1.0 | Installed |  |
+| Loki | Monitoring & Observability | 2.9.0 | Installed |  |
+| Prometheus | Monitoring & Observability | 2.44.0 | Installed |  |
+| CrowdSec | Security & Identity | 1.5.0 | Installed |  |
+| Fail2ban | Security & Identity | latest | Installed |  |
+| Keycloak | Security & Identity | 22.0.1 | Installed |  |
+| Security Hardening | Security & Identity | 1.0.0 | Installed |  |
+| Signing & Timestamps | Security & Identity | 1.0.0 | Installed |  |
+| Vault | Security & Identity | 1.14.0 | Installed |  |
+| Backup Strategy | Security & Storage | 1.0.0 | Installed |  |
+| Cryptosync | Security & Storage | v1.0.0 | Installed |  |

@@ -1,5 +1,9 @@
 # AgencyStack Dashboard
 
+## SSO & TLS Migration Update (2025-04-20)
+
+> **Note:** As of April 2025, dashboard installation now enforces SSO and HTTPS/TLS via unified preflight checks in `common.sh`. All Keycloak SSO logic is managed through the `--enable-keycloak` install flag and validated by the `preflight_check_agencystack` function. Deprecated fix scripts have been removed.
+
 The AgencyStack Dashboard provides a real-time overview of all installed components and their current status. It serves as a central hub for monitoring and managing your AgencyStack installation.
 
 ## Purpose

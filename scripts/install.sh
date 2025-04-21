@@ -1066,6 +1066,16 @@ AGENCYSCRIPT
   echo -e "${GREEN}Created 'agency_stack' command for easier management${NC}"
 fi
 
+# --- BEGIN: Preflight/Prerequisite Integration ---
+# All preflight and prerequisite logic is now unified in scripts/utils/common.sh
+# Call preflight_check_agencystack before main installation menu
+source "$(dirname "$0")/../scripts/utils/common.sh"
+preflight_check_agencystack || {
+  echo -e "${RED}Preflight checks failed. Please resolve the above issues before proceeding.${NC}"
+  exit 1
+}
+# --- END: Preflight/Prerequisite Integration ---
+
 # Function to setup basic utilities
 setup_basic_utilities() {
   echo -e "${BLUE}${BOLD} Setting up basic utilities...${NC}"

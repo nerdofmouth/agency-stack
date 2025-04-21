@@ -3,6 +3,10 @@ layout: default
 title: pgvector - PostgreSQL Vector Extension - AgencyStack Documentation
 ---
 
+## Migration Notice (2025-04-20)
+
+> **Note:** As of April 2025, pgvector installation and validation is now governed by the unified `preflight_check_agencystack` logic in `common.sh`. All prerequisite and fix scripts have been deprecated and removed. See the Makefile and install_pgvector.sh for details.
+
 # pgvector
 
 pgvector is a PostgreSQL extension that adds support for vector similarity search, enabling AI-powered semantic search capabilities within your existing PostgreSQL database.

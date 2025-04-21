@@ -2,6 +2,14 @@
 # Install AgencyStack Dashboard Component
 # Installs and configures the Next.js dashboard for monitoring component status
 
+# --- BEGIN: Preflight/Prerequisite Check ---
+source "$(dirname "$0")/../utils/common.sh"
+preflight_check_agencystack || {
+  echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
+  exit 1
+}
+# --- END: Preflight/Prerequisite Check ---
+
 # Determine script path and repo root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
