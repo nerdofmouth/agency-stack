@@ -2,6 +2,8 @@
 # FOSS Server Stack for Agencies & Enterprises
 # https://stack.nerdofmouth.com
 
+export FORCE
+
 # Variables
 SHELL := /bin/bash
 VERSION := 0.0.1.2025.04.04.0013
@@ -814,7 +816,7 @@ erpnext-sso:
 		echo "Usage: make erpnext-sso DOMAIN=erp.example.com KEYCLOAK_DOMAIN=auth.example.com [CLIENT_ID=tenant1]"; \
 		exit 1; \
 	fi; \
-	sudo $(SCRIPTS_DIR)/components/install_erpnext.sh --domain $(DOMAIN) --keycloak-domain $(KEYCLOAK_DOMAIN) --enable-sso $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(VERBOSE),--verbose,)
+	sudo $(SCRIPTS_DIR)/components/install_erpnext.sh --domain $(DOMAIN) --keycloak-domain $(KEYCLOAK_DOMAIN) --enable-sso $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(VERBOSE),--verbose,)
 
 # PostHog
 install-posthog: validate
@@ -1389,7 +1391,16 @@ tailscale-restart:
 # builderio component targets
 builderio:
 	@echo "🔧 Installing builderio..."
-	@$(SCRIPTS_DIR)/components/install_builderio.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(VERBOSE),--verbose,)
+	@$(SCRIPTS_DIR)/components/install_builderio.sh $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) \
+		$(if $(DOMAIN),--domain $(DOMAIN),) \
+		$(if $(PORT),--port $(PORT),) \
+		$(if $(ADMIN_USER),--admin-user $(ADMIN_USER),) \
+		$(if $(ADMIN_EMAIL),--admin-email $(ADMIN_EMAIL),) \
+		$(if $(ADMIN_PASSWORD),--admin-password $(ADMIN_PASSWORD),) \
+		$(if $(FORCE),--force,) \
+		$(if $(WITH_DEPS),--with-deps,) \
+		$(if $(NO_SSL),--no-ssl,) \
+		$(if $(DISABLE_MONITORING),--disable-monitoring,)
 
 builderio-status:
 	@echo "🔍 Checking builderio status..."
@@ -1420,7 +1431,16 @@ builderio-restart:
 # calcom component targets
 calcom:
 	@echo "🔧 Installing calcom..."
-	@$(SCRIPTS_DIR)/components/install_calcom.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(VERBOSE),--verbose,)
+	@$(SCRIPTS_DIR)/components/install_calcom.sh $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) \
+		$(if $(DOMAIN),--domain $(DOMAIN),) \
+		$(if $(PORT),--port $(PORT),) \
+		$(if $(ADMIN_USER),--admin-user $(ADMIN_USER),) \
+		$(if $(ADMIN_EMAIL),--admin-email $(ADMIN_EMAIL),) \
+		$(if $(ADMIN_PASSWORD),--admin-password $(ADMIN_PASSWORD),) \
+		$(if $(FORCE),--force,) \
+		$(if $(WITH_DEPS),--with-deps,) \
+		$(if $(NO_SSL),--no-ssl,) \
+		$(if $(DISABLE_MONITORING),--disable-monitoring,)
 
 calcom-status:
 	@echo "🔍 Checking calcom status..."
@@ -2532,3 +2552,5 @@ install-builderio: validate
 install-backup-strategy: validate
 	@echo "$(MAGENTA)$(BOLD)💾 Installing Backup Strategy...$(RESET)"
 	@FORCE=$(FORCE) sudo $(SCRIPTS_DIR)/components/install_backup_strategy.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+```
