@@ -1,16 +1,13 @@
 #!/bin/bash
-# install_gitea.sh - Installation script for gitea
-#
-# This script installs and configures gitea for AgencyStack
-# following the component installation conventions.
-#
-# Author: AgencyStack Team
-# Date: 2025-04-07
+# install_gitea.sh - Installation script for Gitea
+# AgencyStack Team
 
 set -e
 
 # --- BEGIN: Preflight/Prerequisite Check ---
-source "$(dirname "$0")/../utils/common.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+source "$REPO_ROOT/scripts/utils/common.sh"
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -19,10 +16,13 @@ preflight_check_agencystack || {
 
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../utils/common.sh"
+REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+source "$REPO_ROOT/scripts/utils/common.sh"
 
 # Use robust, portable path for helpers
-source "$(dirname "$0")/../utils/log_helpers.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+source "$REPO_ROOT/scripts/utils/log_helpers.sh"
 
 # Default configuration
 CLIENT_ID="${CLIENT_ID:-default}"

@@ -1,15 +1,4 @@
 #!/bin/bash
-# Source common utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../utils/common.sh"
-
-# --- BEGIN: Preflight/Prerequisite Check ---
-preflight_check_agencystack || {
-  echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
-  exit 1
-}
-# --- END: Preflight/Prerequisite Check ---
-
 # install_erpnext.sh - Install and configure ERPNext for AgencyStack
 # https://stack.nerdofmouth.com
 #
@@ -25,8 +14,20 @@ preflight_check_agencystack || {
 # Version: 2.0.0
 # Created: $(date +%Y-%m-%d)
 
+set -e
+
+# --- BEGIN: Preflight/Prerequisite Check ---
+SCRIPT_DIR="$(cd \"$(dirname \"${BASH_SOURCE[0]}\")" && pwd)"
+REPO_ROOT="$(dirname \"$(dirname \"$SCRIPT_DIR\")\")"
+source "$REPO_ROOT/scripts/utils/common.sh"
+preflight_check_agencystack || {
+  echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
+  exit 1
+}
+# --- END: Preflight/Prerequisite Check ---
+
 # Variables
-ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
+ROOT_DIR="$REPO_ROOT"
 CONFIG_DIR="/opt/agency_stack"
 ERPS_DIR="${CONFIG_DIR}/erpnext"
 LOG_DIR="/var/log/agency_stack"

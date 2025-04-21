@@ -1,16 +1,13 @@
 #!/bin/bash
-# install_focalboard.sh - Installation script for focalboard
-#
-# This script installs and configures focalboard for AgencyStack
-# following the component installation conventions.
-#
-# Author: AgencyStack Team
-# Date: 2025-04-07
+# install_focalboard.sh - Installation script for Focalboard
+# AgencyStack Team
 
 set -e
 
 # --- BEGIN: Preflight/Prerequisite Check ---
-source "$(dirname "$0")/../utils/common.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+source "$REPO_ROOT/scripts/utils/common.sh"
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -22,7 +19,8 @@ source "$(dirname "$0")/../utils/log_helpers.sh"
 
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../utils/common.sh"
+REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+source "$REPO_ROOT/scripts/utils/common.sh"
 
 # Default configuration
 CLIENT_ID="${CLIENT_ID:-default}"

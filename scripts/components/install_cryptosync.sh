@@ -11,7 +11,9 @@
 # Date: April 5, 2025
 
 # --- BEGIN: Preflight/Prerequisite Check ---
-source "$(dirname "$0")/../utils/common.sh"
+SCRIPT_DIR="$(cd \"$(dirname \"${BASH_SOURCE[0]}\")" && pwd)"
+REPO_ROOT="$(dirname \"$(dirname \"$SCRIPT_DIR\")\")"
+source "$REPO_ROOT/scripts/utils/common.sh"
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -32,8 +34,7 @@ NC='\033[0m' # No Color
 BOLD='\033[1m'
 
 # Variables
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
+ROOT_DIR="$REPO_ROOT"
 CONFIG_DIR="/opt/agency_stack"
 LOG_DIR="/var/log/agency_stack"
 COMPONENT_LOG_DIR="${LOG_DIR}/components"
