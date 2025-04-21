@@ -46,24 +46,37 @@ VERBOSE=false
 WITH_DEPS=false
 
 while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --enable-keycloak)
-      ENABLE_KEYCLOAK=true
-      shift
+  key="$1"
+  case $key in
+    --domain)
+      DOMAIN="$2"
+      shift 2
+      ;;
+    --admin-email)
+      ADMIN_EMAIL="$2"
+      shift 2
+      ;;
+    --client-id)
+      CLIENT_ID="$2"
+      shift 2
       ;;
     --force)
       FORCE=true
-      shift
-      ;;
-    --verbose)
-      VERBOSE=true
       shift
       ;;
     --with-deps)
       WITH_DEPS=true
       shift
       ;;
-    --help)
+    --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    --enable-keycloak)
+      ENABLE_KEYCLOAK=true
+      shift
+      ;;
+    -h|--help)
       echo "Usage: $0 [OPTIONS]"
       echo "Options:"
       echo "  --enable-keycloak    Enable Keycloak SSO integration"
@@ -78,6 +91,13 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+# Normalize FORCE value for robustness
+if [[ "${FORCE}" =~ ^([Tt][Rr][Uu][Ee]|1)$ ]]; then
+  FORCE=true
+else
+  FORCE=false
+fi
 
 log_info "Starting Cal.com installation..."
 

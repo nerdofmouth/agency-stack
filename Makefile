@@ -661,12 +661,12 @@ prerequisites-restart:
 # WordPress
 install-wordpress: validate
 	@echo "$(MAGENTA)$(BOLD)🌐 Installing WordPress...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+	@FORCE=$(FORCE) sudo $(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
 # WordPress with SSO integration (convenience target)
 wordpress-sso: validate
 	@echo "$(MAGENTA)$(BOLD)🌐 Installing WordPress with Keycloak SSO integration...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) --enable-keycloak $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+	@FORCE=$(FORCE) sudo $(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) --enable-keycloak $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
 # ERPNext
 install-erpnext: validate
@@ -1458,6 +1458,14 @@ calcom-restart:
 		echo "calcom restart not implemented"; \
 	fi
 
+# Database Components
+
+# AI Foundation
+.PHONY: ollama ollama-status ollama-logs ollama-stop ollama-start ollama-restart ollama-pull ollama-list ollama-test
+
+# LangChain
+.PHONY: langchain langchain-status langchain-logs langchain-stop langchain-start langchain-restart langchain-test
+
 # Auto-generated target for portainer
 portainer-logs:
 	@echo "TODO: Implement portainer-logs"
@@ -1623,12 +1631,12 @@ component-restart:
 # WordPress
 install-wordpress: validate
 	@echo "$(MAGENTA)$(BOLD)🌐 Installing WordPress...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+	@FORCE=$(FORCE) sudo $(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
 # WordPress with SSO integration (convenience target)
 wordpress-sso: validate
 	@echo "$(MAGENTA)$(BOLD)🌐 Installing WordPress with Keycloak SSO integration...$(RESET)"
-	@sudo $(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) --enable-keycloak $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+	@FORCE=$(FORCE) sudo $(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) --enable-keycloak $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
 # Crowdsec
 crowdsec: validate
@@ -2519,3 +2527,18 @@ generate-docs:
 .PHONY: check-registry-vs-scripts
 check-registry-vs-scripts:
 	python3 scripts/utils/check_registry_vs_scripts.py
+
+# Cal.com
+install-calcom: validate
+	@echo "$(MAGENTA)$(BOLD)📅 Installing Cal.com...$(RESET)"
+	@FORCE=$(FORCE) sudo $(SCRIPTS_DIR)/components/install_calcom.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+# Builder.io
+install-builderio: validate
+	@echo "$(MAGENTA)$(BOLD)🧩 Installing Builder.io...$(RESET)"
+	@FORCE=$(FORCE) sudo $(SCRIPTS_DIR)/components/install_builderio.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+# Backup Strategy
+install-backup-strategy: validate
+	@echo "$(MAGENTA)$(BOLD)💾 Installing Backup Strategy...$(RESET)"
+	@FORCE=$(FORCE) sudo $(SCRIPTS_DIR)/components/install_backup_strategy.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
