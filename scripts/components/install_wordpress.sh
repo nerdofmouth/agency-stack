@@ -75,13 +75,14 @@ if [ -f "${SCRIPT_DIR}/../utils/component_sso_helper.sh" ]; then
 fi
 
 # --- BULLETPROOF: Always create/overwrite my.cnf as a file before any Docker logic, even for existing installs ---
+log "INFO: Ensuring MariaDB init directory exists" "${CYAN}Ensuring MariaDB init directory exists...${NC}"
 mkdir -p "/opt/agency_stack/wordpress/localhost/mariadb-init"
 MYCNF_PATH="${WP_DIR}/localhost/mariadb-init/my.cnf"
 if [ -d "$MYCNF_PATH" ]; then
-  echo "[FATAL] $MYCNF_PATH is a directory. Removing to allow file mount."
+  log "FATAL: $MYCNF_PATH is a directory. Removing to allow file mount." "${RED}[FATAL] $MYCNF_PATH is a directory. Removing to allow file mount.${NC}"
   rm -rf "$MYCNF_PATH"
 fi
-# Always create/overwrite as a file
+log "INFO: Creating MariaDB my.cnf configuration" "${CYAN}Creating MariaDB my.cnf configuration...${NC}"
 cat > "$MYCNF_PATH" <<EOL
 [mysqld]
 character-set-server=utf8mb4
@@ -90,7 +91,7 @@ bind-address=0.0.0.0
 max_allowed_packet=128M
 EOL
 if [ ! -f "$MYCNF_PATH" ]; then
-  echo "[FATAL] $MYCNF_PATH could not be created as a file. Aborting install."
+  log "FATAL: $MYCNF_PATH could not be created as a file. Aborting install." "${RED}[FATAL] $MYCNF_PATH could not be created as a file. Aborting install.${NC}"
   exit 1
 fi
 
@@ -706,12 +707,13 @@ start_mariadb_container() {
 }
 
 # Start WordPress stack
-log "INFO: Starting WordPress stack" "${CYAN}Starting WordPress stack...${NC}"
+log "INFO: Starting WordPress stack with Docker Compose" "${CYAN}Starting WordPress stack with Docker Compose...${NC}"
 cd "${WP_DIR}/${DOMAIN}"
 # Start MariaDB container with auto-heal logic
 start_mariadb_container
 # Start other containers (WordPress, Redis, Nginx)
 docker-compose up -d wordpress redis nginx
+log "INFO: Docker Compose up completed" "${GREEN}Docker Compose up completed.${NC}"
 cd - > /dev/null
 
 # Wait for WordPress stack to initialize
