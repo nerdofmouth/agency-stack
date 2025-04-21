@@ -17,6 +17,16 @@ fi
 # --- Ensure FORCE is always initialized to avoid unbound variable errors ---
 FORCE="${FORCE:-false}"
 
+# --- Parse command-line arguments for --force and others ---
+for arg in "$@"; do
+  case "$arg" in
+    --force)
+      FORCE="true"
+      ;;
+    # Add other flags here if needed
+  esac
+done
+
 # Accept multiple true values for FORCE
 FORCE_NORMALIZED="false"
 if [[ "$FORCE" =~ ^([Tt][Rr][Uu][Ee]|1)$ ]]; then
