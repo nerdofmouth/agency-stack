@@ -13,7 +13,9 @@
 # Created: 2025-04-07
 
 # --- BEGIN: Preflight/Prerequisite Check ---
-source "$(dirname "$0")/../utils/common.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+source "$REPO_ROOT/scripts/utils/common.sh"
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -31,8 +33,8 @@ AGENCY_SCRIPTS_DIR="${AGENCY_ROOT}/repo/scripts"
 AGENCY_UTILS_DIR="${AGENCY_SCRIPTS_DIR}/utils"
 
 # Use a robust, portable path for common.sh
-source "$(dirname "$0")/../utils/common.sh"
-source "$(dirname "$0")/../utils/log_helpers.sh"
+source "$REPO_ROOT/scripts/utils/common.sh"
+source "$REPO_ROOT/scripts/utils/log_helpers.sh"
 
 # Define component-specific variables
 COMPONENT="fail2ban"

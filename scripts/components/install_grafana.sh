@@ -1,8 +1,13 @@
 #!/bin/bash
-# Source common utilities
-source "$(dirname "$0")/../utils/common.sh"
+# install_grafana.sh - Installation script for Grafana
+# AgencyStack Team
+
+set -e
 
 # --- BEGIN: Preflight/Prerequisite Check ---
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+source "$REPO_ROOT/scripts/utils/common.sh"
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -32,8 +37,6 @@ NC='\033[0m' # No Color
 BOLD='\033[1m'
 
 # Variables
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 CONFIG_DIR="/opt/agency_stack"
 GRAFANA_DIR="${CONFIG_DIR}/grafana"
 LOG_DIR="/var/log/agency_stack"
@@ -151,9 +154,9 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # Run system validation
-if [ -f "${ROOT_DIR}/scripts/utils/validate_system.sh" ]; then
+if [ -f "${REPO_ROOT}/scripts/utils/validate_system.sh" ]; then
   echo -e "${BLUE}Validating system requirements...${NC}"
-  bash "${ROOT_DIR}/scripts/utils/validate_system.sh" || {
+  bash "${REPO_ROOT}/scripts/utils/validate_system.sh" || {
     echo -e "${RED}System validation failed. Please fix the issues and try again.${NC}"
     exit 1
   }
@@ -235,8 +238,8 @@ if ! command -v docker &> /dev/null; then
   log "ERROR: Docker is not installed" "${RED}Docker is not installed. Please install Docker first.${NC}"
   if [ "$WITH_DEPS" = true ]; then
     log "INFO: Installing Docker with --with-deps flag" "${CYAN}Installing Docker with --with-deps flag...${NC}"
-    if [ -f "${ROOT_DIR}/scripts/core/install_infrastructure.sh" ]; then
-      bash "${ROOT_DIR}/scripts/core/install_infrastructure.sh" || {
+    if [ -f "${REPO_ROOT}/scripts/core/install_infrastructure.sh" ]; then
+      bash "${REPO_ROOT}/scripts/core/install_infrastructure.sh" || {
         log "ERROR: Failed to install Docker" "${RED}Failed to install Docker. Please install it manually.${NC}"
         exit 1
       }
@@ -261,8 +264,8 @@ if ! command -v docker-compose &> /dev/null; then
   log "ERROR: Docker Compose is not installed" "${RED}Docker Compose is not installed. Please install Docker Compose first.${NC}"
   if [ "$WITH_DEPS" = true ]; then
     log "INFO: Installing Docker Compose with --with-deps flag" "${CYAN}Installing Docker Compose with --with-deps flag...${NC}"
-    if [ -f "${ROOT_DIR}/scripts/core/install_infrastructure.sh" ]; then
-      bash "${ROOT_DIR}/scripts/core/install_infrastructure.sh" || {
+    if [ -f "${REPO_ROOT}/scripts/core/install_infrastructure.sh" ]; then
+      bash "${REPO_ROOT}/scripts/core/install_infrastructure.sh" || {
         log "ERROR: Failed to install Docker Compose" "${RED}Failed to install Docker Compose. Please install it manually.${NC}"
         exit 1
       }
@@ -293,8 +296,8 @@ if ! docker ps --format '{{.Names}}' | grep -q "traefik"; then
   log "WARNING: Traefik container not found" "${YELLOW}⚠️ Traefik container not found. Grafana may not be accessible without a reverse proxy.${NC}"
   if [ "$WITH_DEPS" = true ]; then
     log "INFO: Installing security infrastructure with --with-deps flag" "${CYAN}Installing security infrastructure with --with-deps flag...${NC}"
-    if [ -f "${ROOT_DIR}/scripts/core/install_security_infrastructure.sh" ]; then
-      bash "${ROOT_DIR}/scripts/core/install_security_infrastructure.sh" --domain "$DOMAIN" --email "$ADMIN_EMAIL" || {
+    if [ -f "${REPO_ROOT}/scripts/core/install_security_infrastructure.sh" ]; then
+      bash "${REPO_ROOT}/scripts/core/install_security_infrastructure.sh" --domain "$DOMAIN" --email "$ADMIN_EMAIL" || {
         log "ERROR: Failed to install security infrastructure" "${RED}Failed to install security infrastructure. Please install it manually.${NC}"
       }
     else

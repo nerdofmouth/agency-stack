@@ -10,7 +10,9 @@
 # Date: April 10, 2025
 
 # --- BEGIN: Preflight/Prerequisite Check ---
-source "$(dirname \"$0\")/../utils/common.sh"
+SCRIPT_DIR="$(cd \"$(dirname \"${BASH_SOURCE[0]}\")" && pwd)"
+REPO_ROOT="$(dirname \"$(dirname \"$SCRIPT_DIR\")\")"
+source "$REPO_ROOT/scripts/utils/common.sh"
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1

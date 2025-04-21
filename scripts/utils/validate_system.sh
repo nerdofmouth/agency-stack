@@ -1,4 +1,24 @@
 #!/bin/bash
+# AgencyStack System Validation Script
+
+# --- Ensure required base packages (idempotent, supports Alpine/Debian/Ubuntu) ---
+REQUIRED_CMDS="jq git bash make curl sudo"
+MISSING_CMDS=""
+for CMD in $REQUIRED_CMDS; do
+  command -v $CMD >/dev/null 2>&1 || MISSING_CMDS="$MISSING_CMDS $CMD"
+done
+if [ ! -z "$MISSING_CMDS" ]; then
+  echo "[INFO] Installing missing base packages: $MISSING_CMDS"
+  if [ -f /etc/alpine-release ]; then
+    apk update && apk add --no-cache $MISSING_CMDS
+  elif [ -f /etc/debian_version ] || grep -qi ubuntu /etc/os-release; then
+    apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y $MISSING_CMDS
+  else
+    echo "[ERROR] Unsupported OS. Please install: $MISSING_CMDS manually."
+    exit 1
+  fi
+fi
+
 # validate_system.sh - System requirements validator for AgencyStack
 # 
 # Performs environment, memory, disk, network, and docker checks before installation
