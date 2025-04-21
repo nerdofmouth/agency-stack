@@ -123,6 +123,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Normalize FORCE value for robustness
+if [[ "${FORCE}" =~ ^([Tt][Rr][Uu][Ee]|1)$ ]]; then
+  FORCE=true
+else
+  FORCE=false
+fi
+
 # Setup logging
 mkdir -p "$(dirname "${COMPONENT_LOG_FILE}")"
 exec &> >(tee -a "${COMPONENT_LOG_FILE}")
