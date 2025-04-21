@@ -65,7 +65,7 @@ PHP_VERSION="8.1"
 ENABLE_KEYCLOAK=false
 ENFORCE_HTTPS=true
 USE_HOST_NETWORK=true
-MARIADB_CONTAINER="default_mariadb"
+MARIADB_CONTAINER_NAME="${CLIENT_ID}_mariadb"
 KEYCLOAK_DOMAIN="keycloak.proto001.alpha.nerdofmouth.com"
 CONFIGURE_DNS=false
 
@@ -76,6 +76,129 @@ fi
 
 # --- Enable AgencyStack Standard Error Trap ---
 trap_agencystack_errors
+
+# --- Set container and volume names BEFORE any pre-flight logic ---
+# (This logic should match the main container naming logic used later)
+MARIADB_CONTAINER_NAME="${CLIENT_ID}_mariadb"
+# (Add other container/volume names here if needed)
+
+# --- Ensure Docker Compose file is generated before MariaDB pre-flight ---
+# (Move or duplicate Docker Compose file generation logic here)
+log "INFO: Creating WordPress Docker Compose file (early, for pre-flight validation)" "${CYAN}Creating WordPress Docker Compose file (early, for pre-flight validation)...${NC}"
+cat > "${WP_DIR}/${DOMAIN}/docker-compose.yml" <<EOL
+version: '3'
+
+networks:
+  wordpress_network:
+    name: default_wordpress_${DOMAIN_UNDERSCORE}_network
+  default_network:
+    external: true
+    name: ${NETWORK_NAME}
+
+services:
+  wordpress:
+    container_name: ${WORDPRESS_CONTAINER_NAME}
+    image: wordpress:php8.2-fpm
+    restart: unless-stopped
+    volumes:
+      - ${WP_DIR}/${DOMAIN}/wordpress:/var/www/html
+      - ${WP_DIR}/${DOMAIN}/php/custom.ini:/usr/local/etc/php/conf.d/custom.ini
+    environment:
+      - WORDPRESS_DB_HOST=mariadb
+      - WORDPRESS_DB_USER=${WP_DB_USER}
+      - WORDPRESS_DB_PASSWORD=${WP_DB_PASSWORD}
+      - WORDPRESS_DB_NAME=${WP_DB_NAME}
+      - WORDPRESS_DEBUG=1
+      - WORDPRESS_CONFIG_EXTRA=define('WP_HOME', 'https://${DOMAIN}'); define('WP_SITEURL', 'https://${DOMAIN}');
+    networks:
+      wordpress_network:
+        aliases:
+          - wordpress
+          - wp
+      default_network: {}
+    depends_on:
+      - mariadb
+      - redis
+    healthcheck:
+      test: ["CMD", "php", "-r", "if(!file_exists('/var/www/html/wp-includes/version.php')) exit(1);"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    labels:
+      - "traefik.enable=false"
+  
+  nginx:
+    container_name: ${NGINX_CONTAINER_NAME}
+    image: nginx:latest
+    restart: unless-stopped
+    depends_on:
+      wordpress:
+        condition: service_healthy
+    networks:
+      wordpress_network:
+        aliases:
+          - nginx
+          - web
+      default_network: {}
+    volumes:
+      - ${WP_DIR}/${DOMAIN}/wordpress:/var/www/html
+      - ${WP_DIR}/${DOMAIN}/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.wordpress_${SITE_NAME}.rule=Host(\`${DOMAIN}\`)"
+      - "traefik.http.routers.wordpress_${SITE_NAME}.entrypoints=websecure"
+      - "traefik.http.routers.wordpress_${SITE_NAME}.tls=true"
+      - "traefik.http.routers.wordpress_${SITE_NAME}.tls.certresolver=myresolver"
+      - "traefik.http.services.wordpress_${SITE_NAME}.loadbalancer.server.port=80"
+      # HTTP to HTTPS redirect
+      - "traefik.http.routers.wordpress_${SITE_NAME}_http.rule=Host(\`${DOMAIN}\`)"
+      - "traefik.http.routers.wordpress_${SITE_NAME}_http.entrypoints=web"
+      - "traefik.http.middlewares.redirect_https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirect_https.redirectscheme.permanent=true"
+      - "traefik.http.routers.wordpress_${SITE_NAME}_http.middlewares=redirect_https"
+  
+  mariadb:
+    container_name: ${MARIADB_CONTAINER_NAME}
+    image: mariadb:10.5
+    restart: unless-stopped
+    volumes:
+      - ${WP_DIR}/${DOMAIN}/mariadb:/var/lib/mysql
+      - ${WP_DIR}/${DOMAIN}/mariadb-init/my.cnf:/etc/mysql/my.cnf
+      - ${WP_DIR}/${DOMAIN}/mariadb-init/init.sql:/docker-entrypoint-initdb.d/init.sql
+    environment:
+      - MYSQL_DATABASE=${WP_DB_NAME}
+      - MYSQL_USER=${WP_DB_USER}
+      - MYSQL_PASSWORD=${WP_DB_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${WP_ROOT_PASSWORD}
+      - MYSQL_ROOT_HOST=%
+      - MYSQL_ALLOW_EMPTY_PASSWORD=no
+    networks:
+      wordpress_network:
+        aliases:
+          - mariadb
+          - db
+      default_network: {}
+    labels:
+      - "traefik.enable=false"
+  
+  redis:
+    container_name: ${REDIS_CONTAINER_NAME}
+    image: redis:alpine
+    restart: unless-stopped
+    networks:
+      wordpress_network:
+        aliases:
+          - redis
+          - cache
+      default_network: {}
+    labels:
+      - "traefik.enable=false"
+EOL
+
+if [ ! -f "${WP_DIR}/${DOMAIN}/docker-compose.yml" ]; then
+  log "FATAL: Docker Compose file ${WP_DIR}/${DOMAIN}/docker-compose.yml not found. Cannot proceed with MariaDB startup." "${RED}[FATAL] Docker Compose file ${WP_DIR}/${DOMAIN}/docker-compose.yml not found. Cannot proceed with MariaDB startup.${NC}"
+  exit 14
+fi
 
 # --- BULLETPROOF: Always create/overwrite my.cnf as a file before any Docker logic, even for existing installs ---
 log "INFO: Ensuring MariaDB init directory exists" "${CYAN}Ensuring MariaDB init directory exists...${NC}"
@@ -114,7 +237,6 @@ if docker volume ls --format '{{.Name}}' | grep -q "^${MARIADB_CONTAINER_NAME}_d
   docker volume rm "${MARIADB_CONTAINER_NAME}_data"
 fi
 
-# Remove any anonymous or path-based volumes if present (optional safety)
 docker volume prune -f
 
 log "INFO: MariaDB config and Docker environment validated. Proceeding with container startup." "${CYAN}MariaDB config and Docker environment validated. Proceeding with container startup...${NC}"
@@ -289,13 +411,11 @@ DOMAIN_UNDERSCORE=$(echo "$DOMAIN" | tr '.' '_')
 if [ -n "$CLIENT_ID" ]; then
   WORDPRESS_CONTAINER_NAME="${CLIENT_ID}_wordpress"
   NGINX_CONTAINER_NAME="${CLIENT_ID}_nginx"
-  MARIADB_CONTAINER_NAME="${CLIENT_ID}_mariadb"
   REDIS_CONTAINER_NAME="${CLIENT_ID}_redis"
   NETWORK_NAME="${CLIENT_ID}_network"
 else
   WORDPRESS_CONTAINER_NAME="wordpress"
   NGINX_CONTAINER_NAME="nginx"
-  MARIADB_CONTAINER_NAME="mariadb"
   REDIS_CONTAINER_NAME="redis"
   NETWORK_NAME="default_network"
 fi
