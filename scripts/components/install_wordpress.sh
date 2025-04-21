@@ -74,6 +74,9 @@ if [ -f "${SCRIPT_DIR}/../utils/component_sso_helper.sh" ]; then
   source "${SCRIPT_DIR}/../utils/component_sso_helper.sh"
 fi
 
+# --- Enable AgencyStack Standard Error Trap ---
+trap_agencystack_errors
+
 # --- BULLETPROOF: Always create/overwrite my.cnf as a file before any Docker logic, even for existing installs ---
 log "INFO: Ensuring MariaDB init directory exists" "${CYAN}Ensuring MariaDB init directory exists...${NC}"
 mkdir -p "/opt/agency_stack/wordpress/localhost/mariadb-init"
@@ -1064,42 +1067,9 @@ if [ -f "${ROOT_DIR}/scripts/utils/update_component_registry.sh" ]; then
   bash "${ROOT_DIR}/scripts/utils/update_component_registry.sh" "${REGISTRY_ARGS[@]}"
 fi
 
-log "INFO: WordPress installation completed successfully" "${GREEN}WordPress installation completed successfully!${NC}"
-log "INFO: WordPress is now accessible at https://${DOMAIN}" "${GREEN}WordPress is now accessible at:${NC} https://${DOMAIN}"
-log "INFO: Admin URL: https://${DOMAIN}/wp-admin/" "${GREEN}Admin URL:${NC} https://${DOMAIN}/wp-admin/"
-log "INFO: Admin username: ${WP_ADMIN_USER}" "${GREEN}Admin username:${NC} ${WP_ADMIN_USER}"
-log "INFO: Admin password: ${ADMIN_PASSWORD}" "${GREEN}Admin password:${NC} ${ADMIN_PASSWORD}"
-
-log "INFO: Installation complete" "${GREEN}Installation complete!${NC}"
-echo -e "${CYAN}WordPress URL: https://${DOMAIN}/${NC}"
-echo -e "${CYAN}Admin URL: https://${DOMAIN}/wp-admin/${NC}"
-echo -e "${YELLOW}Admin Username: ${WP_ADMIN_USER}${NC}"
-echo -e "${YELLOW}Admin Password: ${ADMIN_PASSWORD}${NC}"
-echo -e "${YELLOW}IMPORTANT: Please save these credentials safely and change the password!${NC}"
-echo -e ""
-echo -e "${CYAN}Credentials saved to: ${CONFIG_DIR}/secrets/wordpress/${DOMAIN}.env${NC}"
-
-# Configure DNS if requested
-if [ "$CONFIGURE_DNS" = true ]; then
-  log "INFO: Configuring DNS for ${DOMAIN}" "${CYAN}Configuring DNS for ${DOMAIN}...${NC}"
-  
-  # Get public IP
-  PUBLIC_IP=$(curl -s https://ipinfo.io/ip)
-  if [ -z "$PUBLIC_IP" ]; then
-    log "WARNING: Failed to detect public IP" "${YELLOW}⚠️ Failed to detect public IP, DNS configuration skipped${NC}"
-  else
-    # Configure DNS using the configure_dns.sh utility
-    if [ -f "${SCRIPT_DIR}/../utils/configure_dns.sh" ]; then
-      bash "${SCRIPT_DIR}/../utils/configure_dns.sh" --domain "${DOMAIN}" --public-ip "${PUBLIC_IP}" --force
-      if [ $? -eq 0 ]; then
-        log "SUCCESS: DNS configured successfully" "${GREEN}✅ DNS configured successfully for ${DOMAIN} -> ${PUBLIC_IP}${NC}"
-      else
-        log "ERROR: Failed to configure DNS" "${RED}❌ Failed to configure DNS for ${DOMAIN}${NC}"
-      fi
-    else
-      log "ERROR: configure_dns.sh script not found" "${RED}❌ configure_dns.sh script not found, DNS configuration skipped${NC}"
-    fi
-  fi
+log "SUCCESS: WordPress installation completed!" "${GREEN}✅ WordPress installation completed!${NC}"
+echo -e "\n${CYAN}WordPress should now be accessible at: https://${DOMAIN}/\nAdmin user: ${WP_ADMIN_USER}\nAdmin password: (see secrets in ${WP_DIR}/${DOMAIN}/)\n${NC}"
+if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
+  echo -e "${CYAN}Keycloak SSO is enabled. Configure your IdP as needed.${NC}"
 fi
-
 exit 0
