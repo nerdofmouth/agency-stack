@@ -62,8 +62,17 @@ if [[ -n "$MATCHING_CONTAINERS" ]]; then
   if [ "$FORCE_NORMALIZED" = "true" ]; then
     log "INFO: Removing all matching MariaDB containers (FORCE enabled)" "${CYAN}Removing all matching MariaDB containers...${NC}"
     echo "$MATCHING_CONTAINERS" | xargs -r -I {} docker rm -f "{}"
-    # Wait for Docker to fully remove the container
-    sleep 2
+    # Robust wait: up to 10 seconds for Docker to fully remove the container
+    max_wait=10
+    waited=0
+    while docker ps -a --format '{{.Names}}' | grep -q "^${MARIADB_CONTAINER_NAME}$"; do
+      if [ "$waited" -ge "$max_wait" ]; then
+        log "ERROR: MariaDB container still exists after $max_wait seconds. Aborting." "${RED}MariaDB container still exists after $max_wait seconds. Aborting.${NC}"
+        exit 1
+      fi
+      sleep 1
+      waited=$((waited+1))
+    done
     # Double-check the container is gone before proceeding
     if docker ps -a --format '{{.Names}}' | grep -q "^${MARIADB_CONTAINER_NAME}$"; then
       log "ERROR: MariaDB container still exists after attempted removal. Aborting." "${RED}MariaDB container still exists after attempted removal. Aborting.${NC}"
