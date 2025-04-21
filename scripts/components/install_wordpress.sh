@@ -84,7 +84,7 @@ if [[ -n "$MATCHING_CONTAINERS" ]]; then
   fi
 fi
 
-# --- BEGIN: Preflight/Prerequisite Check ---
+# --- Preflight/Prerequisite Check ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 source "$REPO_ROOT/scripts/utils/common.sh"
@@ -92,7 +92,6 @@ preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
 }
-# --- END: Preflight/Prerequisite Check ---
 
 # install_wordpress.sh - Install and configure WordPress for AgencyStack
 # https://stack.nerdofmouth.com
@@ -329,8 +328,72 @@ docker volume prune -f
 
 log "INFO: MariaDB config and Docker environment validated. Proceeding with container startup." "${CYAN}MariaDB config and Docker environment validated. Proceeding with container startup...${NC}"
 
+# --- MariaDB port pre-check (fail-safe) ---
+MARIADB_PORT=3306
+if ss -ltn | grep -q ":$MARIADB_PORT "; then
+  log "ERROR: Port $MARIADB_PORT is already in use. MariaDB cannot start." "${RED}Port $MARIADB_PORT is already in use. MariaDB cannot start.${NC}"
+  ss -ltn | grep ":$MARIADB_PORT " || true
+  exit 1
+else
+  log "INFO: MariaDB port $MARIADB_PORT is available."
+fi
+
+# --- Docker network state pre-startup (debug) ---
+log "INFO: Docker network state before MariaDB startup" "${CYAN}Docker network state before MariaDB startup...${NC}"
+docker network ls || true
+if docker network inspect wordpress_network &>/dev/null; then
+  docker network inspect wordpress_network || true
+fi
+
 # --- Start MariaDB container ---
-docker-compose -f "${WP_DIR}/${DOMAIN}/docker-compose.yml" up -d mariadb
+set +e
+DOCKER_COMPOSE_OUTPUT=$(docker-compose -f "${WP_DIR}/${DOMAIN}/docker-compose.yml" up -d mariadb 2>&1)
+DC_EXIT=$?
+set -e
+if [ $DC_EXIT -ne 0 ]; then
+  log "ERROR: docker-compose failed to start MariaDB. Output:\n$DOCKER_COMPOSE_OUTPUT" "${RED}docker-compose failed to start MariaDB. See logs below.${NC}"
+  log "INFO: Last 20 lines of MariaDB logs:" "${YELLOW}Last 20 lines of MariaDB logs:${NC}"
+  docker logs --tail 20 "${MARIADB_CONTAINER_NAME}" || true
+  # Fail-safe: clean up half-started container
+  docker rm -f "${MARIADB_CONTAINER_NAME}" || true
+  docker volume rm "${MARIADB_CONTAINER_NAME}_data" || true
+  exit 1
+fi
+log "INFO: MariaDB container started. Waiting for healthy status..." "${CYAN}MariaDB container started. Waiting for healthy status...${NC}"
+
+# --- Wait for MariaDB to become healthy (fail-safe) ---
+max_wait=30
+waited=0
+while [ $waited -lt $max_wait ]; do
+  health=$(docker inspect --format='{{.State.Health.Status}}' "${MARIADB_CONTAINER_NAME}" 2>/dev/null || echo "unknown")
+  if [ "$health" = "healthy" ]; then
+    log "INFO: MariaDB container is healthy after $waited seconds." "${GREEN}MariaDB container is healthy.${NC}"
+    break
+  fi
+  if [ "$health" = "unhealthy" ]; then
+    log "ERROR: MariaDB container is unhealthy after $waited seconds. Aborting." "${RED}MariaDB container is unhealthy. Aborting.${NC}"
+    docker logs --tail 20 "${MARIADB_CONTAINER_NAME}" || true
+    docker rm -f "${MARIADB_CONTAINER_NAME}" || true
+    docker volume rm "${MARIADB_CONTAINER_NAME}_data" || true
+    exit 1
+  fi
+  sleep 1
+  waited=$((waited+1))
+done
+if [ "$health" != "healthy" ]; then
+  log "ERROR: MariaDB did not become healthy after $max_wait seconds. Aborting." "${RED}MariaDB did not become healthy after $max_wait seconds. Aborting.${NC}"
+  docker logs --tail 20 "${MARIADB_CONTAINER_NAME}" || true
+  docker rm -f "${MARIADB_CONTAINER_NAME}" || true
+  docker volume rm "${MARIADB_CONTAINER_NAME}_data" || true
+  exit 1
+fi
+
+# --- Docker network state post-startup (debug) ---
+log "INFO: Docker network state after MariaDB startup" "${CYAN}Docker network state after MariaDB startup...${NC}"
+docker network ls || true
+if docker network inspect wordpress_network &>/dev/null; then
+  docker network inspect wordpress_network || true
+fi
 
 # (Optional) Add health check/wait logic here if needed
 
@@ -643,7 +706,7 @@ WP_DB_PASSWORD=${WP_DB_PASSWORD}
 WP_ROOT_PASSWORD=${WP_ROOT_PASSWORD}
 WP_TABLE_PREFIX=${WP_TABLE_PREFIX}
 WP_ADMIN_USER=${WP_ADMIN_USER}
-WP_ADMIN_PASSWORD=${WP_ADMIN_PASSWORD}
+WP_ADMIN_PASSWORD=${ADMIN_PASSWORD}
 EOL
 
 chmod 600 "${WP_DIR}/${DOMAIN}/config/.env"
