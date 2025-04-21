@@ -658,16 +658,6 @@ prerequisites-restart:
 	@sudo rm -f /opt/agency_stack/.prerequisites_ok 
 	@sudo $(SCRIPTS_DIR)/components/install_prerequisites.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
-# WordPress
-install-wordpress: validate
-	@echo "$(MAGENTA)$(BOLD)🌐 Installing WordPress...$(RESET)"
-	@FORCE=$(FORCE) sudo $(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
-# WordPress with SSO integration (convenience target)
-wordpress-sso: validate
-	@echo "$(MAGENTA)$(BOLD)🌐 Installing WordPress with Keycloak SSO integration...$(RESET)"
-	@FORCE=$(FORCE) sudo $(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) --enable-keycloak $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
-
 # ERPNext
 install-erpnext: validate
 	@echo "Installing ERPNext..."
