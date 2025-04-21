@@ -12,6 +12,8 @@ UTILS_DIR="${SCRIPT_DIR}/utils"
 COMPONENTS_DIR="${SCRIPT_DIR}/components"
 DASHBOARD_DIR="${SCRIPT_DIR}/dashboard"
 
+# DEPRECATION NOTICE: This script's logic should be migrated into install scripts or common.sh as idempotent remote path checks. This script will be removed after migration is complete.
+
 # Create required directories
 mkdir -p /opt/agency_stack/logs/components /opt/agency_stack/config
 mkdir -p /var/log/agency_stack/components

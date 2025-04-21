@@ -9,6 +9,14 @@
 
 set -e
 
+# --- BEGIN: Preflight/Prerequisite Check ---
+source "$(dirname \"$0\")/../utils/common.sh"
+preflight_check_agencystack || {
+  echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
+  exit 1
+}
+# --- END: Preflight/Prerequisite Check ---
+
 # Use robust, portable path for helpers
 source "$(dirname "$0")/../utils/log_helpers.sh"
 

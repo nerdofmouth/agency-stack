@@ -1,7 +1,14 @@
 #!/bin/bash
 # Source common utilities
 source "$(dirname "$0")/../utils/common.sh"
-        
+
+# --- BEGIN: Preflight/Prerequisite Check ---
+preflight_check_agencystack || {
+  echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
+  exit 1
+}
+# --- END: Preflight/Prerequisite Check ---
+
 # install_peertube.sh - AgencyStack PeerTube Component Installer
 # [https://stack.nerdofmouth.com](https://stack.nerdofmouth.com)
 #
@@ -258,7 +265,7 @@ services:
       - "traefik.http.routers.peertube-${CLIENT_ID}.rule=Host(\`\${DOMAIN}\`)"
       - "traefik.http.routers.peertube-${CLIENT_ID}.entrypoints=websecure"
       - "traefik.http.routers.peertube-${CLIENT_ID}.tls=true"
-      - "traefik.http.routers.peertube-${CLIENT_ID}.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.peertube-${CLIENT_ID}.tls.certResolver=letsencrypt"
       - "traefik.http.services.peertube-${CLIENT_ID}.loadbalancer.server.port=9000"
       - "traefik.http.middlewares.peertube-${CLIENT_ID}-security.headers.stsSeconds=31536000"
       - "traefik.http.middlewares.peertube-${CLIENT_ID}-security.headers.browserXssFilter=true"

@@ -223,6 +223,150 @@ run_pre_installation_checks() {
   return 0
 }
 
+# --- BEGIN: Preflight/Prerequisite Checks (Unified) ---
+# This section consolidates all system, network, and environment validation logic
+# previously found in preflight_check.sh, install_prerequisites.sh, and install.sh
+# into a single, idempotent, reusable function for all installers.
+
+preflight_check_agencystack() {
+    log_info "[Preflight] Starting AgencyStack preflight checks..."
+    local errors=0
+    local warnings=0
+
+    # 1. System Requirements
+    local total_ram=$(free -g | awk '/^Mem:/{print $2}')
+    if [ "$total_ram" -lt 8 ]; then
+        log_error "[Preflight] Insufficient RAM: ${total_ram}GB (minimum 8GB required)"; errors=$((errors+1));
+    else
+        log_success "[Preflight] RAM: ${total_ram}GB - OK"
+    fi
+    local disk_space=$(df -BG / | awk 'NR==2 {print $4}' | sed 's/G//')
+    if [ "$disk_space" -lt 40 ]; then
+        log_error "[Preflight] Insufficient disk space: ${disk_space}GB (minimum 40GB required)"; errors=$((errors+1));
+    else
+        log_success "[Preflight] Disk space: ${disk_space}GB - OK"
+    fi
+    # Check for public static IP
+    local public_ip=$(curl -s https://ipinfo.io/ip)
+    if [ -z "$public_ip" ]; then
+        log_warning "[Preflight] Could not detect public IP address"; warnings=$((warnings+1));
+    else
+        log_success "[Preflight] Public IP: $public_ip"
+    fi
+    # 2. Network Requirements
+    if ! ping -c1 8.8.8.8 >/dev/null 2>&1; then
+        log_error "[Preflight] Network unreachable (cannot ping 8.8.8.8)"; errors=$((errors+1));
+    else
+        log_success "[Preflight] Network connectivity OK"
+    fi
+    # 3. Required Commands
+    local required_cmds=(docker docker-compose jq git curl wget)
+    for cmd in "${required_cmds[@]}"; do
+        if ! command -v "$cmd" &>/dev/null; then
+            log_error "[Preflight] Required command missing: $cmd"; errors=$((errors+1));
+        else
+            log_success "[Preflight] Command present: $cmd"
+        fi
+    done
+    # 4. Root Check
+    if [ "$(id -u)" -ne 0 ]; then
+        log_error "[Preflight] Script must be run as root"; errors=$((errors+1));
+    else
+        log_success "[Preflight] Running as root"
+    fi
+    # 5. Directory Structure
+    local required_dirs=(/opt/agency_stack /var/log/agency_stack /opt/agency_stack/clients/default)
+    for d in "${required_dirs[@]}"; do
+        if [ ! -d "$d" ]; then
+            log_warning "[Preflight] Missing directory: $d (will attempt to create)"; mkdir -p "$d" || errors=$((errors+1));
+        else
+            log_success "[Preflight] Directory exists: $d"
+        fi
+    done
+    # 6. Firewall/Ports (basic check)
+    local ports=(80 443 3001)
+    for p in "${ports[@]}"; do
+        if ss -ltn | grep -q ":$p "; then
+            log_success "[Preflight] Port $p is open/listening"
+        else
+            log_warning "[Preflight] Port $p is not open/listening (may be opened by installer)"; warnings=$((warnings+1));
+        fi
+    done
+    # 7. SSH Check
+    if ! ss -ltn | grep -q ':22 '; then
+        log_warning "[Preflight] SSH port 22 is not open (remote management may fail)"; warnings=$((warnings+1));
+    else
+        log_success "[Preflight] SSH port 22 is open"
+    fi
+    # 8. DNS/Hostname
+    local fqdn=$(hostname -f)
+    if [ -z "$fqdn" ]; then
+        log_warning "[Preflight] Could not determine FQDN"; warnings=$((warnings+1));
+    else
+        log_success "[Preflight] Host FQDN: $fqdn"
+    fi
+    # 9. Log Summary
+    if [ "$errors" -gt 0 ]; then
+        log_error "[Preflight] $errors critical issue(s) detected. Please resolve before proceeding."
+        return 1
+    elif [ "$warnings" -gt 0 ]; then
+        log_warning "[Preflight] $warnings warning(s) detected. Review before proceeding."
+        return 0
+    else
+        log_success "[Preflight] All checks passed. System is ready for AgencyStack installation."
+        return 0
+    fi
+
+    # --- BEGIN: ENVIRONMENT FILE CREATION (from fix_remote_paths.sh) ---
+    local ENV_FILE="/opt/agency_stack/scripts/env.sh"
+    if [ ! -f "$ENV_FILE" ]; then
+        mkdir -p /opt/agency_stack/scripts
+        cat > "$ENV_FILE" << EOF
+#!/bin/bash
+# Environment for AgencyStack scripts
+export SCRIPT_DIR="/opt/agency_stack/scripts"
+export UTILS_DIR="/opt/agency_stack/scripts/utils"
+export COMPONENTS_DIR="/opt/agency_stack/scripts/components"
+export DASHBOARD_DIR="/opt/agency_stack/scripts/dashboard"
+export CONFIG_DIR="/opt/agency_stack/config"
+export LOGS_DIR="/opt/agency_stack/logs"
+export COMPONENT_LOGS_DIR="/var/log/agency_stack/components"
+EOF
+        chmod +x "$ENV_FILE"
+    fi
+    # --- END: ENVIRONMENT FILE CREATION ---
+
+    # --- BEGIN: FQDN/DNS CHECKS (from fix_fqdn_access.sh) ---
+    # Basic DNS check for DOMAIN
+    if ! getent hosts "$DOMAIN" >/dev/null; then
+        echo "[WARNING] DNS lookup for $DOMAIN failed. Attempting fallback."
+        # Fallback: add to /etc/hosts if not present
+        if ! grep -q "$DOMAIN" /etc/hosts; then
+            echo "127.0.0.1 $DOMAIN" >> /etc/hosts
+            echo "[INFO] Added $DOMAIN to /etc/hosts for local resolution."
+        fi
+    fi
+    # --- END: FQDN/DNS CHECKS ---
+
+    # --- BEGIN: TRAEFIK PORT/FIREWALL CHECKS (from fix_traefik_ports.sh) ---
+    local PORTS=(80 443)
+    for PORT in "${PORTS[@]}"; do
+        if ! ss -tuln | grep -q ":$PORT "; then
+            echo "[WARNING] Port $PORT not open. Attempting to open via firewall-cmd (if available)."
+            if command -v firewall-cmd >/dev/null 2>&1; then
+                firewall-cmd --permanent --add-port=${PORT}/tcp || true
+                firewall-cmd --reload || true
+            elif command -v ufw >/dev/null 2>&1; then
+                ufw allow $PORT/tcp || true
+            fi
+        fi
+    done
+    # --- END: TRAEFIK PORT/FIREWALL CHECKS ---
+
+    return 0
+}
+# --- END: Preflight/Prerequisite Checks (Unified) ---
+
 # Set trap for cleanup
 trap cleanup EXIT
 

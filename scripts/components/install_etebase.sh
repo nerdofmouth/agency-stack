@@ -9,6 +9,14 @@
 # Version: 1.0.0
 # Date: April 5, 2025
 
+# --- BEGIN: Preflight/Prerequisite Check ---
+source "$(dirname "$0")/../utils/common.sh"
+preflight_check_agencystack || {
+  echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
+  exit 1
+}
+# --- END: Preflight/Prerequisite Check ---
+
 # Strict error handling
 set -eo pipefail
 
@@ -284,7 +292,7 @@ services:
       - "traefik.http.routers.etebase-${CLIENT_ID}.rule=Host(\`${DOMAIN}\`)"
       - "traefik.http.routers.etebase-${CLIENT_ID}.entrypoints=websecure"
       - "traefik.http.routers.etebase-${CLIENT_ID}.tls=true"
-      - "traefik.http.routers.etebase-${CLIENT_ID}.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.etebase-${CLIENT_ID}.tls.certResolver=letsencrypt"
       - "traefik.http.services.etebase-${CLIENT_ID}.loadbalancer.server.port=3735"
       - "com.centurylinklabs.watchtower.enable=true"
       - "traefik.http.middlewares.etebase-security-headers.headers.browserXssFilter=true"

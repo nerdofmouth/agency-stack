@@ -12,6 +12,14 @@
 # Version: 1.0.0
 # Created: $(date +%Y-%m-%d)
 
+# --- BEGIN: Preflight/Prerequisite Check ---
+source "$(dirname "$0")/../utils/common.sh"
+preflight_check_agencystack || {
+  echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
+  exit 1
+}
+# --- END: Preflight/Prerequisite Check ---
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'

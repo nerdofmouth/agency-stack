@@ -10,6 +10,14 @@
 # Version: 1.0.0
 # Date: April 5, 2025
 
+# --- BEGIN: Preflight/Prerequisite Check ---
+source "$(dirname "$0")/../utils/common.sh"
+preflight_check_agencystack || {
+  echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
+  exit 1
+}
+# --- END: Preflight/Prerequisite Check ---
+
 # Strict error handling
 set -eo pipefail
 
@@ -496,7 +504,7 @@ RCLONE_CONFIG="${CLIENT_DIR}/rclone/rclone.conf"
 # Check if remote is configured
 if ! grep -q "^\[${REMOTE_NAME}\]$" "$RCLONE_CONFIG" 2>/dev/null; then
     echo "Remote '${REMOTE_NAME}' not configured in rclone config"
-    echo "Please configure it first using 'rclone config --config $RCLONE_CONFIG'"
+    echo "Please configure it first using 'rclone config --config ${RCLONE_CONFIG}'"
     exit 1
 fi
 

@@ -9,12 +9,16 @@
 # Version: 1.0.0
 # Date: April 10, 2025
 
+# --- BEGIN: Preflight/Prerequisite Check ---
+source "$(dirname \"$0\")/../utils/common.sh"
+preflight_check_agencystack || {
+  echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
+  exit 1
+}
+# --- END: Preflight/Prerequisite Check ---
+
 # Strict error handling
 set -euo pipefail
-
-# Source common utilities
-SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
-source "${SCRIPT_DIR}/../utils/common.sh"
 
 # Variables
 COMPONENT_NAME="pgvector"

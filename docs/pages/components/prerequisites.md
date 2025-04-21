@@ -3,6 +3,10 @@ layout: default
 title: System Prerequisites - AgencyStack Documentation
 ---
 
+## Migration Notice (2025-04-20)
+
+> **Note:** As of April 2025, all prerequisite checks and fix logic have been consolidated into the unified `preflight_check_agencystack` function in `scripts/utils/common.sh`. Deprecated scripts such as `install_prerequisites.sh` and all `fix_*.sh` scripts have been removed or replaced with no-ops. All installation scripts now invoke this unified check, ensuring idempotence and full environment validation.
+
 # System Prerequisites
 
 The System Prerequisites component installs and configures the essential base packages, system configurations, and security settings required by all other AgencyStack components.

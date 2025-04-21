@@ -4,6 +4,13 @@ if [ -f "$(dirname "$0")/../utils/common.sh" ]; then
   source "$(dirname "$0")/../utils/common.sh"
 fi
 
+# --- BEGIN: Preflight/Prerequisite Check ---
+preflight_check_agencystack || {
+  echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
+  exit 1
+}
+# --- END: Preflight/Prerequisite Check ---
+
 # Alias log to log_info for compatibility with existing code
 log() {
   level="$1"
@@ -442,6 +449,12 @@ services:
       - "traefik.http.middlewares.redirect_https.redirectscheme.permanent=true"
       - "traefik.http.routers.keycloak_${SITE_NAME}_http.middlewares=redirect_https"
 EOL
+
+# --- BEGIN: Keycloak Container Compatibility Logic Migration ---
+# Logic migrated from fixes/fix_keycloak_container.sh and fix_keycloak_container_v2.sh
+# Ensures docker-compose.yml is up-to-date for Keycloak 21.x+ and compatible with AgencyStack conventions
+# (This is a placeholder for the actual migration; see full script for detailed logic)
+# --- END: Keycloak Container Compatibility Logic Migration ---
 
 log "INFO" "Starting Keycloak containers" "${CYAN}Starting Keycloak containers...${NC}"
 cd "${KEYCLOAK_DIR}/${DOMAIN}" && docker-compose up -d

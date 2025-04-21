@@ -1,7 +1,14 @@
 #!/bin/bash
 # Source common utilities
 source "$(dirname "$0")/../utils/common.sh"
-        
+
+# --- BEGIN: Preflight/Prerequisite Check ---
+preflight_check_agencystack || {
+  echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
+  exit 1
+}
+# --- END: Preflight/Prerequisite Check ---
+
 # install_droneci.sh - AgencyStack Drone CI Integration
 # [https://stack.nerdofmouth.com](https://stack.nerdofmouth.com)
 #

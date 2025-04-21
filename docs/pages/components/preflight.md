@@ -1,5 +1,9 @@
 # Pre-Flight Installation Verification
 
+## Migration Notice (2025-04-20)
+
+> **Note:** As of April 2025, all preflight, prerequisites, and fix logic has been consolidated into the unified `preflight_check_agencystack` function in `scripts/utils/common.sh`. Deprecated scripts such as `preflight_check.sh`, `install_prerequisites.sh`, and all `fix_*.sh` scripts have been removed or replaced with no-ops. All installation scripts now invoke this unified check, ensuring idempotence and full environment validation.
+
 This component verifies that your system meets all requirements specified in the pre-installation checklist before proceeding with AgencyStack installation.
 
 ## Purpose

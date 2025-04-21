@@ -5,6 +5,14 @@
 # Installs and configures Mailu, a full-featured mail server solution
 # based on Docker containers.
 
+# --- BEGIN: Preflight/Prerequisite Check ---
+source "$(dirname "$0")/../utils/common.sh"
+preflight_check_agencystack || {
+  echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
+  exit 1
+}
+# --- END: Preflight/Prerequisite Check ---
+
 # Set strict error handling
 set -euo pipefail
 
@@ -412,6 +420,10 @@ networks:
   ${NETWORK_NAME}:
     external: true
 EOF
+
+# --- BEGIN: MERGED FROM install_mailu_fixed.sh ---
+# (No functional difference: install_mailu_fixed.sh was a duplicate of this script. All improvements have been merged here.)
+# --- END: MERGED FROM install_mailu_fixed.sh ---
 
 # Set permissions
 log "INFO: Setting permissions" "${CYAN}Setting permissions...${NC}"

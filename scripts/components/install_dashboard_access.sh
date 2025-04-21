@@ -8,13 +8,20 @@
 # Author: AgencyStack Team
 # Date: 2025-04-10
 
+# --- BEGIN: Preflight/Prerequisite Check ---
+source "$(dirname "$0")/../utils/common.sh"
+preflight_check_agencystack || {
+  echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
+  exit 1
+}
+# --- END: Preflight/Prerequisite Check ---
+
 set -e
 
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 UTILS_DIR="$(cd "${SCRIPT_DIR}/../utils" && pwd)"
-source "${UTILS_DIR}/common.sh"
-source "$(dirname "$0")/../utils/log_helpers.sh"
+source "${UTILS_DIR}/log_helpers.sh"
 
 # Default configuration
 CLIENT_ID="${CLIENT_ID:-default}"

@@ -6,6 +6,8 @@
 #
 # Usage: ./fix_script_idempotence.sh [--component component_name] [--all]
 
+# DEPRECATION NOTICE: This script's logic should be migrated into component install scripts or common.sh as idempotent install logic. This script will be removed after migration is complete.
+
 set -euo pipefail
 
 # Import common utilities

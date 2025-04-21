@@ -2,6 +2,9 @@
 # fix_installed_markers.sh
 # Adds proper .installed_ok marker creation to all component installation scripts
 
+# DEPRECATION NOTICE: This script's logic should be migrated into install_<component>.sh scripts or common.sh as idempotent install checks.
+# This script will be removed after migration is complete.
+
 # Define colors for output
 BOLD="\e[1m"
 RED="\e[31m"

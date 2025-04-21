@@ -2506,3 +2506,16 @@ shellcheck-components:
 # Lint only utility scripts
 shellcheck-utils:
 	bash scripts/utils/lint_shell.sh scripts/utils
+
+.PHONY: install-all
+
+install-all: install-wordpress install-erpnext install-posthog install-voip install-mailu install-listmonk install-killbill
+	@echo "All core components installed."
+
+.PHONY: generate-docs
+generate-docs:
+	python3 scripts/utils/generate_docs_from_registry.py
+
+.PHONY: check-registry-vs-scripts
+check-registry-vs-scripts:
+	python3 scripts/utils/check_registry_vs_scripts.py

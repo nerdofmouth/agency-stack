@@ -3,6 +3,14 @@
 # AgencyStack Design System Dev Environment Installation Script
 # Integrates Bit.dev with AgencyStack Dashboard for component development
 
+# --- BEGIN: Preflight/Prerequisite Check ---
+source "$(dirname "$0")/../utils/common.sh"
+preflight_check_agencystack || {
+  echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
+  exit 1
+}
+# --- END: Preflight/Prerequisite Check ---
+
 # Source common utilities
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 source "${SCRIPT_DIR}/../utils/common.sh"
@@ -44,17 +52,6 @@ while [[ $# -gt 0 ]]; do
       echo "Usage: $0 [--client-id=<client-id>] [--port=<port>] [--bit-port=<bit-port>] [--domain=<domain>] [--enable-cloud]"
       echo "  --domain        Domain name (default: localhost)"
       echo "  --client-id    Client ID for multi-tenant deployments (default: default)"
-      echo "  --port         Port for design system dashboard (default: 3333)"
-      echo "  --bit-port     Port for Bit dev server (default: 3000)"
-      echo "  --enable-cloud Enable Bit.dev cloud features (default: off/sovereign mode)"
-      exit 0
-      ;;
-    *)
-      log_error "Unknown argument: $1"
-      exit 1
-      ;;
-  esac
-done
       echo "  --port         Port for design system dashboard (default: 3333)"
       echo "  --bit-port     Port for Bit dev server (default: 3000)"
       echo "  --enable-cloud Enable Bit.dev cloud features (default: off/sovereign mode)"

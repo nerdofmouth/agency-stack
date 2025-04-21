@@ -8,6 +8,8 @@
 # Author: AgencyStack Team
 # Date: 2025-04-10
 
+# DEPRECATION NOTICE: This script's logic should be merged into install_traefik.sh as part of port validation and remediation. This script will be removed after migration is complete.
+
 set -e
 
 # Self-contained utilities
