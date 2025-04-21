@@ -17,6 +17,31 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
+# --- BEGIN: AgencyStack Standard Error Trap ---
+trap_agencystack_errors() {
+    trap 'agencystack_error_handler ${LINENO} $?' ERR
+    set -E
+}
+
+agencystack_error_handler() {
+    local lineno="$1"
+    local errcode="$2"
+    local scriptname="${BASH_SOURCE[1]:-unknown}"
+    local msg="[FAILURE] ${scriptname} failed at line ${lineno} with exit code ${errcode}."
+    echo -e "${RED}${msg}${NC}" >&2
+    if [[ -n "${LOG_FILE:-}" ]]; then
+        echo "${msg}" >> "${LOG_FILE}" 2>/dev/null || true
+    fi
+    # Optionally print stack trace for debugging
+    if command -v caller &>/dev/null; then
+        echo "Stack trace:" >&2
+        caller
+    fi
+    exit ${errcode}
+}
+# Usage: Add `trap_agencystack_errors` near the top of any install script after sourcing common.sh
+# --- END: AgencyStack Standard Error Trap ---
+
 # Set default values
 CLIENT_ID="${CLIENT_ID:-default}"
 DOMAIN="${DOMAIN:-localhost}"
@@ -306,10 +331,10 @@ preflight_check_agencystack() {
     # 6. Firewall/Ports (basic check)
     local ports=(80 443 3001)
     for p in "${ports[@]}"; do
-        if ss -ltn | grep -q ":$p "; then
-            log_success "[Preflight] Port $p is open/listening"
-        else
+        if ! ss -ltn | grep -q ":$p "; then
             log_warning "[Preflight] Port $p is not open/listening (may be opened by installer)"; warnings=$((warnings+1));
+        else
+            log_success "[Preflight] Port $p is open/listening"
         fi
     done
     # 7. SSH Check
