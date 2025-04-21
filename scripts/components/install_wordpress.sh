@@ -62,6 +62,13 @@ if [[ -n "$MATCHING_CONTAINERS" ]]; then
   if [ "$FORCE_NORMALIZED" = "true" ]; then
     log "INFO: Removing all matching MariaDB containers (FORCE enabled)" "${CYAN}Removing all matching MariaDB containers...${NC}"
     echo "$MATCHING_CONTAINERS" | xargs -r -I {} docker rm -f "{}"
+    # Wait for Docker to fully remove the container
+    sleep 2
+    # Double-check the container is gone before proceeding
+    if docker ps -a --format '{{.Names}}' | grep -q "^${MARIADB_CONTAINER_NAME}$"; then
+      log "ERROR: MariaDB container still exists after attempted removal. Aborting." "${RED}MariaDB container still exists after attempted removal. Aborting.${NC}"
+      exit 1
+    fi
   else
     log "ERROR: MariaDB container name conflict. Use --force to remove the existing container(s), or rename/remove manually." "${RED}MariaDB container name conflict. Use --force to remove, or rename/remove manually.${NC}"
     exit 1
