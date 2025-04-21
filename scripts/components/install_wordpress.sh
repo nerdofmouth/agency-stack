@@ -81,26 +81,48 @@ trap_agencystack_errors
 log "INFO: Ensuring MariaDB init directory exists" "${CYAN}Ensuring MariaDB init directory exists...${NC}"
 mkdir -p "/opt/agency_stack/wordpress/localhost/mariadb-init"
 MYCNF_PATH="${WP_DIR}/localhost/mariadb-init/my.cnf"
+
+# --- MariaDB Pre-Flight Setup & Validation ---
+log "INFO: Validating MariaDB config and Docker volume state before startup" "${CYAN}Validating MariaDB config and Docker volume state before startup...${NC}"
+
+# Ensure MariaDB config file is a file (not a directory)
 if [ -d "$MYCNF_PATH" ]; then
   log "FATAL: $MYCNF_PATH is a directory. Removing to allow file mount." "${RED}[FATAL] $MYCNF_PATH is a directory. Removing to allow file mount.${NC}"
   rm -rf "$MYCNF_PATH"
 fi
-log "INFO: Creating MariaDB my.cnf configuration" "${CYAN}Creating MariaDB my.cnf configuration...${NC}"
-cat > "$MYCNF_PATH" <<EOL
+
+if [ ! -f "$MYCNF_PATH" ]; then
+  log "INFO: Creating MariaDB my.cnf configuration" "${CYAN}Creating MariaDB my.cnf configuration...${NC}"
+  cat > "$MYCNF_PATH" <<EOL
 [mysqld]
 character-set-server=utf8mb4
 collation-server=utf8mb4_unicode_ci
 bind-address=0.0.0.0
 max_allowed_packet=128M
 EOL
-if [ ! -f "$MYCNF_PATH" ]; then
-  log "FATAL: $MYCNF_PATH could not be created as a file. Aborting install." "${RED}[FATAL] $MYCNF_PATH could not be created as a file. Aborting install.${NC}"
-  exit 1
+  chown ${AGENCY_USER:-developer}:${AGENCY_GROUP:-developer} "$MYCNF_PATH" 2>/dev/null || true
+  chmod 644 "$MYCNF_PATH"
 fi
 
-# --- Ensure correct ownership/permissions for my.cnf ---
-chown ${AGENCY_USER:-developer}:${AGENCY_GROUP:-developer} "$MYCNF_PATH" 2>/dev/null || true
-chmod 644 "$MYCNF_PATH"
+# Check for leftover/failed MariaDB containers and volumes
+if docker ps -a --format '{{.Names}}' | grep -q "^${MARIADB_CONTAINER_NAME}$"; then
+  log "INFO: Removing existing MariaDB container ${MARIADB_CONTAINER_NAME} before startup" "${YELLOW}Removing existing MariaDB container ${MARIADB_CONTAINER_NAME} before startup...${NC}"
+  docker rm -f "${MARIADB_CONTAINER_NAME}"
+fi
+if docker volume ls --format '{{.Name}}' | grep -q "^${MARIADB_CONTAINER_NAME}_data$"; then
+  log "INFO: Removing existing MariaDB Docker volume ${MARIADB_CONTAINER_NAME}_data before startup" "${YELLOW}Removing existing MariaDB Docker volume ${MARIADB_CONTAINER_NAME}_data before startup...${NC}"
+  docker volume rm "${MARIADB_CONTAINER_NAME}_data"
+fi
+
+# Remove any anonymous or path-based volumes if present (optional safety)
+docker volume prune -f
+
+log "INFO: MariaDB config and Docker environment validated. Proceeding with container startup." "${CYAN}MariaDB config and Docker environment validated. Proceeding with container startup...${NC}"
+
+# --- Start MariaDB container ---
+docker-compose -f "${WP_DIR}/${DOMAIN}/docker-compose.yml" up -d mariadb
+
+# (Optional) Add health check/wait logic here if needed
 
 # Show help message
 show_help() {
@@ -689,31 +711,11 @@ server {
 }
 EOL
 
-# --- Detect and auto-heal Docker mount errors for MariaDB ---
-start_mariadb_container() {
-  # Try to start the container
-  docker-compose -f "${WP_DIR}/${DOMAIN}/docker-compose.yml" up -d mariadb 2>start_mariadb.err
-  if grep -q 'error mounting' start_mariadb.err && grep -q 'my.cnf' start_mariadb.err; then
-    echo "[WARN] Detected Docker mount error for my.cnf. Removing and recreating MariaDB container..."
-    docker-compose -f "${WP_DIR}/${DOMAIN}/docker-compose.yml" rm -sf mariadb
-    # Remove MariaDB volume if it exists (named volume or path-based)
-    if docker volume ls --format '{{.Name}}' | grep -q "^${MARIADB_CONTAINER_NAME}_data$"; then
-      echo "[INFO] Removing MariaDB Docker volume ${MARIADB_CONTAINER_NAME}_data ..."
-      docker volume rm "${MARIADB_CONTAINER_NAME}_data"
-    fi
-    # Remove any anonymous or path-based volumes if present (optional safety)
-    docker volume prune -f
-    # Try again
-    docker-compose -f "${WP_DIR}/${DOMAIN}/docker-compose.yml" up -d mariadb
-  fi
-  rm -f start_mariadb.err
-}
-
 # Start WordPress stack
 log "INFO: Starting WordPress stack with Docker Compose" "${CYAN}Starting WordPress stack with Docker Compose...${NC}"
 cd "${WP_DIR}/${DOMAIN}"
 # Start MariaDB container with auto-heal logic
-start_mariadb_container
+docker-compose -f "${WP_DIR}/${DOMAIN}/docker-compose.yml" up -d mariadb
 # Start other containers (WordPress, Redis, Nginx)
 docker-compose up -d wordpress redis nginx
 log "INFO: Docker Compose up completed" "${GREEN}Docker Compose up completed.${NC}"
