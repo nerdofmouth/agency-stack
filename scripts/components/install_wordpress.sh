@@ -75,7 +75,8 @@ if [ -f "${SCRIPT_DIR}/../utils/component_sso_helper.sh" ]; then
 fi
 
 # --- BULLETPROOF: Always create/overwrite my.cnf as a file before any Docker logic, even for existing installs ---
-MYCNF_PATH="${WP_DIR}/${DOMAIN}/mariadb-init/my.cnf"
+mkdir -p "/opt/agency_stack/wordpress/localhost/mariadb-init"
+MYCNF_PATH="${WP_DIR}/localhost/mariadb-init/my.cnf"
 if [ -d "$MYCNF_PATH" ]; then
   echo "[FATAL] $MYCNF_PATH is a directory. Removing to allow file mount."
   rm -rf "$MYCNF_PATH"

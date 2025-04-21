@@ -4,29 +4,12 @@
 
 Kill Bill is a comprehensive open-source subscription billing, invoicing, and contract management platform integrated into AgencyStack. It provides a robust system for managing recurring payments, subscriptions, usage-based billing, and complex contract scenarios across multiple clients.
 
-### Key Features
+## Directory Creation and File Operation Robustness
 
-- **Subscription Management**: Create and manage complex subscription plans
-- **Contract Management**: Handle contracts, amendments, and terms
-- **Multi-Tenant Architecture**: Support for isolated client environments
-- **Advanced Invoicing**: Generate and manage invoices with customizable templates
-- **Payment Gateway Integration**: Support for multiple payment processors
-- **Dunning Management**: Configure automated payment retry logic
-- **Usage-Based Billing**: Track and bill for metered usage
-- **Catalog Management**: Define and manage product catalogs with pricing
-- **APIs & SDKs**: RESTful API for integration with other systems
-- **Analytics & Reporting**: Track revenue, churn, and other metrics
-- **Multi-Currency Support**: Billing in different currencies
-- **Tax Integration**: Calculate and apply taxes automatically
+Kill Bill's install script has been updated to ensure all configuration, secret, and marker files are only written after creating their parent directories using `mkdir -p`. This prevents installation errors due to missing directories and ensures robust, repeatable deployments in all environments.
 
-## Architecture
-
-Kill Bill consists of two main components:
-
-1. **Kill Bill Server** - Core billing engine that provides the REST API and business logic
-2. **Kaui (Kill Bill Admin UI)** - Administrative interface for managing Kill Bill configuration
-
-The system uses MariaDB for data storage, configured for multi-tenant operation with proper security hardening and resource controls.
+**Best Practice:**
+All component install scripts in AgencyStack should create necessary directories with `mkdir -p` before any file write, copy, or move operation. This is enforced in Kill Bill and all core components as of April 2025.
 
 ## Installation
 
