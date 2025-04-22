@@ -269,7 +269,11 @@ services:
       default_network: {}
     labels:
       - "traefik.enable=false"
-  
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "--password=${WP_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
   redis:
     container_name: ${REDIS_CONTAINER_NAME}
     image: redis:alpine
@@ -875,7 +879,11 @@ services:
       default_network: {}
     labels:
       - "traefik.enable=false"
-  
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "--password=${WP_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
   redis:
     container_name: ${REDIS_CONTAINER_NAME}
     image: redis:alpine
