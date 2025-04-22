@@ -338,6 +338,18 @@ log "INFO: MariaDB config and Docker environment validated. Proceeding with cont
 if docker ps -a --format '{{.Names}}' | grep -q '^default_mariadb$'; then
   log "INFO: Removing existing MariaDB container (default_mariadb) to prevent name conflict" "${CYAN}Removing existing MariaDB container (default_mariadb)...${NC}"
   docker rm -f default_mariadb
+  # Wait for container removal to complete before proceeding
+  MAX_WAIT=10
+  WAITED=0
+  while docker ps -a --format '{{.Names}}' | grep -q '^default_mariadb$'; do
+    if [ $WAITED -ge $MAX_WAIT ]; then
+      log "ERROR: MariaDB container (default_mariadb) could not be removed after $MAX_WAIT seconds." "${RED}ERROR: MariaDB container (default_mariadb) could not be removed after $MAX_WAIT seconds.${NC}"
+      exit 1
+    fi
+    log "INFO: Waiting for Docker to fully remove default_mariadb container..." "${YELLOW}Waiting for Docker to fully remove default_mariadb container...${NC}"
+    sleep 1
+    WAITED=$((WAITED+1))
+  done
 fi
 
 # --- MariaDB port pre-check (fail-safe) ---
