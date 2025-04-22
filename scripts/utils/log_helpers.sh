@@ -21,7 +21,7 @@ MAX_LOG_FILES=5
 # This ensures existing component scripts continue to work
 log() {
     local level="$1"
-    local message="$2"
+    local message="${2:-}"
     local display="${3:-$message}"
     
     case "$level" in

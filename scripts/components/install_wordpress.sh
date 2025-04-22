@@ -172,6 +172,8 @@ fi
 
 # --- Ensure Docker Compose file is generated before MariaDB pre-flight ---
 log "INFO: Creating WordPress Docker Compose file (early, for pre-flight validation)" "${CYAN}Creating WordPress Docker Compose file (early, for pre-flight validation)...${NC}"
+# Ensure parent directory exists for idempotence (fix for install failure)
+mkdir -p "${WP_DIR}/${DOMAIN}"
 cat > "${WP_DIR}/${DOMAIN}/docker-compose.yml" <<EOL
 version: '3'
 
@@ -696,20 +698,29 @@ mkdir -p "${WP_DIR}/${DOMAIN}/logs"
 mkdir -p "${WP_DIR}/${DOMAIN}/redis"
 
 # Store database credentials in environment file for reference
-mkdir -p "${WP_DIR}/${DOMAIN}/config"
-chmod 700 "${WP_DIR}/${DOMAIN}/config"
+mkdir -p "${CONFIG_DIR}/secrets/wordpress"
+chmod 700 "${CONFIG_DIR}/secrets/wordpress"
 
-cat > "${WP_DIR}/${DOMAIN}/config/.env" <<EOL
-WP_DB_NAME=${WP_DB_NAME}
-WP_DB_USER=${WP_DB_USER}
-WP_DB_PASSWORD=${WP_DB_PASSWORD}
-WP_ROOT_PASSWORD=${WP_ROOT_PASSWORD}
-WP_TABLE_PREFIX=${WP_TABLE_PREFIX}
+cat > "${CONFIG_DIR}/secrets/wordpress/${DOMAIN}.env" <<EOF
+# WordPress Credentials for ${DOMAIN}
+# Generated on $(date +"%Y-%m-%d %H:%M:%S")
+# KEEP THIS FILE SECURE
+
+WP_ADMIN_URL=https://${DOMAIN}/wp-admin/
 WP_ADMIN_USER=${WP_ADMIN_USER}
 WP_ADMIN_PASSWORD=${ADMIN_PASSWORD}
-EOL
+WP_ADMIN_EMAIL=${ADMIN_EMAIL}
 
-chmod 600 "${WP_DIR}/${DOMAIN}/config/.env"
+DB_ROOT_PASSWORD=${WP_ROOT_PASSWORD}
+WP_DB_PASSWORD=${WP_DB_PASSWORD}
+
+# Docker containers
+WP_CONTAINER=wordpress
+MARIADB_CONTAINER=${MARIADB_CONTAINER_NAME}
+REDIS_CONTAINER=${REDIS_CONTAINER_NAME}
+EOF
+
+chmod 600 "${CONFIG_DIR}/secrets/wordpress/${DOMAIN}.env"
 
 # Create MariaDB initialization script
 log "INFO: Creating MariaDB initialization script" "${CYAN}Creating MariaDB initialization script...${NC}"
