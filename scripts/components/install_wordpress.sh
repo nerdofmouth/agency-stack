@@ -350,7 +350,15 @@ if docker ps -a --format '{{.Names}}' | grep -q '^default_mariadb$'; then
     sleep 1
     WAITED=$((WAITED+1))
   done
+  # Check for dead/zombie containers with same name and force remove
+  if docker ps -a --filter "status=dead" --format '{{.Names}}' | grep -q '^default_mariadb$'; then
+    log "INFO: Forcibly removing dead MariaDB container (default_mariadb) after normal removal" "${YELLOW}Forcibly removing dead MariaDB container (default_mariadb)...${NC}"
+    docker rm -f default_mariadb
+  fi
+  log "INFO: Docker ps -a after MariaDB removal:" "$(docker ps -a)"
 fi
+# Log Docker state after removal for diagnostics
+log "INFO: Docker ps -a after MariaDB removal:" "$(docker ps -a)"
 
 # --- MariaDB port pre-check (fail-safe) ---
 MARIADB_PORT=3306
