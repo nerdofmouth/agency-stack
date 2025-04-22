@@ -334,6 +334,12 @@ docker volume prune -f
 
 log "INFO: MariaDB config and Docker environment validated. Proceeding with container startup." "${CYAN}MariaDB config and Docker environment validated. Proceeding with container startup...${NC}"
 
+# --- Remove existing MariaDB container if present (idempotence fix for name conflict) ---
+if docker ps -a --format '{{.Names}}' | grep -q '^default_mariadb$'; then
+  log "INFO: Removing existing MariaDB container (default_mariadb) to prevent name conflict" "${CYAN}Removing existing MariaDB container (default_mariadb)...${NC}"
+  docker rm -f default_mariadb
+fi
+
 # --- MariaDB port pre-check (fail-safe) ---
 MARIADB_PORT=3306
 if ss -ltn | grep -q ":$MARIADB_PORT "; then
