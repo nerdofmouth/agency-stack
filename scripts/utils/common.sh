@@ -255,10 +255,10 @@ run_pre_installation_checks() {
 
 preflight_check_agencystack() {
     # Ensure required base packages are installed (idempotent, supports Alpine/Debian/Ubuntu)
-    local REQUIRED_CMDS=(jq git bash make curl sudo)
+    local REQUIRED_CMDS=(jq git bash make curl sudo ss)
     local MISSING_CMDS=()
     for CMD in "${REQUIRED_CMDS[@]}"; do
-        if ! command -v "$CMD" >/dev/null 2>&1; then
+        if ! command -v "$CMD" > /dev/null 2>&1; then
             MISSING_CMDS+=("$CMD")
         fi
     done
@@ -267,7 +267,7 @@ preflight_check_agencystack() {
         if [ -f /etc/alpine-release ]; then
             apk update && apk add --no-cache jq git bash make curl sudo iproute2
         elif [ -f /etc/debian_version ] || grep -qi ubuntu /etc/os-release; then
-            apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y "${MISSING_CMDS[@]}"
+            apt-get update && apt-get install -y jq git bash make curl sudo iproute2
         else
             echo "[ERROR] Unsupported OS. Please install: ${MISSING_CMDS[*]} manually."
             exit 1
