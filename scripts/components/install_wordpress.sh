@@ -347,6 +347,13 @@ if docker network inspect wordpress_network &>/dev/null; then
   docker network inspect wordpress_network || true
 fi
 
+# --- Ensure MariaDB Docker volume exists for data persistence ---
+MARIADB_VOLUME="default_mariadb_data"
+if ! docker volume ls --format '{{.Name}}' | grep -q "^$MARIADB_VOLUME$"; then
+  log "INFO: Creating Docker volume $MARIADB_VOLUME for MariaDB data persistence" "${CYAN}Creating Docker volume $MARIADB_VOLUME for MariaDB data persistence...${NC}"
+  docker volume create $MARIADB_VOLUME
+fi
+
 # --- Start MariaDB container ---
 set +e
 DOCKER_COMPOSE_OUTPUT=$(docker-compose -f "${WP_DIR}/${DOMAIN}/docker-compose.yml" up -d mariadb 2>&1)
@@ -1278,7 +1285,7 @@ if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
         "support_state": 1
       }'
       
-      # Update OpenID Connect Generic settings
+      # Update OpenID Connect configuration
       KEYCLOAK_CLIENT_ID=$(jq -r '.client_id' "$SSO_CREDENTIALS_FILE")
       KEYCLOAK_CLIENT_SECRET=$(jq -r '.client_secret' "$SSO_CREDENTIALS_FILE")
 
