@@ -154,12 +154,25 @@ if [[ -f "${INSTALL_DIR}/.installed_ok" ]] && [[ "$FORCE" != "true" ]]; then
   exit 0
 fi
 
+# --- WSL2/Docker Desktop detection and override ---
+if grep -qi microsoft /proc/version 2>/dev/null || grep -qi wsl /proc/sys/kernel/osrelease 2>/dev/null; then
+  echo "[INFO] Detected WSL2/Docker Desktop environment. Forcing bridge network mode for Traefik."
+  USE_HOST_NETWORK="false"
+fi
+
+# Ensure log and install directories exist and are writable
+sudo mkdir -p /var/log/agency_stack/components
+sudo chown "$(id -u):$(id -g)" /var/log/agency_stack/components
+
+sudo mkdir -p "${INSTALL_DIR}"
+sudo chown "$(id -u):$(id -g)" "${INSTALL_DIR}"
+
 # Start Traefik installation
 log_info "Starting traefik installation..."
 
 # Create installation directories
 log_cmd "Creating installation directories..."
-mkdir -p "${INSTALL_DIR}" "${CONFIG_DIR}" "${CONFIG_DIR}/dynamic" "${DATA_DIR}" "${DATA_DIR}/acme"
+mkdir -p "${CONFIG_DIR}" "${CONFIG_DIR}/dynamic" "${DATA_DIR}" "${DATA_DIR}/acme"
 
 # Create Docker network if it doesn't exist
 log_cmd "Creating Docker network ${TRAEFIK_NETWORK_NAME}..."

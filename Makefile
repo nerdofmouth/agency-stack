@@ -977,7 +977,7 @@ etebase-status:
 	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Etebase status...$(RESET)"
 		$(CONFIG_DIR)/monitoring/scripts/check_etebase-$(CLIENT_ID).sh $(CLIENT_ID); \
 	else \
-		echo "$(RED)Monitoring script not found. Checking container status...$(RESET)"; \
+		echo "$(RED)Monitoring script not found. Checking service..."; \
 		docker ps -a | grep etebase-$(CLIENT_ID) || echo "$(RED)Etebase container not found$(RESET)"; \
 	fi
 
@@ -2506,8 +2506,8 @@ registry-tls-sso-check: validate
 registry-tls-sso-fix: validate
 	@echo "$(MAGENTA)$(BOLD)🔧 Fixing Component Registry TLS/SSO Entries...$(RESET)"
 	@echo "$(YELLOW)⚠️ This will modify component registry entries. Continue? [y/N]$(RESET)"
-	@read -p "" CONFIRM; \
-	if [ "$${CONFIRM}" = "y" ] || [ "$${CONFIRM}" = "Y" ]; then \
+	@read -p "" confirm; \
+	if [ "$${confirm}" = "y" ] || [ "$${confirm}" = "Y" ]; then \
 		bash $(ROOT_DIR)/scripts/utils/tls_sso_registry_check.sh --fix-issues $(if $(filter true,$(VERBOSE)),--verbose,); \
 	else \
 		echo "$(YELLOW)Operation cancelled$(RESET)"; \
@@ -2527,7 +2527,7 @@ shellcheck-utils:
 
 .PHONY: install-all
 
-install-all: install-wordpress install-erpnext install-posthog install-voip install-mailu install-listmonk install-killbill
+install-all: install-traefik install-wordpress install-erpnext install-posthog install-voip install-mailu install-listmonk install-killbill
 	@echo "All core components installed."
 
 .PHONY: generate-docs
@@ -2552,3 +2552,17 @@ install-builderio: validate
 install-backup-strategy: validate
 	@echo "$(MAGENTA)$(BOLD)💾 Installing Backup Strategy...$(RESET)"
 	@FORCE=$(FORCE) sudo $(SCRIPTS_DIR)/components/install_backup_strategy.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
+
+# Traefik
+install-traefik: validate
+	@echo "[INFO] Installing Traefik (auto bridge mode for WSL2/Docker Desktop)"
+	bash scripts/components/install_traefik.sh
+
+traefik-status:
+	docker ps | grep traefik || echo "No running Traefik container found."
+
+traefik-logs:
+	docker logs traefik_default || echo "No logs found for traefik_default."
+
+traefik-restart:
+	cd scripts/components && bash install_traefik.sh --force
