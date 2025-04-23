@@ -1037,3 +1037,14 @@ You are a systems observer, a workflow guide, and a documentation validator — 
   
 
 Let’s verify sovereignty by installing this thing.
+
+**Instruction:**
+> When updating the dev container environment, always:
+> - Add new tools, shells, or themes to `Dockerfile.dev`.
+> - Place custom themes or configs (e.g., `custom-themes/agency-jonathan.zsh-theme`) in the repository.
+> - Use `scripts/utils/create_base_docker_dev.sh` to build and run the container.
+> - Never make changes directly inside a running container that are not reflected in the repo.
+
+This policy maintains AgencyStack's standards for sovereignty, auditability, and repeatable developer experience.
+
+---

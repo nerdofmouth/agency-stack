@@ -42,6 +42,21 @@ RUN useradd -m -s /bin/bash developer && \
     chmod 700 /home/developer/.ssh && \
     chown -R developer:developer /home/developer/.ssh
 
+# Install zsh, Oh My Zsh, and set up config for developer
+RUN apt-get update && apt-get install -y zsh git && \
+    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" --unattended -O && \
+    cp /root/.oh-my-zsh/templates/zshrc.zsh-template /home/developer/.zshrc && \
+    sed -i 's/^ZSH_THEME=.*/ZSH_THEME="jonathan"/' /home/developer/.zshrc && \
+    chown developer:developer /home/developer/.zshrc && \
+    chown -R developer:developer /home/developer/.oh-my-zsh
+
+# Copy custom AgencyStack jonathan theme into Oh My Zsh themes directory
+COPY custom-themes/agency-jonathan.zsh-theme /home/developer/.oh-my-zsh/themes/agency-jonathan.zsh-theme
+RUN chown developer:developer /home/developer/.oh-my-zsh/themes/agency-jonathan.zsh-theme
+
+# Set AgencyStack theme in .zshrc
+RUN sed -i 's/^ZSH_THEME=.*/ZSH_THEME="agency-jonathan"/' /home/developer/.zshrc
+
 # Add docker group and add developer to it
 RUN groupadd -f docker && \
     usermod -aG docker developer
@@ -58,6 +73,9 @@ EXPOSE 22
 # Set up working directory
 WORKDIR /home/developer/agency-stack
 
+# Set default shell for developer (and root for completeness) to zsh
+RUN chsh -s /usr/bin/zsh developer && chsh -s /usr/bin/zsh root
+
 # Switch to the developer user
 USER developer
 
@@ -68,3 +86,5 @@ RUN chmod +x /entrypoint.sh
 USER developer
 
 ENTRYPOINT ["/entrypoint.sh"]
+
+CMD ["zsh"]
