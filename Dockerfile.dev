@@ -42,12 +42,17 @@ RUN useradd -m -s /bin/bash developer && \
     chmod 700 /home/developer/.ssh && \
     chown -R developer:developer /home/developer/.ssh
 
-# Install zsh, Oh My Zsh, and set up config for developer
-RUN apt-get update && apt-get install -y zsh git && \
-    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" --unattended -O && \
-    cp /root/.oh-my-zsh/templates/zshrc.zsh-template /home/developer/.zshrc && \
-    sed -i 's/^ZSH_THEME=.*/ZSH_THEME="jonathan"/' /home/developer/.zshrc && \
-    chown developer:developer /home/developer/.zshrc && \
+# Install zsh and git as root
+RUN apt-get update && apt-get install -y zsh git
+
+# Install Oh My Zsh as developer user and set up config
+USER developer
+RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" --unattended -O && \
+    cp /home/developer/.oh-my-zsh/templates/zshrc.zsh-template /home/developer/.zshrc && \
+    sed -i 's/^ZSH_THEME=.*/ZSH_THEME=\"jonathan\"/' /home/developer/.zshrc
+
+USER root
+RUN chown developer:developer /home/developer/.zshrc && \
     chown -R developer:developer /home/developer/.oh-my-zsh
 
 # Copy custom AgencyStack jonathan theme into Oh My Zsh themes directory
