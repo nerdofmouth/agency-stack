@@ -1,5 +1,5 @@
 # AgencyStack Component Validation Report
-Generated: 2025-04-10 10:04:01
+Generated: 2025-04-23 15:41:23
 
 ## Summary
 
@@ -11,14 +11,13 @@ Generated: 2025-04-10 10:04:01
 ✅ Documentation exists: `backup_strategy.md`
 ✅ Documentation contains all recommended sections
 #### Makefile Targets
-✅ Target `backup-strategy` exists
-✅ Target `backup-strategy-status` exists
-✅ Target `backup-strategy-logs` exists
-✅ Target `backup-strategy-restart` exists
-✅ All Makefile targets present for backup_strategy
+❌ Target `backup-strategy` missing
+❌ Target `backup-strategy-status` missing
+❌ Target `backup-strategy-logs` missing
+❌ Target `backup-strategy-restart` missing
 #### Registry Entry
 ✅ Component registered in component_registry.json
-✅ backup_strategy passed all validation checks
+⚠️ backup_strategy had issues, some remain unfixed
 ## builderio
 #### Component Script
 ✅ Component script exists: `install_builderio.sh`
@@ -59,14 +58,13 @@ Generated: 2025-04-10 10:04:01
 ✅ Documentation exists: `chatwoot.md`
 ✅ Documentation contains all recommended sections
 #### Makefile Targets
-✅ Target `chatwoot` exists
-✅ Target `chatwoot-status` exists
-✅ Target `chatwoot-logs` exists
-✅ Target `chatwoot-restart` exists
-✅ All Makefile targets present for chatwoot
+❌ Target `chatwoot` missing
+❌ Target `chatwoot-status` missing
+❌ Target `chatwoot-logs` missing
+❌ Target `chatwoot-restart` missing
 #### Registry Entry
 ✅ Component registered in component_registry.json
-✅ chatwoot passed all validation checks
+⚠️ chatwoot had issues, some remain unfixed
 ## crowdsec
 #### Component Script
 ✅ Component script exists: `install_crowdsec.sh`
@@ -76,13 +74,12 @@ Generated: 2025-04-10 10:04:01
 ✅ Documentation contains all recommended sections
 #### Makefile Targets
 ✅ Target `crowdsec` exists
-✅ Target `crowdsec-status` exists
-✅ Target `crowdsec-logs` exists
-✅ Target `crowdsec-restart` exists
-✅ All Makefile targets present for crowdsec
+❌ Target `crowdsec-status` missing
+❌ Target `crowdsec-logs` missing
+❌ Target `crowdsec-restart` missing
 #### Registry Entry
 ✅ Component registered in component_registry.json
-✅ crowdsec passed all validation checks
+⚠️ crowdsec had issues, some remain unfixed
 ## cryptosync
 #### Component Script
 ✅ Component script exists: `install_cryptosync.sh`
@@ -94,11 +91,10 @@ Generated: 2025-04-10 10:04:01
 ✅ Target `cryptosync` exists
 ✅ Target `cryptosync-status` exists
 ✅ Target `cryptosync-logs` exists
-✅ Target `cryptosync-restart` exists
-✅ All Makefile targets present for cryptosync
+❌ Target `cryptosync-restart` missing
 #### Registry Entry
 ✅ Component registered in component_registry.json
-✅ cryptosync passed all validation checks
+⚠️ cryptosync had issues, some remain unfixed
 ## docker
 #### Component Script
 ✅ Component script exists: `install_docker.sh`
@@ -107,14 +103,13 @@ Generated: 2025-04-10 10:04:01
 ✅ Documentation exists: `docker.md`
 ✅ Documentation contains all recommended sections
 #### Makefile Targets
-✅ Target `docker` exists
-✅ Target `docker-status` exists
-✅ Target `docker-logs` exists
-✅ Target `docker-restart` exists
-✅ All Makefile targets present for docker
+❌ Target `docker` missing
+❌ Target `docker-status` missing
+❌ Target `docker-logs` missing
+❌ Target `docker-restart` missing
 #### Registry Entry
 ✅ Component registered in component_registry.json
-✅ docker passed all validation checks
+⚠️ docker had issues, some remain unfixed
 ## docker_compose
 #### Component Script
 ✅ Component script exists: `install_docker_compose.sh`
@@ -122,27 +117,25 @@ Generated: 2025-04-10 10:04:01
 #### Documentation
 ❌ Documentation `docker_compose.md` not found
 #### Makefile Targets
-✅ Target `docker-compose` exists
-✅ Target `docker-compose-status` exists
-✅ Target `docker-compose-logs` exists
-✅ Target `docker-compose-restart` exists
-✅ All Makefile targets present for docker_compose
+❌ Target `docker-compose` missing
+❌ Target `docker-compose-status` missing
+❌ Target `docker-compose-logs` missing
+❌ Target `docker-compose-restart` missing
 #### Registry Entry
 ✅ Component registered in component_registry.json
 ⚠️ docker_compose had issues, some remain unfixed
 ## documenso
 #### Component Script
 ✅ Component script exists: `install_documenso.sh`
-⚠️ Script may not implement proper idempotence
+✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `documenso.md`
 ✅ Documentation contains all recommended sections
 #### Makefile Targets
-✅ Target `documenso` exists
-✅ Target `documenso-status` exists
-✅ Target `documenso-logs` exists
-✅ Target `documenso-restart` exists
-✅ All Makefile targets present for documenso
+❌ Target `documenso` missing
+❌ Target `documenso-status` missing
+❌ Target `documenso-logs` missing
+❌ Target `documenso-restart` missing
 #### Registry Entry
 ✅ Component registered in component_registry.json
 ⚠️ documenso had issues, some remain unfixed
@@ -218,27 +211,25 @@ Generated: 2025-04-10 10:04:01
 ✅ Documentation exists: `fail2ban.md`
 ⚠️ Documentation missing sections: Usage
 #### Makefile Targets
-✅ Target `fail2ban` exists
-✅ Target `fail2ban-status` exists
-✅ Target `fail2ban-logs` exists
-✅ Target `fail2ban-restart` exists
-✅ All Makefile targets present for fail2ban
+❌ Target `fail2ban` missing
+❌ Target `fail2ban-status` missing
+❌ Target `fail2ban-logs` missing
+❌ Target `fail2ban-restart` missing
 #### Registry Entry
 ✅ Component registered in component_registry.json
 ⚠️ fail2ban had issues, some remain unfixed
 ## focalboard
 #### Component Script
 ✅ Component script exists: `install_focalboard.sh`
-⚠️ Script may not implement proper idempotence
+✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `focalboard.md`
 ⚠️ Documentation missing sections: Usage
 #### Makefile Targets
-✅ Target `focalboard` exists
-✅ Target `focalboard-status` exists
-✅ Target `focalboard-logs` exists
-✅ Target `focalboard-restart` exists
-✅ All Makefile targets present for focalboard
+❌ Target `focalboard` missing
+❌ Target `focalboard-status` missing
+❌ Target `focalboard-logs` missing
+❌ Target `focalboard-restart` missing
 #### Registry Entry
 ✅ Component registered in component_registry.json
 ⚠️ focalboard had issues, some remain unfixed
@@ -250,27 +241,25 @@ Generated: 2025-04-10 10:04:01
 ✅ Documentation exists: `ghost.md`
 ⚠️ Documentation missing sections: Usage
 #### Makefile Targets
-✅ Target `ghost` exists
-✅ Target `ghost-status` exists
-✅ Target `ghost-logs` exists
-✅ Target `ghost-restart` exists
-✅ All Makefile targets present for ghost
+❌ Target `ghost` missing
+❌ Target `ghost-status` missing
+❌ Target `ghost-logs` missing
+❌ Target `ghost-restart` missing
 #### Registry Entry
 ✅ Component registered in component_registry.json
 ⚠️ ghost had issues, some remain unfixed
 ## gitea
 #### Component Script
 ✅ Component script exists: `install_gitea.sh`
-⚠️ Script may not implement proper idempotence
+✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `gitea.md`
 ⚠️ Documentation missing sections: Usage
 #### Makefile Targets
-✅ Target `gitea` exists
-✅ Target `gitea-status` exists
-✅ Target `gitea-logs` exists
-✅ Target `gitea-restart` exists
-✅ All Makefile targets present for gitea
+❌ Target `gitea` missing
+❌ Target `gitea-status` missing
+❌ Target `gitea-logs` missing
+❌ Target `gitea-restart` missing
 #### Registry Entry
 ✅ Component registered in component_registry.json
 ⚠️ gitea had issues, some remain unfixed
@@ -282,14 +271,13 @@ Generated: 2025-04-10 10:04:01
 ✅ Documentation exists: `grafana.md`
 ✅ Documentation contains all recommended sections
 #### Makefile Targets
-✅ Target `grafana` exists
-✅ Target `grafana-status` exists
-✅ Target `grafana-logs` exists
-✅ Target `grafana-restart` exists
-✅ All Makefile targets present for grafana
+❌ Target `grafana` missing
+❌ Target `grafana-status` missing
+❌ Target `grafana-logs` missing
+❌ Target `grafana-restart` missing
 #### Registry Entry
 ✅ Component registered in component_registry.json
-✅ grafana passed all validation checks
+⚠️ grafana had issues, some remain unfixed
 ## keycloak
 #### Component Script
 ✅ Component script exists: `install_keycloak.sh`
@@ -309,7 +297,7 @@ Generated: 2025-04-10 10:04:01
 ## killbill
 #### Component Script
 ✅ Component script exists: `install_killbill.sh`
-⚠️ Script may not implement proper idempotence
+✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `killbill.md`
 ⚠️ Documentation missing sections: Usage
@@ -346,11 +334,10 @@ Generated: 2025-04-10 10:04:01
 ✅ Documentation exists: `loki.md`
 ⚠️ Documentation missing sections: Usage
 #### Makefile Targets
-✅ Target `loki` exists
-✅ Target `loki-status` exists
-✅ Target `loki-logs` exists
-✅ Target `loki-restart` exists
-✅ All Makefile targets present for loki
+❌ Target `loki` missing
+❌ Target `loki-status` missing
+❌ Target `loki-logs` missing
+❌ Target `loki-restart` missing
 #### Registry Entry
 ✅ Component registered in component_registry.json
 ⚠️ loki had issues, some remain unfixed
@@ -378,11 +365,10 @@ Generated: 2025-04-10 10:04:01
 ✅ Documentation exists: `mattermost.md`
 ⚠️ Documentation missing sections: Usage
 #### Makefile Targets
-✅ Target `mattermost` exists
-✅ Target `mattermost-status` exists
-✅ Target `mattermost-logs` exists
-✅ Target `mattermost-restart` exists
-✅ All Makefile targets present for mattermost
+❌ Target `mattermost` missing
+❌ Target `mattermost-status` missing
+❌ Target `mattermost-logs` missing
+❌ Target `mattermost-restart` missing
 #### Registry Entry
 ✅ Component registered in component_registry.json
 ⚠️ mattermost had issues, some remain unfixed
@@ -408,7 +394,7 @@ Generated: 2025-04-10 10:04:01
 ✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `peertube.md`
-⚠️ Documentation missing sections: Configuration
+✅ Documentation contains all recommended sections
 #### Makefile Targets
 ✅ Target `peertube` exists
 ✅ Target `peertube-status` exists
@@ -417,7 +403,22 @@ Generated: 2025-04-10 10:04:01
 ✅ All Makefile targets present for peertube
 #### Registry Entry
 ✅ Component registered in component_registry.json
-⚠️ peertube had issues, some remain unfixed
+✅ peertube passed all validation checks
+## pgvector
+#### Component Script
+✅ Component script exists: `install_pgvector.sh`
+✅ Script implements idempotence checks
+#### Documentation
+✅ Documentation exists: `pgvector.md`
+✅ Documentation contains all recommended sections
+#### Makefile Targets
+❌ Target `pgvector` missing
+❌ Target `pgvector-status` missing
+❌ Target `pgvector-logs` missing
+❌ Target `pgvector-restart` missing
+#### Registry Entry
+✅ Component registered in component_registry.json
+⚠️ pgvector had issues, some remain unfixed
 ## portainer
 #### Component Script
 ✅ Component script exists: `install_portainer.sh`
@@ -426,18 +427,31 @@ Generated: 2025-04-10 10:04:01
 ✅ Documentation exists: `portainer.md`
 ✅ Documentation contains all recommended sections
 #### Makefile Targets
-✅ Target `portainer` exists
-✅ Target `portainer-status` exists
+❌ Target `portainer` missing
+❌ Target `portainer-status` missing
 ✅ Target `portainer-logs` exists
 ✅ Target `portainer-restart` exists
-✅ All Makefile targets present for portainer
 #### Registry Entry
 ✅ Component registered in component_registry.json
 ⚠️ portainer had issues, some remain unfixed
+## preflight
+#### Component Script
+❌ Component script `install_preflight.sh` not found
+#### Documentation
+✅ Documentation exists: `preflight.md`
+⚠️ Documentation missing sections: Troubleshooting
+#### Makefile Targets
+❌ Target `preflight` missing
+❌ Target `preflight-status` missing
+❌ Target `preflight-logs` missing
+❌ Target `preflight-restart` missing
+#### Registry Entry
+✅ Component registered in component_registry.json
+⚠️ preflight had issues, some remain unfixed
 ## prerequisites
 #### Component Script
 ✅ Component script exists: `install_prerequisites.sh`
-✅ Script implements idempotence checks
+⚠️ Script may not implement proper idempotence
 #### Documentation
 ✅ Documentation exists: `prerequisites.md`
 ✅ Documentation contains all recommended sections
@@ -449,7 +463,7 @@ Generated: 2025-04-10 10:04:01
 ✅ All Makefile targets present for prerequisites
 #### Registry Entry
 ✅ Component registered in component_registry.json
-✅ prerequisites passed all validation checks
+⚠️ prerequisites had issues, some remain unfixed
 ## prometheus
 #### Component Script
 ✅ Component script exists: `install_prometheus.sh`
@@ -458,11 +472,10 @@ Generated: 2025-04-10 10:04:01
 ✅ Documentation exists: `prometheus.md`
 ⚠️ Documentation missing sections: Usage
 #### Makefile Targets
-✅ Target `prometheus` exists
-✅ Target `prometheus-status` exists
-✅ Target `prometheus-logs` exists
-✅ Target `prometheus-restart` exists
-✅ All Makefile targets present for prometheus
+❌ Target `prometheus` missing
+❌ Target `prometheus-status` missing
+❌ Target `prometheus-logs` missing
+❌ Target `prometheus-restart` missing
 #### Registry Entry
 ✅ Component registered in component_registry.json
 ⚠️ prometheus had issues, some remain unfixed
@@ -490,11 +503,10 @@ Generated: 2025-04-10 10:04:01
 ✅ Documentation exists: `security.md`
 ⚠️ Documentation missing sections: Usage
 #### Makefile Targets
-✅ Target `security` exists
-✅ Target `security-status` exists
-✅ Target `security-logs` exists
-✅ Target `security-restart` exists
-✅ All Makefile targets present for security
+❌ Target `security` missing
+❌ Target `security-status` missing
+❌ Target `security-logs` missing
+❌ Target `security-restart` missing
 #### Registry Entry
 ✅ Component registered in component_registry.json
 ⚠️ security had issues, some remain unfixed
@@ -505,18 +517,17 @@ Generated: 2025-04-10 10:04:01
 #### Documentation
 ❌ Documentation `signing_timestamps.md` not found
 #### Makefile Targets
-✅ Target `signing-timestamps` exists
-✅ Target `signing-timestamps-status` exists
-✅ Target `signing-timestamps-logs` exists
-✅ Target `signing-timestamps-restart` exists
-✅ All Makefile targets present for signing_timestamps
+❌ Target `signing-timestamps` missing
+❌ Target `signing-timestamps-status` missing
+❌ Target `signing-timestamps-logs` missing
+❌ Target `signing-timestamps-restart` missing
 #### Registry Entry
 ✅ Component registered in component_registry.json
 ⚠️ signing_timestamps had issues, some remain unfixed
 ## traefik
 #### Component Script
 ✅ Component script exists: `install_traefik.sh`
-⚠️ Script may not implement proper idempotence
+✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `traefik.md`
 ⚠️ Documentation missing sections: Usage
@@ -551,7 +562,7 @@ Generated: 2025-04-10 10:04:01
 ✅ Script implements idempotence checks
 #### Documentation
 ✅ Documentation exists: `voip.md`
-⚠️ Documentation missing sections: Configuration Usage
+⚠️ Documentation missing sections: Usage
 #### Makefile Targets
 ✅ Target `voip` exists
 ✅ Target `voip-status` exists
@@ -578,6 +589,6 @@ Generated: 2025-04-10 10:04:01
 ✅ Component registered in component_registry.json
 ⚠️ wordpress had issues, some remain unfixed
 ## Summary
-- **Total components**: 41
-- **Passed validation**: 18
-- **Failed validation**: 23
+- **Total components**: 43
+- **Passed validation**: 12
+- **Failed validation**: 31
