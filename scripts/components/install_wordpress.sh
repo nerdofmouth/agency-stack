@@ -231,7 +231,7 @@ services:
       default_network: {}
     volumes:
       - ${WP_DIR}/${DOMAIN}/wordpress:/var/www/html
-      - ${WP_DIR}/${DOMAIN}/nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - ${WP_DIR}/${DOMAIN}/nginx/:/etc/nginx/conf.d/
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.wordpress_${SITE_NAME}.rule=Host(\`${DOMAIN}\`)"
@@ -343,7 +343,7 @@ if docker ps -a --format '{{.Names}}' | grep -q '^default_mariadb$'; then
   WAITED=0
   while docker ps -a --format '{{.Names}}' | grep -q '^default_mariadb$'; do
     if [ "$WAITED" -ge "$MAX_WAIT" ]; then
-      log "ERROR: MariaDB container still exists after $MAX_WAIT seconds. Aborting." "${RED}ERROR: MariaDB container still exists after $MAX_WAIT seconds. Aborting.${NC}"
+      log "ERROR: MariaDB container still exists after $MAX_WAIT seconds. Aborting." "${RED}MariaDB container still exists after $MAX_WAIT seconds. Aborting.${NC}"
       exit 1
     fi
     log "INFO: Waiting for Docker to fully remove default_mariadb container..." "${YELLOW}Waiting for Docker to fully remove default_mariadb container...${NC}"
@@ -390,58 +390,64 @@ if ! docker network ls --format '{{.Name}}' | grep -q "^${NETWORK_NAME}$"; then
   docker network create "${NETWORK_NAME}"
 fi
 
-# --- Ensure Nginx config file exists before bringing up the stack (bulletproof) ---
-log "INFO: Ensuring Nginx config file exists before Docker Compose up" "${CYAN}Ensuring Nginx config file exists before Docker Compose up...${NC}"
-mkdir -p "${WP_DIR}/${DOMAIN}/nginx"
-# If FORCE, forcibly remove Nginx container
-if [ "$FORCE_NORMALIZED" = "true" ]; then
-  if docker ps -a --format '{{.Names}}' | grep -q "^${NGINX_CONTAINER_NAME}$"; then
-    log "WARNING: Removing existing Nginx container (${NGINX_CONTAINER_NAME}) due to FORCE." "${YELLOW}Removing existing Nginx container (${NGINX_CONTAINER_NAME}) due to FORCE.${NC}"
-    docker rm -f "${NGINX_CONTAINER_NAME}"
+# --- Bulletproof cleanup and diagnostics for nginx config directory ---
+log "INFO: Sanity checking ${WP_DIR}/${DOMAIN}/nginx/ before creation" "${CYAN}Sanity checking ${WP_DIR}/${DOMAIN}/nginx/ before creation...${NC}"
+if [ -e "${WP_DIR}/${DOMAIN}/nginx" ]; then
+  if [ -f "${WP_DIR}/${DOMAIN}/nginx" ]; then
+    log "WARNING: ${WP_DIR}/${DOMAIN}/nginx is a file. Removing it." "${YELLOW}${WP_DIR}/${DOMAIN}/nginx is a file. Removing it.${NC}"
+    rm -f "${WP_DIR}/${DOMAIN}/nginx"
+  elif [ -L "${WP_DIR}/${DOMAIN}/nginx" ]; then
+    log "WARNING: ${WP_DIR}/${DOMAIN}/nginx is a symlink. Removing it." "${YELLOW}${WP_DIR}/${DOMAIN}/nginx is a symlink. Removing it.${NC}"
+    rm -f "${WP_DIR}/${DOMAIN}/nginx"
+  elif [ -d "${WP_DIR}/${DOMAIN}/nginx" ]; then
+    log "INFO: ${WP_DIR}/${DOMAIN}/nginx is a directory. Cleaning contents." "${CYAN}${WP_DIR}/${DOMAIN}/nginx is a directory. Cleaning contents.${NC}"
+    rm -rf "${WP_DIR}/${DOMAIN}/nginx"/*
+  else
+    log "WARNING: ${WP_DIR}/${DOMAIN}/nginx exists but is an unknown type. Removing it." "${YELLOW}${WP_DIR}/${DOMAIN}/nginx exists but is an unknown type. Removing it.${NC}"
+    rm -rf "${WP_DIR}/${DOMAIN}/nginx"
   fi
 fi
-# Always remove default.conf if it exists (file or dir)
-if [ -e "${WP_DIR}/${DOMAIN}/nginx/default.conf" ]; then
-  log "WARNING: Removing pre-existing ${WP_DIR}/${DOMAIN}/nginx/default.conf (file or directory) to ensure correct type." "${YELLOW}Removing pre-existing ${WP_DIR}/${DOMAIN}/nginx/default.conf (file or directory) to ensure correct type.${NC}"
-  rm -rf "${WP_DIR}/${DOMAIN}/nginx/default.conf"
-fi
-# Create as a file
-cat > "${WP_DIR}/${DOMAIN}/nginx/default.conf" <<EOL
+mkdir -p "${WP_DIR}/${DOMAIN}/nginx"
+cat > "${WP_DIR}/${DOMAIN}/nginx/default.conf" <<'EOL'
 server {
     listen 80;
     server_name ${DOMAIN};
     root /var/www/html;
     index index.php;
-
     location / {
-        try_files \$uri \$uri/ /index.php?\$args;
+        try_files $uri $uri/ /index.php?$args;
     }
-
     location ~ \.php$ {
-        fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        include snippets/fastcgi-php.conf;
         fastcgi_pass wordpress:9000;
-        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
         include fastcgi_params;
-        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
-        fastcgi_param PATH_INFO \$fastcgi_path_info;
     }
-
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico)$ {
-        expires max;
-        log_not_found off;
+    location ~ /\.ht {
+        deny all;
     }
 }
 EOL
 # Log and sanity check
-ls -ld "${WP_DIR}/${DOMAIN}/nginx/default.conf"
+ls -ld "${WP_DIR}/${DOMAIN}/nginx"
+ls -l "${WP_DIR}/${DOMAIN}/nginx"
+stat "${WP_DIR}/${DOMAIN}/nginx" || log "ERROR: Failed to stat nginx config directory" "${RED}Failed to stat nginx config directory${NC}"
+stat "${WP_DIR}/${DOMAIN}/nginx/default.conf" || log "ERROR: Failed to stat nginx/default.conf" "${RED}Failed to stat nginx/default.conf${NC}"
+file "${WP_DIR}/${DOMAIN}/nginx/default.conf"
+# Defensive: check if still a directory (should never happen)
+if [ -d "${WP_DIR}/${DOMAIN}/nginx/default.conf" ]; then
+  log "ERROR: nginx/default.conf is STILL a directory after cleanup. Aborting to prevent Docker mount error." "${RED}nginx/default.conf is STILL a directory after cleanup. Aborting.${NC}"
+  exit 1
+fi
+
+# --- DIAGNOSTIC: Dump state of nginx config directory and default.conf before Docker Compose ---
+log "INFO: Diagnostic: Listing contents and stat info of nginx config directory and default.conf before Docker Compose up" "${CYAN}Diagnostic: Listing contents and stat info of nginx config directory and default.conf before Docker Compose up...${NC}"
+ls -lR "${WP_DIR}/${DOMAIN}/nginx" || log "ERROR: Failed to list nginx config directory" "${RED}Failed to list nginx config directory${NC}"
+stat "${WP_DIR}/${DOMAIN}/nginx" || log "ERROR: Failed to stat nginx config directory" "${RED}Failed to stat nginx config directory${NC}"
+stat "${WP_DIR}/${DOMAIN}/nginx/default.conf" || log "ERROR: Failed to stat nginx/default.conf" "${RED}Failed to stat nginx/default.conf${NC}"
+# Show permissions, ownership, and type
 if command -v file >/dev/null 2>&1; then
   file "${WP_DIR}/${DOMAIN}/nginx/default.conf"
-else
-  log "INFO: 'file' utility not found; skipping file type check." "${YELLOW}'file' utility not found; skipping file type check.${NC}"
-fi
-if [ ! -f "${WP_DIR}/${DOMAIN}/nginx/default.conf" ]; then
-  log "ERROR: ${WP_DIR}/${DOMAIN}/nginx/default.conf is not a regular file after creation. Aborting to prevent Docker mount error." "${RED}${WP_DIR}/${DOMAIN}/nginx/default.conf is not a regular file after creation. Aborting.${NC}"
-  exit 1
 fi
 
 # --- Start WordPress stack
