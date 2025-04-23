@@ -392,50 +392,57 @@ fi
 
 # --- Bulletproof cleanup and diagnostics for nginx config directory ---
 log "INFO: Sanity checking ${WP_DIR}/${DOMAIN}/nginx/ before creation" "${CYAN}Sanity checking ${WP_DIR}/${DOMAIN}/nginx/ before creation...${NC}"
-if [ -e "${WP_DIR}/${DOMAIN}/nginx" ]; then
-  if [ -f "${WP_DIR}/${DOMAIN}/nginx" ]; then
-    log "WARNING: ${WP_DIR}/${DOMAIN}/nginx is a file. Removing it." "${YELLOW}${WP_DIR}/${DOMAIN}/nginx is a file. Removing it.${NC}"
-    rm -f "${WP_DIR}/${DOMAIN}/nginx"
-  elif [ -L "${WP_DIR}/${DOMAIN}/nginx" ]; then
-    log "WARNING: ${WP_DIR}/${DOMAIN}/nginx is a symlink. Removing it." "${YELLOW}${WP_DIR}/${DOMAIN}/nginx is a symlink. Removing it.${NC}"
-    rm -f "${WP_DIR}/${DOMAIN}/nginx"
-  elif [ -d "${WP_DIR}/${DOMAIN}/nginx" ]; then
-    log "INFO: ${WP_DIR}/${DOMAIN}/nginx is a directory. Cleaning contents." "${CYAN}${WP_DIR}/${DOMAIN}/nginx is a directory. Cleaning contents.${NC}"
-    rm -rf "${WP_DIR}/${DOMAIN}/nginx"/*
+NGINX_CONF_DIR="${WP_DIR}/${DOMAIN}/nginx"
+DEFAULT_CONF="${NGINX_CONF_DIR}/default.conf"
+
+# Ensure nginx config directory exists and is clean
+if [ -e "${DEFAULT_CONF}" ]; then
+  if [ -d "${DEFAULT_CONF}" ]; then
+    log "WARNING: ${DEFAULT_CONF} is a directory. Removing it." "${YELLOW}${DEFAULT_CONF} is a directory. Removing it.${NC}"
+    rm -rf "${DEFAULT_CONF}"
   else
-    log "WARNING: ${WP_DIR}/${DOMAIN}/nginx exists but is an unknown type. Removing it." "${YELLOW}${WP_DIR}/${DOMAIN}/nginx exists but is an unknown type. Removing it.${NC}"
-    rm -rf "${WP_DIR}/${DOMAIN}/nginx"
+    log "WARNING: ${DEFAULT_CONF} is a file or symlink. Removing it." "${YELLOW}${DEFAULT_CONF} is a file or symlink. Removing it.${NC}"
+    rm -f "${DEFAULT_CONF}"
   fi
 fi
-mkdir -p "${WP_DIR}/${DOMAIN}/nginx"
-cat > "${WP_DIR}/${DOMAIN}/nginx/default.conf" <<'EOL'
+mkdir -p "${NGINX_CONF_DIR}"
+cat > "${DEFAULT_CONF}" <<'EOL'
 server {
     listen 80;
-    server_name ${DOMAIN};
+    server_name _;
     root /var/www/html;
-    index index.php;
+    index index.php index.html index.htm;
+
     location / {
         try_files $uri $uri/ /index.php?$args;
     }
+
     location ~ \.php$ {
         include snippets/fastcgi-php.conf;
         fastcgi_pass wordpress:9000;
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
         include fastcgi_params;
     }
-    location ~ /\.ht {
-        deny all;
+
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+        expires max;
+        log_not_found off;
     }
+
+    error_log  /var/log/nginx/error.log warn;
+    access_log /var/log/nginx/access.log;
 }
 EOL
-# Log and sanity check
-ls -ld "${WP_DIR}/${DOMAIN}/nginx"
-ls -l "${WP_DIR}/${DOMAIN}/nginx"
-stat "${WP_DIR}/${DOMAIN}/nginx" || log "ERROR: Failed to stat nginx config directory" "${RED}Failed to stat nginx config directory${NC}"
-stat "${WP_DIR}/${DOMAIN}/nginx/default.conf" || log "ERROR: Failed to stat nginx/default.conf" "${RED}Failed to stat nginx/default.conf${NC}"
-file "${WP_DIR}/${DOMAIN}/nginx/default.conf"
-# Defensive: check if still a directory (should never happen)
-if [ -d "${WP_DIR}/${DOMAIN}/nginx/default.conf" ]; then
+ls -ld "${NGINX_CONF_DIR}"
+ls -l "${NGINX_CONF_DIR}"
+stat "${NGINX_CONF_DIR}" || log "ERROR: Failed to stat nginx config directory" "${RED}Failed to stat nginx config directory${NC}"
+stat "${DEFAULT_CONF}" || log "ERROR: Failed to stat nginx/default.conf" "${RED}Failed to stat nginx/default.conf${NC}"
+if command -v file >/dev/null 2>&1; then
+  file "${DEFAULT_CONF}"
+else
+  log "WARNING: 'file' command not found; skipping file type check for nginx/default.conf" "${YELLOW}'file' command not found; skipping file type check for nginx/default.conf${NC}"
+fi
+if [ -d "${DEFAULT_CONF}" ]; then
   log "ERROR: nginx/default.conf is STILL a directory after cleanup. Aborting to prevent Docker mount error." "${RED}nginx/default.conf is STILL a directory after cleanup. Aborting.${NC}"
   exit 1
 fi
@@ -443,11 +450,11 @@ fi
 # --- DIAGNOSTIC: Dump state of nginx config directory and default.conf before Docker Compose ---
 log "INFO: Diagnostic: Listing contents and stat info of nginx config directory and default.conf before Docker Compose up" "${CYAN}Diagnostic: Listing contents and stat info of nginx config directory and default.conf before Docker Compose up...${NC}"
 ls -lR "${WP_DIR}/${DOMAIN}/nginx" || log "ERROR: Failed to list nginx config directory" "${RED}Failed to list nginx config directory${NC}"
-stat "${WP_DIR}/${DOMAIN}/nginx" || log "ERROR: Failed to stat nginx config directory" "${RED}Failed to stat nginx config directory${NC}"
-stat "${WP_DIR}/${DOMAIN}/nginx/default.conf" || log "ERROR: Failed to stat nginx/default.conf" "${RED}Failed to stat nginx/default.conf${NC}"
+stat "${NGINX_CONF_DIR}" || log "ERROR: Failed to stat nginx config directory" "${RED}Failed to stat nginx config directory${NC}"
+stat "${DEFAULT_CONF}" || log "ERROR: Failed to stat nginx/default.conf" "${RED}Failed to stat nginx/default.conf${NC}"
 # Show permissions, ownership, and type
 if command -v file >/dev/null 2>&1; then
-  file "${WP_DIR}/${DOMAIN}/nginx/default.conf"
+  file "${DEFAULT_CONF}"
 fi
 
 # --- Start WordPress stack
@@ -596,7 +603,9 @@ fi
   
 # Create database backup if exists
 log "INFO: Creating database backup" "${CYAN}Creating WordPress database backup (if database exists)...${NC}"
-BACKUP_FILE="${WP_DIR}/${DOMAIN}/mariadb/backup_$(date +%Y%m%d%H%M%S).sql"
+BACKUP_DIR="${WP_DIR}/${DOMAIN}/mariadb"
+mkdir -p "${BACKUP_DIR}"
+BACKUP_FILE="${BACKUP_DIR}/backup_$(date +%Y%m%d%H%M%S).sql"
 docker exec "${MARIADB_CONTAINER_NAME}" mysqldump -u"${WP_DB_USER}" -p"${WP_DB_PASSWORD}" "${WP_DB_NAME}" > "${BACKUP_FILE}" 2>/dev/null || true
   
 # Check if wp_posts table exists
@@ -789,16 +798,16 @@ if [ -f "${ROOT_DIR}/scripts/utils/update_component_registry.sh" ]; then
   log "INFO: Updating component registry" "${CYAN}Updating component registry...${NC}"
   
   REGISTRY_ARGS=(
-    "--component" "wordpress"
-    "--installed" "true"
-    "--monitoring" "true"
-    "--traefik_tls" "true"
+    --update-component "wordpress"
+    --update-flag "installed" --update-value "true"
+    --update-flag "monitoring" --update-value "true"
+    --update-flag "traefik_tls" --update-value "true"
   )
   
   if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
     REGISTRY_ARGS+=(
-      "--sso" "true"
-      "--sso_configured" "true"
+      --update-flag "sso" --update-value "true"
+      --update-flag "sso_configured" --update-value "true"
     )
   fi
   
