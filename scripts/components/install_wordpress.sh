@@ -384,6 +384,12 @@ if ! docker volume ls --format '{{.Name}}' | grep -q "^$MARIADB_VOLUME$"; then
   docker volume create $MARIADB_VOLUME
 fi
 
+# --- Ensure the external Docker network exists before running Docker Compose ---
+if ! docker network ls --format '{{.Name}}' | grep -q "^${NETWORK_NAME}$"; then
+  log "INFO: Creating external Docker network '${NETWORK_NAME}'" "${CYAN}Creating external Docker network '${NETWORK_NAME}'...${NC}"
+  docker network create "${NETWORK_NAME}"
+fi
+
 # --- Ensure Nginx config file exists before bringing up the stack (bulletproof) ---
 log "INFO: Ensuring Nginx config file exists before Docker Compose up" "${CYAN}Ensuring Nginx config file exists before Docker Compose up...${NC}"
 mkdir -p "${WP_DIR}/${DOMAIN}/nginx"
