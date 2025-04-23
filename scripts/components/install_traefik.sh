@@ -182,6 +182,27 @@ else
   log_info "Docker network ${TRAEFIK_NETWORK_NAME} already exists"
 fi
 
+# --- BEGIN: Ensure /etc/traefik/traefik.yml is a file, not a directory ---
+TRAEFIK_CONFIG_FILE="/opt/agency_stack/clients/${CLIENT_ID}/traefik/traefik.yml"
+
+if [ -d "$TRAEFIK_CONFIG_FILE" ]; then
+  log_warning "Removing directory at $TRAEFIK_CONFIG_FILE (should be a file)"
+  rm -rf "$TRAEFIK_CONFIG_FILE"
+fi
+
+if [ ! -f "$TRAEFIK_CONFIG_FILE" ]; then
+  log_info "Creating default traefik.yml config at $TRAEFIK_CONFIG_FILE"
+  mkdir -p "$(dirname "$TRAEFIK_CONFIG_FILE")"
+  cat > "$TRAEFIK_CONFIG_FILE" <<EOL
+entryPoints:
+  web:
+    address: ':80'
+  websecure:
+    address: ':443'
+EOL
+fi
+# --- END: Ensure /etc/traefik/traefik.yml is a file ---
+
 # Create Traefik configuration files
 create_traefik_yml() {
   log_info "Creating Traefik configuration files..."
@@ -331,6 +352,12 @@ networks:
     external: true
 EOL
 fi
+
+# --- BEGIN: Compose file volume mapping comment ---
+# In your docker-compose.yml, ensure:
+#   - /opt/agency_stack/clients/${CLIENT_ID}/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+# is used. The source must be a file, not a directory.
+# --- END: Compose file volume mapping comment ---
 
 # Start Traefik
 log_cmd "Starting Traefik..."
