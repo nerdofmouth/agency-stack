@@ -384,6 +384,60 @@ if ! docker volume ls --format '{{.Name}}' | grep -q "^$MARIADB_VOLUME$"; then
   docker volume create $MARIADB_VOLUME
 fi
 
+# --- Ensure Nginx config file exists before bringing up the stack (bulletproof) ---
+log "INFO: Ensuring Nginx config file exists before Docker Compose up" "${CYAN}Ensuring Nginx config file exists before Docker Compose up...${NC}"
+mkdir -p "${WP_DIR}/${DOMAIN}/nginx"
+# If FORCE, forcibly remove Nginx container
+if [ "$FORCE_NORMALIZED" = "true" ]; then
+  if docker ps -a --format '{{.Names}}' | grep -q "^${NGINX_CONTAINER_NAME}$"; then
+    log "WARNING: Removing existing Nginx container (${NGINX_CONTAINER_NAME}) due to FORCE." "${YELLOW}Removing existing Nginx container (${NGINX_CONTAINER_NAME}) due to FORCE.${NC}"
+    docker rm -f "${NGINX_CONTAINER_NAME}"
+  fi
+fi
+# Always remove default.conf if it exists (file or dir)
+if [ -e "${WP_DIR}/${DOMAIN}/nginx/default.conf" ]; then
+  log "WARNING: Removing pre-existing ${WP_DIR}/${DOMAIN}/nginx/default.conf (file or directory) to ensure correct type." "${YELLOW}Removing pre-existing ${WP_DIR}/${DOMAIN}/nginx/default.conf (file or directory) to ensure correct type.${NC}"
+  rm -rf "${WP_DIR}/${DOMAIN}/nginx/default.conf"
+fi
+# Create as a file
+cat > "${WP_DIR}/${DOMAIN}/nginx/default.conf" <<EOL
+server {
+    listen 80;
+    server_name ${DOMAIN};
+    root /var/www/html;
+    index index.php;
+
+    location / {
+        try_files \$uri \$uri/ /index.php?\$args;
+    }
+
+    location ~ \.php$ {
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        fastcgi_pass wordpress:9000;
+        fastcgi_index index.php;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+        fastcgi_param PATH_INFO \$fastcgi_path_info;
+    }
+
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico)$ {
+        expires max;
+        log_not_found off;
+    }
+}
+EOL
+# Log and sanity check
+ls -ld "${WP_DIR}/${DOMAIN}/nginx/default.conf"
+if command -v file >/dev/null 2>&1; then
+  file "${WP_DIR}/${DOMAIN}/nginx/default.conf"
+else
+  log "INFO: 'file' utility not found; skipping file type check." "${YELLOW}'file' utility not found; skipping file type check.${NC}"
+fi
+if [ ! -f "${WP_DIR}/${DOMAIN}/nginx/default.conf" ]; then
+  log "ERROR: ${WP_DIR}/${DOMAIN}/nginx/default.conf is not a regular file after creation. Aborting to prevent Docker mount error." "${RED}${WP_DIR}/${DOMAIN}/nginx/default.conf is not a regular file after creation. Aborting.${NC}"
+  exit 1
+fi
+
 # --- Start WordPress stack
 log "INFO: Starting WordPress stack with Docker Compose" "${CYAN}Starting WordPress stack with Docker Compose...${NC}"
 cd "${WP_DIR}/${DOMAIN}"
