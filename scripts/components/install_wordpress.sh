@@ -395,17 +395,18 @@ log "INFO: Sanity checking ${WP_DIR}/${DOMAIN}/nginx/ before creation" "${CYAN}S
 NGINX_CONF_DIR="${WP_DIR}/${DOMAIN}/nginx"
 DEFAULT_CONF="${NGINX_CONF_DIR}/default.conf"
 
-# Ensure nginx config directory exists and is clean
-if [ -e "${DEFAULT_CONF}" ]; then
-  if [ -d "${DEFAULT_CONF}" ]; then
-    log "WARNING: ${DEFAULT_CONF} is a directory. Removing it." "${YELLOW}${DEFAULT_CONF} is a directory. Removing it.${NC}"
-    rm -rf "${DEFAULT_CONF}"
-  else
-    log "WARNING: ${DEFAULT_CONF} is a file or symlink. Removing it." "${YELLOW}${DEFAULT_CONF} is a file or symlink. Removing it.${NC}"
-    rm -f "${DEFAULT_CONF}"
-  fi
-fi
+# CRITICAL WSL2/Docker Fix: Ensure both parent directory AND config file are clean
+# First make sure the parent directory exists
 mkdir -p "${NGINX_CONF_DIR}"
+
+# Then remove any existing default.conf, whether it's a file, directory, or symlink
+if [ -e "${DEFAULT_CONF}" ]; then
+  log "WARNING: ${DEFAULT_CONF} exists. Removing it completely." "${YELLOW}${DEFAULT_CONF} exists. Removing it completely.${NC}"
+  rm -rf "${DEFAULT_CONF}"
+fi
+
+# Create a new default.conf with proper permissions
+log "INFO: Creating fresh nginx default.conf file" "${CYAN}Creating fresh nginx default.conf file...${NC}"
 cat > "${DEFAULT_CONF}" <<'EOL'
 server {
     listen 80;
@@ -429,33 +430,34 @@ server {
         log_not_found off;
     }
 
+    # Deny access to WordPress files that don't need to be accessed via web
+    location ~ /\. {
+        deny all;
+    }
+    location ~* /(?:uploads|files)/.*.php$ {
+        deny all;
+    }
+
     error_log  /var/log/nginx/error.log warn;
     access_log /var/log/nginx/access.log;
 }
 EOL
-ls -ld "${NGINX_CONF_DIR}"
-ls -l "${NGINX_CONF_DIR}"
-stat "${NGINX_CONF_DIR}" || log "ERROR: Failed to stat nginx config directory" "${RED}Failed to stat nginx config directory${NC}"
-stat "${DEFAULT_CONF}" || log "ERROR: Failed to stat nginx/default.conf" "${RED}Failed to stat nginx/default.conf${NC}"
-if command -v file >/dev/null 2>&1; then
-  file "${DEFAULT_CONF}"
-else
-  log "WARNING: 'file' command not found; skipping file type check for nginx/default.conf" "${YELLOW}'file' command not found; skipping file type check for nginx/default.conf${NC}"
-fi
-if [ -d "${DEFAULT_CONF}" ]; then
-  log "ERROR: nginx/default.conf is STILL a directory after cleanup. Aborting to prevent Docker mount error." "${RED}nginx/default.conf is STILL a directory after cleanup. Aborting.${NC}"
+
+# Ensure proper ownership and permissions
+chmod 644 "${DEFAULT_CONF}"
+chown "$(id -u):$(id -g)" "${DEFAULT_CONF}" 2>/dev/null || true
+
+# Triple-check that default.conf is a file, not a directory
+if [ ! -f "${DEFAULT_CONF}" ]; then
+  log "ERROR: ${DEFAULT_CONF} is not a regular file after creation. Aborting." "${RED}${DEFAULT_CONF} is not a regular file after creation. Aborting.${NC}"
+  ls -la "${NGINX_CONF_DIR}"
+  file "${DEFAULT_CONF}" 2>/dev/null || echo "Cannot determine file type"
   exit 1
 fi
 
-# --- DIAGNOSTIC: Dump state of nginx config directory and default.conf before Docker Compose ---
-log "INFO: Diagnostic: Listing contents and stat info of nginx config directory and default.conf before Docker Compose up" "${CYAN}Diagnostic: Listing contents and stat info of nginx config directory and default.conf before Docker Compose up...${NC}"
-ls -lR "${WP_DIR}/${DOMAIN}/nginx" || log "ERROR: Failed to list nginx config directory" "${RED}Failed to list nginx config directory${NC}"
-stat "${NGINX_CONF_DIR}" || log "ERROR: Failed to stat nginx config directory" "${RED}Failed to stat nginx config directory${NC}"
-stat "${DEFAULT_CONF}" || log "ERROR: Failed to stat nginx/default.conf" "${RED}Failed to stat nginx/default.conf${NC}"
-# Show permissions, ownership, and type
-if command -v file >/dev/null 2>&1; then
-  file "${DEFAULT_CONF}"
-fi
+# WSL2/Docker volume mount verification 
+log "INFO: Verified nginx config is a proper file (critical for Docker mounts)" "${GREEN}✅ Verified nginx config is a proper file (critical for Docker mounts)${NC}"
+ls -l "${DEFAULT_CONF}"
 
 # --- Start WordPress stack
 log "INFO: Starting WordPress stack with Docker Compose" "${CYAN}Starting WordPress stack with Docker Compose...${NC}"
