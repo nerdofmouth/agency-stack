@@ -23,7 +23,8 @@ REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 if [ -f "$REPO_ROOT/scripts/utils/common.sh" ]; then
   source "$REPO_ROOT/scripts/utils/common.sh"
 else
-  log() {
+  # Define a local log function if common.sh isn't available
+  function log() {
     local level="$1"
     local message="$2"
     local color_message="${3:-$message}"
