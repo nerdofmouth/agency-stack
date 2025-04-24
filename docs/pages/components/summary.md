@@ -7,7 +7,7 @@ title: Component Integration Status - AgencyStack Documentation
 
 This document provides a comprehensive overview of all components in the AgencyStack ecosystem and their integration status. It is automatically generated from the authoritative `component_registry.json` file.
 
-Last updated: April 24, 2025
+Last updated: April 23, 2025
 
 ## Integration Status Legend
 

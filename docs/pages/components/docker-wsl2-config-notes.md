@@ -58,6 +58,58 @@ When containers are already affected by this issue, follow this procedure:
 - Integrate these checks into install, upgrade, and repair flows.
 - Always verify file type before starting containers.
 
+## Working with Nested Containers (Docker-in-Docker)
+
+### Installation Patterns for AgencyStack
+
+When working with AgencyStack where components need to be installed inside a container:
+
+1. **Preferred Method: Use Docker Socket Mounting**
+   - Mount the host's Docker socket to allow the container to use the host's Docker engine
+   - Example: `docker run -v /var/run/docker.sock:/var/run/docker.sock agencystack-dev`
+   - This preserves Repository Integrity by using the same installation code for all environments
+
+2. **Alternative: Host-Level Installation with Container Support**
+   - Add checks in installation scripts to detect if running inside a container
+   - Configure paths and permissions appropriately
+   - Document container-specific requirements in component docs
+
+### Critical Nginx Configuration for Docker Compatibility
+
+1. **Problem**: Standard nginx config from typical Ubuntu/Debian installations often includes references to `snippets/fastcgi-php.conf` which doesn't exist in the official nginx Docker image
+2. **Solution**: Use Docker-compatible nginx configuration that:
+   - Doesn't rely on external snippets
+   - Explicitly defines all fastcgi parameters
+   - Is created by `fix_nginx_config.sh` or updated `install_wordpress.sh`
+
+### Example Helper Functions
+
+Add this to your shell scripts for config validation:
+
+```bash
+# Validate a config file to ensure it's not a directory
+validate_config_file() {
+  local config_path="$1"
+  local template_content="$2"
+  
+  # Ensure parent directory exists
+  mkdir -p "$(dirname "$config_path")"
+  
+  # Remove if it's a directory (critical for WSL2/Docker compatibility)
+  if [ -d "$config_path" ]; then
+    echo "WARNING: $config_path is a directory. Removing it."
+    rm -rf "$config_path"
+  fi
+  
+  # Create file with content if it doesn't exist
+  if [ ! -f "$config_path" ]; then
+    echo "Creating $config_path"
+    echo "$template_content" > "$config_path"
+    chmod 644 "$config_path"
+  fi
+}
+```
+
 ## Recommended Helper Function
 Add this helper function to your installation scripts:
 
