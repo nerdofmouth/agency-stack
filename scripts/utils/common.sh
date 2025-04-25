@@ -48,10 +48,6 @@ DOMAIN="${DOMAIN:-localhost}"
 ADMIN_EMAIL="${ADMIN_EMAIL:-admin@example.com}"
 VERBOSE="${VERBOSE:-false}"
 
-# Ensure log directory exists
-LOG_DIR="/var/log/agency_stack/components"
-mkdir -p "${LOG_DIR}" 2>/dev/null || true
-
 # Add a function to detect if running inside a container
 is_running_in_container() {
   if [ -f "/.dockerenv" ] || grep -q "docker\|lxc" /proc/1/cgroup 2>/dev/null; then
@@ -60,6 +56,26 @@ is_running_in_container() {
     return 1  # false
   fi
 }
+
+# Initialize container detection flag
+CONTAINER_RUNNING=false
+
+# Auto-detect if we're running in a Docker container and set a global flag
+if is_running_in_container; then
+  CONTAINER_RUNNING=true
+  echo "[INFO] Detected Docker-in-Docker environment, enabling container compatibility mode"
+fi
+
+# Define log directory and ensure it exists
+if [ "$CONTAINER_RUNNING" = "true" ]; then
+  # In container environment, use developer's home directory
+  LOG_DIR="${HOME}/.logs/agency_stack/components"
+  mkdir -p "${LOG_DIR}" 2>/dev/null || true
+else
+  # On host systems, use standard system path
+  LOG_DIR="/var/log/agency_stack/components"
+  mkdir -p "${LOG_DIR}" 2>/dev/null || true
+fi
 
 # Add a function to ensure log directory is writable 
 ensure_log_directory() {
@@ -79,19 +95,11 @@ ensure_log_directory() {
   fi
 }
 
-# Auto-detect if we're running in a Docker container and set a global flag
-if is_running_in_container; then
-  export CONTAINER_RUNNING=true
-  log_info "Detected Docker-in-Docker environment, enabling container compatibility mode"
-else
-  export CONTAINER_RUNNING=false
-fi
-
 # Configure proper DB hostnames for docker-in-docker environments
 configure_docker_network_mode() {
   # Auto-detect if we're running inside a Docker container
   if is_running_in_container; then
-    log_info "Detected Docker-in-Docker environment, configuring for container networking"
+    echo "[INFO] Detected Docker-in-Docker environment, configuring for container networking"
     
     # Use container names instead of service names in docker-compose networks
     USE_CONTAINER_NAMES=true
@@ -100,12 +108,12 @@ configure_docker_network_mode() {
     # Ensure /etc/hosts has localhost entries
     if ! grep -q "wordpress.localhost" /etc/hosts 2>/dev/null; then
       echo "127.0.0.1 wordpress.localhost" >> "${HOME}/.dind_hosts"
-      log_info "Added wordpress.localhost to ${HOME}/.dind_hosts"
+      echo "[INFO] Added wordpress.localhost to ${HOME}/.dind_hosts"
     fi
     
     if ! grep -q "dashboard.localhost" /etc/hosts 2>/dev/null; then
       echo "127.0.0.1 dashboard.localhost" >> "${HOME}/.dind_hosts"
-      log_info "Added dashboard.localhost to ${HOME}/.dind_hosts"
+      echo "[INFO] Added dashboard.localhost to ${HOME}/.dind_hosts"
     fi
     
     # Return true to indicate we're in a container
@@ -116,49 +124,80 @@ configure_docker_network_mode() {
   return 1
 }
 
+# Adjust log path for container environments if needed
+adjust_log_path() {
+    local original_path="$1"
+    
+    # If not in container or path is empty, return original
+    if [ -z "$original_path" ] || [ "$CONTAINER_RUNNING" != "true" ]; then
+        echo "$original_path"
+        return 0
+    fi
+    
+    # Get base filename
+    local base_name="$(basename "$original_path")"
+    
+    # Create container-specific log path
+    local container_path="${HOME}/.logs/agency_stack/components/${base_name}"
+    
+    # Ensure directory exists
+    mkdir -p "$(dirname "$container_path")" 2>/dev/null || true
+    
+    # Return adjusted path
+    echo "$container_path"
+}
+
 # Logging functions
 log_info() {
     local message="$1"
-    local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
-    echo -e "[${timestamp}] [INFO] ${message}"
+    local console_msg="${2:-$1}"
     
-    # Log to file if LOG_FILE is defined
-    if [[ -n "${LOG_FILE:-}" ]]; then
-        mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
-        echo "[${timestamp}] [INFO] ${message}" >> "${LOG_FILE}" 2>/dev/null || true
+    # Get the timestamp in the right format
+    local timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
+    
+    # Adjust log path if needed
+    if [ -n "${LOG_FILE:-}" ]; then
+        local adjusted_log_file="$(adjust_log_path "$LOG_FILE")"
+        echo "[$timestamp] [INFO] $message" >> "$adjusted_log_file" 2>/dev/null || true
     fi
+    
+    # Always output to console
+    echo -e "[INFO] $console_msg"
 }
 
 log_success() {
     local message="$1"
-    local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
-    echo -e "[${timestamp}] [${GREEN}SUCCESS${NC}] ${message}"
+    local timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
+    echo -e "${GREEN}[SUCCESS] ${message}${NC}"
     
     # Log to file if LOG_FILE is defined
-    if [[ -n "${LOG_FILE:-}" ]]; then
-        echo "[${timestamp}] [SUCCESS] ${message}" >> "${LOG_FILE}" 2>/dev/null || true
+    if [ -n "${LOG_FILE:-}" ]; then
+        local adjusted_log_file="$(adjust_log_path "$LOG_FILE")"
+        echo "[$timestamp] [SUCCESS] ${message}" >> "$adjusted_log_file" 2>/dev/null || true
     fi
 }
 
 log_warning() {
     local message="$1"
-    local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
-    echo -e "[${timestamp}] [${YELLOW}WARNING${NC}] ${message}"
+    local timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
+    echo -e "${YELLOW}[WARNING] ${message}${NC}"
     
     # Log to file if LOG_FILE is defined
-    if [[ -n "${LOG_FILE:-}" ]]; then
-        echo "[${timestamp}] [WARNING] ${message}" >> "${LOG_FILE}" 2>/dev/null || true
+    if [ -n "${LOG_FILE:-}" ]; then
+        local adjusted_log_file="$(adjust_log_path "$LOG_FILE")"
+        echo "[$timestamp] [WARNING] ${message}" >> "$adjusted_log_file" 2>/dev/null || true
     fi
 }
 
 log_error() {
     local message="$1"
-    local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
-    echo -e "[${timestamp}] [${RED}ERROR${NC}] ${message}" >&2
+    local timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
+    echo -e "${RED}[ERROR] ${message}${NC}" >&2
     
     # Log to file if LOG_FILE is defined
-    if [[ -n "${LOG_FILE:-}" ]]; then
-        echo "[${timestamp}] [ERROR] ${message}" >> "${LOG_FILE}" 2>/dev/null || true
+    if [ -n "${LOG_FILE:-}" ]; then
+        local adjusted_log_file="$(adjust_log_path "$LOG_FILE")"
+        echo "[$timestamp] [ERROR] ${message}" >> "$adjusted_log_file" 2>/dev/null || true
     fi
 }
 
