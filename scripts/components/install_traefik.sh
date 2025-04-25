@@ -300,7 +300,7 @@ http:
     auth:
       basicAuth:
         users:
-          - "admin:$apr1$qzOrVK3m$uUYSj0U1NIIaQBUZFRQcn1"
+          - "admin:\$apr1\$qzOrVK3m\$uUYSj0U1NIIaQBUZFRQcn1"
 EOL
 
 # Create docker-compose.yml
