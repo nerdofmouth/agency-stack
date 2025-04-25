@@ -27,7 +27,16 @@ USE_HOST_NETWORK="${USE_HOST_NETWORK:-true}"
 INSTALL_DIR="/opt/agency_stack/clients/${CLIENT_ID}/traefik"
 CONFIG_DIR="${INSTALL_DIR}/config"
 DATA_DIR="${INSTALL_DIR}/data"
-LOG_DIR="/var/log/agency_stack/components"
+
+# Define log paths based on environment
+if [ "$CONTAINER_RUNNING" = "true" ]; then
+  # Use container-safe log directory
+  LOG_DIR="${HOME}/.logs/agency_stack/components"
+else
+  # Use standard system path
+  LOG_DIR="/var/log/agency_stack/components"
+fi
+
 LOG_FILE="${LOG_DIR}/traefik.log"
 DOCKER_COMPOSE_FILE="${INSTALL_DIR}/docker-compose.yml"
 TRAEFIK_NETWORK_NAME="agency_stack"
@@ -89,16 +98,13 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Configure log file
-mkdir -p /var/log/agency_stack/components
-if [ ! -w "/var/log/agency_stack/components" ]; then
+mkdir -p "${LOG_DIR}"
+if [ ! -w "${LOG_DIR}" ]; then
   # If running in container without sudo, create temp log
   if [ -n "${CONTAINER_RUNNING}" ]; then
-    LOG_DIR="${HOME}/.logs/agency_stack/components"
-    mkdir -p "${LOG_DIR}"
-    log_warning "Cannot write to /var/log/agency_stack/components, using ${LOG_DIR} instead"
-    LOG_FILE="${LOG_DIR}/traefik.log"
+    log_warning "Cannot write to ${LOG_DIR}, using ${LOG_DIR} instead"
   else
-    log_error "Cannot write to /var/log/agency_stack/components, exiting"
+    log_error "Cannot write to ${LOG_DIR}, exiting"
     exit 1
   fi
 fi
@@ -291,16 +297,15 @@ http:
       rule: "Host(\`dashboard.localhost\`) || (Host(\`localhost\`) && (PathPrefix(\`/api\`) || PathPrefix(\`/dashboard\`)))"
       service: "api@internal"
       entrypoints:
-        - "websecure"
+        - "web"
       middlewares:
         - "auth"
-      tls: {}
 
   middlewares:
     auth:
       basicAuth:
         users:
-          - "admin:\$apr1\$qzOrVK3m\$uUYSj0U1NIIaQBUZFRQcn1"
+          - "admin:$$apr1$$B5T.lj03$$Ia0ac51/f0oz5RDEfqS/h/"
 EOL
 
 # Create docker-compose.yml
@@ -346,10 +351,9 @@ cat >> "${DOCKER_COMPOSE_FILE}" <<EOL
       - ${DATA_DIR}/logs:/etc/traefik/logs
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.traefik.entrypoints=websecure"
+      - "traefik.http.routers.traefik.entrypoints=web"
       - "traefik.http.routers.traefik.rule=Host(\`${DOMAIN}\`) && PathPrefix(\`/dashboard\`, \`/api\`)"
       - "traefik.http.routers.traefik.service=api@internal"
-      - "traefik.http.routers.traefik.tls=true"
 EOL
 
 # Add networks section if not using host network

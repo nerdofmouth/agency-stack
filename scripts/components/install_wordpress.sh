@@ -14,6 +14,39 @@ if [[ "$(type -t log)" != "function" ]]; then
   source "$REPO_ROOT/scripts/utils/log_helpers.sh"
 fi
 
+# Set paths based on Docker-in-Docker environment
+if [ "$CONTAINER_RUNNING" = "true" ]; then
+  # Container-safe log directory
+  LOG_DIR="${HOME}/.logs/agency_stack/components"
+  mkdir -p "$LOG_DIR"
+  LOG_FILE="${LOG_DIR}/wordpress.log"
+  
+  # Configure proper container networking
+  configure_docker_network_mode
+  
+  # Bypass preflight checks in container environment
+  SKIP_PREFLIGHT=true
+  log "INFO" "Detected container environment, bypassing preflight checks"
+  
+  # Use container-safe installation directory
+  BASE_INSTALL_DIR="${HOME}/agency_stack"
+  log "INFO" "Using container-safe installation directory: ${BASE_INSTALL_DIR}"
+else
+  # Standard system paths on host
+  LOG_DIR="/var/log/agency_stack/components"
+  mkdir -p "$LOG_DIR"
+  LOG_FILE="${LOG_DIR}/wordpress.log"
+  
+  # Allow preflight checks on host system
+  SKIP_PREFLIGHT="${SKIP_PREFLIGHT:-false}"
+  
+  # Use standard installation directory on host
+  BASE_INSTALL_DIR="/opt/agency_stack"
+fi
+
+# Define directories
+WP_DIR="${BASE_INSTALL_DIR}/wordpress"
+
 # --- Ensure FORCE is always initialized to avoid unbound variable errors ---
 FORCE="${FORCE:-false}"
 
@@ -50,8 +83,22 @@ WP_ADMIN_PASSWORD="admin"
 # --- Define MariaDB container name early ---
 if [ -n "$CLIENT_ID" ]; then
   MARIADB_CONTAINER_NAME="${CLIENT_ID}_mariadb"
+  WORDPRESS_CONTAINER_NAME="${CLIENT_ID}_wordpress"
+  NGINX_CONTAINER_NAME="${CLIENT_ID}_nginx"
+  REDIS_CONTAINER_NAME="${CLIENT_ID}_redis"
 else
-  MARIADB_CONTAINER_NAME="mariadb"
+  # In container environments, the names are prefixed with the domain
+  if [ "$CONTAINER_RUNNING" = "true" ]; then
+    MARIADB_CONTAINER_NAME="localhost-mariadb-1"
+    WORDPRESS_CONTAINER_NAME="localhost-wordpress-1"
+    NGINX_CONTAINER_NAME="localhost-nginx-1"
+    REDIS_CONTAINER_NAME="localhost-redis-1"
+  else
+    MARIADB_CONTAINER_NAME="default_mariadb"
+    WORDPRESS_CONTAINER_NAME="default_wordpress"
+    NGINX_CONTAINER_NAME="default_nginx"
+    REDIS_CONTAINER_NAME="default_redis"
+  fi
 fi
 
 # --- MariaDB container existence check and auto-handling (robust for Compose patterns) ---
@@ -85,13 +132,15 @@ if [[ -n "$MATCHING_CONTAINERS" ]]; then
 fi
 
 # --- Preflight/Prerequisite Check ---
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
-source "$REPO_ROOT/scripts/utils/common.sh"
-preflight_check_agencystack || {
-  echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
-  exit 1
-}
+if [ "$SKIP_PREFLIGHT" != "true" ]; then
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+  source "$REPO_ROOT/scripts/utils/common.sh"
+  preflight_check_agencystack || {
+    echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
+    exit 1
+  }
+fi
 
 # install_wordpress.sh - Install and configure WordPress for AgencyStack
 # https://stack.nerdofmouth.com
@@ -120,8 +169,22 @@ BOLD='\033[1m'
 # Variables
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
-CONFIG_DIR="/opt/agency_stack"
-WP_DIR="${CONFIG_DIR}/wordpress"
+
+# Set installation paths based on environment
+if [ "$CONTAINER_RUNNING" = "true" ]; then
+  # Use container-safe installation directory structure
+  CONFIG_DIR="${HOME}/agency_stack"
+  WP_DIR="${CONFIG_DIR}/wordpress"
+  log "INFO" "Using container-safe installation directory: ${CONFIG_DIR}"
+else
+  # Use standard system paths
+  CONFIG_DIR="/opt/agency_stack"
+  WP_DIR="${CONFIG_DIR}/wordpress"
+fi
+
+# Ensure directories exist with proper permissions
+mkdir -p "${WP_DIR}" 2>/dev/null || true
+
 LOG_DIR="/var/log/agency_stack"
 COMPONENTS_LOG_DIR="${LOG_DIR}/components"
 INTEGRATIONS_LOG_DIR="${LOG_DIR}/integrations"
@@ -181,10 +244,18 @@ if [ -n "$CLIENT_ID" ]; then
   NGINX_CONTAINER_NAME="${CLIENT_ID}_nginx"
   REDIS_CONTAINER_NAME="${CLIENT_ID}_redis"
 else
-  NETWORK_NAME="default_network"
-  WORDPRESS_CONTAINER_NAME="wordpress"
-  NGINX_CONTAINER_NAME="nginx"
-  REDIS_CONTAINER_NAME="redis"
+  # In container environments, the names are prefixed with the domain
+  if [ "$CONTAINER_RUNNING" = "true" ]; then
+    NETWORK_NAME="localhost_network"
+    WORDPRESS_CONTAINER_NAME="localhost-wordpress-1"
+    NGINX_CONTAINER_NAME="localhost-nginx-1"
+    REDIS_CONTAINER_NAME="localhost-redis-1"
+  else
+    NETWORK_NAME="default_network"
+    WORDPRESS_CONTAINER_NAME="default_wordpress"
+    NGINX_CONTAINER_NAME="default_nginx"
+    REDIS_CONTAINER_NAME="default_redis"
+  fi
 fi
 
 # --- Helper functions for networking and containerization ---
@@ -204,7 +275,7 @@ test_container_connectivity() {
     ip_address=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$target_name" 2>/dev/null)
     
     if [ -z "$ip_address" ]; then
-      log_error " Could not get IP address for $target_name"
+      log "ERROR: Could not get IP address for $target_name"
       return 1
     fi
     
@@ -227,7 +298,7 @@ test_container_connectivity() {
 log "INFO: Creating WordPress Docker Compose file (early, for pre-flight validation)" "${CYAN}Creating WordPress Docker Compose file (early, for pre-flight validation)...${NC}"
 # Ensure parent directory exists for idempotence (fix for install failure)
 mkdir -p "${WP_DIR}/${DOMAIN}"
-cat > "${WP_DIR}/${DOMAIN}/docker-compose.yml" <<EOL
+cat > "${WP_DIR}/${DOMAIN}/docker-compose.yml" <<'EOL'
 version: '3'
 
 networks:
@@ -235,7 +306,7 @@ networks:
     name: default_wordpress_${DOMAIN_UNDERSCORE}_network
   default_network:
     external: true
-    name: ${NETWORK_NAME}
+    name: agency_stack
 
 services:
   wordpress:
@@ -305,7 +376,6 @@ services:
     restart: unless-stopped
     volumes:
       - ${WP_DIR}/${DOMAIN}/mariadb:/var/lib/mysql
-      - ${WP_DIR}/${DOMAIN}/mariadb-init/my.cnf:/etc/mysql/my.cnf
       - ${WP_DIR}/${DOMAIN}/mariadb-init/init.sql:/docker-entrypoint-initdb.d/init.sql
     environment:
       - MYSQL_DATABASE=${WP_DB_NAME}
@@ -314,6 +384,10 @@ services:
       - MYSQL_ROOT_PASSWORD=${WP_ROOT_PASSWORD}
       - MYSQL_ROOT_HOST=%
       - MYSQL_ALLOW_EMPTY_PASSWORD=no
+      - CHARACTER_SET_SERVER=utf8mb4
+      - COLLATION_SERVER=utf8mb4_unicode_ci
+      - BIND_ADDRESS=0.0.0.0
+      - MAX_ALLOWED_PACKET=128M
     networks:
       wordpress_network:
         aliases:
@@ -348,7 +422,7 @@ fi
 
 # --- BULLETPROOF: Always create/overwrite my.cnf as a file before any Docker logic, even for existing installs ---
 log "INFO: Ensuring MariaDB init directory exists" "${CYAN}Ensuring MariaDB init directory exists...${NC}"
-mkdir -p "/opt/agency_stack/wordpress/localhost/mariadb-init"
+mkdir -p "${WP_DIR}/localhost/mariadb-init"
 MYCNF_PATH="${WP_DIR}/localhost/mariadb-init/my.cnf"
 
 # --- MariaDB Pre-Flight Setup & Validation ---
@@ -528,28 +602,25 @@ log "INFO: Waiting for WordPress to start" "${CYAN}Waiting for WordPress to star
 if [ "$CONTAINER_RUNNING" = "true" ]; then
   log "INFO: Running enhanced networking setup for Docker-in-Docker environment" "${CYAN}Running enhanced networking setup for Docker-in-Docker environment...${NC}"
   
-  # Fix container networking for docker-in-docker if needed
-  test_container_connectivity "${WORDPRESS_CONTAINER_NAME}" "${MARIADB_CONTAINER_NAME}" || {
-    log "WARNING: Adding manual host entries for container communication" "${YELLOW}Adding manual host entries for container communication...${NC}"
+  # Get all active containers in the WordPress stack
+  ACTIVE_CONTAINERS=$(docker ps --filter "name=localhost-" --format "{{.Names}}")
+  log "INFO: Active containers: $ACTIVE_CONTAINERS" "${CYAN}Active containers: $ACTIVE_CONTAINERS${NC}"
+  
+  # Get MariaDB container IP directly
+  MARIADB_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' localhost-mariadb-1 2>/dev/null)
+  
+  if [ -n "$MARIADB_IP" ]; then
+    # Add hosts entry to WordPress container
+    docker exec localhost-wordpress-1 bash -c "echo '$MARIADB_IP mariadb localhost-mariadb-1' >> /etc/hosts" 2>/dev/null
+    log "INFO: Added mariadb -> $MARIADB_IP to WordPress container hosts file" "${CYAN}Added mariadb -> $MARIADB_IP to WordPress container hosts file${NC}"
     
-    # Get MariaDB container IP
-    MARIADB_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "${MARIADB_CONTAINER_NAME}")
-    
-    if [ -n "$MARIADB_IP" ]; then
-      # Add hosts entry to WordPress container
-      docker exec "${WORDPRESS_CONTAINER_NAME}" bash -c "echo '$MARIADB_IP mariadb ${MARIADB_CONTAINER_NAME}' >> /etc/hosts"
-      log "INFO: Added mariadb -> $MARIADB_IP to WordPress container hosts file" "${CYAN}Added mariadb -> $MARIADB_IP to WordPress container hosts file${NC}"
-    fi
-    
-    # Get Redis container IP
-    REDIS_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "${REDIS_CONTAINER_NAME}")
-    
-    if [ -n "$REDIS_IP" ]; then
-      # Add hosts entry to WordPress container
-      docker exec "${WORDPRESS_CONTAINER_NAME}" bash -c "echo '$REDIS_IP redis ${REDIS_CONTAINER_NAME}' >> /etc/hosts"
-      log "INFO: Added redis -> $REDIS_IP to WordPress container hosts file" "${CYAN}Added redis -> $REDIS_IP to WordPress container hosts file${NC}"
-    fi
-  }
+    # Test connectivity
+    docker exec localhost-wordpress-1 ping -c 1 mariadb 2>/dev/null && \
+      log "SUCCESS: WordPress can now ping MariaDB by hostname" "${GREEN}SUCCESS: WordPress can now ping MariaDB by hostname${NC}" || \
+      log "WARNING: WordPress still cannot ping MariaDB by hostname" "${YELLOW}WARNING: WordPress still cannot ping MariaDB by hostname${NC}"
+  else
+    log "WARNING: Could not get MariaDB IP address" "${YELLOW}Could not get MariaDB IP address${NC}"
+  fi
 fi
 
 # Wait for WordPress stack to initialize
@@ -901,6 +972,10 @@ if [ -f "${ROOT_DIR}/scripts/utils/update_component_registry.sh" ]; then
   
   bash "${ROOT_DIR}/scripts/utils/update_component_registry.sh" "${REGISTRY_ARGS[@]}"
 fi
+
+# Default configuration
+CLIENT_ID="${CLIENT_ID:-default}"
+DOMAIN="${DOMAIN:-localhost}"
 
 log "SUCCESS: WordPress installation completed!" "${GREEN} WordPress installation completed!${NC}"
 echo -e "\n${CYAN}WordPress should now be accessible at: https://${DOMAIN}/\nAdmin user: ${WP_ADMIN_USER}\nAdmin password: (see secrets in ${WP_DIR}/${DOMAIN}/)\n${NC}"

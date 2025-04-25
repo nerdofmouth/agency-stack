@@ -975,7 +975,7 @@ etebase:
 
 etebase-status:
 	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Etebase status...$(RESET)"
-		$(CONFIG_DIR)/monitoring/scripts/check_etebase-$(CLIENT_ID).sh $(CLIENT_ID); \
+		$(CONFIG_DIR)/monitoring/scripts/check_etebase-$(CLIENT_ID).sh; \
 	else \
 		echo "Status script not found. Checking service..."; \
 		docker ps -a | grep etebase-$(CLIENT_ID) || echo "$(RED)Etebase container not found$(RESET)"; \
@@ -1509,19 +1509,16 @@ seafile-restart:
 # Auto-generated target for traefik
 traefik:
 	@echo "$(MAGENTA)$(BOLD)🚀 Installing Traefik...$(RESET)"
-	@$(SCRIPTS_DIR)/components/install_traefik.sh --domain=$(DOMAIN) --admin-email=$(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(ENABLE_CLOUD),--enable-cloud,) $(if $(ENABLE_OPENAI),--enable-openai,) $(if $(USE_GITHUB),--use-github,)
+	@$(SCRIPTS_DIR)/components/install_traefik.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(ENABLE_CLOUD),--enable-cloud,) $(if $(ENABLE_OPENAI),--enable-openai,) $(if $(USE_GITHUB),--use-github,) $(if $(ENABLE_METRICS),--enable-metrics,)
 
-# Auto-generated target for traefik
 traefik-status:
 	@echo "$(MAGENTA)$(BOLD)🔍 Checking Traefik status...$(RESET)"
 	@docker ps | grep -q traefik_default && echo "$(GREEN)Traefik is running$(RESET)" || echo "$(RED)Traefik is not running$(RESET)"
 
-# Auto-generated target for traefik
 traefik-logs:
 	@echo "$(MAGENTA)$(BOLD)📜 Viewing Traefik logs...$(RESET)"
 	@docker logs traefik_default --tail 50
 
-# Auto-generated target for traefik
 traefik-restart:
 	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Traefik...$(RESET)"
 	@docker restart traefik_default
@@ -1548,32 +1545,20 @@ vault-restart:
 
 # Auto-generated target for wordpress
 wordpress:
-	@echo "TODO: Implement wordpress"
-	@exit 1
+	@echo "$(MAGENTA)$(BOLD)🚀 Installing WordPress...$(RESET)"
+	@$(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(ENABLE_CLOUD),--enable-cloud,) $(if $(ENABLE_OPENAI),--enable-openai,) $(if $(USE_GITHUB),--use-github,)
 
-# Auto-generated target for wordpress
 wordpress-status:
-	@echo "TODO: Implement wordpress-status"
-	@exit 1
+	@echo "$(MAGENTA)$(BOLD)🔍 Checking WordPress status...$(RESET)"
+	@docker ps | grep -q wordpress_$(CLIENT_ID) && echo "$(GREEN)WordPress is running$(RESET)" || echo "$(RED)WordPress is not running$(RESET)"
 
-# Auto-generated target for wordpress
 wordpress-logs:
-	@echo "TODO: Implement wordpress-logs"
-	@exit 1
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing WordPress logs...$(RESET)"
+	@docker logs wordpress_$(CLIENT_ID) --tail 50
 
-# Auto-generated target for wordpress
 wordpress-restart:
-	@echo "TODO: Implement wordpress-restart"
-	@exit 1
-
-
-	@exit 1
-
-	@exit 1
-
-	@exit 1
-
-	@exit 1
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting WordPress...$(RESET)"
+	@docker restart wordpress_$(CLIENT_ID)
 
 # Auto-generated target for Parsing
 Parsing:
@@ -2318,7 +2303,7 @@ beta-check-remote: validate
 		exit 1; \
 	fi
 	@echo "$(CYAN)Checking remote VM connectivity...$(RESET)"
-	@if ! ssh -q -o BatchMode=yes -o ConnectTimeout=5 $(REMOTE_VM_SSH) exit > /dev/null 2>&1; then \
+	@if ! ssh -q -o BatchMode=yes -o ConnectTimeout=10 $(REMOTE_VM_SSH) exit > /dev/null 2>&1; then \
 		echo "$(RED)✗ Cannot connect to remote VM: $(REMOTE_VM_SSH)$(RESET)"; \
 		echo "$(YELLOW)Check SSH keys and connectivity$(RESET)"; \
 		exit 1; \
