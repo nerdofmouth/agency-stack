@@ -977,7 +977,7 @@ etebase-status:
 	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Etebase status...$(RESET)"
 		$(CONFIG_DIR)/monitoring/scripts/check_etebase-$(CLIENT_ID).sh $(CLIENT_ID); \
 	else \
-		echo "$(RED)Monitoring script not found. Checking service..."; \
+		echo "Status script not found. Checking service..."; \
 		docker ps -a | grep etebase-$(CLIENT_ID) || echo "$(RED)Etebase container not found$(RESET)"; \
 	fi
 
@@ -1508,23 +1508,23 @@ seafile-restart:
 
 # Auto-generated target for traefik
 traefik:
-	@echo "TODO: Implement traefik"
-	@exit 1
+	@echo "$(MAGENTA)$(BOLD)🚀 Installing Traefik...$(RESET)"
+	@$(SCRIPTS_DIR)/components/install_traefik.sh --domain=$(DOMAIN) --admin-email=$(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(ENABLE_CLOUD),--enable-cloud,) $(if $(ENABLE_OPENAI),--enable-openai,) $(if $(USE_GITHUB),--use-github,)
 
 # Auto-generated target for traefik
 traefik-status:
-	@echo "TODO: Implement traefik-status"
-	@exit 1
+	@echo "$(MAGENTA)$(BOLD)🔍 Checking Traefik status...$(RESET)"
+	@docker ps | grep -q traefik_default && echo "$(GREEN)Traefik is running$(RESET)" || echo "$(RED)Traefik is not running$(RESET)"
 
 # Auto-generated target for traefik
 traefik-logs:
-	@echo "TODO: Implement traefik-logs"
-	@exit 1
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing Traefik logs...$(RESET)"
+	@docker logs traefik_default --tail 50
 
 # Auto-generated target for traefik
 traefik-restart:
-	@echo "TODO: Implement traefik-restart"
-	@exit 1
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Traefik...$(RESET)"
+	@docker restart traefik_default
 
 # Auto-generated target for vault
 vault:
