@@ -1,0 +1,29 @@
+http:
+  routers:
+    wordpress:
+      rule: "Host(`wordpress.localhost`)"
+      service: "wordpress_service"
+      entrypoints:
+        - "websecure"
+      tls: {}
+
+    dashboard:
+      rule: "Host(`dashboard.localhost`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))"
+      service: "api@internal"
+      entrypoints:
+        - "websecure"
+      middlewares:
+        - "auth"
+      tls: {}
+
+  services:
+    wordpress_service:
+      loadBalancer:
+        servers:
+          - url: "http://default_nginx:80"
+
+  middlewares:
+    auth:
+      basicAuth:
+        users:
+          - "admin:$2y$05$42428apr142428qzOrVK3m42428uUYSj0U1NIIaQBUZFRQcn1"
