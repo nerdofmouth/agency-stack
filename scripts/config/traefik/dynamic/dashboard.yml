@@ -1,0 +1,16 @@
+http:
+  routers:
+    dashboard:
+      rule: "Host(`localhost`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))"
+      service: "api@internal"
+      entrypoints:
+        - "websecure"
+      middlewares:
+        - "auth"
+      tls: {}
+
+  middlewares:
+    auth:
+      basicAuth:
+        users:
+          - "admin:$2y$05$khoXbqn8Fezl9u4mG4zuGuLfxv.y5unOn/zj8hZ0poLueo0sSP2Xa"

@@ -52,6 +52,70 @@ VERBOSE="${VERBOSE:-false}"
 LOG_DIR="/var/log/agency_stack/components"
 mkdir -p "${LOG_DIR}" 2>/dev/null || true
 
+# Add a function to detect if running inside a container
+is_running_in_container() {
+  if [ -f "/.dockerenv" ] || grep -q "docker\|lxc" /proc/1/cgroup 2>/dev/null; then
+    return 0  # true
+  else
+    return 1  # false
+  fi
+}
+
+# Add a function to ensure log directory is writable 
+ensure_log_directory() {
+  local log_dir="$1"
+  
+  # Create the directory if it doesn't exist
+  mkdir -p "$log_dir" 2>/dev/null || true
+  
+  # Check if we can write to it
+  if [ ! -w "$log_dir" ]; then
+    # Create an alternative in the user's home directory
+    local alt_dir="${HOME}/.logs/agency_stack"
+    mkdir -p "$alt_dir" 2>/dev/null
+    echo "$alt_dir"
+  else
+    echo "$log_dir"
+  fi
+}
+
+# Auto-detect if we're running in a Docker container and set a global flag
+if is_running_in_container; then
+  export CONTAINER_RUNNING=true
+  log_info "Detected Docker-in-Docker environment, enabling container compatibility mode"
+else
+  export CONTAINER_RUNNING=false
+fi
+
+# Configure proper DB hostnames for docker-in-docker environments
+configure_docker_network_mode() {
+  # Auto-detect if we're running inside a Docker container
+  if is_running_in_container; then
+    log_info "Detected Docker-in-Docker environment, configuring for container networking"
+    
+    # Use container names instead of service names in docker-compose networks
+    USE_CONTAINER_NAMES=true
+    export USE_CONTAINER_NAMES
+    
+    # Ensure /etc/hosts has localhost entries
+    if ! grep -q "wordpress.localhost" /etc/hosts 2>/dev/null; then
+      echo "127.0.0.1 wordpress.localhost" >> "${HOME}/.dind_hosts"
+      log_info "Added wordpress.localhost to ${HOME}/.dind_hosts"
+    fi
+    
+    if ! grep -q "dashboard.localhost" /etc/hosts 2>/dev/null; then
+      echo "127.0.0.1 dashboard.localhost" >> "${HOME}/.dind_hosts"
+      log_info "Added dashboard.localhost to ${HOME}/.dind_hosts"
+    fi
+    
+    # Return true to indicate we're in a container
+    return 0
+  fi
+  
+  # Not in a container
+  return 1
+}
+
 # Logging functions
 log_info() {
     local message="$1"

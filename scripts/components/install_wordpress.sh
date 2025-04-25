@@ -150,6 +150,23 @@ fi
 # --- Enable AgencyStack Standard Error Trap ---
 trap_agencystack_errors
 
+# Configure for docker-in-docker if needed
+if is_running_in_container; then
+  log_info "Detected Docker-in-Docker environment, adjusting configurations"
+  
+  # Ensure log directories are writable
+  COMPONENTS_LOG_DIR=$(ensure_log_directory "${COMPONENTS_LOG_DIR}")
+  INTEGRATIONS_LOG_DIR=$(ensure_log_directory "${INTEGRATIONS_LOG_DIR}")
+  INSTALL_LOG="${COMPONENTS_LOG_DIR}/wordpress.log"
+  INTEGRATION_LOG="${INTEGRATIONS_LOG_DIR}/wordpress.log"
+  
+  # Use full container names for service resolution
+  WORDPRESS_DB_HOST="${MARIADB_CONTAINER_NAME}"
+else
+  # Use service name for standard installations
+  WORDPRESS_DB_HOST="mariadb"
+fi
+
 # --- Set container and volume names BEFORE any pre-flight logic ---
 # (This logic should match the main container naming logic used later)
 # --- Ensure DOMAIN_UNDERSCORE and SITE_NAME are initialized BEFORE use ---
@@ -169,6 +186,42 @@ else
   NGINX_CONTAINER_NAME="nginx"
   REDIS_CONTAINER_NAME="redis"
 fi
+
+# --- Helper functions for networking and containerization ---
+test_container_connectivity() {
+  local container_name="$1"
+  local target_name="$2"
+  local ip_address=""
+  
+  # Get the IP of the target for direct testing if hostname fails
+  if docker exec "$container_name" ping -c 1 "$target_name" >/dev/null 2>&1; then
+    log_info " Container $container_name can resolve and ping $target_name"
+    return 0
+  else
+    log_info " Container $container_name cannot ping $target_name by hostname, trying direct IP"
+    
+    # Try to get IP address of target container
+    ip_address=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$target_name" 2>/dev/null)
+    
+    if [ -z "$ip_address" ]; then
+      log_error " Could not get IP address for $target_name"
+      return 1
+    fi
+    
+    # Try with IP instead
+    if docker exec "$container_name" ping -c 1 "$ip_address" >/dev/null 2>&1; then
+      log_info " Container $container_name can ping $target_name via IP ($ip_address)"
+      
+      # Add hosts entry for DinD environments
+      docker exec "$container_name" bash -c "echo '$ip_address $target_name' >> /etc/hosts"
+      log_info " Added hosts entry for $target_name in $container_name container"
+      return 0
+    else
+      log_error " Container $container_name cannot ping $target_name even via IP ($ip_address)"
+      return 1
+    fi
+  fi
+}
 
 # --- Ensure Docker Compose file is generated before MariaDB pre-flight ---
 log "INFO: Creating WordPress Docker Compose file (early, for pre-flight validation)" "${CYAN}Creating WordPress Docker Compose file (early, for pre-flight validation)...${NC}"
@@ -193,7 +246,7 @@ services:
       - ${WP_DIR}/${DOMAIN}/wordpress:/var/www/html
       - ${WP_DIR}/${DOMAIN}/php/custom.ini:/usr/local/etc/php/conf.d/custom.ini
     environment:
-      - WORDPRESS_DB_HOST=mariadb
+      - WORDPRESS_DB_HOST=${WORDPRESS_DB_HOST}
       - WORDPRESS_DB_USER=${WP_DB_USER}
       - WORDPRESS_DB_PASSWORD=${WP_DB_PASSWORD}
       - WORDPRESS_DB_NAME=${WP_DB_NAME}
@@ -234,13 +287,13 @@ services:
       - ${WP_DIR}/${DOMAIN}/nginx/:/etc/nginx/conf.d/
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.wordpress_${SITE_NAME}.rule=Host(\`${DOMAIN}\`)"
+      - "traefik.http.routers.wordpress_${SITE_NAME}.rule=Host(`${DOMAIN}`) || Host(`*.${DOMAIN}`)"
       - "traefik.http.routers.wordpress_${SITE_NAME}.entrypoints=websecure"
       - "traefik.http.routers.wordpress_${SITE_NAME}.tls=true"
       - "traefik.http.routers.wordpress_${SITE_NAME}.tls.certresolver=myresolver"
       - "traefik.http.services.wordpress_${SITE_NAME}.loadbalancer.server.port=80"
       # HTTP to HTTPS redirect
-      - "traefik.http.routers.wordpress_${SITE_NAME}_http.rule=Host(\`${DOMAIN}\`)"
+      - "traefik.http.routers.wordpress_${SITE_NAME}_http.rule=Host(`${DOMAIN}`) || Host(`*.${DOMAIN}`)"
       - "traefik.http.routers.wordpress_${SITE_NAME}_http.entrypoints=web"
       - "traefik.http.middlewares.redirect_https.redirectscheme.scheme=https"
       - "traefik.http.middlewares.redirect_https.redirectscheme.permanent=true"
@@ -459,15 +512,45 @@ if [ ! -f "${DEFAULT_CONF}" ]; then
 fi
 
 # WSL2/Docker volume mount verification 
-log "INFO: Verified nginx config is a proper file (critical for Docker mounts)" "${GREEN}✅ Verified nginx config is a proper file (critical for Docker mounts)${NC}"
+log "INFO: Verified nginx config is a proper file (critical for Docker mounts)" "${GREEN} Verified nginx config is a proper file (critical for Docker mounts)${NC}"
 ls -l "${DEFAULT_CONF}"
 
 # --- Start WordPress stack
 log "INFO: Starting WordPress stack with Docker Compose" "${CYAN}Starting WordPress stack with Docker Compose...${NC}"
-cd "${WP_DIR}/${DOMAIN}"
-docker-compose -f "${WP_DIR}/${DOMAIN}/docker-compose.yml" up -d
-log "INFO: Docker Compose up completed" "${GREEN}Docker Compose up completed.${NC}"
-cd - > /dev/null
+cd "${WP_DIR}/${DOMAIN}" && docker-compose up -d
+log "INFO: Docker Compose up completed." "${CYAN}Docker Compose up completed.${NC}"
+
+# Add a short pause to ensure containers are fully started
+sleep 15
+log "INFO: Waiting for WordPress to start" "${CYAN}Waiting for WordPress to start...${NC}"
+
+# --- Docker container networking setup for docker-in-docker environments ---
+if [ "$CONTAINER_RUNNING" = "true" ]; then
+  log "INFO: Running enhanced networking setup for Docker-in-Docker environment" "${CYAN}Running enhanced networking setup for Docker-in-Docker environment...${NC}"
+  
+  # Fix container networking for docker-in-docker if needed
+  test_container_connectivity "${WORDPRESS_CONTAINER_NAME}" "${MARIADB_CONTAINER_NAME}" || {
+    log "WARNING: Adding manual host entries for container communication" "${YELLOW}Adding manual host entries for container communication...${NC}"
+    
+    # Get MariaDB container IP
+    MARIADB_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "${MARIADB_CONTAINER_NAME}")
+    
+    if [ -n "$MARIADB_IP" ]; then
+      # Add hosts entry to WordPress container
+      docker exec "${WORDPRESS_CONTAINER_NAME}" bash -c "echo '$MARIADB_IP mariadb ${MARIADB_CONTAINER_NAME}' >> /etc/hosts"
+      log "INFO: Added mariadb -> $MARIADB_IP to WordPress container hosts file" "${CYAN}Added mariadb -> $MARIADB_IP to WordPress container hosts file${NC}"
+    fi
+    
+    # Get Redis container IP
+    REDIS_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "${REDIS_CONTAINER_NAME}")
+    
+    if [ -n "$REDIS_IP" ]; then
+      # Add hosts entry to WordPress container
+      docker exec "${WORDPRESS_CONTAINER_NAME}" bash -c "echo '$REDIS_IP redis ${REDIS_CONTAINER_NAME}' >> /etc/hosts"
+      log "INFO: Added redis -> $REDIS_IP to WordPress container hosts file" "${CYAN}Added redis -> $REDIS_IP to WordPress container hosts file${NC}"
+    fi
+  }
+fi
 
 # Wait for WordPress stack to initialize
 log "INFO: Waiting for WordPress to start" "${CYAN}Waiting for WordPress to start...${NC}"
@@ -478,12 +561,12 @@ log "INFO: Running network diagnostics" "${CYAN}Running network diagnostics...${
 docker network inspect default_wordpress_${DOMAIN_UNDERSCORE}_network
 echo "Testing connectivity between containers:"
 # Install ping utility for network diagnostics
-docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "apt-get update && apt-get install -y iputils-ping" || log "WARNING: Unable to install ping utilities" "${YELLOW}⚠️ Unable to install ping utilities${NC}"
-docker exec ${WORDPRESS_CONTAINER_NAME} ping -c 2 ${MARIADB_CONTAINER_NAME} || log "WARNING: Ping failed between WordPress and MariaDB" "${YELLOW}⚠️ Ping failed between WordPress and MariaDB${NC}"
+docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "apt-get update && apt-get install -y iputils-ping" || log "WARNING: Unable to install ping utilities" "${YELLOW} Unable to install ping utilities${NC}"
+docker exec ${WORDPRESS_CONTAINER_NAME} ping -c 2 ${MARIADB_CONTAINER_NAME} || log "WARNING: Ping failed between WordPress and MariaDB" "${YELLOW} Ping failed between WordPress and MariaDB${NC}"
 
 # Install MySQL client for diagnostics
 log "INFO: Installing MySQL client for diagnostics" "${CYAN}Installing MySQL client for diagnostics...${NC}"
-docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "apt-get update && apt-get install -y default-mysql-client" || log "WARNING: Unable to install MySQL client" "${YELLOW}⚠️ Unable to install MySQL client${NC}"
+docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "apt-get update && apt-get install -y default-mysql-client" || log "WARNING: Unable to install MySQL client" "${YELLOW} Unable to install MySQL client${NC}"
 
 # Create script to install WordPress properly
 log "INFO: Creating WordPress installation scripts" "${CYAN}Creating WordPress installation scripts...${NC}"
@@ -582,11 +665,11 @@ chmod +x "${WP_DIR}/${DOMAIN}/scripts/install_wp.sh"
 
 # Copy the script to the WordPress container
 log "INFO: Copying installation scripts to WordPress container" "${CYAN}Copying installation scripts to WordPress container...${NC}"
-docker cp "${WP_DIR}/${DOMAIN}/scripts/install_wp.sh" ${WORDPRESS_CONTAINER_NAME}:/tmp/install_wp.sh || log "WARNING: Failed to copy installation script" "${YELLOW}⚠️ Failed to copy installation script${NC}"
+docker cp "${WP_DIR}/${DOMAIN}/scripts/install_wp.sh" ${WORDPRESS_CONTAINER_NAME}:/tmp/install_wp.sh || log "WARNING: Failed to copy installation script" "${YELLOW} Failed to copy installation script${NC}"
 
 # Execute the WordPress installation script
 log "INFO: Running WordPress installation script" "${CYAN}Running WordPress installation script...${NC}"
-docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "chmod +x /tmp/install_wp.sh && /tmp/install_wp.sh" || log "WARNING: WordPress installation script failed" "${YELLOW}⚠️ WordPress installation script failed${NC}"
+docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "chmod +x /tmp/install_wp.sh && /tmp/install_wp.sh" || log "WARNING: WordPress installation script failed" "${YELLOW} WordPress installation script failed${NC}"
 
 # Check if WordPress database tables exist and install if needed
 log "INFO: Ensuring database schema is initialized" "${CYAN}Ensuring database schema is initialized...${NC}"
@@ -602,7 +685,7 @@ echo "=========================================="
 if docker exec "${MARIADB_CONTAINER_NAME}" mysql -u"${WP_DB_USER}" -p"${WP_DB_PASSWORD}" -e "SELECT 1" "${WP_DB_NAME}" > /dev/null 2>&1; then
   echo "SUCCESS: Connected to database"
 else
-  log "ERROR: Failed to connect to database" "${RED}❌ Failed to connect to database${NC}"
+  log "ERROR: Failed to connect to database" "${RED} Failed to connect to database${NC}"
   exit 1
 fi
   
@@ -635,24 +718,24 @@ if ! docker exec "${MARIADB_CONTAINER_NAME}" mysql -u"${WP_DB_USER}" -p"${WP_DB_
       
   # Verify tables were created
   if docker exec "${MARIADB_CONTAINER_NAME}" mysql -u"${WP_DB_USER}" -p"${WP_DB_PASSWORD}" -e "SHOW TABLES LIKE 'wp_posts'" "${WP_DB_NAME}" | grep -q "wp_posts"; then
-    log "INFO: Database schema initialized successfully" "${GREEN}✅ WordPress database tables created successfully${NC}"
+    log "INFO: Database schema initialized successfully" "${GREEN} WordPress database tables created successfully${NC}"
   else
-    log "ERROR: Failed to initialize WordPress database schema" "${RED}❌ Failed to initialize WordPress database schema${NC}"
+    log "ERROR: Failed to initialize WordPress database schema" "${RED} Failed to initialize WordPress database schema${NC}"
     exit 1
   fi
 else
-  log "INFO: WordPress database schema already initialized" "${GREEN}✅ WordPress database schema already initialized${NC}"
+  log "INFO: WordPress database schema already initialized" "${GREEN} WordPress database schema already initialized${NC}"
 fi
 
 # Verify WordPress installation
 log "INFO: Verifying WordPress installation" "${CYAN}Verifying WordPress installation...${NC}"
-docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "wp --allow-root core verify-checksums" || log "WARNING: WordPress core verification failed" "${YELLOW}⚠️ WordPress core verification failed${NC}"
+docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "wp --allow-root core verify-checksums" || log "WARNING: WordPress core verification failed" "${YELLOW} WordPress core verification failed${NC}"
 
 # Set a few basic configurations
 log "INFO: Configuring WordPress" "${CYAN}Configuring WordPress...${NC}"
-docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "wp --allow-root option update blogname 'WordPress on AgencyStack'" || log "WARNING: Failed to update blog name" "${YELLOW}⚠️ Failed to update blog name${NC}"
-docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "wp --allow-root option update blogdescription 'Powered by AgencyStack'" || log "WARNING: Failed to update blog description" "${YELLOW}⚠️ Failed to update blog description${NC}"
-docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "wp --allow-root rewrite structure '/%postname%/'" || log "WARNING: Failed to update permalink structure" "${YELLOW}⚠️ Failed to update permalink structure${NC}"
+docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "wp --allow-root option update blogname 'WordPress on AgencyStack'" || log "WARNING: Failed to update blog name" "${YELLOW} Failed to update blog name${NC}"
+docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "wp --allow-root option update blogdescription 'Powered by AgencyStack'" || log "WARNING: Failed to update blog description" "${YELLOW} Failed to update blog description${NC}"
+docker exec ${WORDPRESS_CONTAINER_NAME} bash -c "wp --allow-root rewrite structure '/%postname%/'" || log "WARNING: Failed to update permalink structure" "${YELLOW} Failed to update permalink structure${NC}"
 
 # Store credentials in a secure location
 log "INFO: Storing credentials" "${CYAN}Storing credentials...${NC}"
@@ -715,7 +798,7 @@ if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
       
       # Install and configure the OpenID Connect plugin
       log "INFO: Installing OpenID Connect plugin for WordPress" "${CYAN}Installing OpenID Connect plugin for WordPress...${NC}"
-      docker exec -w /var/www/html ${WORDPRESS_CONTAINER_NAME} bash -c "cd /tmp && curl -L -O https://github.com/daggerhart/openid-connect-generic/archive/refs/heads/master.zip && cd /var/www/html && wp --allow-root plugin install /tmp/master.zip --activate && rm /tmp/master.zip" || log "WARNING: Failed to install OpenID Connect plugin" "${YELLOW}⚠️ Failed to install OpenID Connect plugin${NC}"
+      docker exec -w /var/www/html ${WORDPRESS_CONTAINER_NAME} bash -c "cd /tmp && curl -L -O https://github.com/daggerhart/openid-connect-generic/archive/refs/heads/master.zip && cd /var/www/html && wp --allow-root plugin install /tmp/master.zip --activate && rm /tmp/master.zip" || log "WARNING: Failed to install OpenID Connect plugin" "${YELLOW} Failed to install OpenID Connect plugin${NC}"
       
       # Configure OpenID Connect plugin
       log "INFO: Configuring OpenID Connect plugin" "${CYAN}Configuring OpenID Connect plugin...${NC}"
@@ -819,7 +902,7 @@ if [ -f "${ROOT_DIR}/scripts/utils/update_component_registry.sh" ]; then
   bash "${ROOT_DIR}/scripts/utils/update_component_registry.sh" "${REGISTRY_ARGS[@]}"
 fi
 
-log "SUCCESS: WordPress installation completed!" "${GREEN}✅ WordPress installation completed!${NC}"
+log "SUCCESS: WordPress installation completed!" "${GREEN} WordPress installation completed!${NC}"
 echo -e "\n${CYAN}WordPress should now be accessible at: https://${DOMAIN}/\nAdmin user: ${WP_ADMIN_USER}\nAdmin password: (see secrets in ${WP_DIR}/${DOMAIN}/)\n${NC}"
 if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
   echo -e "${CYAN}Keycloak SSO is enabled. Configure your IdP as needed.${NC}"
