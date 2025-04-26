@@ -1512,16 +1512,73 @@ traefik:
 	@$(SCRIPTS_DIR)/components/install_traefik.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(ENABLE_CLOUD),--enable-cloud,) $(if $(ENABLE_OPENAI),--enable-openai,) $(if $(USE_GITHUB),--use-github,) $(if $(ENABLE_METRICS),--enable-metrics,)
 
 traefik-status:
-	@echo "$(MAGENTA)$(BOLD)🔍 Checking Traefik status...$(RESET)"
-	@docker ps | grep -q traefik_default && echo "$(GREEN)Traefik is running$(RESET)" || echo "$(RED)Traefik is not running$(RESET)"
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Traefik status...$(RESET)"
+	@$(SCRIPTS_DIR)/components/install_traefik.sh --status-only $(if $(CLIENT_ID),--client-id $(CLIENT_ID),)
 
-traefik-logs:
-	@echo "$(MAGENTA)$(BOLD)📜 Viewing Traefik logs...$(RESET)"
-	@docker logs traefik_default --tail 50
+traefik-docker:
+	@echo "$(MAGENTA)$(BOLD)🐳 Creating Docker-based Traefik Container for Host Access...$(RESET)"
+	@echo "$(CYAN)This will create a clean Docker container with proper port exposure$(RESET)"
+	@docker rm -f traefik_$${CLIENT_ID:-default} 2>/dev/null || true
+	@mkdir -p $(CURDIR)/services/traefik/$${CLIENT_ID:-default}/config
+	@mkdir -p $(CURDIR)/services/traefik/$${CLIENT_ID:-default}/dynamic
+	@cat > $(CURDIR)/services/traefik/$${CLIENT_ID:-default}/config/traefik.yml <<EOF
+api:
+  dashboard: true
+  insecure: true
 
-traefik-restart:
-	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Traefik...$(RESET)"
-	@docker restart traefik_default
+entryPoints:
+  web:
+    address: ":80"
+  dashboard:
+    address: ":8081"
+
+providers:
+  file:
+    directory: "/etc/traefik/dynamic"
+
+# Global configuration
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+EOF
+	@docker run -d --name traefik_$${CLIENT_ID:-default} \
+		-p 8081:8081 \
+		-p 80:80 \
+		-v $(CURDIR)/services/traefik/$${CLIENT_ID:-default}/config/traefik.yml:/etc/traefik/traefik.yml:ro \
+		-v $(CURDIR)/services/traefik/$${CLIENT_ID:-default}/dynamic:/etc/traefik/dynamic:ro \
+		traefik:v2.6.3
+	@echo "$(GREEN)✅ Traefik container started and accessible at: http://localhost:8081/dashboard/$(RESET)"
+
+traefik-host-test:
+	@echo "$(MAGENTA)$(BOLD)🧪 Testing Traefik Dashboard Access from Host...$(RESET)"
+	@echo "$(CYAN)Testing connection to dashboard...$(RESET)"
+	@HTTP_CODE=$$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/dashboard/); \
+	if [ "$$HTTP_CODE" = "200" ]; then \
+		echo "$(GREEN)✅ Traefik dashboard is accessible at http://localhost:8081/dashboard/ (HTTP $$HTTP_CODE)$(RESET)"; \
+		echo "$(CYAN)You can open this URL in your browser$(RESET)"; \
+	else \
+		echo "$(RED)❌ Traefik dashboard is not accessible (HTTP $$HTTP_CODE)$(RESET)"; \
+		echo "$(YELLOW)Try running 'make traefik-docker' to create a properly exposed container$(RESET)"; \
+		echo "$(YELLOW)Container status:$(RESET)"; \
+		docker ps -a | grep traefik; \
+	fi
+
+traefik-browser:
+	@echo "$(MAGENTA)$(BOLD)🌐 Opening Traefik Dashboard in Browser...$(RESET)"
+	@if command -v xdg-open > /dev/null; then \
+		xdg-open http://localhost:8081/dashboard/; \
+	elif command -v open > /dev/null; then \
+		open http://localhost:8081/dashboard/; \
+	else \
+		echo "$(YELLOW)Cannot automatically open browser. Please open this URL manually:$(RESET)"; \
+		echo "http://localhost:8081/dashboard/"; \
+	fi
+
+traefik-clean:
+	@echo "$(MAGENTA)$(BOLD)🧹 Cleaning up Traefik Containers...$(RESET)"
+	@echo "$(CYAN)Stopping and removing Traefik containers...$(RESET)"
+	@docker rm -f $$(docker ps -a -q --filter "name=traefik_*") 2>/dev/null || echo "No Traefik containers to remove"
+	@echo "$(GREEN)✅ Cleanup completed$(RESET)"
 
 # Auto-generated target for vault
 vault:
@@ -1549,7 +1606,7 @@ wordpress:
 	@$(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(ENABLE_CLOUD),--enable-cloud,) $(if $(ENABLE_OPENAI),--enable-openai,) $(if $(USE_GITHUB),--use-github,)
 
 wordpress-status:
-	@echo "$(MAGENTA)$(BOLD)🔍 Checking WordPress status...$(RESET)"
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking WordPress status...$(RESET)"
 	@docker ps | grep -q wordpress_$(CLIENT_ID) && echo "$(GREEN)WordPress is running$(RESET)" || echo "$(RED)WordPress is not running$(RESET)"
 
 wordpress-logs:

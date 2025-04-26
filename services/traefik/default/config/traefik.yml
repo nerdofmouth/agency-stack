@@ -1,0 +1,18 @@
+api:
+  dashboard: true
+  insecure: true
+
+entryPoints:
+  web:
+    address: ":80"
+  dashboard:
+    address: ":8081"
+
+providers:
+  file:
+    directory: "/etc/traefik/dynamic"
+
+# Global configuration
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
