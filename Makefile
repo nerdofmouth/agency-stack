@@ -2608,3 +2608,28 @@ traefik-logs:
 
 traefik-restart:
 	cd scripts/components && bash install_traefik.sh --force
+
+# Traefik-Keycloak Integration targets
+traefik-keycloak:
+	@echo "$(MAGENTA)$(BOLD)🚀 Installing Traefik with Keycloak authentication...$(RESET)"
+	@$(SCRIPTS_DIR)/components/install_traefik_keycloak.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(TRAEFIK_PORT),--traefik-port $(TRAEFIK_PORT),) $(if $(KEYCLOAK_PORT),--keycloak-port $(KEYCLOAK_PORT),) $(if $(ENABLE_TLS),--enable-tls,)
+
+traefik-keycloak-status:
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Traefik-Keycloak status...$(RESET)"
+	@$(SCRIPTS_DIR)/components/install_traefik_keycloak.sh --status-only $(if $(CLIENT_ID),--client-id $(CLIENT_ID),)
+
+traefik-keycloak-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Traefik-Keycloak...$(RESET)"
+	@if [ -d "/opt/agency_stack/clients/$(CLIENT_ID)/traefik-keycloak/docker-compose" ]; then \
+		cd /opt/agency_stack/clients/$(CLIENT_ID)/traefik-keycloak/docker-compose && docker-compose restart; \
+	else \
+		echo "$(RED)Traefik-Keycloak not installed. Run 'make traefik-keycloak' first.$(RESET)"; \
+	fi
+
+traefik-keycloak-logs:
+	@echo "$(MAGENTA)$(BOLD)📜 Viewing Traefik-Keycloak logs...$(RESET)"
+	@if [ -d "/opt/agency_stack/clients/$(CLIENT_ID)/traefik-keycloak/docker-compose" ]; then \
+		cd /opt/agency_stack/clients/$(CLIENT_ID)/traefik-keycloak/docker-compose && docker-compose logs --tail=100; \
+	else \
+		echo "$(RED)Traefik-Keycloak not installed. Run 'make traefik-keycloak' first.$(RESET)"; \
+	fi

@@ -1,0 +1,81 @@
+version: '3'
+
+networks:
+  traefik-keycloak:
+    name: traefik-keycloak
+
+services:
+  traefik:
+    image: traefik:v2.10
+    container_name: traefik_default
+    restart: unless-stopped
+    networks:
+      - traefik-keycloak
+    ports:
+      - "80:80"
+      - "8081:8080"
+    volumes:
+      - ./traefik/config:/etc/traefik
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.dashboard.address=:8080"
+    depends_on:
+      - keycloak
+      - forward-auth
+    labels:
+      - "traefik.enable=true"
+      # Dashboard route with auth
+      - "traefik.http.routers.dashboard.rule=PathPrefix(`/api`) || PathPrefix(`/dashboard`)"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.entrypoints=dashboard"
+      - "traefik.http.routers.dashboard.middlewares=forward-auth"
+  
+  # Keycloak instance for SSO authentication
+  keycloak:
+    image: quay.io/keycloak/keycloak:22.0
+    container_name: keycloak_default
+    restart: unless-stopped
+    networks:
+      - traefik-keycloak
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+      - KC_HOSTNAME=keycloak.localhost
+      - KC_HTTP_RELATIVE_PATH=/auth
+    command: 
+      - start-dev
+    volumes:
+      - ./keycloak/data:/opt/keycloak/data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.keycloak.rule=Host(`keycloak.localhost`)"
+      - "traefik.http.routers.keycloak.entrypoints=web"
+      - "traefik.http.services.keycloak.loadbalancer.server.port=8080"
+  
+  # Forward Auth service for authentication
+  forward-auth:
+    image: thomseddon/traefik-forward-auth:2
+    container_name: traefik_forward_auth
+    restart: unless-stopped
+    networks:
+      - traefik-keycloak
+    environment:
+      - PROVIDERS_OIDC_ISSUER_URL=http://keycloak:8080/auth/realms/AgencyStack
+      - PROVIDERS_OIDC_CLIENT_ID=traefik-dashboard
+      - PROVIDERS_OIDC_CLIENT_SECRET=traefik-secret
+      - SECRET=changemelater
+      - AUTH_HOST=auth.localhost
+      - COOKIE_DOMAIN=localhost
+      - INSECURE_COOKIE=true
+      - LOG_LEVEL=debug
+    depends_on:
+      - keycloak
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.forward-auth.forwardauth.address=http://forward-auth:4181"
+      - "traefik.http.middlewares.forward-auth.forwardauth.authResponseHeaders=X-Forwarded-User"
