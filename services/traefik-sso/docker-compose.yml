@@ -1,0 +1,53 @@
+version: '3'
+
+networks:
+  traefik-network:
+    external: true
+
+services:
+  traefik:
+    image: traefik:v2.10
+    container_name: traefik_default
+    restart: unless-stopped
+    networks:
+      - traefik-network
+    ports:
+      - "80:80"
+      - "8081:8080"
+    volumes:
+      - ./config:/etc/traefik
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.dashboard.address=:8080"
+      - "--log.level=DEBUG"
+    labels:
+      - "traefik.enable=true"
+      # Dashboard route
+      - "traefik.http.routers.traefik.rule=PathPrefix(`/api`) || PathPrefix(`/dashboard`)"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.traefik.entrypoints=dashboard"
+      # Forward auth middleware
+      - "traefik.http.routers.traefik.middlewares=traefik-auth"
+      - "traefik.http.middlewares.traefik-auth.forwardauth.address=http://traefik-forward-auth:4181"
+      - "traefik.http.middlewares.traefik-auth.forwardauth.authResponseHeaders=X-Forwarded-User"
+
+  traefik-forward-auth:
+    image: thomseddon/traefik-forward-auth:2
+    container_name: traefik_forward_auth
+    restart: unless-stopped
+    networks:
+      - traefik-network
+    environment:
+      - PROVIDERS_OIDC_ISSUER_URL=http://keycloak_default:8080/realms/master
+      - PROVIDERS_OIDC_CLIENT_ID=traefik-dashboard
+      - PROVIDERS_OIDC_CLIENT_SECRET=traefik-secret
+      - SECRET=something-random
+      - AUTH_HOST=auth.localhost
+      - COOKIE_DOMAIN=localhost
+      - INSECURE_COOKIE=true
+      - LOG_LEVEL=debug

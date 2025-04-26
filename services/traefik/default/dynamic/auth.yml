@@ -1,0 +1,18 @@
+http:
+  middlewares:
+    keycloak-forward-auth:
+      forwardAuth:
+        address: "http://keycloak_default:8080/auth/realms/master/protocol/openid-connect/auth"
+        authResponseHeaders:
+          - "Authorization"
+          - "X-Forwarded-User"
+        trustForwardHeader: true
+
+  routers:
+    dashboard-secure:
+      rule: "PathPrefix(`/dashboard`)"
+      service: "api@internal"
+      middlewares:
+        - "keycloak-forward-auth"
+      entryPoints:
+        - "dashboard"
