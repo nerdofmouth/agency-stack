@@ -21,29 +21,8 @@ MAGENTA := $(shell tput setaf 5)
 CYAN := $(shell tput setaf 6)
 RESET := $(shell tput sgr0)
 
-.PHONY: help install update client test-env clean backup stack-info talknerdy rootofmouth buddy-init buddy-monitor drone-setup generate-buddy-keys start-buddy-system enable-monitoring mailu-setup mailu-test-email logs health-check verify-dns setup-log-rotation monitoring-setup config-snapshot config-rollback config-diff verify-backup setup-cron test-alert integrate-keycloak test-operations motd audit integrate-components dashboard dashboard-refresh dashboard-enable dashboard-update dashboard-open integrate-sso integrate-email integrate-monitoring integrate-data-bridge detect-ports remap-ports scan-ports setup-cronjobs view-alerts log-summary create-client setup-roles security-audit security-fix rotate-secrets setup-log-segmentation verify-certs verify-auth multi-tenancy-status install-wordpress install-erpnext install-posthog install-voip install-mailu install-grafana install-loki install-prometheus install-keycloak install-infrastructure install-security-infrastructure install-multi-tenancy validate validate-report peertube peertube-sso peertube-with-deps peertube-reinstall peertube-status peertube-logs peertube-stop peertube-start peertube-restart demo-core demo-core-clean demo-core-status demo-core-logs
-
-# Keycloak Makefile Targets for AgencyStack Alpha
-
-keycloak:
-	@echo "🔑 Installing Keycloak..."
-	@$(SCRIPTS_DIR)/components/install_keycloak.sh --domain=$(DOMAIN) --admin-email=$(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(ENABLE_CLOUD),--enable-cloud,) $(if $(ENABLE_OPENAI),--enable-openai,) $(if $(USE_GITHUB),--use-github,) $(if $(ENABLE_KEYCLOAK),--enable-keycloak,)
-
-keycloak-status:
-	@echo "🔍 Checking Keycloak status..."
-	@$(SCRIPTS_DIR)/components/verify_keycloak.sh --domain=$(DOMAIN) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),)
-
-keycloak-logs:
-	@echo "📜 Tailing Keycloak logs..."
-	@tail -n 50 /var/log/agency_stack/components/keycloak.log
-
-keycloak-restart:
-	@echo "♻️  Restarting Keycloak Docker container..."
-	@docker restart keycloak_$(DOMAIN)
-
-keycloak-test:
-	@echo "🧪 Testing Keycloak API endpoint..."
-	@curl -k https://$(DOMAIN)/admin/ || echo "Keycloak API test failed"
+# Include all component makefiles
+-include makefiles/components/*.mk
 
 # Default target
 help:
@@ -1579,10 +1558,10 @@ vault-restart:
 	@echo "TODO: Implement vault-restart"
 	@exit 1
 
-# Auto-generated target for wordpress
-wordpress:
-	@echo "$(MAGENTA)$(BOLD)🚀 Installing WordPress...$(RESET)"
-	@$(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(ENABLE_CLOUD),--enable-cloud,) $(if $(ENABLE_OPENAI),--enable-openai,) $(if $(USE_GITHUB),--use-github,)
+# WordPress
+install-wordpress: validate
+	@echo "$(MAGENTA)$(BOLD)🌐 Installing WordPress...$(RESET)"
+	@FORCE=$(FORCE) sudo $(SCRIPTS_DIR)/components/install_wordpress.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(ENABLE_CLOUD),--enable-cloud,) $(if $(ENABLE_OPENAI),--enable-openai,) $(if $(USE_GITHUB),--use-github,)
 
 wordpress-status:
 	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking WordPress status...$(RESET)"
