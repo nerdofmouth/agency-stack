@@ -1,0 +1,9 @@
+http:
+  routers:
+    dashboard:
+      rule: "PathPrefix(`/api`) || PathPrefix(`/dashboard`)"
+      service: "api@internal"
+      entryPoints:
+        - "dashboard"
+      middlewares:
+        - "oauth2-auth"

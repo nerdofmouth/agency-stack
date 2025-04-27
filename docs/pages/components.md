@@ -80,6 +80,24 @@ For detailed Builder.io integration instructions, see our [Builder.io Integratio
 | Component | Description | Default URL |
 |-----------|-------------|-------------|
 | **Keycloak** | Open-source identity and access management | https://auth.yourdomain.com |
+| **Traefik-Keycloak SSO** | Traefik dashboard secured with Keycloak authentication | http://localhost:8090/dashboard/ |
+
+### Traefik-Keycloak SSO Integration
+
+AgencyStack includes a secure integration between Traefik and Keycloak for Single Sign-On:
+
+**Features:**
+- Secures Traefik dashboard with Keycloak authentication
+- Uses OAuth2 Proxy as authentication middleware
+- Supports role-based access control
+- Follows repository integrity policy
+- Multi-tenant aware with client isolation
+
+**Default URLs:**
+- Traefik Dashboard: http://localhost:8090/dashboard/
+- Keycloak Admin: http://localhost:8091/auth/admin/
+
+For detailed setup and configuration information, see our [Traefik-Keycloak SSO Guide](./components/traefik-keycloak-sso.md).
 
 ### Keycloak Identity Provider
 
