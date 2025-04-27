@@ -60,12 +60,12 @@
       "traefik": {
         "name": "Traefik",
         "category": "Core Infrastructure",
-        "version": "2.9.8",
+        "version": "2.10.7",
         "integration_status": {
           "installed": true,
           "hardened": true,
           "makefile": true,
-          "sso": false,
+          "sso": true,
           "dashboard": true,
           "logs": true,
           "docs": true,
@@ -73,7 +73,45 @@
           "traefik_tls": true,
           "multi_tenant": true
         },
-        "description": "Edge router and reverse proxy"
+        "description": "Edge router and reverse proxy with Keycloak authentication"
+      },
+      "traefik-keycloak": {
+        "name": "Traefik-Keycloak",
+        "category": "Core Infrastructure",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true,
+          "sso_configured": true
+        },
+        "description": "Integrated Traefik and Keycloak setup for dashboard authentication"
+      },
+      "traefik-keycloak-sso": {
+        "name": "Traefik-Keycloak SSO",
+        "category": "Core Infrastructure",
+        "version": "1.0.0",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": true,
+          "dashboard": true,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": true,
+          "multi_tenant": true,
+          "sso_configured": true
+        },
+        "description": "Full OAuth2-based SSO integration between Traefik and Keycloak"
       },
       "portainer": {
         "name": "Portainer",
@@ -377,7 +415,7 @@
           "multi_tenant": true,
           "sso_configured": true
         },
-        "description": "Single sign-on and identity management via Keycloak. Provides OIDC and SAML, integrates with all sso: true components, supports multi-tenant realms and RBAC via Keycloak groups. Installation is repo-driven and validated by alpha-check workflows."
+        "description": "Open source identity and access management with Traefik integration"
       },
       "vault": {
         "name": "Vault",

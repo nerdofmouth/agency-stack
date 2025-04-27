@@ -1,0 +1,7 @@
+http:
+  middlewares:
+    keycloak-auth:
+      forwardAuth:
+        address: "http://keycloak_default:8080/auth/realms/master/protocol/openid-connect/auth"
+        authResponseHeaders:
+          - "X-Forwarded-User"

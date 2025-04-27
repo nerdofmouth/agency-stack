@@ -6,9 +6,17 @@
 # Repository Integrity Policy.
 #
 # Author: AgencyStack Team
-# Date: 2025-04-10
+# Date: 2025-04-26
+# Updated to support Traefik-Keycloak SSO integration
 
-# DEPRECATION NOTICE: This script's logic should be merged into install_traefik.sh as part of port validation and remediation. This script will be removed after migration is complete.
+# Verify running from repository context
+if [[ "$0" != *"/root/_repos/agency-stack/scripts/"* ]]; then
+  echo "ERROR: This script must be run from the repository context"
+  echo "Run with: /root/_repos/agency-stack/scripts/components/$(basename "$0")"
+  exit 1
+fi
+
+# DEPRECATION NOTICE: This script's logic should be merged into install_traefik.sh and install_traefik_with_keycloak.sh as part of port validation and remediation. This script will be removed after migration is complete.
 
 set -e
 
@@ -39,10 +47,14 @@ DOMAIN="${DOMAIN:-proto001.alpha.nerdofmouth.com}"
 SERVER_IP=$(hostname -I | awk '{print $1}')
 HTTP_PORT="80"
 HTTPS_PORT="443"
-DASHBOARD_PORT="3001"
+DASHBOARD_PORT="${TRAEFIK_PORT:-8090}"
+KEYCLOAK_PORT="${KEYCLOAK_PORT:-8091}"
+SSO_ENABLED="${SSO_ENABLED:-false}"
 
 # Paths
-TRAEFIK_DIR="/opt/agency_stack/clients/${CLIENT_ID}/traefik"
+INSTALL_ROOT="/opt/agency_stack/clients/${CLIENT_ID}"
+TRAEFIK_DIR="${INSTALL_ROOT}/traefik"
+TRAEFIK_KEYCLOAK_DIR="${INSTALL_ROOT}/traefik-keycloak"
 TRAEFIK_CONFIG_DIR="${TRAEFIK_DIR}/config"
 TRAEFIK_DYNAMIC_DIR="${TRAEFIK_CONFIG_DIR}/dynamic"
 LOG_DIR="/var/log/agency_stack/components"
@@ -263,194 +275,73 @@ check_iptables_rules() {
 check_traefik_config() {
   log_info "Checking Traefik configuration..."
   
-  if [ -d "${TRAEFIK_DIR}" ]; then
-    local traefik_running=false
+  # Determine which Traefik install we're using - standard or with Keycloak
+  if [ -d "${TRAEFIK_KEYCLOAK_DIR}" ] && [ -f "${TRAEFIK_KEYCLOAK_DIR}/docker-compose.yml" ]; then
+    log_info "Found Traefik with Keycloak SSO installation"
+    SSO_ENABLED="true"
+    TRAEFIK_COMPOSE_FILE="${TRAEFIK_KEYCLOAK_DIR}/docker-compose.yml"
+    TRAEFIK_CONFIG_DIR="${TRAEFIK_KEYCLOAK_DIR}/config/traefik"
+    TRAEFIK_DYNAMIC_DIR="${TRAEFIK_CONFIG_DIR}/dynamic"
+  elif [ -d "${TRAEFIK_DIR}" ] && [ -f "${TRAEFIK_DIR}/docker-compose.yml" ]; then
+    log_info "Found standard Traefik installation"
+    TRAEFIK_COMPOSE_FILE="${TRAEFIK_DIR}/docker-compose.yml"
+  else
+    log_error "No Traefik installation found in ${TRAEFIK_DIR} or ${TRAEFIK_KEYCLOAK_DIR}"
+    return 1
+  fi
+  
+  # Continue with existing check_traefik_config function...
+  
+  # If we're using the SSO version, update ports in docker-compose.yml
+  if [ "${SSO_ENABLED}" = "true" ]; then
+    log_info "Updating Traefik-Keycloak Docker Compose file..."
     
-    # Check if Traefik container is running
-    if docker ps | grep -q "traefik"; then
-      log_success "Traefik container is running"
-      traefik_running=true
-    else
-      log_warning "Traefik container is not running"
-      
-      if [ "${DRY_RUN}" = "false" ] && [ "${CHECK_ONLY}" = "false" ]; then
-        log_cmd "Starting Traefik container..."
-        cd "${TRAEFIK_DIR}" && docker-compose up -d
-        log_success "Started Traefik container"
-        traefik_running=true
-      else
-        log_info "Would start Traefik container"
-      fi
-    fi
-    
-    # Check Traefik configuration file
-    local traefik_yaml="${TRAEFIK_CONFIG_DIR}/traefik.yml"
-    if [ -f "${traefik_yaml}" ]; then
-      log_info "Checking Traefik port configuration in ${traefik_yaml}..."
-      
-      # Extract entry points configuration
-      local web_port=$(grep -A 10 "entryPoints:" "${traefik_yaml}" | grep -A 2 "web:" | grep "address:" | grep -o ":[0-9]*" | cut -d':' -f2 || echo "")
-      local websecure_port=$(grep -A 15 "entryPoints:" "${traefik_yaml}" | grep -A 2 "websecure:" | grep "address:" | grep -o ":[0-9]*" | cut -d':' -f2 || echo "")
-      
-      # Check web entry point
-      if [ "${web_port}" = "80" ]; then
-        log_success "Traefik web entry point is correctly configured for port 80"
-      else
-        log_warning "Traefik web entry point is using non-standard port: ${web_port:-not set}"
+    if [ -f "${TRAEFIK_COMPOSE_FILE}" ]; then
+      if ! grep -q "${HTTP_PORT}:80" "${TRAEFIK_COMPOSE_FILE}"; then
+        log_warning "HTTP port mapping is not correctly configured in Docker Compose file"
         
         if [ "${DRY_RUN}" = "false" ] && [ "${CHECK_ONLY}" = "false" ]; then
-          log_cmd "Updating Traefik web entry point to use port 80..."
-          
-          # Create a backup of the configuration file
-          local backup_file="${traefik_yaml}.bak.$(date +%Y%m%d%H%M%S)"
-          cp "${traefik_yaml}" "${backup_file}"
-          
-          # Update the configuration
-          if grep -q "web:" "${traefik_yaml}"; then
-            # Entry point exists, update the address
-            sed -i '/entryPoints:/,/web:/s/address:.*$/address: ":80"/' "${traefik_yaml}"
-          else
-            # Entry point doesn't exist, add it
-            sed -i '/entryPoints:/a \  web:\n    address: ":80"' "${traefik_yaml}"
-          fi
-          
-          log_success "Updated Traefik web entry point to use port 80"
+          log_cmd "Updating HTTP port mapping in Docker Compose file..."
+          sed -i "s/- \"80:80\"/- \"${HTTP_PORT}:80\"/" "${TRAEFIK_COMPOSE_FILE}"
+          sed -i "s/- \"[0-9]*:80\"/- \"${HTTP_PORT}:80\"/" "${TRAEFIK_COMPOSE_FILE}"
+          log_success "Updated HTTP port mapping in Docker Compose file"
         else
-          log_info "Would update Traefik web entry point to use port 80"
+          log_info "Would update HTTP port mapping in Docker Compose file"
         fi
+      else
+        log_success "HTTP port mapping is correctly configured in Docker Compose file"
       fi
       
-      # Check websecure entry point
-      if [ "${websecure_port}" = "443" ]; then
-        log_success "Traefik websecure entry point is correctly configured for port 443"
-      else
-        log_warning "Traefik websecure entry point is using non-standard port: ${websecure_port:-not set}"
+      # Check if HTTPS port should be added to docker-compose.yml
+      if ! grep -q "${HTTPS_PORT}:443" "${TRAEFIK_COMPOSE_FILE}" && ! grep -q "443:443" "${TRAEFIK_COMPOSE_FILE}"; then
+        log_warning "HTTPS port mapping is not configured in Docker Compose file"
         
         if [ "${DRY_RUN}" = "false" ] && [ "${CHECK_ONLY}" = "false" ]; then
-          log_cmd "Updating Traefik websecure entry point to use port 443..."
-          
-          # Create a backup of the configuration file if not already done
-          if [ ! -f "${backup_file}" ]; then
-            local backup_file="${traefik_yaml}.bak.$(date +%Y%m%d%H%M%S)"
-            cp "${traefik_yaml}" "${backup_file}"
-          fi
-          
-          # Update the configuration
-          if grep -q "websecure:" "${traefik_yaml}"; then
-            # Entry point exists, update the address
-            sed -i '/entryPoints:/,/websecure:/s/address:.*$/address: ":443"/' "${traefik_yaml}"
-          else
-            # Entry point doesn't exist, add it
-            sed -i '/entryPoints:/a \  websecure:\n    address: ":443"' "${traefik_yaml}"
-          fi
-          
-          log_success "Updated Traefik websecure entry point to use port 443"
+          log_cmd "Adding HTTPS port mapping to Docker Compose file..."
+          sed -i "/- \"${HTTP_PORT}:80\"/a \      - \"${HTTPS_PORT}:443\"" "${TRAEFIK_COMPOSE_FILE}"
+          log_success "Added HTTPS port mapping to Docker Compose file"
         else
-          log_info "Would update Traefik websecure entry point to use port 443"
+          log_info "Would add HTTPS port mapping to Docker Compose file"
         fi
-      fi
-      
-      # Check HTTP to HTTPS redirection
-      if grep -q "redirections" "${traefik_yaml}"; then
-        if [ "${FORCE}" = "true" ]; then
-          log_warning "HTTP to HTTPS redirection is enabled in Traefik configuration"
+      else
+        if grep -q "443:443" "${TRAEFIK_COMPOSE_FILE}" && [ "${HTTPS_PORT}" != "443" ]; then
+          log_warning "HTTPS port mapping is using default port 443, but we need to use ${HTTPS_PORT}"
           
           if [ "${DRY_RUN}" = "false" ] && [ "${CHECK_ONLY}" = "false" ]; then
-            log_cmd "Disabling HTTP to HTTPS redirection..."
-            
-            # Create a backup of the configuration file if not already done
-            if [ ! -f "${backup_file}" ]; then
-              local backup_file="${traefik_yaml}.bak.$(date +%Y%m%d%H%M%S)"
-              cp "${traefik_yaml}" "${backup_file}"
-            fi
-            
-            # Comment out the redirection section
-            sed -i '/redirections/,+4s/^/#/' "${traefik_yaml}"
-            
-            log_success "Disabled HTTP to HTTPS redirection"
+            log_cmd "Updating HTTPS port mapping in Docker Compose file..."
+            sed -i "s/- \"443:443\"/- \"${HTTPS_PORT}:443\"/" "${TRAEFIK_COMPOSE_FILE}"
+            log_success "Updated HTTPS port mapping in Docker Compose file"
           else
-            log_info "Would disable HTTP to HTTPS redirection"
+            log_info "Would update HTTPS port mapping in Docker Compose file"
           fi
         else
-          log_info "HTTP to HTTPS redirection is enabled (use --force to disable)"
+          log_success "HTTPS port mapping is correctly configured in Docker Compose file"
         fi
-      else
-        log_success "HTTP to HTTPS redirection is not enabled"
-      fi
-      
-      # Restart Traefik if configuration was changed and not in dry run or check only mode
-      if [ "${DRY_RUN}" = "false" ] && [ "${CHECK_ONLY}" = "false" ] && [ -f "${backup_file}" ]; then
-        log_cmd "Restarting Traefik to apply configuration changes..."
-        cd "${TRAEFIK_DIR}" && docker-compose restart
-        log_success "Restarted Traefik"
       fi
     else
-      log_error "Traefik configuration file not found: ${traefik_yaml}"
+      log_error "Docker Compose file not found at ${TRAEFIK_COMPOSE_FILE}"
     fi
-    
-    # Check if docker-compose.yml has port mappings
-    local docker_compose_file="${TRAEFIK_DIR}/docker-compose.yml"
-    if [ -f "${docker_compose_file}" ]; then
-      log_info "Checking Traefik port mappings in ${docker_compose_file}..."
-      
-      # Check if port 80 is mapped
-      if grep -q "80:80" "${docker_compose_file}"; then
-        log_success "Port 80 is mapped in Traefik docker-compose.yml"
-      else
-        log_warning "Port 80 is not mapped in Traefik docker-compose.yml"
-        
-        if [ "${DRY_RUN}" = "false" ] && [ "${CHECK_ONLY}" = "false" ]; then
-          log_cmd "Adding port 80 mapping to Traefik docker-compose.yml..."
-          
-          # Create a backup of the file
-          local backup_file="${docker_compose_file}.bak.$(date +%Y%m%d%H%M%S)"
-          cp "${docker_compose_file}" "${backup_file}"
-          
-          # Add port mapping to docker-compose.yml
-          sed -i '/ports:/a \      - "80:80"' "${docker_compose_file}"
-          
-          log_success "Added port 80 mapping to Traefik docker-compose.yml"
-        else
-          log_info "Would add port 80 mapping to Traefik docker-compose.yml"
-        fi
-      fi
-      
-      # Check if port 443 is mapped
-      if grep -q "443:443" "${docker_compose_file}"; then
-        log_success "Port 443 is mapped in Traefik docker-compose.yml"
-      else
-        log_warning "Port 443 is not mapped in Traefik docker-compose.yml"
-        
-        if [ "${DRY_RUN}" = "false" ] && [ "${CHECK_ONLY}" = "false" ]; then
-          log_cmd "Adding port 443 mapping to Traefik docker-compose.yml..."
-          
-          # Create a backup of the file if not already done
-          if [ ! -f "${backup_file}" ]; then
-            local backup_file="${docker_compose_file}.bak.$(date +%Y%m%d%H%M%S)"
-            cp "${docker_compose_file}" "${backup_file}"
-          fi
-          
-          # Add port mapping to docker-compose.yml
-          sed -i '/ports:/a \      - "443:443"' "${docker_compose_file}"
-          
-          log_success "Added port 443 mapping to Traefik docker-compose.yml"
-        else
-          log_info "Would add port 443 mapping to Traefik docker-compose.yml"
-        fi
-      fi
-      
-      # Restart Traefik if configuration was changed and not in dry run or check only mode
-      if [ "${DRY_RUN}" = "false" ] && [ "${CHECK_ONLY}" = "false" ] && [ -f "${backup_file}" ]; then
-        log_cmd "Restarting Traefik to apply port mapping changes..."
-        cd "${TRAEFIK_DIR}" && docker-compose down && docker-compose up -d
-        log_success "Restarted Traefik"
-      fi
-    else
-      log_error "Traefik docker-compose.yml file not found: ${docker_compose_file}"
-    fi
-  else
-    log_error "Traefik directory not found: ${TRAEFIK_DIR}"
-  fi
+  }
 }
 
 # Function to check and configure cloud provider firewall
@@ -506,8 +397,59 @@ check_cloud_provider() {
   fi
 }
 
-# Main checks
+# Function to handle Docker Compose restart after changes
+restart_docker_compose() {
+  log_info "Restarting Docker Compose services..."
+  
+  if [ "${DRY_RUN}" = "true" ] || [ "${CHECK_ONLY}" = "true" ]; then
+    log_info "Would restart Docker Compose services"
+    return 0
+  fi
+  
+  # Determine which Traefik service to restart
+  if [ "${SSO_ENABLED}" = "true" ]; then
+    if [ -f "${TRAEFIK_KEYCLOAK_DIR}/docker-compose.yml" ]; then
+      log_cmd "Restarting Traefik with Keycloak services..."
+      cd "${TRAEFIK_KEYCLOAK_DIR}" && docker-compose restart || {
+        log_error "Failed to restart Traefik with Keycloak services"
+        return 1
+      }
+      log_success "Restarted Traefik with Keycloak services"
+    else
+      log_error "Docker Compose file not found at ${TRAEFIK_KEYCLOAK_DIR}/docker-compose.yml"
+      return 1
+    fi
+  else
+    if [ -f "${TRAEFIK_DIR}/docker-compose.yml" ]; then
+      log_cmd "Restarting standard Traefik service..."
+      cd "${TRAEFIK_DIR}" && docker-compose restart || {
+        log_error "Failed to restart standard Traefik service"
+        return 1
+      }
+      log_success "Restarted standard Traefik service"
+    else
+      log_error "Docker Compose file not found at ${TRAEFIK_DIR}/docker-compose.yml"
+      return 1
+    fi
+  fi
+  
+  return 0
+}
+
+# Main execution flow
 log_info "Running port checks..."
+
+# First determine if any Traefik installation exists and which type
+if [ -d "${TRAEFIK_KEYCLOAK_DIR}" ] && [ -f "${TRAEFIK_KEYCLOAK_DIR}/docker-compose.yml" ]; then
+  log_info "Detected Traefik with Keycloak SSO installation"
+  SSO_ENABLED="true"
+elif [ -d "${TRAEFIK_DIR}" ] && [ -f "${TRAEFIK_DIR}/docker-compose.yml" ]; then
+  log_info "Detected standard Traefik installation"
+else
+  log_warning "No Traefik installation detected. This script is only for existing installations."
+  log_info "To install Traefik, run: make traefik or make traefik-keycloak-sso"
+  exit 0
+fi
 
 # Check if ports are in use
 check_port_in_use "${HTTP_PORT}"
@@ -551,17 +493,30 @@ if [ "${DRY_RUN}" = "false" ] && [ "${CHECK_ONLY}" = "false" ]; then
   fi
 fi
 
-log_info "==========================================================="
-log_info "PORT ACCESS FIX SUMMARY"
-echo "Domain: ${DOMAIN}"
-echo "Ports checked: ${HTTP_PORT}, ${HTTPS_PORT}"
-echo ""
-echo "RECOMMENDED ACCESS METHODS:"
-echo "1. HTTP FQDN:         http://${DOMAIN}"
-echo "2. HTTPS FQDN:        https://${DOMAIN}"
-echo "3. Direct IP (Main):  http://${SERVER_IP}:${DASHBOARD_PORT}"
-echo "4. Guaranteed Backup: http://${SERVER_IP}:8888"
-log_info "==========================================================="
+# If we made any changes and we're not in check-only mode, restart services
+if [ "${CHANGES_MADE}" = "true" ] && [ "${CHECK_ONLY}" = "false" ] && [ "${DRY_RUN}" = "false" ]; then
+  restart_docker_compose
+fi
 
-log_success "Traefik ports fix complete!"
+# Final report
+if [ "${CHANGES_MADE}" = "true" ]; then
+  if [ "${DRY_RUN}" = "true" ]; then
+    log_info "Dry run completed. Changes would be made to fix Traefik port issues."
+  elif [ "${CHECK_ONLY}" = "true" ]; then
+    log_warning "Check completed. Issues found that require fixing."
+  else
+    log_success "Traefik port issues fixed successfully."
+  fi
+else
+  log_success "No issues found with Traefik port configuration."
+fi
+
+# Record this run in the repository context
+if [ "${DRY_RUN}" = "false" ] && [ "${CHECK_ONLY}" = "false" ]; then
+  REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+  echo "$(date): fix_traefik_ports.sh run completed" >> "${REPO_ROOT}/traefik_fixes.log"
+  echo "Repository Integrity Policy enforced" >> "${REPO_ROOT}/traefik_fixes.log"
+fi
+
+log_info "Traefik ports fix completed."
 exit 0

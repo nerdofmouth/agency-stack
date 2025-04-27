@@ -1,0 +1,32 @@
+http:
+  middlewares:
+    oauth2-auth:
+      forwardAuth:
+        address: "http://oauth2-proxy:4180"
+        trustForwardHeader: true
+        authResponseHeaders:
+          - "X-Auth-Request-User"
+          - "X-Auth-Request-Email"
+          - "X-Auth-Request-Access-Token"
+    
+    rewrite-keycloak-host:
+      replacePathRegex:
+        regex: "http://keycloak:8080/(.*)"
+        replacement: "http://localhost:8091/$1"
+    
+    sso-chain:
+      chain:
+        middlewares:
+          - oauth2-auth
+          - response-modifier
+
+    response-modifier:
+      headers:
+        customResponseHeaders:
+          Location: ""  # Clear any existing Location header first
+      plugin:
+        rewriteResponse:
+          middleware: 
+            urlRewrites:
+              - fromPattern: "http://keycloak:8080"
+                toReplacement: "http://localhost:8091"

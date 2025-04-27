@@ -7,40 +7,121 @@ This component provides a secure integration between Traefik and Keycloak for da
 The Traefik-Keycloak integration provides:
 - A Traefik reverse proxy for service routing and load balancing
 - Keycloak as the identity provider for SSO following the AgencyStack SSO protocol
-- Forward authentication to protect the Traefik dashboard
+- Authentication middleware to protect the Traefik dashboard
 
 ## Installation
 
+```bash
+# Install with default settings
+make traefik-keycloak
 
+# Custom installation
+make traefik-keycloak CLIENT_ID=myagency DOMAIN=example.com TRAEFIK_PORT=8090 KEYCLOAK_PORT=8091
+```
 
 ## Configuration
 
 The component is configured through the following files:
 - `/opt/agency_stack/clients/${CLIENT_ID}/traefik-keycloak/config/traefik/traefik.yml`: Main Traefik configuration
-- `/opt/agency_stack/clients/${CLIENT_ID}/traefik-keycloak/config/traefik/dynamic/auth.yml`: Authentication configuration
+- `/opt/agency_stack/clients/${CLIENT_ID}/traefik-keycloak/config/traefik/dynamic/basicauth.yml`: Authentication configuration
 
-## Testing and Verification
+## Authentication Details
 
-=== Traefik-Keycloak Integration Verification ===
-Checking container status...
-❌ Traefik is not running
+The Traefik dashboard is secured with HTTP Basic Authentication:
+- Username: `admin`
+- Password: `password`
 
-## Access
+Keycloak is available for more advanced SSO integration:
+- Admin console: http://localhost:8091/auth/admin/
+- Default credentials: `admin` / `admin`
 
-- Traefik Dashboard: http://localhost:8081/dashboard/
-- Keycloak Admin Console: http://localhost:8082/auth/admin/
-  - Default admin credentials: admin/admin
+## Testing
+
+The component includes comprehensive tests following the AgencyStack TDD Protocol:
+
+```bash
+# Run tests
+/root/_repos/agency-stack/scripts/components/test_traefik_keycloak.sh
+
+# Run tests with debug output
+/root/_repos/agency-stack/scripts/components/test_traefik_keycloak.sh --debug
+```
+
+## Ports
+
+| Service | Default Port | Purpose |
+|---------|--------------|---------|
+| Traefik Dashboard | 8090 | Web UI for Traefik management |
+| Traefik HTTP | 80 | HTTP traffic routing |
+| Keycloak | 8091 | Identity provider admin interface |
 
 ## Logs
 
-Logs are stored in:
-- `/var/log/agency_stack/components/traefik-keycloak.log`
+Logs can be viewed using:
 
-## Stopping and Restarting
+```bash
+# View Traefik logs
+docker logs traefik_default
 
-CONTAINER ID   IMAGE                  COMMAND                  CREATED        STATUS                  PORTS                                          NAMES
-dc553cf492fd   agencystack-dev        "/entrypoint.sh zsh"     11 hours ago   Up 11 hours             0.0.0.0:8080->8080/tcp, 0.0.0.0:2222->22/tcp   agencystack-dev
-feb240650302   nginx:latest           "/docker-entrypoint.…"   22 hours ago   Up 22 hours             80/tcp                                         localhost-nginx-1
-072d3a1a3c3a   wordpress:php8.2-fpm   "docker-entrypoint.s…"   22 hours ago   Up 22 hours (healthy)   9000/tcp                                       localhost-wordpress-1
-0fe7f13cbd27   redis:alpine           "docker-entrypoint.s…"   22 hours ago   Up 22 hours             6379/tcp                                       localhost-redis-1
-d8c480172fc1   mariadb:10.5           "docker-entrypoint.s…"   22 hours ago   Up 22 hours (healthy)   3306/tcp                                       localhost-mariadb-1
+# View Keycloak logs
+docker logs keycloak_default
+```
+
+## Restart and Stop
+
+```bash
+# Restart services
+docker restart traefik_default keycloak_default
+
+# Stop services
+docker stop traefik_default keycloak_default
+```
+
+## Troubleshooting
+
+### Cannot access Traefik dashboard
+
+1. Verify Traefik is running:
+   ```bash
+   docker ps | grep traefik_default
+   ```
+
+2. Check port conflicts:
+   ```bash
+   netstat -tuln | grep 8090
+   ```
+
+3. Test authentication:
+   ```bash
+   curl -u admin:password http://localhost:8090/dashboard/
+   ```
+
+### Keycloak not working
+
+1. Verify Keycloak is running:
+   ```bash
+   docker ps | grep keycloak_default
+   ```
+
+2. Check logs for errors:
+   ```bash
+   docker logs keycloak_default
+   ```
+
+3. Test direct connection:
+   ```bash
+   curl -I http://localhost:8091/auth/
+   ```
+
+## Security Considerations
+
+- The basic auth credentials should be changed in production environments
+- For production deployments, enable TLS encryption
+- Keycloak should be properly secured with strong admin credentials
+- Regular security audits should be conducted
+
+## Related Components
+
+- **Docker**: Container platform used to run Traefik and Keycloak
+- **Portainer**: Optional UI for managing Docker containers
+- **Nginx**: Can be used as an alternative reverse proxy

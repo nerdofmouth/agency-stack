@@ -1,0 +1,78 @@
+version: '3'
+
+networks:
+  traefik-net:
+    name: traefik-net-default
+
+services:
+  traefik:
+    image: traefik:v2.10
+    container_name: traefik_default
+    restart: unless-stopped
+    networks:
+      - traefik-net
+    ports:
+      - "80:80"
+      - "8090:8080"
+    volumes:
+      - /opt/agency_stack/clients/default/traefik-keycloak/config/traefik:/etc/traefik:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=PathPrefix(`/api`) || PathPrefix(`/dashboard`)"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.entrypoints=dashboard"
+      - "traefik.http.routers.dashboard.middlewares=oauth2-proxy@docker"
+      - "traefik.http.middlewares.oauth2-proxy.forwardauth.address=http://oauth2-proxy:4180/oauth2/auth"
+      - "traefik.http.middlewares.oauth2-proxy.forwardauth.authResponseHeaders=X-Auth-Request-User,X-Auth-Request-Email,X-Auth-Request-Access-Token"
+      - "traefik.http.middlewares.oauth2-proxy.forwardauth.trustForwardHeader=true"
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: keycloak_default
+    restart: unless-stopped
+    networks:
+      - traefik-net
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+      - KC_HTTP_RELATIVE_PATH=/auth
+    command: 
+      - start-dev
+    ports:
+      - "8091:8080"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.keycloak.rule=Host(`keycloak.localhost`)"
+      - "traefik.http.routers.keycloak.entrypoints=web"
+      - "traefik.http.services.keycloak.loadbalancer.server.port=8080"
+
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:latest
+    container_name: oauth2_proxy_default
+    restart: unless-stopped
+    networks:
+      - traefik-net
+    depends_on:
+      - keycloak
+    environment:
+      - OAUTH2_PROXY_PROVIDER=keycloak
+      - OAUTH2_PROXY_CLIENT_ID=traefik-dashboard
+      - OAUTH2_PROXY_CLIENT_SECRET=traefik-secret
+      - OAUTH2_PROXY_COOKIE_SECRET=YUNtZ3Bua0RPY2QzSEZFZGR4Ump5emQ5
+      - OAUTH2_PROXY_EMAIL_DOMAINS=*
+      - OAUTH2_PROXY_REDIRECT_URL=http://localhost:8090/oauth2/callback
+      - OAUTH2_PROXY_UPSTREAMS=http://traefik:8080
+      - OAUTH2_PROXY_KEYCLOAK_GROUP=
+      - OAUTH2_PROXY_SCOPE=openid profile email
+      - OAUTH2_PROXY_OIDC_ISSUER_URL=http://keycloak:8080/auth/realms/master
+      - OAUTH2_PROXY_COOKIE_SECURE=false
+      - OAUTH2_PROXY_HTTP_ADDRESS=0.0.0.0:4180
+      - OAUTH2_PROXY_COOKIE_REFRESH=1h
+      - OAUTH2_PROXY_COOKIE_EXPIRE=4h
+      - OAUTH2_PROXY_SKIP_PROVIDER_BUTTON=true
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.oauth2-proxy.rule=PathPrefix(`/oauth2`)"
+      - "traefik.http.routers.oauth2-proxy.entrypoints=dashboard"
+      - "traefik.http.services.oauth2-proxy.loadbalancer.server.port=4180"

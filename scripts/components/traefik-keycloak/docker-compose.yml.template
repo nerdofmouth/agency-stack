@@ -1,0 +1,95 @@
+version: '3'
+
+networks:
+  traefik-net:
+    name: traefik-net-${CLIENT_ID}
+    external: true
+
+services:
+  traefik:
+    image: traefik:${TRAEFIK_VERSION}
+    container_name: traefik_${CLIENT_ID}
+    restart: unless-stopped
+    networks:
+      - traefik-net
+    ports:
+      - "${TRAEFIK_PORT}:8080"
+      - "80:80"
+    volumes:
+      - ${CONFIG_DIR}/traefik:/etc/traefik:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=PathPrefix(`/api`) || PathPrefix(`/dashboard`)"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.entrypoints=dashboard"
+      - "traefik.http.routers.dashboard.middlewares=oauth2-auth@file"
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:${KEYCLOAK_VERSION}
+    container_name: keycloak_${CLIENT_ID}
+    restart: unless-stopped
+    networks:
+      - traefik-net
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+      - KC_HTTP_RELATIVE_PATH=/auth
+      - KC_HOSTNAME_URL=http://localhost:${KEYCLOAK_PORT}
+      - KC_HOSTNAME_ADMIN_URL=http://localhost:${KEYCLOAK_PORT}
+      - KC_PROXY=edge
+      - KC_HTTP_ENABLED=true
+    command: 
+      - start-dev 
+      - --spi-client-registration-openid-connect-static-client-auth-method=client-secret
+      - --spi-client-registration-openid-connect-static-client-secret=traefik-secret
+      - --spi-client-registration-openid-connect-static-client-id=traefik-dashboard
+    ports:
+      - "${KEYCLOAK_PORT}:8080"
+    volumes:
+      - ${INSTALL_DIR}/keycloak:/opt/keycloak/data
+
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:latest
+    container_name: oauth2_proxy_${CLIENT_ID}
+    restart: unless-stopped
+    networks:
+      - traefik-net
+    depends_on:
+      - keycloak
+      - traefik
+    command:
+      - --upstream=http://traefik:8080
+      - --http-address=0.0.0.0:4180
+      - --provider=oidc
+      - --oidc-issuer-url=http://localhost:8091/auth/realms/master
+      - --client-id=traefik-dashboard
+      - --client-secret=traefik-secret
+      - --redirect-url=http://localhost:8090/oauth2/callback
+      - --cookie-secure=false
+      - --email-domain=*
+      - --cookie-secret=YUNtZ3Bua0RPY2QzSEZFZGR4Ump5emQ5
+      - --whitelist-domain=localhost:8090
+      - --whitelist-domain=localhost:8091
+      - --cookie-domain=localhost
+      - --skip-provider-button=true
+      - --proxy-prefix=/oauth2
+      - --skip-auth-route=/api/providers
+      - --cookie-refresh=1h
+      - --cookie-expire=4h
+      - --set-xauthrequest=true
+      - --ssl-insecure-skip-verify=true
+      - --pass-access-token=true
+      - --insecure-oidc-allow-unverified-email=true
+      - --code-challenge-method=S256
+      - --reverse-proxy=true
+      - --skip-oidc-discovery=true
+      - --login-url=http://localhost:8091/auth/realms/master/protocol/openid-connect/auth
+      - --redeem-url=http://localhost:8091/auth/realms/master/protocol/openid-connect/token
+      - --profile-url=http://localhost:8091/auth/realms/master/protocol/openid-connect/userinfo
+      - --validate-url=http://localhost:8091/auth/realms/master/protocol/openid-connect/userinfo
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.oauth2-proxy.rule=PathPrefix(`/oauth2`)"
+      - "traefik.http.routers.oauth2-proxy.entrypoints=dashboard"
+      - "traefik.http.services.oauth2-proxy.loadbalancer.server.port=4180"

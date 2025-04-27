@@ -506,17 +506,15 @@ multi-tenancy-status:
 cryptosync:
 	@echo "$(MAGENTA)$(BOLD)🔒 Installing Cryptosync...$(RESET)"
 	@sudo $(SCRIPTS_DIR)/components/install_cryptosync.sh $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) \
-		$(if $(MOUNT_DIR),--mount-dir $(MOUNT_DIR),) \
-		$(if $(REMOTE_NAME),--remote-name $(REMOTE_NAME),) \
-		$(if $(CONFIG_NAME),--config-name $(CONFIG_NAME),) \
-		$(if $(REMOTE_TYPE),--remote-type $(REMOTE_TYPE),) \
-		$(if $(REMOTE_PATH),--remote-path $(REMOTE_PATH),) \
-		$(if $(REMOTE_OPTIONS),--remote-options $(REMOTE_OPTIONS),) \
+		$(if $(DOMAIN),--domain $(DOMAIN),) \
+		$(if $(PORT),--port $(PORT),) \
+		$(if $(ADMIN_USER),--admin-user $(ADMIN_USER),) \
+		$(if $(ADMIN_EMAIL),--admin-email $(ADMIN_EMAIL),) \
+		$(if $(ADMIN_PASSWORD),--admin-password $(ADMIN_PASSWORD),) \
 		$(if $(FORCE),--force,) \
 		$(if $(WITH_DEPS),--with-deps,) \
-		$(if $(USE_CRYFS),--use-cryfs,) \
-		$(if $(INITIAL_SYNC),--initial-sync,) \
-		$(if $(AUTO_MOUNT),--auto-mount,)
+		$(if $(NO_SSL),--no-ssl,) \
+		$(if $(DISABLE_MONITORING),--disable-monitoring,)
 
 cryptosync-mount:
 	@echo "$(MAGENTA)$(BOLD)🔒 Mounting Cryptosync vault...$(RESET)"
@@ -1509,6 +1507,7 @@ seafile-restart:
 # Auto-generated target for traefik
 traefik:
 	@echo "$(MAGENTA)$(BOLD)🚀 Installing Traefik...$(RESET)"
+	@cp services/traefik-sso/config/traefik.yml $(CURDIR)/services/traefik/$${CLIENT_ID:-default}/config/traefik.yml
 	@$(SCRIPTS_DIR)/components/install_traefik.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,) $(if $(ENABLE_CLOUD),--enable-cloud,) $(if $(ENABLE_OPENAI),--enable-openai,) $(if $(USE_GITHUB),--use-github,) $(if $(ENABLE_METRICS),--enable-metrics,)
 
 traefik-status:
@@ -1519,28 +1518,8 @@ traefik-docker:
 	@echo "$(MAGENTA)$(BOLD)🐳 Creating Docker-based Traefik Container for Host Access...$(RESET)"
 	@echo "$(CYAN)This will create a clean Docker container with proper port exposure$(RESET)"
 	@docker rm -f traefik_$${CLIENT_ID:-default} 2>/dev/null || true
-	@mkdir -p $(CURDIR)/services/traefik/$${CLIENT_ID:-default}/config
 	@mkdir -p $(CURDIR)/services/traefik/$${CLIENT_ID:-default}/dynamic
-	@cat > $(CURDIR)/services/traefik/$${CLIENT_ID:-default}/config/traefik.yml <<EOF
-api:
-  dashboard: true
-  insecure: true
-
-entryPoints:
-  web:
-    address: ":80"
-  dashboard:
-    address: ":8081"
-
-providers:
-  file:
-    directory: "/etc/traefik/dynamic"
-
-# Global configuration
-global:
-  checkNewVersion: false
-  sendAnonymousUsage: false
-EOF
+	@cp services/traefik-sso/config/traefik.yml $(CURDIR)/services/traefik/$${CLIENT_ID:-default}/config/traefik.yml
 	@docker run -d --name traefik_$${CLIENT_ID:-default} \
 		-p 8081:8081 \
 		-p 80:80 \
@@ -2595,41 +2574,52 @@ install-backup-strategy: validate
 	@echo "$(MAGENTA)$(BOLD)💾 Installing Backup Strategy...$(RESET)"
 	@FORCE=$(FORCE) sudo $(SCRIPTS_DIR)/components/install_backup_strategy.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(FORCE),--force,) $(if $(WITH_DEPS),--with-deps,) $(if $(VERBOSE),--verbose,)
 
-# Traefik
-install-traefik: validate
-	@echo "[INFO] Installing Traefik (auto bridge mode for WSL2/Docker Desktop)"
-	bash scripts/components/install_traefik.sh
-
-traefik-status:
-	docker ps | grep traefik || echo "No running Traefik container found."
-
-traefik-logs:
-	docker logs traefik_default || echo "No logs found for traefik_default."
-
-traefik-restart:
-	cd scripts/components && bash install_traefik.sh --force
-
 # Traefik-Keycloak Integration targets
 traefik-keycloak:
 	@echo "$(MAGENTA)$(BOLD)🚀 Installing Traefik with Keycloak authentication...$(RESET)"
-	@$(SCRIPTS_DIR)/components/install_traefik_keycloak.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(TRAEFIK_PORT),--traefik-port $(TRAEFIK_PORT),) $(if $(KEYCLOAK_PORT),--keycloak-port $(KEYCLOAK_PORT),) $(if $(ENABLE_TLS),--enable-tls,)
+	@bash -c "set -o pipefail && $(SCRIPTS_DIR)/components/install_traefik_keycloak.sh --domain $(DOMAIN) --admin-email $(ADMIN_EMAIL) $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(TRAEFIK_PORT),--traefik-port $(TRAEFIK_PORT),) $(if $(KEYCLOAK_PORT),--keycloak-port $(KEYCLOAK_PORT),) $(if $(ENABLE_TLS),--enable-tls,) $(if $(FORCE),--force,)"
 
 traefik-keycloak-status:
 	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Traefik-Keycloak status...$(RESET)"
-	@$(SCRIPTS_DIR)/components/install_traefik_keycloak.sh --status-only $(if $(CLIENT_ID),--client-id $(CLIENT_ID),)
+	@bash -c "set -e && $(SCRIPTS_DIR)/components/install_traefik_keycloak.sh --status-only $(if $(CLIENT_ID),--client-id $(CLIENT_ID),)"
 
 traefik-keycloak-restart:
 	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Traefik-Keycloak...$(RESET)"
-	@if [ -d "/opt/agency_stack/clients/$(CLIENT_ID)/traefik-keycloak/docker-compose" ]; then \
-		cd /opt/agency_stack/clients/$(CLIENT_ID)/traefik-keycloak/docker-compose && docker-compose restart; \
-	else \
-		echo "$(RED)Traefik-Keycloak not installed. Run 'make traefik-keycloak' first.$(RESET)"; \
-	fi
+	@bash -c "set -e && $(SCRIPTS_DIR)/components/install_traefik_keycloak.sh --restart-only $(if $(CLIENT_ID),--client-id $(CLIENT_ID),)"
 
 traefik-keycloak-logs:
 	@echo "$(MAGENTA)$(BOLD)📜 Viewing Traefik-Keycloak logs...$(RESET)"
-	@if [ -d "/opt/agency_stack/clients/$(CLIENT_ID)/traefik-keycloak/docker-compose" ]; then \
-		cd /opt/agency_stack/clients/$(CLIENT_ID)/traefik-keycloak/docker-compose && docker-compose logs --tail=100; \
+	@bash -c "set -e && $(SCRIPTS_DIR)/components/install_traefik_keycloak.sh --logs-only $(if $(CLIENT_ID),--client-id $(CLIENT_ID),)"
+
+# Traefik-Keycloak SSO Integration
+traefik-keycloak-sso:
+	@echo "🔑 Installing Traefik with Keycloak SSO integration..."
+	@$(SCRIPTS_DIR)/components/traefik-keycloak-integration/install_sso_integration.sh $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) $(if $(DOMAIN),--domain $(DOMAIN),)
+
+traefik-keycloak-sso-verify:
+	@echo "🔍 Verifying Traefik-Keycloak SSO integration..."
+	@if [ -f "/opt/agency_stack/clients/$(CLIENT_ID)/traefik-keycloak/scripts/verify_integration.sh" ]; then \
+		/opt/agency_stack/clients/$(CLIENT_ID)/traefik-keycloak/scripts/verify_integration.sh; \
 	else \
-		echo "$(RED)Traefik-Keycloak not installed. Run 'make traefik-keycloak' first.$(RESET)"; \
+		echo "❌ Verification script not found. Please install the integration first."; \
+		exit 1; \
 	fi
+
+traefik-keycloak-sso-logs:
+	@echo "📋 Viewing Traefik-Keycloak SSO logs..."
+	@echo "=== Traefik Logs ===" && docker logs traefik_$(CLIENT_ID) 2>&1 | tail -n 20
+	@echo "\n=== Keycloak Logs ===" && docker logs keycloak_$(CLIENT_ID) 2>&1 | tail -n 20
+	@echo "\n=== OAuth2 Proxy Logs ===" && docker logs oauth2_proxy_$(CLIENT_ID) 2>&1 | tail -n 20
+
+traefik-keycloak-sso-restart:
+	@echo "🔄 Restarting Traefik-Keycloak SSO services..."
+	@if [ -d "/opt/agency_stack/clients/$(CLIENT_ID)/traefik-keycloak" ]; then \
+		cd /opt/agency_stack/clients/$(CLIENT_ID)/traefik-keycloak && docker-compose restart; \
+	else \
+		echo "❌ Integration not found. Please install it first."; \
+		exit 1; \
+	fi
+
+traefik-syntax-test:
+	@echo "🧪 Testing Makefile syntax for Traefik target..."
+	@make traefik --dry-run > /dev/null 2>&1 || (echo "Syntax error detected"; exit 1)

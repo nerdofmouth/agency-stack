@@ -1,0 +1,33 @@
+[
+  {
+    "name": "traefik-keycloak-sso",
+    "category": "infrastructure",
+    "description": "Traefik with Keycloak SSO integration",
+    "flags": {
+      "installed": true,
+      "makefile": true,
+      "docs": true,
+      "hardened": true,
+      "monitoring": true,
+      "multi_tenant": true,
+      "sso": true,
+      "sso_configured": true
+    }
+  }
+
+
+]
+  {
+    "name": "traefik-keycloak",
+    "category": "infrastructure",
+    "description": "Traefik with Keycloak authentication for dashboard",
+    "flags": {
+      "installed": true,
+      "makefile": true,
+      "docs": true,
+      "hardened": true,
+      "monitoring": false,
+      "multi_tenant": true,
+      "sso": true
+    }
+  },
