@@ -1,4 +1,20 @@
 #!/bin/bash
+
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: fix_traefik_ports.sh
+# Path: /scripts/components/fix_traefik_ports.sh
+#
+
+# Enforce containerization (prevent host contamination)
+
 # fix_traefik_ports.sh - Fix Traefik Ports for Standard HTTP/HTTPS Access
 #
 # This script diagnoses and fixes issues with Traefik binding to
@@ -14,26 +30,21 @@ if [[ "$0" != *"/root/_repos/agency-stack/scripts/"* ]]; then
   echo "ERROR: This script must be run from the repository context"
   echo "Run with: /root/_repos/agency-stack/scripts/components/$(basename "$0")"
   exit 1
-fi
 
 # DEPRECATION NOTICE: This script's logic should be merged into install_traefik.sh and install_traefik_with_keycloak.sh as part of port validation and remediation. This script will be removed after migration is complete.
 
 set -e
 
 # Self-contained utilities
-log_info() {
   echo -e "\033[0;34m[INFO] $1\033[0m"
 }
 
-log_success() {
   echo -e "\033[0;32m[SUCCESS] $1\033[0m"
 }
 
-log_warning() {
   echo -e "\033[0;33m[WARNING] $1\033[0m"
 }
 
-log_error() {
   echo -e "\033[0;31m[ERROR] $1\033[0m" >&2
 }
 
@@ -445,11 +456,9 @@ if [ -d "${TRAEFIK_KEYCLOAK_DIR}" ] && [ -f "${TRAEFIK_KEYCLOAK_DIR}/docker-comp
   SSO_ENABLED="true"
 elif [ -d "${TRAEFIK_DIR}" ] && [ -f "${TRAEFIK_DIR}/docker-compose.yml" ]; then
   log_info "Detected standard Traefik installation"
-else
   log_warning "No Traefik installation detected. This script is only for existing installations."
   log_info "To install Traefik, run: make traefik or make traefik-keycloak-sso"
   exit 0
-fi
 
 # Check if ports are in use
 check_port_in_use "${HTTP_PORT}"
@@ -491,12 +500,10 @@ if [ "${DRY_RUN}" = "false" ] && [ "${CHECK_ONLY}" = "false" ]; then
     log_warning "HTTPS access is not working for https://${DOMAIN}"
     log_warning "You may need to wait for changes to propagate or check cloud provider firewall settings"
   fi
-fi
 
 # If we made any changes and we're not in check-only mode, restart services
 if [ "${CHANGES_MADE}" = "true" ] && [ "${CHECK_ONLY}" = "false" ] && [ "${DRY_RUN}" = "false" ]; then
   restart_docker_compose
-fi
 
 # Final report
 if [ "${CHANGES_MADE}" = "true" ]; then
@@ -507,16 +514,13 @@ if [ "${CHANGES_MADE}" = "true" ]; then
   else
     log_success "Traefik port issues fixed successfully."
   fi
-else
   log_success "No issues found with Traefik port configuration."
-fi
 
 # Record this run in the repository context
 if [ "${DRY_RUN}" = "false" ] && [ "${CHECK_ONLY}" = "false" ]; then
   REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
   echo "$(date): fix_traefik_ports.sh run completed" >> "${REPO_ROOT}/traefik_fixes.log"
   echo "Repository Integrity Policy enforced" >> "${REPO_ROOT}/traefik_fixes.log"
-fi
 
 log_info "Traefik ports fix completed."
 exit 0

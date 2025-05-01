@@ -1,19 +1,17 @@
 #!/bin/bash
-# install_jitsi.sh - Install and configure Jitsi Meet for AgencyStack
-#
-# This script sets up Jitsi Meet with:
-# - Full Keycloak SSO integration when enabled
-# - Traefik integration for TLS and routing
-# - Multi-tenant support
-# - Monitoring integration
-#
-# Following the repository-first approach in the AgencyStack Repository Integrity Policy
-#
-# Author: AgencyStack Team
-# Date: 2025-04-11
 
-# --- BEGIN: Preflight/Prerequisite Check ---
-source "$(dirname "$0")/../utils/common.sh"
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: jitsi.sh
+# Path: /scripts/components/install_jitsi.sh
+#
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -23,7 +21,6 @@ preflight_check_agencystack || {
 set -e
 
 # Source common utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../utils/log_helpers.sh"
 source "${SCRIPT_DIR}/../utils/component_sso_helper.sh"
 
@@ -109,7 +106,6 @@ if [[ -f "${INSTALL_DIR}/.installed_ok" ]] && [[ "$FORCE" != "true" ]]; then
   log_info "Jitsi is already installed in ${INSTALL_DIR}"
   log_info "Use --force to reinstall"
   exit 0
-fi
 
 # Create directories
 log_info "Creating installation directories"
@@ -168,7 +164,6 @@ JWT_APP_ID=jitsi
 JWT_APP_SECRET=${JWT_APP_SECRET}
 TOKEN_AUTH_URL=https://${DOMAIN}/auth/realms/agency_stack/protocol/openid-connect/auth
 EOF
-fi
 
 # Configure Docker Compose file
 log_info "Creating Docker Compose configuration"
@@ -211,7 +206,6 @@ if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
       - JWT_APP_SECRET
       - TOKEN_AUTH_URL
 EOF
-fi
 
 # Continue Docker Compose configuration
 cat >> "${INSTALL_DIR}/docker-compose.yml" <<EOF
@@ -230,7 +224,6 @@ if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
       - "traefik.http.middlewares.jitsi-auth.forwardauth.address=http://keycloak:8080/auth/realms/agency_stack/protocol/openid-connect/auth"
       - "traefik.http.middlewares.jitsi-auth.forwardauth.trustForwardHeader=true"
 EOF
-fi
 
 # Continue Docker Compose configuration with other Jitsi components
 cat >> "${INSTALL_DIR}/docker-compose.yml" <<EOF
@@ -269,7 +262,6 @@ if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
       - JWT_APP_ID
       - JWT_APP_SECRET
 EOF
-fi
 
 # Continue Docker Compose configuration
 cat >> "${INSTALL_DIR}/docker-compose.yml" <<EOF
@@ -329,7 +321,6 @@ if ! docker network inspect "${JITSI_NETWORK_NAME}" >/dev/null 2>&1; then
     log_error "Failed to create Docker network: ${JITSI_NETWORK_NAME}"
     exit 1
   }
-fi
 
 # Start Jitsi Meet
 log_info "Starting Jitsi Meet containers"
@@ -373,7 +364,6 @@ if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
   else
     log_warning "Failed to enable Keycloak SSO for Jitsi, continuing with basic setup"
   fi
-fi
 
 # Update component registry
 log_info "Updating component registry with Jitsi installation status"
@@ -394,9 +384,7 @@ if [ -f "$REGISTRY_SCRIPT" ]; then
   fi
   
   bash "$REGISTRY_SCRIPT" "${REGISTRY_ARGS[@]}"
-else
   log_warning "Registry update script not found: $REGISTRY_SCRIPT"
-fi
 
 # Create installation marker
 log_info "Creating installation marker"
@@ -407,6 +395,5 @@ log_info "Jitsi Meet is now available at: https://${JITSI_FQDN}"
 
 if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
   log_info "SSO authentication is enabled via Keycloak"
-fi
 
 exit 0

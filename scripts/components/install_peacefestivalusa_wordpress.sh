@@ -1,25 +1,28 @@
 #!/bin/bash
-# install_peacefestivalusa_wordpress.sh - Client-specific WordPress installation
-# Part of AgencyStack Alpha - https://stack.nerdofmouth.com
 
-# Verify running from repository context
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: peacefestivalusa_wordpress.sh
+# Path: /scripts/components/install_peacefestivalusa_wordpress.sh
+#
 if [[ "$0" != *"/root/_repos/agency-stack/scripts/"* ]]; then
   echo "ERROR: This script must be run from the repository context"
   echo "Run with: /root/_repos/agency-stack/scripts/components/$(basename "$0")"
   exit 1
-fi
 
 # Source common utilities and logging functions
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 SCRIPTS_DIR="${ROOT_DIR}/scripts"
 
-if [ -f "${SCRIPTS_DIR}/utils/common.sh" ]; then
-  source "${SCRIPTS_DIR}/utils/common.sh"
-else
   echo "ERROR: Could not find common.sh"
   exit 1
-fi
 
 # Check if running in development container
 is_dev_container() {
@@ -48,11 +51,9 @@ elif is_dev_container; then
   CONTAINER_RUNNING="true"
   DID_MODE="false"
   log_info "Detected development container environment"
-else
   CONTAINER_RUNNING="false"
   DID_MODE="false"
   log_info "Running in host environment"
-fi
 
 # Client-specific variables
 CLIENT_ID="peacefestivalusa"
@@ -160,7 +161,6 @@ if [ "$DID_MODE" = "true" ]; then
   else
     log_warning "Docker network configuration function not found"
   fi
-fi
 
 # Set paths based on environment
 if [ "$CONTAINER_RUNNING" = "true" ]; then
@@ -174,11 +174,9 @@ if [ "$CONTAINER_RUNNING" = "true" ]; then
     INSTALL_BASE_DIR="${HOME}/agency_stack"
     LOG_DIR="${HOME}/logs/agency_stack/components"
   fi
-else
   # Host system paths
   INSTALL_BASE_DIR="/opt/agency_stack"
   LOG_DIR="/var/log/agency_stack/components"
-fi
 
 # Ensure log directory exists
 mkdir -p "$LOG_DIR"
@@ -196,7 +194,6 @@ if [ "$DID_MODE" = "true" ]; then
     log_info "Adding $DOMAIN to /etc/hosts inside container"
     echo "127.0.0.1 $DOMAIN" >> "${HOME}/.dind_hosts"
   fi
-fi
 
 # Define container names and network
 NETWORK_NAME="${CLIENT_ID}_network"
@@ -207,10 +204,8 @@ MARIADB_CONTAINER_NAME="${CLIENT_ID}_mariadb"
 if [ "$CONTAINER_RUNNING" = "true" ] && [ "$DID_MODE" = "true" ]; then
   # In Docker-in-Docker, use a path that mirrors the host structure
   WP_DIR="${INSTALL_BASE_DIR}/clients/${CLIENT_ID}/wordpress"
-else
   # Direct path for normal installation
   WP_DIR="${INSTALL_BASE_DIR}/clients/${CLIENT_ID}/wordpress"
-fi
 
 mkdir -p "${WP_DIR}"
 
@@ -232,7 +227,6 @@ if [ "$STATUS_ONLY" = "true" ]; then
   fi
   
   exit 0
-fi
 
 # Logs-only check
 if [ "$LOGS_ONLY" = "true" ]; then
@@ -246,7 +240,6 @@ if [ "$LOGS_ONLY" = "true" ]; then
   fi
   
   exit 0
-fi
 
 # Restart-only operation
 if [ "$RESTART_ONLY" = "true" ]; then
@@ -261,7 +254,6 @@ if [ "$RESTART_ONLY" = "true" ]; then
   fi
   
   exit 0
-fi
 
 # Test-only operation
 if [ "$TEST_ONLY" = "true" ]; then
@@ -287,7 +279,6 @@ if [ "$TEST_ONLY" = "true" ]; then
   
   log_success "All WordPress tests PASSED"
   exit 0
-fi
 
 # Main installation logic
 log_info "Starting WordPress installation for ${CLIENT_ID} at ${DOMAIN}..."
@@ -431,7 +422,6 @@ if [ -f "${SCRIPT_DIR}/templates/wordpress-entrypoint.sh" ]; then
   # Copy and customize the entrypoint script
   cp "${SCRIPT_DIR}/templates/wordpress-entrypoint.sh" "${WP_DIR}/custom-entrypoint.sh"
   chmod +x "${WP_DIR}/custom-entrypoint.sh"
-else
   log_warning "Entrypoint template not found, creating basic entrypoint"
   cat > "${WP_DIR}/custom-entrypoint.sh" <<'EOL'
 #!/bin/bash
@@ -449,7 +439,6 @@ if [ ! -f /tmp/.packages-installed ]; then
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
   touch /tmp/.packages-installed
-fi
 
 # Function to check if MySQL is ready
 function wait_for_db() {
@@ -496,7 +485,6 @@ wait_for_db
 exec docker-entrypoint.sh "$@"
 EOL
   chmod +x "${WP_DIR}/custom-entrypoint.sh"
-fi
 log_success "Custom entrypoint script created from template"
 
 # Create WordPress config
@@ -631,14 +619,12 @@ WP_RUNNING=\$(docker ps -q -f "name=\${WORDPRESS_CONTAINER_NAME}" 2>/dev/null)
 if [ -z "\$WP_RUNNING" ]; then
   echo "WordPress container not running"
   exit 1
-fi
 
 # Check if WordPress is accessible
 HTTP_CODE=\$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${WP_PORT}" 2>/dev/null)
 if [ "\$HTTP_CODE" != "200" ]; then
   echo "WordPress not accessible (HTTP \$HTTP_CODE)"
   exit 1
-fi
 
 echo "WordPress installation verified successfully"
 exit 0
@@ -649,19 +635,16 @@ chmod +x "${WP_DIR}/verify_wordpress.sh"
 if ! docker network ls | grep -q "${NETWORK_NAME}"; then
   log_info "Creating Docker network: ${NETWORK_NAME}"
   docker network create "${NETWORK_NAME}" || log_error "Failed to create network ${NETWORK_NAME}"
-fi
 
 # Check if Traefik network exists, create if not
 if ! docker network ls | grep -q "traefik-keycloak-default"; then
   log_info "Creating Traefik network: traefik-keycloak-default"
   docker network create traefik-keycloak-default || log_error "Failed to create Traefik network"
-fi
 
 # Remove existing containers if they exist and force is enabled
 if [ "$FORCE" = "true" ]; then
   log_info "Force flag enabled - removing existing containers if present..."
   docker rm -f "${WORDPRESS_CONTAINER_NAME}" "${MARIADB_CONTAINER_NAME}" 2>/dev/null || true
-fi
 
 # Start WordPress with Docker Compose
 log_info "Starting WordPress containers with Docker Compose..."
@@ -695,14 +678,11 @@ if [ -f /tmp/wp-config-agency.php ]; then
   echo "?>" >> /var/www/html/wp-config.php
   
   echo "[$(date)] WordPress configuration updated successfully!"
-else
   echo "[$(date)] Custom configuration file not found!"
-fi
 EOF
   
   # Make script executable
   chmod +x "${WP_DIR}/configure_wordpress.sh"
-fi
 
 cd "${WP_DIR}" && docker-compose up -d
 
@@ -711,7 +691,6 @@ if [ "$DID_MODE" = "true" ]; then
   log_info "Running WordPress configuration in Docker-in-Docker environment"
   docker cp "${WP_DIR}/configure_wordpress.sh" "${WORDPRESS_CONTAINER_NAME}:/configure_wordpress.sh"
   docker exec -it "${WORDPRESS_CONTAINER_NAME}" bash -c "chmod +x /configure_wordpress.sh && /configure_wordpress.sh" || log_warning "Error running configuration script"
-fi
 
 # Wait for WordPress to be ready
 log_info "Waiting for WordPress to start (this may take a minute)..."
@@ -760,7 +739,6 @@ if [ -f "${SCRIPTS_DIR}/utils/register_component.sh" ]; then
     --docs=true \
     --hardened=true \
     --multi_tenant=true || true
-fi
 
 # Display success message
 log_success "✅ WordPress installation for ${CLIENT_ID} complete"

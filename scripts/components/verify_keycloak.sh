@@ -1,13 +1,26 @@
 #!/bin/bash
+
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: verify_keycloak.sh
+# Path: /scripts/components/verify_keycloak.sh
+#
+
+# Enforce containerization (prevent host contamination)
+
 # verify_keycloak.sh - Simple validation for Keycloak status and OAuth configuration
 # Following the AgencyStack repository integrity policy
 
 set -e
 
 # Hardcoded logging functions
-log_info() { echo "[INFO] $1"; }
-log_success() { echo "[SUCCESS] $1"; }
-log_error() { echo "[ERROR] $1" >&2; }
 
 # Default settings
 DOMAIN=""
@@ -66,7 +79,6 @@ done
 if [[ -z "$DOMAIN" ]]; then
   log_error "No domain specified. Use --domain option."
   exit 1
-fi
 
 log_info "==================================================="
 log_info "Starting verify_keycloak.sh"
@@ -78,19 +90,15 @@ log_info "==================================================="
 log_info "Checking Keycloak container status..."
 if docker ps | grep -q "keycloak_${DOMAIN}"; then
   log_success "Keycloak container is running"
-else
   log_error "Keycloak container is not running"
   exit 1
-fi
 
 # Verify Keycloak is responsive
 log_info "Checking Keycloak admin console accessibility..."
 if curl -s -o /dev/null -w "%{http_code}" "https://${DOMAIN}/auth/" | grep -q "200\|301\|302"; then
   log_success "Keycloak admin console is accessible"
-else
   log_error "Keycloak admin console is not accessible"
   # Not failing here as it might be a proxy issue
-fi
 
 # Check component registry
 log_info "Checking component registry..."
@@ -104,14 +112,11 @@ if [ -f "/opt/agency_stack/config/component_registry.json" ]; then
   else
     log_error "Keycloak OAuth providers not found in component registry"
   fi
-else
   log_error "Component registry not found"
-fi
 
 # Display docker logs for troubleshooting
 if [ "$VERBOSE" = true ]; then
   log_info "Recent Keycloak container logs:"
   docker logs --tail 20 "keycloak_${DOMAIN}"
-fi
 
 log_success "Verification completed"

@@ -1,11 +1,20 @@
 #!/bin/bash
-# PeerTube Upgrade Script
-# AgencyStack Component: peertube
 
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: upgrade_peertube.sh
+# Path: /scripts/components/upgrade_peertube.sh
+#
 set -euo pipefail
 
 # Source common utilities
-source "$(dirname "$0")/../utils/common.sh"
 
 # Component configuration
 COMPONENT_NAME="peertube"
@@ -19,14 +28,12 @@ log_start "${LOG_FILE}" "PeerTube upgrade to v7.0 started"
 if [ ! -f "${INSTALL_DIR}/.installed" ]; then
     log_error "${LOG_FILE}" "PeerTube not installed, cannot upgrade"
     exit 1
-fi
 
 # Check current version
 CURRENT_VERSION=$(docker inspect --format='{{.Config.Image}}' peertube | cut -d: -f2)
 if [ "$CURRENT_VERSION" == "production-bookworm-v7.0" ]; then
     log_info "${LOG_FILE}" "PeerTube already at v7.0, skipping upgrade"
     exit 0
-fi
 
 # Stop existing service
 log_info "${LOG_FILE}" "Stopping PeerTube service"
@@ -56,7 +63,6 @@ log_info "${LOG_FILE}" "Running post-upgrade checks"
 sleep 30 # Wait for services to initialize
 if docker ps -f name=peertube | grep -q peertube; then
     log_success "${LOG_FILE}" "PeerTube upgraded to v7.0 successfully"
-else
     log_error "${LOG_FILE}" "PeerTube upgrade failed"
     # Attempt rollback
     log_info "${LOG_FILE}" "Attempting rollback"
@@ -65,4 +71,3 @@ else
     cp -r "${BACKUP_DIR}"/* "${INSTALL_DIR}"/
     docker-compose up -d
     exit 1
-fi

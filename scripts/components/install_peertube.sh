@@ -1,6 +1,17 @@
 #!/bin/bash
+
 # Source common utilities
-source "$(dirname "$0")/../utils/common.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: peertube.sh
+# Path: /scripts/components/install_peertube.sh
+#
 
 # --- BEGIN: Preflight/Prerequisite Check ---
 preflight_check_agencystack || {
@@ -33,7 +44,6 @@ NC='\033[0m' # No Color
 BOLD='\033[1m'
 
 # Variables
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 CONFIG_DIR="/opt/agency_stack"
 LOG_DIR="/var/log/agency_stack"
@@ -679,7 +689,6 @@ if [ -z "$DOMAIN" ]; then
   echo -e "${RED}Error: Domain name is required.${NC} Use --domain to specify."
   echo -e "Use --help for usage information"
   exit 1
-fi
 
 # Run the installer
 install_peertube

@@ -1,11 +1,20 @@
 #!/bin/bash
-# Archon Installation Script
-# AgencyStack Component: archon
 
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: archon.sh
+# Path: /scripts/components/install_archon.sh
+#
 set -euo pipefail
 
 # --- BEGIN: Preflight/Prerequisite Check ---
-source "$(dirname "$0")/../utils/common.sh"
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -24,7 +33,6 @@ log_start "${LOG_FILE}" "Archon installation started"
 if [ -f "${INSTALL_DIR}/.installed" ]; then
     log_info "${LOG_FILE}" "Archon already installed, skipping"
     exit 0
-fi
 
 # Create installation directory
 mkdir -p "${INSTALL_DIR}"
@@ -35,7 +43,6 @@ if ! command -v docker &> /dev/null; then
     log_info "${LOG_FILE}" "Installing Docker"
     curl -fsSL https://get.docker.com | sh
     usermod -aG docker $SUDO_USER
-fi
 
 # Pull Archon Docker image
 log_info "${LOG_FILE}" "Pulling Archon Docker image"

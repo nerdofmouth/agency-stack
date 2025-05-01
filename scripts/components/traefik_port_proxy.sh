@@ -1,14 +1,17 @@
 #!/bin/bash
 
-# Source common utilities if available
-if [ -f "$(dirname "$0")/../utils/common.sh" ]; then
-  source "$(dirname "$0")/../utils/common.sh"
-else
-  log_info() { echo "[INFO] $1"; }
-  log_success() { echo "[SUCCESS] $1"; }
-  log_warning() { echo "[WARNING] $1"; }
-  log_error() { echo "[ERROR] $1"; }
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
 fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: traefik_port_proxy.sh
+# Path: /scripts/components/traefik_port_proxy.sh
+#
 
 # Configuration
 CONTAINER_NAME="${CONTAINER_NAME:-agencystack-dev}"
@@ -27,7 +30,6 @@ log_info "==========================================="
 if ! command -v socat &> /dev/null; then
   log_error "socat is not installed. Please install it with: apt-get install socat"
   exit 1
-fi
 
 # Get container IP
 CONTAINER_IP=$(docker inspect --format '{{.NetworkSettings.IPAddress}}' $CONTAINER_NAME 2>/dev/null)
@@ -36,7 +38,6 @@ if [[ -z "$CONTAINER_IP" || "$CONTAINER_IP" == "<no value>" ]]; then
   log_info "Container status:"
   docker ps -a | grep $CONTAINER_NAME || echo "Container not found"
   exit 1
-fi
 
 log_info "Container IP: $CONTAINER_IP"
 
@@ -51,7 +52,6 @@ if [[ -f "$TRAEFIK_PID_FILE" ]]; then
     log_info "Found stale PID file, cleaning up..."
   fi
   rm -f "$TRAEFIK_PID_FILE"
-fi
 
 # Start socat as a proxy
 log_info "Starting proxy from host:$HOST_PORT to container:$TRAEFIK_PORT..."
@@ -106,7 +106,5 @@ EOF
     rm -f "$TRAEFIK_PID_FILE"
     exit 1
   fi
-else
   log_error "Failed to start proxy process"
   exit 1
-fi

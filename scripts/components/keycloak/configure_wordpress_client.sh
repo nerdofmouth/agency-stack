@@ -1,10 +1,17 @@
 #!/bin/bash
-# WordPress SSO integration with Keycloak
-# This script configures a WordPress instance to use Keycloak for SSO
 
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../../utils/common.sh"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: configure_wordpress_client.sh
+# Path: /scripts/components/configure_wordpress_client.sh
+#
 
 # Default values
 CLIENT_ID="default"
@@ -47,18 +54,15 @@ done
 if [[ -z "$DOMAIN" ]]; then
     log_error "Domain must be specified with --domain"
     exit 1
-fi
 
 # Set up variables
 WP_DIR="/opt/agency_stack/wordpress"
 if [[ -n "$CLIENT_ID" && "$CLIENT_ID" != "default" ]]; then
     WP_DIR="/opt/agency_stack/clients/${CLIENT_ID}/wordpress"
-fi
 
 KEYCLOAK_DIR="/opt/agency_stack/keycloak"
 if [[ -n "$CLIENT_ID" && "$CLIENT_ID" != "default" ]]; then
     KEYCLOAK_DIR="/opt/agency_stack/clients/${CLIENT_ID}/keycloak"
-fi
 
 KEYCLOAK_DOMAIN="auth.${DOMAIN}"
 KEYCLOAK_REALM="agency-stack"
@@ -75,14 +79,12 @@ if [[ ! -d "${WP_DIR}/${DOMAIN}" ]]; then
     log_error "WordPress directory not found at ${WP_DIR}/${DOMAIN}"
     log_error "Please install WordPress first with: make wordpress DOMAIN=${DOMAIN}"
     exit 1
-fi
 
 # Check if Keycloak is installed
 if [[ ! -d "${KEYCLOAK_DIR}" ]]; then
     log_error "Keycloak directory not found at ${KEYCLOAK_DIR}"
     log_error "Please install Keycloak first with: make keycloak DOMAIN=${DOMAIN}"
     exit 1
-fi
 
 # Create WordPress OAuth client in Keycloak
 log_info "Creating WordPress OAuth client in Keycloak"
@@ -100,7 +102,6 @@ ADMIN_TOKEN=$(curl -s -X POST \
 if [[ -z "$ADMIN_TOKEN" || "$ADMIN_TOKEN" == "null" ]]; then
     log_error "Failed to get Keycloak admin token"
     exit 1
-fi
 
 log_info "Checking if WordPress client already exists"
 CLIENT_ID_UUID=$(curl -s -X GET \
@@ -135,7 +136,6 @@ if [[ -n "$CLIENT_ID_UUID" && "$CLIENT_ID_UUID" != "null" ]]; then
                 "fullScopeAllowed": true
             }'
     fi
-else
     log_info "Creating new WordPress client"
     # Create new client
     curl -s -X POST \
@@ -165,7 +165,6 @@ else
     CLIENT_ID_UUID=$(curl -s -X GET \
         "https://${KEYCLOAK_DOMAIN}/admin/realms/${KEYCLOAK_REALM}/clients?clientId=wordpress" \
         -H "Authorization: Bearer ${ADMIN_TOKEN}" | jq -r '.[0].id')
-fi
 
 # Generate client secret if it doesn't exist
 log_info "Getting client secret"
@@ -182,7 +181,6 @@ if [[ -z "$CLIENT_SECRET" || "$CLIENT_SECRET" == "null" ]]; then
     CLIENT_SECRET=$(curl -s -X GET \
         "https://${KEYCLOAK_DOMAIN}/admin/realms/${KEYCLOAK_REALM}/clients/${CLIENT_ID_UUID}/client-secret" \
         -H "Authorization: Bearer ${ADMIN_TOKEN}" | jq -r '.value')
-fi
 
 log_info "Client secret: ${CLIENT_SECRET}"
 
@@ -193,13 +191,11 @@ log_info "Installing and configuring OAuth plugin in WordPress"
 WP_CONTAINER="wordpress"
 if [[ "$CLIENT_ID" != "default" ]]; then
     WP_CONTAINER="${CLIENT_ID}_wordpress"
-fi
 
 if ! docker ps --format '{{.Names}}' | grep -q "$WP_CONTAINER"; then
     log_error "WordPress container not running"
     log_error "Please start WordPress with: make wordpress-restart"
     exit 1
-fi
 
 # Install the OpenID Connect plugin
 log_info "Installing and activating the OpenID Connect plugin"
@@ -242,7 +238,6 @@ if [[ -f "$REGISTRY_FILE" ]]; then
         jq '.components += [{"name":"wordpress","description":"WordPress CMS","enabled":true,"sso":true,"sso_configured":true}]' "$REGISTRY_FILE" > "${REGISTRY_FILE}.tmp"
         mv "${REGISTRY_FILE}.tmp" "$REGISTRY_FILE"
     fi
-fi
 
 log_success "WordPress SSO integration with Keycloak configured successfully"
 log_info "You can now log in to WordPress using Keycloak credentials at: ${WP_SITE_URL}/wp-login.php"

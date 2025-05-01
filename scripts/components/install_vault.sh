@@ -1,17 +1,20 @@
 #!/bin/bash
-# install_vault.sh - Installation script for vault
-#
-# This script installs and configures vault for AgencyStack
-# following the component installation conventions.
-#
-# Author: AgencyStack Team
-# Date: 2025-04-07
-
-set -e
 
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../utils/common.sh"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: vault.sh
+# Path: /scripts/components/install_vault.sh
+#
+set -e
+
+# Source common utilities
 
 # Default configuration
 CLIENT_ID="${CLIENT_ID:-default}"

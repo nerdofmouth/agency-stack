@@ -1,21 +1,19 @@
 #!/bin/bash
-#
-# Traefik-Keycloak SSO Integration Installer
-# Following the AgencyStack Repository Integrity Policy
-#
 
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$(dirname "$(dirname "$(dirname "$SCRIPT_DIR")")")" && pwd)"
-if [[ -f "${REPO_ROOT}/scripts/utils/common.sh" ]]; then
-  source "${REPO_ROOT}/scripts/utils/common.sh"
-else
-  # Minimal logging functions if common.sh is not available
-  log_info() { echo "[INFO] $1"; }
-  log_success() { echo "[SUCCESS] $1"; }
-  log_warning() { echo "[WARNING] $1"; }
-  log_error() { echo "[ERROR] $1"; }
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
 fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: sso_integration.sh
+# Path: /scripts/components/install_sso_integration.sh
+#
+REPO_ROOT="$(cd "$(dirname "$(dirname "$(dirname "$SCRIPT_DIR")")")" && pwd)"
+  # Minimal logging functions if common.sh is not available
 
 # Parameters
 CLIENT_ID="${CLIENT_ID:-default}"
@@ -142,7 +140,6 @@ TOKEN=$(get_token)
 if [ -z "$TOKEN" ] || [ "$TOKEN" == "null" ]; then
   echo "Failed to obtain admin token. Check Keycloak credentials."
   exit 1
-fi
 
 # Check if client already exists
 CLIENT_EXISTS=$(curl -s -H "Authorization: Bearer ${TOKEN}" \
@@ -171,7 +168,6 @@ if [ -n "$CLIENT_EXISTS" ]; then
     "${KEYCLOAK_URL}/admin/realms/${REALM}/clients/${CLIENT_EXISTS}"
   
   echo "Client updated successfully"
-else
   echo "Creating new client ${CLIENT_ID}..."
   
   # Create new client
@@ -193,7 +189,6 @@ else
     "${KEYCLOAK_URL}/admin/realms/${REALM}/clients"
   
   echo "Client created successfully"
-fi
 
 echo "Keycloak setup completed"
 EOF
@@ -314,21 +309,15 @@ OAUTH2_RUNNING=\$(docker ps -q -f "name=oauth2_proxy_\${CLIENT_ID}" 2>/dev/null)
 
 if [ -n "\$TRAEFIK_RUNNING" ]; then
   echo -e "${GREEN}✓ Traefik is running${NC}"
-else
   echo -e "${RED}✗ Traefik is not running${NC}"
-fi
 
 if [ -n "\$KEYCLOAK_RUNNING" ]; then
   echo -e "${GREEN}✓ Keycloak is running${NC}"
-else
   echo -e "${RED}✗ Keycloak is not running${NC}"
-fi
 
 if [ -n "\$OAUTH2_RUNNING" ]; then
   echo -e "${GREEN}✓ OAuth2 Proxy is running${NC}"
-else
   echo -e "${RED}✗ OAuth2 Proxy is not running${NC}"
-fi
 
 # Check network
 echo -e "\n${YELLOW}Checking Docker network:${NC}"
@@ -353,9 +342,7 @@ if docker network inspect traefik-net-\${CLIENT_ID} &>/dev/null; then
   else
     echo -e "${RED}✗ OAuth2 Proxy is not connected to the network${NC}"
   fi
-else
   echo -e "${RED}✗ Docker network doesn't exist${NC}"
-fi
 
 # Check endpoints
 echo -e "\n${YELLOW}Checking service endpoints:${NC}"
@@ -366,25 +353,19 @@ if [ "\$TRAEFIK_STATUS" = "401" ] || [ "\$TRAEFIK_STATUS" = "302" ]; then
   echo -e "${GREEN}✓ Traefik dashboard is protected (HTTP \$TRAEFIK_STATUS)${NC}"
 elif [ "\$TRAEFIK_STATUS" = "200" ]; then
   echo -e "${YELLOW}! Traefik dashboard is accessible without authentication${NC}"
-else
   echo -e "${RED}✗ Traefik dashboard is not accessible (HTTP \$TRAEFIK_STATUS)${NC}"
-fi
 
 # Keycloak
 KEYCLOAK_STATUS=\$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:\${KEYCLOAK_PORT}/auth/" 2>/dev/null)
 if [ "\$KEYCLOAK_STATUS" = "200" ] || [ "\$KEYCLOAK_STATUS" = "302" ] || [ "\$KEYCLOAK_STATUS" = "303" ]; then
   echo -e "${GREEN}✓ Keycloak is accessible (HTTP \$KEYCLOAK_STATUS)${NC}"
-else
   echo -e "${RED}✗ Keycloak is not accessible (HTTP \$KEYCLOAK_STATUS)${NC}"
-fi
 
 # OAuth2 Proxy
 OAUTH2_STATUS=\$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:\${TRAEFIK_PORT}/oauth2/auth" 2>/dev/null)
 if [ "\$OAUTH2_STATUS" = "302" ] || [ "\$OAUTH2_STATUS" = "401" ]; then
   echo -e "${GREEN}✓ OAuth2 Proxy is working (HTTP \$OAUTH2_STATUS)${NC}"
-else
   echo -e "${RED}✗ OAuth2 Proxy is not functioning properly (HTTP \$OAUTH2_STATUS)${NC}"
-fi
 
 echo -e "\n${YELLOW}Access Information:${NC}"
 echo "- Traefik Dashboard (requires auth): http://localhost:\${TRAEFIK_PORT}/dashboard/"
@@ -394,9 +375,7 @@ echo "  Credentials: admin / admin"
 echo -e "\n${YELLOW}Integration Status:${NC}"
 if [ -n "\$TRAEFIK_RUNNING" ] && [ -n "\$KEYCLOAK_RUNNING" ] && [ -n "\$OAUTH2_RUNNING" ] && [ "\$TRAEFIK_STATUS" = "302" ] || [ "\$TRAEFIK_STATUS" = "401" ]; then
   echo -e "${GREEN}✓ Integration appears to be working correctly${NC}"
-else
   echo -e "${RED}✗ Integration has issues that need to be addressed${NC}"
-fi
 
 echo -e "\nVerification complete."
 EOF

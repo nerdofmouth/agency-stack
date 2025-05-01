@@ -1,18 +1,18 @@
 #!/bin/bash
-# install_pgvector.sh - AgencyStack Vector Database Integration
-# [https://stack.nerdofmouth.com](https://stack.nerdofmouth.com)
-#
-# Installs and configures pgvector extension with PostgreSQL
-# Part of the AgencyStack Database suite
-#
-# Author: AgencyStack Team
-# Version: 1.0.0
-# Date: April 10, 2025
 
-# --- BEGIN: Preflight/Prerequisite Check ---
-SCRIPT_DIR="$(cd \"$(dirname \"${BASH_SOURCE[0]}\")" && pwd)"
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: pgvector.sh
+# Path: /scripts/components/install_pgvector.sh
+#
 REPO_ROOT="$(dirname \"$(dirname \"$SCRIPT_DIR\")\")"
-source "$REPO_ROOT/scripts/utils/common.sh"
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -110,7 +110,6 @@ if [ -z "${DOMAIN}" ] || [ -z "${ADMIN_EMAIL}" ]; then
   log_error "${LOG_FILE}" "Missing required parameters: domain and admin-email must be provided"
   show_help
   exit 1
-fi
 
 # Check if pgvector is already installed
 check_existing() {

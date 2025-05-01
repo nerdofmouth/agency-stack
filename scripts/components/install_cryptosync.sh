@@ -1,19 +1,18 @@
 #!/bin/bash
-# install_cryptosync.sh - AgencyStack Encrypted Storage & Remote Sync Integration
-# [https://stack.nerdofmouth.com](https://stack.nerdofmouth.com)
-#
-# Installs and configures gocryptfs and rclone for encrypted storage with
-# remote sync capabilities
-# Part of the AgencyStack Security & Storage suite
-#
-# Author: AgencyStack Team
-# Version: 1.0.0
-# Date: April 5, 2025
 
-# --- BEGIN: Preflight/Prerequisite Check ---
-SCRIPT_DIR="$(cd \"$(dirname \"${BASH_SOURCE[0]}\")" && pwd)"
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: cryptosync.sh
+# Path: /scripts/components/install_cryptosync.sh
+#
 REPO_ROOT="$(dirname \"$(dirname \"$SCRIPT_DIR\")\")"
-source "$REPO_ROOT/scripts/utils/common.sh"
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -441,7 +440,6 @@ source "$CONFIG_FILE"
 if mountpoint -q "$MOUNT_DIR"; then
     echo "Already mounted at $MOUNT_DIR"
     exit 0
-fi
 
 # Create mount directory if it doesn't exist
 mkdir -p "$MOUNT_DIR"
@@ -458,14 +456,12 @@ if [ -f "$PASSWORD_FILE" ]; then
     else
         echo "$PASSWORD" | gocryptfs "$ENCRYPTED_DIR" "$MOUNT_DIR"
     fi
-else
     # Interactive mounting
     if [ "$FILESYSTEM_TYPE" = "cryfs" ]; then
         cryfs --config "$(dirname "$CONFIG_FILE")/cryfs.${CONFIG_NAME}.conf" "$ENCRYPTED_DIR" "$MOUNT_DIR"
     else
         gocryptfs "$ENCRYPTED_DIR" "$MOUNT_DIR"
     fi
-fi
 
 echo "Mounted $ENCRYPTED_DIR at $MOUNT_DIR"
 EOF
@@ -483,7 +479,6 @@ source "$CONFIG_FILE"
 if ! mountpoint -q "$MOUNT_DIR"; then
     echo "Not mounted at $MOUNT_DIR"
     exit 0
-fi
 
 # Unmount
 fusermount -u "$MOUNT_DIR"
@@ -507,7 +502,6 @@ if ! grep -q "^\[${REMOTE_NAME}\]$" "$RCLONE_CONFIG" 2>/dev/null; then
     echo "Remote '${REMOTE_NAME}' not configured in rclone config"
     echo "Please configure it first using 'rclone config --config ${RCLONE_CONFIG}'"
     exit 1
-fi
 
 # Sync encrypted data to remote
 REMOTE_PATH="${REMOTE_NAME}:${1:-backup}"

@@ -1,12 +1,20 @@
 #!/bin/bash
-# configure_traefik_subdomains.sh - Configure Traefik for local subdomains
-# AgencyStack Team
-
-set -e
 
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../utils/common.sh"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: configure_traefik_subdomains.sh
+# Path: /scripts/components/configure_traefik_subdomains.sh
+#
+set -e
+
+# Source common utilities
 source "${SCRIPT_DIR}/../utils/log_helpers.sh"
 
 # Default configuration
@@ -24,19 +32,16 @@ if ! docker ps | grep -q "${TRAEFIK_CONTAINER_NAME}"; then
     log_error "No running Traefik container found. Please start Traefik first."
     exit 1
   fi
-fi
 
 # Ensure hosts file has the required entries
 log_info "Checking hosts file for required entries"
 if ! grep -q "wordpress.localhost" /etc/hosts; then
   log_info "Adding wordpress.localhost to /etc/hosts"
   echo "127.0.0.1 wordpress.localhost" | sudo tee -a /etc/hosts
-fi
 
 if ! grep -q "dashboard.localhost" /etc/hosts; then
   log_info "Adding dashboard.localhost to /etc/hosts"
   echo "127.0.0.1 dashboard.localhost" | sudo tee -a /etc/hosts
-fi
 
 # Deploy the configuration
 log_info "Deploying subdomain configuration to Traefik"
@@ -46,7 +51,6 @@ CONFIG_DEST="/etc/traefik/dynamic/subdomains.yml"
 if [ ! -f "${CONFIG_SRC}" ]; then
   log_error "Configuration file not found: ${CONFIG_SRC}"
   exit 1
-fi
 
 # Copy the configuration to the Traefik container
 docker cp "${CONFIG_SRC}" "${TRAEFIK_CONTAINER_NAME}:${CONFIG_DEST}"
@@ -64,9 +68,7 @@ if docker ps | grep -q "default_nginx"; then
     default_nginx
     
   log_success "Nginx container labels updated for WordPress subdomain"
-else
   log_warning "Nginx container not found, skipping label update"
-fi
 
 log_success "Subdomain configuration complete. Please access:"
 log_info "WordPress: https://wordpress.localhost"
@@ -81,6 +83,5 @@ if [ -f "${SCRIPT_DIR}/../utils/update_component_registry.sh" ]; then
     --description "Traefik subdomain configuration for local development" \
     --set-flag "installed=true" \
     --set-flag "makefile=false"
-fi
 
 exit 0

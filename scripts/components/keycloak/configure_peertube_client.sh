@@ -1,26 +1,21 @@
 #!/bin/bash
-# configure_peertube_client.sh - Configure Keycloak client for PeerTube
-# Part of the AgencyStack SSO Integration suite
-#
-# This script:
-# - Creates a PeerTube client in Keycloak
-# - Sets up proper redirect URIs and scopes
-# - Configures client roles and mappers
-# - Updates PeerTube configuration for SSO
-#
-# Usage: ./configure_peertube_client.sh --domain <domain> --client-id <client_id>
-#
-# Author: AgencyStack Team
-# Version: 1.0.0
-# Date: April 10, 2025
-
-# Strict error handling
-set -eo pipefail
 
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: configure_peertube_client.sh
+# Path: /scripts/components/configure_peertube_client.sh
+#
+set -eo pipefail
+
+# Source common utilities
 ROOT_DIR="$(dirname "$(dirname "$(dirname "$SCRIPT_DIR")")")"
-source "${ROOT_DIR}/scripts/utils/common.sh" || { echo "Error: Could not source common utilities" >&2; exit 1; }
 source "${ROOT_DIR}/scripts/utils/keycloak_integration.sh" || { echo "Error: Could not source Keycloak integration utilities" >&2; exit 1; }
 
 # Variables
@@ -91,7 +86,6 @@ if [ -z "$DOMAIN" ]; then
   log_error "Domain name is required. Use --domain <domain>"
   show_help
   exit 1
-fi
 
 # Main function to configure PeerTube client in Keycloak
 configure_peertube_client() {

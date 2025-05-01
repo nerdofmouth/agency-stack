@@ -1,4 +1,20 @@
 #!/bin/bash
+
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: test_keycloak_idp.sh
+# Path: /scripts/components/test_keycloak_idp.sh
+#
+
+# Enforce containerization (prevent host contamination)
+
 # test_keycloak_idp.sh - Test Keycloak Identity Providers
 # https://stack.nerdofmouth.com
 #
@@ -20,7 +36,6 @@ NC='\033[0m' # No Color
 BOLD='\033[1m'
 
 # Variables
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 CONFIG_DIR="/opt/agency_stack"
 KEYCLOAK_DIR="${CONFIG_DIR}/keycloak"
@@ -35,7 +50,6 @@ if [ ! -w "$LOG_DIR" ] && [ ! -w "/var/log" ]; then
   COMPONENTS_LOG_DIR="${LOG_DIR}/components"
   LOG_FILE="${COMPONENTS_LOG_DIR}/keycloak_idp_test.log"
   echo "Notice: Using local log directory for development: ${LOG_DIR}"
-fi
 
 VERBOSE=false
 DOMAIN=""
@@ -157,7 +171,6 @@ if [ -z "$DOMAIN" ]; then
   echo -e "${RED}Error: --domain is required${NC}"
   echo -e "Use --help for usage information"
   exit 1
-fi
 
 # Welcome message
 echo -e "${MAGENTA}${BOLD}Keycloak Identity Provider Test for ${DOMAIN}${NC}"
@@ -168,20 +181,17 @@ if ! command -v jq &> /dev/null; then
   log "ERROR" "jq is not installed. Please install jq first:"
   echo -e "${CYAN}sudo apt-get install jq${NC}"
   exit 1
-fi
 
 # Test if curl is installed
 if ! command -v curl &> /dev/null; then
   log "ERROR" "curl is not installed. Please install curl first:"
   echo -e "${CYAN}sudo apt-get install curl${NC}"
   exit 1
-fi
 
 # Check for TLS/SSL support in curl
 if ! curl --version | grep -q "https"; then
   log "ERROR" "curl does not support HTTPS. Please install curl with SSL support"
   exit 1
-fi
 
 # Check if Keycloak is running
 log "INFO" "Checking if Keycloak is running..."
@@ -190,7 +200,6 @@ log "INFO" "Checking if Keycloak is running..."
 REALM_NAME="agency"
 if [ -n "$CLIENT_ID" ]; then
   REALM_NAME="${CLIENT_ID}"
-fi
 
 # Get admin credentials from installation file
 KEYCLOAK_DIR="/opt/agency_stack/keycloak/${DOMAIN}"
@@ -201,7 +210,6 @@ if [ ! -f "$ADMIN_PASSWORD_FILE" ]; then
   log "ERROR" "Admin password file not found. Cannot authenticate to Keycloak."
   log "INFO" "You may need to run a Keycloak installation first."
   exit 1
-fi
 
 ADMIN_PASSWORD=$(cat "$ADMIN_PASSWORD_FILE")
 
@@ -213,7 +221,6 @@ if [ "$HTTP_STATUS" != "200" ]; then
   log "ERROR" "Keycloak is not accessible at https://${DOMAIN}/auth/ (HTTP Status: ${HTTP_STATUS})"
   log "INFO" "Please check if Keycloak is running and properly configured."
   exit 1
-fi
 
 log "SUCCESS" "Keycloak is running at https://${DOMAIN}/auth/"
 
@@ -222,9 +229,7 @@ log "INFO" "Testing HTTP to HTTPS redirect..."
 HTTP_REDIRECT=$(curl -s -o /dev/null -w "%{redirect_url}" "http://${DOMAIN}/auth/")
 if [[ "$HTTP_REDIRECT" == https://* ]]; then
   log "SUCCESS" "HTTP to HTTPS redirect is working properly"
-else
   log "WARN" "HTTP to HTTPS redirect not detected. This could be a security issue."
-fi
 
 # Get admin token for Keycloak API
 log "INFO" "Authenticating to Keycloak API..."
@@ -247,7 +252,6 @@ if [ -z "$ADMIN_TOKEN" ] || [ "$ADMIN_TOKEN" = "null" ]; then
     log "ERROR" "Failed to authenticate to Keycloak API after retry"
     exit 1
   fi
-fi
 
 log "SUCCESS" "Successfully authenticated to Keycloak API"
 
@@ -255,7 +259,6 @@ log "SUCCESS" "Successfully authenticated to Keycloak API"
 if [[ ! "$ADMIN_TOKEN" =~ ^[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+$ ]]; then
   log "ERROR" "Admin token does not appear to be a valid JWT"
   exit 1
-fi
 
 # Check if realm exists
 log "INFO" "Checking if realm '${REALM_NAME}' exists..."
@@ -282,7 +285,6 @@ if [ "$REALM_STATUS" != "200" ]; then
     log "INFO" "Please check your Keycloak configuration."
     exit 1
   fi
-fi
 
 log "SUCCESS" "Realm '${REALM_NAME}' exists"
 
@@ -327,7 +329,6 @@ if [ "$IDP_COUNT" -eq 0 ]; then
   log "WARN" "No identity providers configured in this realm"
   log "INFO" "To configure OAuth providers, run install_keycloak.sh with --enable-oauth-* flags"
   exit 1
-fi
 
 log "SUCCESS" "Found ${IDP_COUNT} identity providers"
 
@@ -502,9 +503,7 @@ IDENTITY_PROVIDER_AUTH=$(echo "$BROWSER_FLOW" | jq -r '[.[] | select(.displayNam
 
 if [ "$IDENTITY_PROVIDER_AUTH" -gt 0 ]; then
   log "SUCCESS" "Identity Provider Redirector is configured in the authentication flow"
-else
   log "WARN" "Identity Provider Redirector is not configured in the authentication flow. Social login buttons may not appear."
-fi
 
 # Check for client configurations
 echo -e "\n${BLUE}Checking for clients that can use these identity providers...${NC}"
@@ -536,7 +535,6 @@ done
 
 if [ $COMPATIBLE_CLIENTS -eq 0 ]; then
   log "WARN" "No OIDC-compatible clients found. This may indicate an issue with IDPs."
-fi
 
 # Check for direct client OAuth settings that bypass Keycloak
 echo -e "\n${CYAN}${BOLD}Direct OAuth Checks:${NC}"
@@ -571,9 +569,7 @@ if [ "$LOGIN_STATUS" = "200" ]; then
   
   echo -e "${CYAN}You can manually test the login flow at:${NC}"
   echo -e "${CYAN}${LOGIN_URL}${NC}"
-else
   log "ERROR" "Login page is not accessible (HTTP Status: ${LOGIN_STATUS})"
-fi
 
 # Final report
 echo -e "\n${GREEN}${BOLD}Keycloak Identity Provider Tests Completed${NC}"
@@ -604,9 +600,7 @@ if [ -f "${ROOT_DIR}/config/registry/component_registry.json" ]; then
       fi
     fi
   fi
-else
   log "WARN" "Component registry file not found"
-fi
 
 # Exit with appropriate code
 if [ $SECURITY_ISSUES -gt 0 ]; then
@@ -615,7 +609,5 @@ if [ $SECURITY_ISSUES -gt 0 ]; then
 elif [ $EXIT_CODE -ne 0 ]; then
   echo -e "\n${RED}${BOLD}❌ Tests completed with errors.${NC}"
   exit $EXIT_CODE
-else
   echo -e "\n${GREEN}${BOLD}✅ All tests completed successfully!${NC}"
   exit 0
-fi

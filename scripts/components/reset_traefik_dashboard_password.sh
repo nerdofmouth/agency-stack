@@ -1,12 +1,20 @@
 #!/bin/bash
-# reset_traefik_dashboard_password.sh - Reset Traefik dashboard credentials
-# AgencyStack Team
-
-set -e
 
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../utils/common.sh"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: reset_traefik_dashboard_password.sh
+# Path: /scripts/components/reset_traefik_dashboard_password.sh
+#
+set -e
+
+# Source common utilities
 source "${SCRIPT_DIR}/../utils/log_helpers.sh"
 
 # Default configuration
@@ -20,7 +28,6 @@ if ! command -v htpasswd &> /dev/null; then
     log_info "Installing apache2-utils to use htpasswd..."
     apt-get update -q
     apt-get install -y apache2-utils
-fi
 
 # Generate hashed password
 HASHED_PASSWORD=$(htpasswd -nbB admin "${NEW_PASSWORD}")
@@ -59,9 +66,7 @@ log_success "Updated dashboard.yml in repository"
 if [ -d "${TRAEFIK_CONFIG_DIR}" ]; then
     cp "${DASHBOARD_YML}" "${TRAEFIK_CONFIG_DIR}/dynamic/dashboard.yml"
     log_success "Updated dashboard.yml in client configuration directory"
-else
     log_warning "Client configuration directory not found: ${TRAEFIK_CONFIG_DIR}"
-fi
 
 # Restart Traefik container if it exists
 if docker ps | grep -q "${TRAEFIK_CONTAINER_NAME}"; then
@@ -70,9 +75,7 @@ if docker ps | grep -q "${TRAEFIK_CONTAINER_NAME}"; then
     log_success "Traefik container restarted with new credentials"
     log_info "Username: admin"
     log_info "Password: ${NEW_PASSWORD}"
-else
     log_warning "Traefik container not found: ${TRAEFIK_CONTAINER_NAME}"
-fi
 
 log_success "Traefik dashboard credentials have been reset."
 log_info "Use the following credentials to login:"

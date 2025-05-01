@@ -1,19 +1,23 @@
 #!/bin/bash
-# install_docker.sh - Docker container runtime installation for AgencyStack
-# https://stack.nerdofmouth.com
-#
-# This script installs and configures Docker with:
-# - System dependency checks
-# - Proper user permissions
-# - Docker daemon configuration
-# - Security hardening
-# - Integration with AgencyStack
-#
-# Author: AgencyStack Team
-# Version: 1.0.0
-# Created: 2025-04-07
 
-# Set strict error handling
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: docker.sh
+# Path: /scripts/components/install_docker.sh
+#
+
+# Enforce containerization (prevent host contamination)
+
+# AgencyStack Component Installer: docker.sh
+# Path: /scripts/components/install_docker.sh
+#
 set -euo pipefail
 
 # Define absolute paths - never rely on relative paths
@@ -24,7 +28,6 @@ AGENCY_SCRIPTS_DIR="${AGENCY_ROOT}/repo/scripts"
 AGENCY_UTILS_DIR="${AGENCY_SCRIPTS_DIR}/utils"
 
 # Use a robust, portable path for common.sh
-source "$(dirname "$0")/../utils/common.sh"
 source "$(dirname "$0")/../utils/log_helpers.sh"
 
 # Define component-specific variables
@@ -178,7 +181,6 @@ if command -v docker &> /dev/null && [[ "${FORCE}" != "true" ]]; then
     log "INFO" "Use --force to reinstall" "${CYAN}Use --force to reinstall.${NC}"
     exit 0
   fi
-fi
 
 # Check system requirements
 log "INFO" "Checking system requirements" "${CYAN}Checking system requirements...${NC}"
@@ -187,11 +189,9 @@ DISK_SPACE=$(df -m / | awk 'NR==2 {print $4}')
 
 if [[ ${SYSTEM_MEMORY} -lt 1024 ]]; then
   log "WARNING" "Low memory detected: ${SYSTEM_MEMORY}MB" "${YELLOW}⚠️ Low memory detected: ${SYSTEM_MEMORY}MB. Docker may not perform optimally.${NC}"
-fi
 
 if [[ ${DISK_SPACE} -lt 10240 ]]; then
   log "WARNING" "Low disk space detected: ${DISK_SPACE}MB" "${YELLOW}⚠️ Low disk space detected: ${DISK_SPACE}MB. Consider adding more storage.${NC}"
-fi
 
 # Install prerequisites
 log "INFO" "Installing prerequisites" "${CYAN}Installing prerequisites...${NC}"
@@ -208,7 +208,6 @@ apt-get install -y \
 if dpkg -l | grep -q docker; then
   log "INFO" "Removing old Docker versions" "${CYAN}Removing old Docker versions...${NC}"
   apt-get remove -y docker docker-engine docker.io containerd runc >> "${INSTALL_LOG}" 2>&1 || true
-fi
 
 # Install Docker using the official script
 log "INFO" "Installing Docker via official script" "${CYAN}Installing Docker via official script...${NC}"
@@ -220,17 +219,14 @@ chmod +x "${INSTALL_DIR}/get-docker.sh"
 if command -v docker &> /dev/null; then
   INSTALLED_DOCKER_VERSION=$(docker --version | awk '{print $3}' | tr -d ',')
   log "SUCCESS" "Docker installed successfully (version ${INSTALLED_DOCKER_VERSION})" "${GREEN}✅ Docker installed successfully (version ${INSTALLED_DOCKER_VERSION})${NC}"
-else
   log "ERROR" "Docker installation failed" "${RED}❌ Docker installation failed. Check the logs for details.${NC}"
   exit 1
-fi
 
 # Add current user to the docker group if not running as root
 if [[ $(id -u) -ne 0 ]]; then
   log "INFO" "Adding current user to docker group" "${CYAN}Adding current user to docker group...${NC}"
   sudo usermod -aG docker "$(whoami)" >> "${INSTALL_LOG}" 2>&1
   log "INFO" "You may need to log out and back in for group changes to take effect" "${YELLOW}⚠️ You may need to log out and back in for group changes to take effect.${NC}"
-fi
 
 # Create Docker daemon configuration with best practices
 log "INFO" "Creating Docker daemon configuration" "${CYAN}Creating Docker daemon configuration...${NC}"
@@ -264,9 +260,7 @@ log "INFO" "Creating AgencyStack Docker network" "${CYAN}Creating AgencyStack Do
 if ! docker network inspect agency_stack_network &> /dev/null; then
   docker network create agency_stack_network >> "${INSTALL_LOG}" 2>&1
   log "SUCCESS" "Created Docker network: agency_stack_network" "${GREEN}✅ Created Docker network: agency_stack_network${NC}"
-else
   log "INFO" "Docker network agency_stack_network already exists" "${CYAN}Docker network agency_stack_network already exists${NC}"
-fi
 
 # Save Docker version information
 echo "${INSTALLED_DOCKER_VERSION}" > "${COMPONENT_DIR}/version.txt"

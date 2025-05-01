@@ -1,21 +1,20 @@
 #!/bin/bash
-#
-# Complete Traefik-Keycloak Integration Script
-# This script finalizes the integration between Traefik and Keycloak
-# for securing the Traefik dashboard with SSO authentication
-#
 
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
   source "${SCRIPT_DIR}/../utils/common.sh"
-else
-  # Minimal logging functions if common.sh is not available
-  log_info() { echo "[INFO] $1"; }
-  log_success() { echo "[SUCCESS] $1"; }
-  log_warning() { echo "[WARNING] $1"; }
-  log_error() { echo "[ERROR] $1"; }
 fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: complete_traefik_keycloak_integration.sh
+# Path: /scripts/components/complete_traefik_keycloak_integration.sh
+#
+  # Minimal logging functions if common.sh is not available
+
+# Enforce containerization (prevent host contamination)
 
 # Parameters
 CLIENT_ID="${CLIENT_ID:-default}"

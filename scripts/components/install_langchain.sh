@@ -1,16 +1,17 @@
 #!/bin/bash
-# install_langchain.sh - AgencyStack LangChain Integration
-# [https://stack.nerdofmouth.com](https://stack.nerdofmouth.com)
-#
-# Installs and configures LangChain API service for AI chain/agent development
-# Part of the AgencyStack AI Foundation
-#
-# Author: AgencyStack Team
-# Version: 1.0.0
-# Date: April 5, 2025
 
-# --- BEGIN: Preflight/Prerequisite Check ---
-source "$(dirname "$0")/../utils/common.sh"
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: langchain.sh
+# Path: /scripts/components/install_langchain.sh
+#
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -31,7 +32,6 @@ NC='\033[0m' # No Color
 BOLD='\033[1m'
 
 # Variables
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 CONFIG_DIR="/opt/agency_stack"
 LOG_DIR="/var/log/agency_stack"
@@ -886,7 +886,6 @@ if docker ps -q -f name=$CONTAINER_NAME | grep -q .; then
     NUM_TOOLS=$(echo "$COUNTS" | cut -d, -f2)
     API_CALLS=$(get_api_metrics)
   fi
-else
   HEALTH="stopped"
   RUNNING="false"
   
@@ -894,7 +893,6 @@ else
   COUNTS=$(count_artifacts)
   NUM_CHAINS=$(echo "$COUNTS" | cut -d, -f1)
   NUM_TOOLS=$(echo "$COUNTS" | cut -d, -f2)
-fi
 
 # Update dashboard
 update_dashboard "$RUNNING" "$HEALTH" "$NUM_CHAINS" "$NUM_TOOLS" "$API_CALLS"

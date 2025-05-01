@@ -1,10 +1,17 @@
 #!/bin/bash
 
-# AgencyStack Design System Dev Environment Installation Script
-# Integrates Bit.dev with AgencyStack Dashboard for component development
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
 
-# --- BEGIN: Preflight/Prerequisite Check ---
-source "$(dirname "$0")/../utils/common.sh"
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: design_system_dev.sh
+# Path: /scripts/components/install_design_system_dev.sh
+#
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -12,8 +19,6 @@ preflight_check_agencystack || {
 # --- END: Preflight/Prerequisite Check ---
 
 # Source common utilities
-SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
-source "${SCRIPT_DIR}/../utils/common.sh"
 
 # Default configuration
 DOMAIN="localhost"
@@ -76,7 +81,6 @@ if ! command -v node &> /dev/null; then
   log_info "Installing Node.js..."
   curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
   apt-get install -y nodejs
-fi
 
 # Check if Bit is installed globally
 if ! command -v bit &> /dev/null; then
@@ -91,7 +95,6 @@ if ! command -v bit &> /dev/null; then
     bit config set analytics_reporting false
     bit config set anonymous_reporting false
   fi
-fi
 
 # Copy design system files to install directory
 log_info "Installing AgencyStack Design System files..."
@@ -422,13 +425,11 @@ log_info "Updating dashboard data with domain configuration..."
 if [ "${DOMAIN}" != "localhost" ]; then
   sed -i "s|http://localhost:${DESIGN_SYSTEM_PORT}|https://${DOMAIN}|g" "${DASHBOARD_DATA_DIR}/design-system.json"
   sed -i "s|http://localhost:${BIT_DEV_PORT}|https://${DOMAIN}/design-system|g" "${DASHBOARD_DATA_DIR}/design-system.json"
-fi
 
 # Restart Traefik if it's running
 if systemctl is-active --quiet traefik; then
   log_info "Restarting Traefik to apply configuration..."
   systemctl restart traefik
-fi
 log_success "AgencyStack Design System has been installed and integrated with the dashboard"
 log_info "Access the dashboard at: http://localhost:${DESIGN_SYSTEM_PORT}"
 log_info "Access Bit dev directly at: http://localhost:${BIT_DEV_PORT}"

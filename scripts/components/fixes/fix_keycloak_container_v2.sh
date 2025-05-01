@@ -1,21 +1,20 @@
 #!/bin/bash
-# fix_keycloak_container_v2.sh - Fix Keycloak container for newer versions
-# https://stack.nerdofmouth.com
-#
-# This script updates Keycloak configuration to be compatible with newer Keycloak versions.
-# Following the AgencyStack repository integrity policy, all VM changes must be tracked in the repo.
-
-set -e
 
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [[ -f "${SCRIPT_DIR}/../../utils/common.sh" ]]; then
-  source "${SCRIPT_DIR}/../../utils/common.sh"
-else
-  log_error() { echo "[ERROR] $1" >&2; }
-  log_info() { echo "[INFO] $1"; }
-  log_success() { echo "[SUCCESS] $1"; }
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
 fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: fix_keycloak_container_v2.sh
+# Path: /scripts/components/fix_keycloak_container_v2.sh
+#
+set -e
+
+# Source common utilities
 
 # Default settings
 DOMAIN=""
@@ -63,7 +62,6 @@ done
 if [[ -z "$DOMAIN" ]]; then
   log_error "No domain specified. Use --domain option."
   exit 1
-fi
 
 log_info "==================================================="
 log_info "Starting fix_keycloak_container_v2.sh"
@@ -75,7 +73,6 @@ log_info "==================================================="
 if [[ ! -d "${KEYCLOAK_DIR}/${DOMAIN}" ]]; then
   log_error "Keycloak not installed for domain: $DOMAIN"
   exit 1
-fi
 
 # Backup the existing docker-compose file
 COMPOSE_FILE="${KEYCLOAK_DIR}/${DOMAIN}/docker-compose.yml"
@@ -84,7 +81,6 @@ BACKUP_FILE="${KEYCLOAK_DIR}/${DOMAIN}/docker-compose.yml.backup-$(date +%Y%m%d%
 if [[ -f "$COMPOSE_FILE" ]]; then
   log_info "Backing up existing docker-compose.yml to $BACKUP_FILE"
   cp "$COMPOSE_FILE" "$BACKUP_FILE"
-fi
 
 # Extract DB and admin passwords from the current docker-compose file
 log_info "Extracting environment variables from current configuration"
@@ -191,7 +187,6 @@ if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
   log_error "Keycloak failed to start within the expected time. Please check logs."
   docker logs keycloak_${DOMAIN} | tail -n 50
   exit 1
-fi
 
 log_success "Keycloak container fix has been completed and service restarted"
 log_info "You can access the Keycloak admin console at: https://${DOMAIN}/auth"

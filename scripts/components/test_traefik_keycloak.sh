@@ -1,19 +1,19 @@
 #!/bin/bash
-#
-# Traefik-Keycloak Integration Test Script
-# Following AgencyStack Test-Driven Development Protocol
-#
 
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
   source "${SCRIPT_DIR}/../utils/common.sh"
-else
-  log_info() { echo "[INFO] $1"; }
-  log_success() { echo "[SUCCESS] $1"; }
-  log_warning() { echo "[WARNING] $1"; }
-  log_error() { echo "[ERROR] $1"; }
 fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: test_traefik_keycloak.sh
+# Path: /scripts/components/test_traefik_keycloak.sh
+#
+
+# Enforce containerization (prevent host contamination)
 
 # Test Config
 CLIENT_ID="${CLIENT_ID:-default}"

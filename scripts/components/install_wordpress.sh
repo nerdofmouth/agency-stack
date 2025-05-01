@@ -1,18 +1,29 @@
 #!/bin/bash
-# install_wordpress.sh - Installation script for WordPress
-# AgencyStack Team
 
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: wordpress.sh
+# Path: /scripts/components/install_wordpress.sh
+#
+
+# Enforce containerization (prevent host contamination)
+
+# AgencyStack Component Installer: wordpress.sh
+# Path: /scripts/components/install_wordpress.sh
+#
 set -e
 
-# --- Ensure logging functions are available (source common.sh and log_helpers.sh) ---
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 if [[ "$(type -t log)" != "function" ]]; then
-  source "$REPO_ROOT/scripts/utils/common.sh"
-fi
 if [[ "$(type -t log)" != "function" ]]; then
   source "$REPO_ROOT/scripts/utils/log_helpers.sh"
-fi
 
 # Set paths based on Docker-in-Docker environment
 if [ "$CONTAINER_RUNNING" = "true" ]; then
@@ -31,7 +42,6 @@ if [ "$CONTAINER_RUNNING" = "true" ]; then
   # Use container-safe installation directory
   BASE_INSTALL_DIR="${HOME}/agency_stack"
   log "INFO" "Using container-safe installation directory: ${BASE_INSTALL_DIR}"
-else
   # Standard system paths on host
   LOG_DIR="/var/log/agency_stack/components"
   mkdir -p "$LOG_DIR"
@@ -42,7 +52,6 @@ else
   
   # Use standard installation directory on host
   BASE_INSTALL_DIR="/opt/agency_stack"
-fi
 
 # Define directories
 WP_DIR="${BASE_INSTALL_DIR}/wordpress"
@@ -64,7 +73,6 @@ done
 FORCE_NORMALIZED="false"
 if [[ "$FORCE" =~ ^([Tt][Rr][Uu][Ee]|1)$ ]]; then
   FORCE_NORMALIZED="true"
-fi
 
 # Debug: Show FORCE value
 log "INFO" "FORCE variable value: $FORCE (normalized: $FORCE_NORMALIZED)"
@@ -86,7 +94,6 @@ if [ -n "$CLIENT_ID" ]; then
   WORDPRESS_CONTAINER_NAME="${CLIENT_ID}_wordpress"
   NGINX_CONTAINER_NAME="${CLIENT_ID}_nginx"
   REDIS_CONTAINER_NAME="${CLIENT_ID}_redis"
-else
   # In container environments, the names are prefixed with the domain
   if [ "$CONTAINER_RUNNING" = "true" ]; then
     MARIADB_CONTAINER_NAME="localhost-mariadb-1"
@@ -99,7 +106,6 @@ else
     NGINX_CONTAINER_NAME="default_nginx"
     REDIS_CONTAINER_NAME="default_redis"
   fi
-fi
 
 # --- MariaDB container existence check and auto-handling (robust for Compose patterns) ---
 MATCHING_CONTAINERS=$(docker ps -a --format '{{.Names}}' | grep -E "(^${MARIADB_CONTAINER_NAME}$|^${CLIENT_ID}_mariadb$|^mariadb$|^default_mariadb$)" || true)
@@ -129,18 +135,14 @@ if [[ -n "$MATCHING_CONTAINERS" ]]; then
     log "ERROR: MariaDB container name conflict. Use --force to remove the existing container(s), or rename/remove manually." "${RED}MariaDB container name conflict. Use --force to remove, or rename/remove manually.${NC}"
     exit 1
   fi
-fi
 
 # --- Preflight/Prerequisite Check ---
 if [ "$SKIP_PREFLIGHT" != "true" ]; then
-  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
-  source "$REPO_ROOT/scripts/utils/common.sh"
   preflight_check_agencystack || {
     echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
     exit 1
   }
-fi
 
 # install_wordpress.sh - Install and configure WordPress for AgencyStack
 # https://stack.nerdofmouth.com
@@ -167,7 +169,6 @@ NC='\033[0m' # No Color
 BOLD='\033[1m'
 
 # Variables
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 # Set installation paths based on environment
@@ -176,11 +177,9 @@ if [ "$CONTAINER_RUNNING" = "true" ]; then
   CONFIG_DIR="${HOME}/agency_stack"
   WP_DIR="${CONFIG_DIR}/wordpress"
   log "INFO" "Using container-safe installation directory: ${CONFIG_DIR}"
-else
   # Use standard system paths
   CONFIG_DIR="/opt/agency_stack"
   WP_DIR="${CONFIG_DIR}/wordpress"
-fi
 
 # Ensure directories exist with proper permissions
 mkdir -p "${WP_DIR}" 2>/dev/null || true
@@ -208,7 +207,6 @@ CONFIGURE_DNS=false
 # Source the component_sso_helper.sh if available
 if [ -f "${SCRIPT_DIR}/../utils/component_sso_helper.sh" ]; then
   source "${SCRIPT_DIR}/../utils/component_sso_helper.sh"
-fi
 
 # --- Enable AgencyStack Standard Error Trap ---
 trap_agencystack_errors
@@ -225,10 +223,8 @@ if is_running_in_container; then
   
   # Use full container names for service resolution
   WORDPRESS_DB_HOST="${MARIADB_CONTAINER_NAME}"
-else
   # Use service name for standard installations
   WORDPRESS_DB_HOST="mariadb"
-fi
 
 # --- Set container and volume names BEFORE any pre-flight logic ---
 # (This logic should match the main container naming logic used later)
@@ -243,7 +239,6 @@ if [ -n "$CLIENT_ID" ]; then
   WORDPRESS_CONTAINER_NAME="${CLIENT_ID}_wordpress"
   NGINX_CONTAINER_NAME="${CLIENT_ID}_nginx"
   REDIS_CONTAINER_NAME="${CLIENT_ID}_redis"
-else
   # In container environments, the names are prefixed with the domain
   if [ "$CONTAINER_RUNNING" = "true" ]; then
     NETWORK_NAME="localhost_network"
@@ -256,7 +251,6 @@ else
     NGINX_CONTAINER_NAME="default_nginx"
     REDIS_CONTAINER_NAME="default_redis"
   fi
-fi
 
 # --- Helper functions for networking and containerization ---
 test_container_connectivity() {
@@ -418,7 +412,6 @@ EOL
 if [ ! -f "${WP_DIR}/${DOMAIN}/docker-compose.yml" ]; then
   log "FATAL: Docker Compose file ${WP_DIR}/${DOMAIN}/docker-compose.yml not found. Cannot proceed with MariaDB startup." "${RED}[FATAL] Docker Compose file ${WP_DIR}/${DOMAIN}/docker-compose.yml not found. Cannot proceed with MariaDB startup.${NC}"
   exit 14
-fi
 
 # --- BULLETPROOF: Always create/overwrite my.cnf as a file before any Docker logic, even for existing installs ---
 log "INFO: Ensuring MariaDB init directory exists" "${CYAN}Ensuring MariaDB init directory exists...${NC}"
@@ -432,7 +425,6 @@ log "INFO: Validating MariaDB config and Docker volume state before startup" "${
 if [ -d "$MYCNF_PATH" ]; then
   log "FATAL: $MYCNF_PATH is a directory. Removing to allow file mount." "${RED}[FATAL] $MYCNF_PATH is a directory. Removing to allow file mount.${NC}"
   rm -rf "$MYCNF_PATH"
-fi
 
 if [ ! -f "$MYCNF_PATH" ]; then
   log "INFO: Creating MariaDB my.cnf configuration" "${CYAN}Creating MariaDB my.cnf configuration...${NC}"
@@ -445,17 +437,14 @@ max_allowed_packet=128M
 EOL
   chown ${AGENCY_USER:-developer}:${AGENCY_GROUP:-developer} "$MYCNF_PATH" 2>/dev/null || true
   chmod 644 "$MYCNF_PATH"
-fi
 
 # Check for leftover/failed MariaDB containers and volumes
 if docker ps -a --format '{{.Names}}' | grep -q "^${MARIADB_CONTAINER_NAME}$"; then
   log "INFO: Removing existing MariaDB container ${MARIADB_CONTAINER_NAME} before startup" "${YELLOW}Removing existing MariaDB container ${MARIADB_CONTAINER_NAME} before startup...${NC}"
   docker rm -f "${MARIADB_CONTAINER_NAME}"
-fi
 if docker volume ls --format '{{.Name}}' | grep -q "^${MARIADB_CONTAINER_NAME}_data$"; then
   log "INFO: Removing existing MariaDB Docker volume ${MARIADB_CONTAINER_NAME}_data before startup" "${YELLOW}Removing existing MariaDB Docker volume ${MARIADB_CONTAINER_NAME}_data before startup...${NC}"
   docker volume rm "${MARIADB_CONTAINER_NAME}_data"
-fi
 
 docker volume prune -f
 
@@ -483,7 +472,6 @@ if docker ps -a --format '{{.Names}}' | grep -q '^default_mariadb$'; then
     docker rm -f default_mariadb
   fi
   log "INFO: Docker ps -a after MariaDB removal:" "$(docker ps -a)"
-fi
 # Log Docker state after removal for diagnostics
 log "INFO: Docker ps -a after MariaDB removal:" "$(docker ps -a)"
 
@@ -493,29 +481,24 @@ if ss -ltn | grep -q ":$MARIADB_PORT "; then
   log "ERROR: Port $MARIADB_PORT is already in use. MariaDB cannot start." "${RED}Port $MARIADB_PORT is already in use. MariaDB cannot start.${NC}"
   ss -ltn | grep ":$MARIADB_PORT " || true
   exit 1
-else
   log "INFO: MariaDB port $MARIADB_PORT is available."
-fi
 
 # --- Docker network state pre-startup (debug) ---
 log "INFO: Docker network state before MariaDB startup" "${CYAN}Docker network state before MariaDB startup...${NC}"
 docker network ls || true
 if docker network inspect wordpress_network &>/dev/null; then
   docker network inspect wordpress_network || true
-fi
 
 # --- Ensure MariaDB Docker volume exists for data persistence ---
 MARIADB_VOLUME="default_mariadb_data"
 if ! docker volume ls --format '{{.Name}}' | grep -q "^$MARIADB_VOLUME$"; then
   log "INFO: Creating Docker volume $MARIADB_VOLUME for MariaDB data persistence" "${CYAN}Creating Docker volume $MARIADB_VOLUME for MariaDB data persistence...${NC}"
   docker volume create $MARIADB_VOLUME
-fi
 
 # --- Ensure the external Docker network exists before running Docker Compose ---
 if ! docker network ls --format '{{.Name}}' | grep -q "^${NETWORK_NAME}$"; then
   log "INFO: Creating external Docker network '${NETWORK_NAME}'" "${CYAN}Creating external Docker network '${NETWORK_NAME}'...${NC}"
   docker network create "${NETWORK_NAME}"
-fi
 
 # --- Bulletproof cleanup and diagnostics for nginx config directory ---
 log "INFO: Sanity checking ${WP_DIR}/${DOMAIN}/nginx/ before creation" "${CYAN}Sanity checking ${WP_DIR}/${DOMAIN}/nginx/ before creation...${NC}"
@@ -530,7 +513,6 @@ mkdir -p "${NGINX_CONF_DIR}"
 if [ -e "${DEFAULT_CONF}" ]; then
   log "WARNING: ${DEFAULT_CONF} exists. Removing it completely." "${YELLOW}${DEFAULT_CONF} exists. Removing it completely.${NC}"
   rm -rf "${DEFAULT_CONF}"
-fi
 
 # Create a new default.conf with proper permissions
 log "INFO: Creating fresh nginx default.conf file" "${CYAN}Creating fresh nginx default.conf file...${NC}"
@@ -583,7 +565,6 @@ if [ ! -f "${DEFAULT_CONF}" ]; then
   ls -la "${NGINX_CONF_DIR}"
   file "${DEFAULT_CONF}" 2>/dev/null || echo "Cannot determine file type"
   exit 1
-fi
 
 # WSL2/Docker volume mount verification 
 log "INFO: Verified nginx config is a proper file (critical for Docker mounts)" "${GREEN} Verified nginx config is a proper file (critical for Docker mounts)${NC}"
@@ -621,7 +602,6 @@ if [ "$CONTAINER_RUNNING" = "true" ]; then
   else
     log "WARNING: Could not get MariaDB IP address" "${YELLOW}Could not get MariaDB IP address${NC}"
   fi
-fi
 
 # Wait for WordPress stack to initialize
 log "INFO: Waiting for WordPress to start" "${CYAN}Waiting for WordPress to start...${NC}"
@@ -726,7 +706,6 @@ if [ "\${ENABLE_KEYCLOAK}" = "true" ]; then
   
   # Update OpenID Connect configuration
   wp --allow-root option update openid_connect_generic_settings "\$OC_CONFIG"
-fi
 
 echo "WordPress installation complete."
 EOL
@@ -755,10 +734,8 @@ echo "=========================================="
   
 if docker exec "${MARIADB_CONTAINER_NAME}" mysql -u"${WP_DB_USER}" -p"${WP_DB_PASSWORD}" -e "SELECT 1" "${WP_DB_NAME}" > /dev/null 2>&1; then
   echo "SUCCESS: Connected to database"
-else
   log "ERROR: Failed to connect to database" "${RED} Failed to connect to database${NC}"
   exit 1
-fi
   
 # Create database backup if exists
 log "INFO: Creating database backup" "${CYAN}Creating WordPress database backup (if database exists)...${NC}"
@@ -794,9 +771,7 @@ if ! docker exec "${MARIADB_CONTAINER_NAME}" mysql -u"${WP_DB_USER}" -p"${WP_DB_
     log "ERROR: Failed to initialize WordPress database schema" "${RED} Failed to initialize WordPress database schema${NC}"
     exit 1
   fi
-else
   log "INFO: WordPress database schema already initialized" "${GREEN} WordPress database schema already initialized${NC}"
-fi
 
 # Verify WordPress installation
 log "INFO: Verifying WordPress installation" "${CYAN}Verifying WordPress installation...${NC}"
@@ -849,7 +824,6 @@ if [ -d "${CONFIG_DIR}/components" ]; then
   "status": "active"
 }
 EOF
-fi
 
 # Configure Keycloak SSO integration if enabled
 if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
@@ -950,7 +924,6 @@ if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
     log "WARNING: component_sso_helper.sh not found or not properly sourced" "${YELLOW}Keycloak SSO integration helper not available${NC}"
     log "INFO: Manual SSO configuration will be required" "${CYAN}Manual SSO configuration will be required${NC}"
   fi
-fi
 
 # Update component registry
 if [ -f "${ROOT_DIR}/scripts/utils/update_component_registry.sh" ]; then
@@ -971,7 +944,6 @@ if [ -f "${ROOT_DIR}/scripts/utils/update_component_registry.sh" ]; then
   fi
   
   bash "${ROOT_DIR}/scripts/utils/update_component_registry.sh" "${REGISTRY_ARGS[@]}"
-fi
 
 # Default configuration
 CLIENT_ID="${CLIENT_ID:-default}"
@@ -981,5 +953,4 @@ log "SUCCESS: WordPress installation completed!" "${GREEN} WordPress installatio
 echo -e "\n${CYAN}WordPress should now be accessible at: https://${DOMAIN}/\nAdmin user: ${WP_ADMIN_USER}\nAdmin password: (see secrets in ${WP_DIR}/${DOMAIN}/)\n${NC}"
 if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
   echo -e "${CYAN}Keycloak SSO is enabled. Configure your IdP as needed.${NC}"
-fi
 exit 0

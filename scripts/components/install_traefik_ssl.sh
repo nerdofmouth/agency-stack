@@ -1,4 +1,20 @@
 #!/bin/bash
+
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: traefik_ssl.sh
+# Path: /scripts/components/install_traefik_ssl.sh
+#
+
+# Enforce containerization (prevent host contamination)
+
 # install_traefik_ssl.sh: Installs Traefik reverse proxy with SSL for AgencyStack
 set -e
 COMPONENT=traefik_ssl
@@ -39,7 +55,6 @@ EOF
 # Create the Docker network if it doesn't exist
 if ! docker network ls | grep -q agency_stack_net; then
   docker network create agency_stack_net
-fi
 
 # Prepare letsencrypt storage
 mkdir -p "$INSTALL_DIR/letsencrypt"

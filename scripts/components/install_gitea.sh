@@ -1,13 +1,21 @@
 #!/bin/bash
-# install_gitea.sh - Installation script for Gitea
-# AgencyStack Team
 
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: gitea.sh
+# Path: /scripts/components/install_gitea.sh
+#
 set -e
 
 # --- BEGIN: Preflight/Prerequisite Check ---
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
-source "$REPO_ROOT/scripts/utils/common.sh"
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -15,12 +23,9 @@ preflight_check_agencystack || {
 # --- END: Preflight/Prerequisite Check ---
 
 # Source common utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
-source "$REPO_ROOT/scripts/utils/common.sh"
 
 # Use robust, portable path for helpers
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 source "$REPO_ROOT/scripts/utils/log_helpers.sh"
 

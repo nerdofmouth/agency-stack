@@ -1,4 +1,20 @@
 #!/bin/bash
+
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: peacefestivalusa-wordpress-custom-entrypoint.sh
+# Path: /scripts/components/peacefestivalusa-wordpress-custom-entrypoint.sh
+#
+
+# Enforce containerization (prevent host contamination)
+
 # AgencyStack WordPress Custom Entrypoint
 # This script properly configures WordPress for Docker-in-Docker environments
 # Following the AgencyStack Charter v1.0.3 principles
@@ -32,7 +48,6 @@ if [ "$DB_READY" != "true" ]; then
   log_message "User: $WORDPRESS_DB_USER"
   log_message "Database: $WORDPRESS_DB_NAME"
   log_message "This may be a networking issue or database container may not be running"
-fi
 
 # Ensure WordPress files exist before proceeding
 if [ ! -f /var/www/html/wp-includes/version.php ]; then
@@ -40,7 +55,6 @@ if [ ! -f /var/www/html/wp-includes/version.php ]; then
   cp -r /usr/src/wordpress/* /var/www/html/
   chown -R www-data:www-data /var/www/html
   log_message "WordPress core files copied successfully"
-fi
 
 # Create a custom wp-config.php override with proper database connection
 log_message "Creating WordPress configuration override"
@@ -100,13 +114,11 @@ if [ -f /var/www/html/index.php ] && [ ! -f /var/www/html/index-original.php ]; 
     # Replace the original index.php with our override
     cp /var/www/html/index-agencystack.php /var/www/html/index.php
     log_message "Installed custom index.php for proper configuration loading"
-fi
 
 # Add SSL overrides to wp-config.php if it exists
 if [ -f /var/www/html/wp-config.php ]; then
     log_message "Ensuring SSL settings are properly configured"
     grep -q "FORCE_SSL_ADMIN" /var/www/html/wp-config.php || sed -i "s/define( 'WP_DEBUG'/define('FORCE_SSL_ADMIN', false); define('FORCE_SSL_LOGIN', false); define( 'WP_DEBUG'/g" /var/www/html/wp-config.php
-fi
 
 # Create a health check file for monitoring
 cat > /var/www/html/agencystack-health.php << 'EOF'

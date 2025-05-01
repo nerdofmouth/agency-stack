@@ -1,11 +1,20 @@
 #!/bin/bash
-# Bolt DIY Installation Script
-# AgencyStack Component: bolt-diy
 
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: bolt_diy.sh
+# Path: /scripts/components/install_bolt_diy.sh
+#
 set -euo pipefail
 
 # --- BEGIN: Preflight/Prerequisite Check ---
-source "$(dirname "$0")/../utils/common.sh"
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -24,7 +33,6 @@ log_start "${LOG_FILE}" "Bolt DIY installation started"
 if [ -f "${INSTALL_DIR}/.installed" ]; then
     log_info "${LOG_FILE}" "Bolt DIY already installed, skipping"
     exit 0
-fi
 
 # Create installation directory
 mkdir -p "${INSTALL_DIR}"

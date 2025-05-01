@@ -1,16 +1,17 @@
 #!/bin/bash
-# install_etebase.sh - AgencyStack Etebase Integration
-# [https://stack.nerdofmouth.com](https://stack.nerdofmouth.com)
-#
-# Installs and configures Etebase server for encrypted CalDAV/CardDAV
-# Part of the AgencyStack Collaboration & Security suite
-#
-# Author: AgencyStack Team
-# Version: 1.0.0
-# Date: April 5, 2025
 
-# --- BEGIN: Preflight/Prerequisite Check ---
-source "$(dirname "$0")/../utils/common.sh"
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: etebase.sh
+# Path: /scripts/components/install_etebase.sh
+#
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -31,7 +32,6 @@ NC='\033[0m' # No Color
 BOLD='\033[1m'
 
 # Variables
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 CONFIG_DIR="/opt/agency_stack"
 LOG_DIR="/var/log/agency_stack"
@@ -505,10 +505,8 @@ if docker ps -q -f name=$CONTAINER_NAME | grep -q .; then
   if [ -z "$SYNC_TIME" ]; then
     SYNC_TIME=$(docker inspect --format='{{.State.StartedAt}}' $CONTAINER_NAME | cut -d'.' -f1 | sed 's/T/ /')
   fi
-else
   HEALTH="stopped"
   RUNNING="false"
-fi
 
 # Update dashboard
 update_dashboard "$RUNNING" "$HEALTH" "$SYNC_TIME" "$CLIENT_COUNT"
@@ -580,12 +578,10 @@ if docker ps -q -f name="etebase-${CLIENT_ID}" | grep -q .; then
   
   # Clean up temporary directory
   rm -rf "${TEMP_DIR}"
-else
   echo "Etebase server is not running. Creating a cold backup..."
   
   # Create the backup archive directly
   tar -czf "${BACKUP_FILE}" -C "${DATA_DIR}/.." "data" -C "${CONFIG_DIR}/.." "config"
-fi
 
 # Check if backup was successful
 if [ -f "${BACKUP_FILE}" ]; then
@@ -598,10 +594,8 @@ if [ -f "${BACKUP_FILE}" ]; then
   ls -1t "${BACKUP_DIR}"/etebase-${CLIENT_ID}-*.tar.gz | tail -n +8 | xargs -r rm
   
   exit 0
-else
   echo "Backup failed"
   exit 1
-fi
 EOF
 
   # Make backup script executable
@@ -627,13 +621,11 @@ if [ -z "${BACKUP_FILE}" ]; then
   echo "Error: No backup file specified"
   echo "Usage: $0 <client_id> <backup_file>"
   exit 1
-fi
 
 # Check if backup file exists
 if [ ! -f "${BACKUP_FILE}" ]; then
   echo "Error: Backup file not found: ${BACKUP_FILE}"
   exit 1
-fi
 
 # Check if Etebase server is running
 if docker ps -q -f name="etebase-${CLIENT_ID}" | grep -q .; then
@@ -641,7 +633,6 @@ if docker ps -q -f name="etebase-${CLIENT_ID}" | grep -q .; then
   
   # Stop the server
   cd /opt/agency_stack/docker/etebase && docker-compose down
-fi
 
 # Create temporary directory
 TEMP_DIR=$(mktemp -d)
@@ -661,7 +652,6 @@ if [ -d "${TEMP_DIR}/config" ]; then
   echo "Restoring configuration..."
   mkdir -p "${CONFIG_DIR}"
   cp -a "${TEMP_DIR}/config/." "${CONFIG_DIR}/"
-fi
 
 # Clean up temporary directory
 rm -rf "${TEMP_DIR}"

@@ -1,14 +1,17 @@
 #!/bin/bash
 
-# Source common utilities if available
-if [ -f "$(dirname "$0")/../utils/common.sh" ]; then
-  source "$(dirname "$0")/../utils/common.sh"
-else
-  log_info() { echo "[INFO] $1"; }
-  log_success() { echo "[SUCCESS] $1"; }
-  log_warning() { echo "[WARNING] $1"; }
-  log_error() { echo "[ERROR] $1"; }
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
 fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: test_traefik_host.sh
+# Path: /scripts/components/test_traefik_host.sh
+#
 
 # Configuration
 CONTAINER_NAME="${CONTAINER_NAME:-agencystack-dev}"
@@ -27,10 +30,8 @@ log_info "==========================================="
 log_info "Testing network connectivity to container..."
 if ping -c 1 -W 1 $CONTAINER_IP > /dev/null; then
   log_success "Network connectivity to container IP $CONTAINER_IP is working"
-else
   log_error "Cannot ping container IP $CONTAINER_IP"
   log_info "This might be due to ICMP being blocked, proceeding with HTTP test..."
-fi
 
 # Dashboard HTTP check
 log_info "Testing Traefik dashboard via container IP..."
@@ -61,7 +62,6 @@ if [[ "$HTTP_CODE" == "200" ]]; then
   log_info "==========================================="
   
   exit 0
-else
   log_error "Traefik dashboard is NOT accessible from host (HTTP $HTTP_CODE)"
   log_info "Debugging information:"
   log_info "- Container IP: $CONTAINER_IP"
@@ -78,4 +78,3 @@ else
   log_info "$PORT_BINDING"
   
   exit 1
-fi

@@ -1,4 +1,20 @@
 #!/bin/bash
+
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: check_keycloak_idp_status.sh
+# Path: /scripts/components/check_keycloak_idp_status.sh
+#
+
+# Enforce containerization (prevent host contamination)
+
 # check_keycloak_idp_status.sh
 #
 # This script checks the status of Keycloak OAuth Identity Providers
@@ -23,7 +39,6 @@ BOLD='\033[1m'
 NC='\033[0m' # No Color
 
 # Variables
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 CONFIG_DIR="/opt/agency_stack"
 KEYCLOAK_DIR="${CONFIG_DIR}/keycloak"
@@ -38,7 +53,6 @@ if [ ! -w "$LOG_DIR" ] && [ ! -w "/var/log" ]; then
   COMPONENTS_LOG_DIR="${LOG_DIR}/components"
   LOG_FILE="${COMPONENTS_LOG_DIR}/keycloak_idp_status.log"
   echo "Notice: Using local log directory for development: ${LOG_DIR}"
-fi
 
 DOMAIN=""
 CLIENT_ID=""
@@ -197,7 +211,6 @@ if [ ! -f "$ADMIN_PASSWORD_FILE" ]; then
   elif [ "$STATUS_ONLY" = true ]; then
     echo "ERROR: Admin password file not found"
   fi
-  
   exit 1
 fi
 
@@ -216,7 +229,6 @@ if [ "$HTTP_STATUS" != "200" ]; then
   fi
   
   exit 1
-fi
 
 log "SUCCESS" "Keycloak is running at https://${DOMAIN}/auth/"
 
@@ -247,7 +259,6 @@ if [ -z "$ADMIN_TOKEN" ] || [ "$ADMIN_TOKEN" = "null" ]; then
     
     exit 1
   fi
-fi
 
 log "SUCCESS" "Successfully authenticated to Keycloak API"
 
@@ -286,7 +297,6 @@ if [ "$REALM_STATUS" != "200" ]; then
     
     exit 1
   fi
-fi
 
 log "SUCCESS" "Realm '${REALM_NAME}' exists"
 
@@ -305,7 +315,6 @@ if [ "$?" -ne 0 ]; then
   fi
   
   exit 1
-fi
 
 # Check if any IDPs exist
 IDP_COUNT=$(echo "$IDP_RESPONSE" | jq -r 'if type=="array" then length else 0 end')
@@ -332,7 +341,6 @@ log "SUCCESS" "Found ${IDP_COUNT} identity providers"
 # Initialize JSON output
 if [ "$JSON_OUTPUT" = true ]; then
   JSON_PROVIDERS="["
-fi
 
 # Check each identity provider
 echo -e "\n${CYAN}${BOLD}Configured Identity Providers:${NC}"
@@ -449,7 +457,6 @@ done
 # Remove trailing comma from JSON array if present
 if [ "$JSON_OUTPUT" = true ]; then
   JSON_PROVIDERS="${JSON_PROVIDERS%,}]"
-fi
 
 # Check authentication flows
 AUTH_FLOWS=$(curl -s -H "Authorization: Bearer ${ADMIN_TOKEN}" \

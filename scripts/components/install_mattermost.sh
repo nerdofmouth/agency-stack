@@ -1,16 +1,20 @@
 #!/bin/bash
-# install_mattermost.sh - Installation script for mattermost
-#
-# This script installs and configures mattermost for AgencyStack
-# following the component installation conventions.
-#
-# Author: AgencyStack Team
-# Date: 2025-04-07
 
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: mattermost.sh
+# Path: /scripts/components/install_mattermost.sh
+#
 set -e
 
 # --- BEGIN: Preflight/Prerequisite Check ---
-source "$(dirname \"$0\")/../utils/common.sh"
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1

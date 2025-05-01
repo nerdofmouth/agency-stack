@@ -1,4 +1,20 @@
 #!/bin/bash
+
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: client-wordpress-entrypoint.sh
+# Path: /scripts/components/client-wordpress-entrypoint.sh
+#
+
+# Enforce containerization (prevent host contamination)
+
 # AgencyStack WordPress Custom Entrypoint Template
 # This script properly configures WordPress for containerized environments
 # Following the AgencyStack Charter v1.0.3 principles
@@ -19,19 +35,16 @@ log_message "Starting database connectivity checks..."
 if ! command -v netcat &> /dev/null && command -v apt-get &> /dev/null; then
   log_message "Installing diagnostic tools..."
   apt-get update && apt-get install -y netcat-openbsd iputils-ping dnsutils 2>/dev/null || true
-fi
 
 # DNS resolution check
 log_message "Checking DNS resolution for ${WORDPRESS_DB_HOST}..."
 if command -v dig &> /dev/null; then
   dig ${WORDPRESS_DB_HOST} || log_message "DNS lookup failed"
-fi
 
 # Network connectivity check (use native tools if available)
 log_message "Checking network connectivity to database..."
 if command -v nc &> /dev/null; then
   nc -zv ${WORDPRESS_DB_HOST} 3306 -w 1 && log_message " Port 3306 is reachable" || log_message " Cannot reach port 3306"
-fi
 
 # Wait for database to be ready with proper error handling
 log_message "Waiting for database connection..."
@@ -57,7 +70,6 @@ if [ "$DB_READY" != "true" ]; then
   # Attempt a more verbose connection to assist with debugging
   log_message "Attempting explicit mysql connection for diagnostics..."
   mysql -h "${WORDPRESS_DB_HOST}" -u "${WORDPRESS_DB_USER}" -p"${WORDPRESS_DB_PASSWORD}" -e "SELECT 'Database connection test';" 2>&1 || log_message "MySQL command failed"
-fi
 
 # Ensure WordPress files exist before proceeding
 if [ ! -f /var/www/html/wp-includes/version.php ]; then
@@ -65,14 +77,12 @@ if [ ! -f /var/www/html/wp-includes/version.php ]; then
   cp -r /usr/src/wordpress/* /var/www/html/
   chown -R www-data:www-data /var/www/html
   log_message "WordPress core files copied successfully"
-fi
 
 # Check for WP config overrides in volume mount
 if [ -f "/tmp/wp-config-agency.php" ]; then
   log_message "Found custom wp-config-agency.php, copying to WordPress directory"
   cp "/tmp/wp-config-agency.php" "/var/www/html/wp-config-agency.php"
   chown www-data:www-data "/var/www/html/wp-config-agency.php"
-fi
 
 # Create a custom wp-config.php override with proper database connection
 log_message "Creating WordPress configuration override"
@@ -157,9 +167,7 @@ if (file_exists(__DIR__ . '/wp-config-agency.php')) {
 require_once __DIR__ . '/index.php.original';
 EOF
   log_message "Custom index loader created"
-else
   log_message "WARNING: WordPress index.php not found, skipping custom loader"
-fi
 
 # Create WordPress health check endpoint
 log_message "Creating WordPress health check endpoint"

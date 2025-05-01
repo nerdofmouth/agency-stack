@@ -1,29 +1,25 @@
 #!/bin/bash
-#
-# Comprehensive Test Suite for Traefik-Keycloak SSO Integration
-# Follows AgencyStack TDD Protocol in docs/charter/tdd_protocol.md
-# Adheres to AgencyStack Repository Integrity Policy
-#
 
-# Verify running from repository context
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: test_traefik_keycloak_sso.sh
+# Path: /scripts/components/test_traefik_keycloak_sso.sh
+#
 if [[ "$0" != *"/root/_repos/agency-stack/scripts/"* ]]; then
   echo "ERROR: This script must be run from the repository context"
   echo "Run with: /root/_repos/agency-stack/scripts/components/$(basename "$0")"
   exit 1
-fi
 
 # Source common utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$(dirname "$(dirname "$SCRIPT_DIR")")" && pwd)"
-if [[ -f "${REPO_ROOT}/scripts/utils/common.sh" ]]; then
-  source "${REPO_ROOT}/scripts/utils/common.sh"
-else
   # Minimal logging functions if common.sh is not available
-  log_info() { echo "[INFO] $1"; }
-  log_success() { echo "[SUCCESS] $1"; }
-  log_warning() { echo "[WARNING] $1"; }
-  log_error() { echo "[ERROR] $1"; }
-fi
 
 # Configuration
 CLIENT_ID="${CLIENT_ID:-default}"
@@ -527,7 +523,6 @@ if [[ $TESTS_FAILED -eq 0 ]]; then
   echo "Repository Integrity Policy enforced" >> "${REPO_ROOT}/traefik_keycloak_test.log"
   
   exit 0
-else
   echo -e "\n${RED}✗ Some tests failed. Please check the output above for details.${NC}"
   
   # Record failed test in repository
@@ -535,4 +530,3 @@ else
   echo "Repository Integrity Policy enforced" >> "${REPO_ROOT}/traefik_keycloak_test.log"
   
   exit 1
-fi
