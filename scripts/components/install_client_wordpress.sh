@@ -36,6 +36,7 @@ ENABLE_TLS="false"
 CONTAINER_RUNNING="false"
 DID_MODE="false"
 OPERATION_MODE="install" # install, status, logs, restart, remove
+CONTAINER_NAME_PREFIX="" # Prefix for container names to prevent collisions
 
 # Detect Docker-in-Docker
 is_running_in_container() {
@@ -59,24 +60,25 @@ show_help() {
   echo "Usage: $0 [options]"
   echo ""
   echo "Options:"
-  echo "  --client-id=<id>       Client ID (required)"
-  echo "  --domain=<domain>      Domain for WordPress (required)"
-  echo "  --admin-email=<email>  Admin email address"
-  echo "  --wordpress-port=<port> WordPress port (default: 8080)"
-  echo "  --mariadb-port=<port>  MariaDB port (default: 3306)"
-  echo "  --force                Force reinstallation"
-  echo "  --enable-traefik       Enable Traefik integration"
-  echo "  --enable-keycloak      Enable Keycloak SSO integration"
-  echo "  --enable-tls           Enable TLS (requires Traefik)"
-  echo "  --did-mode             Enable Docker-in-Docker compatibility"
-  echo "  --status-only          Show status only"
-  echo "  --logs-only            Show logs only"
-  echo "  --restart-only         Restart services only"
-  echo "  --remove               Remove installation"
-  echo "  --help                 Show this help message"
+  echo "  --client-id ID        Client ID for multi-tenant setup (required)"
+  echo "  --domain DOMAIN       Domain for WordPress (required)"
+  echo "  --admin-email EMAIL   Admin email address (default: admin@example.com)"
+  echo "  --wp-port PORT        WordPress port (default: 8080)"
+  echo "  --db-port PORT        MariaDB port (default: 3306)"
+  echo "  --force               Force reinstallation if already installed"
+  echo "  --enable-traefik      Enable Traefik integration"
+  echo "  --enable-keycloak     Enable Keycloak SSO integration"
+  echo "  --enable-tls          Enable TLS/SSL"
+  echo "  --status-only         Only check status, don't install"
+  echo "  --logs-only           Only show logs, don't install"
+  echo "  --restart-only        Only restart services, don't install"
+  echo "  --remove              Remove the installation"
+  echo "  --container-name-prefix PREFIX  Optional prefix for container names to prevent collisions"
+  echo "  --help                Show this help message"
   echo ""
   echo "Example:"
-  echo "  $0 --client-id=clientxyz --domain=client.example.com --admin-email=admin@example.com"
+  echo "  $0 --client-id acme --domain acme.example.com --enable-traefik"
+  echo ""
   exit 0
 }
 
@@ -88,74 +90,56 @@ while [[ $# -gt 0 ]]; do
     value="${key#*=}"
     key="${key%%=*}"
   else
-    # Handle the case where $2 might not be set
-    if [[ $# -ge 2 ]]; then
-      value="$2"
-    else
-      value=""
-    fi
+    value="$2"
   fi
 
-  case $key in
+  case "$key" in
     --client-id)
       CLIENT_ID="$value"
-      if [[ $1 != *"="* ]]; then shift; fi
       shift
       ;;
     --domain)
       DOMAIN="$value"
-      if [[ $1 != *"="* ]]; then shift; fi
       shift
       ;;
     --admin-email)
       ADMIN_EMAIL="$value"
-      if [[ $1 != *"="* ]]; then shift; fi
       shift
       ;;
-    --wordpress-port)
+    --wp-port)
       WP_PORT="$value"
-      if [[ $1 != *"="* ]]; then shift; fi
       shift
       ;;
-    --mariadb-port)
+    --db-port)
       MARIADB_PORT="$value"
-      if [[ $1 != *"="* ]]; then shift; fi
       shift
       ;;
     --force)
       FORCE="true"
-      shift
       ;;
     --enable-traefik)
       ENABLE_TRAEFIK="true"
-      shift
       ;;
     --enable-keycloak)
       ENABLE_KEYCLOAK="true"
-      shift
       ;;
     --enable-tls)
       ENABLE_TLS="true"
-      shift
-      ;;
-    --did-mode)
-      DID_MODE="true"
-      shift
       ;;
     --status-only)
       OPERATION_MODE="status"
-      shift
       ;;
     --logs-only)
       OPERATION_MODE="logs"
-      shift
       ;;
     --restart-only)
       OPERATION_MODE="restart"
-      shift
       ;;
     --remove)
       OPERATION_MODE="remove"
+      ;;
+    --container-name-prefix)
+      CONTAINER_NAME_PREFIX="$value"
       shift
       ;;
     --help)
@@ -163,10 +147,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     *)
       log_error "Unknown option: $key"
-      echo "Use --help for usage information"
-      exit 1
+      show_help
       ;;
   esac
+  shift
 done
 
 # Validate required arguments
@@ -177,6 +161,16 @@ if [ -z "$CLIENT_ID" ]; then
 if [ -z "$DOMAIN" ]; then
   log_error "Domain is required. Use --domain=<domain>"
   exit 1
+
+# Function to generate container names with optional prefix
+get_container_name() {
+  local base_name="$1"
+  if [ -n "$CONTAINER_NAME_PREFIX" ]; then
+    echo "${CONTAINER_NAME_PREFIX}${base_name}"
+  else
+    echo "${CLIENT_ID}_${base_name}"
+  fi
+}
 
 # Set paths based on Docker-in-Docker mode
 if [ "$CONTAINER_RUNNING" = "true" ] && [ "$DID_MODE" = "true" ]; then
@@ -197,9 +191,9 @@ SECRETS_DIR="${CLIENT_DIR}/.secrets"
 LOG_FILE="${LOG_DIR}/${CLIENT_ID}_wordpress.log"
 
 # Container names
-NETWORK_NAME="${CLIENT_ID}_network"
-WORDPRESS_CONTAINER_NAME="${CLIENT_ID}_wordpress"
-MARIADB_CONTAINER_NAME="${CLIENT_ID}_mariadb"
+NETWORK_NAME=$(get_container_name "network")
+WORDPRESS_CONTAINER_NAME=$(get_container_name "wordpress")
+MARIADB_CONTAINER_NAME=$(get_container_name "mariadb")
 
 # Log initial setup information
 {
@@ -258,43 +252,50 @@ check_status() {
 
 # Logs function
 show_logs() {
-  echo "Logs for ${CLIENT_ID} WordPress installation:"
+  local container=""
   
-  echo "=== WordPress Container Logs ==="
-  docker logs "${WORDPRESS_CONTAINER_NAME}" 2>&1 | tail -n 50
+  if [ -n "$1" ]; then
+    container="$1"
+  else
+    container=$(get_container_name "wordpress")
+  fi
   
-  echo ""
-  echo "=== Database Container Logs ==="
-  docker logs "${MARIADB_CONTAINER_NAME}" 2>&1 | tail -n 50
+  log_info "Showing logs for ${container}"
   
-  echo ""
-  echo "=== Installation Log File ==="
-  tail -n 50 "${LOG_FILE}" 2>/dev/null || echo "Log file not found: ${LOG_FILE}"
+  if ! docker ps | grep -q "${container}"; then
+    log_error "Container ${container} is not running"
+    exit 1
+  fi
+  
+  docker logs --tail 100 "${container}"
 }
 
 # Restart function
 restart_services() {
-  echo "Restarting ${CLIENT_ID} WordPress services..."
+  log_info "Restarting ${CLIENT_ID} WordPress services..."
   
-  docker restart "${WORDPRESS_CONTAINER_NAME}" >> "${LOG_FILE}" 2>&1 || echo "❌ Failed to restart WordPress container"
-  docker restart "${MARIADB_CONTAINER_NAME}" >> "${LOG_FILE}" 2>&1 || echo "❌ Failed to restart Database container"
+  WP_CONTAINER=$(get_container_name "wordpress")
+  DB_CONTAINER=$(get_container_name "mariadb")
   
-  echo "✅ Services restarted"
+  docker restart "${WP_CONTAINER}" || log_error "Failed to restart WordPress container"
+  docker restart "${DB_CONTAINER}" || log_error "Failed to restart database container"
+  
+  log_success "Services restarted successfully"
 }
 
 # Remove function
 remove_installation() {
-  echo "Removing ${CLIENT_ID} WordPress installation..."
+  log_info "Removing ${CLIENT_ID} WordPress installation..."
   
-  # Stop and remove containers
-  docker rm -f "${WORDPRESS_CONTAINER_NAME}" "${MARIADB_CONTAINER_NAME}" >> "${LOG_FILE}" 2>&1 || true
+  WP_CONTAINER=$(get_container_name "wordpress")
+  DB_CONTAINER=$(get_container_name "mariadb")
+  NETWORK_NAME=$(get_container_name "network")
   
-  # Remove network
-  docker network rm "${NETWORK_NAME}" >> "${LOG_FILE}" 2>&1 || true
+  docker rm -f "${WP_CONTAINER}" 2>/dev/null || true
+  docker rm -f "${DB_CONTAINER}" 2>/dev/null || true
+  docker network rm "${NETWORK_NAME}" 2>/dev/null || true
   
-  echo "✅ Container services removed"
-  echo "Note: The data directories at ${WP_DIR} were preserved. To completely remove all data, run:"
-  echo "  rm -rf ${WP_DIR}"
+  log_success "Installation removed successfully"
 }
 
 # Handle operation modes
@@ -533,7 +534,7 @@ EOL
 
 # Set network configuration
 if [ -z "$NETWORK_NAME" ]; then
-  NETWORK_NAME="${CLIENT_ID}_wordpress_network"
+  NETWORK_NAME=$(get_container_name "network")
 
 # Check if Docker network exists, create if it doesn't
 check_network() {
@@ -598,8 +599,8 @@ version: '3'
 
 services:
   mariadb:
-    container_name: ${MARIADB_CONTAINER_NAME}
     image: mariadb:10.5
+    container_name: ${MARIADB_CONTAINER_NAME}
     restart: unless-stopped
     volumes:
       - ${WP_DIR}/mariadb-data:/var/lib/mysql
@@ -620,8 +621,8 @@ services:
       - "${MARIADB_PORT}:3306"
 
   wordpress:
-    container_name: ${WORDPRESS_CONTAINER_NAME}
     image: wordpress:6.1-php8.1-apache
+    container_name: ${WORDPRESS_CONTAINER_NAME}
     restart: unless-stopped
     depends_on:
       mariadb:
@@ -663,7 +664,8 @@ EOL
 
   # Start WordPress with Docker Compose
   log_info "Starting WordPress containers with Docker Compose"
-  (cd "${WP_DIR}" && docker-compose up -d) >> "${LOG_FILE}" 2>&1 || {
+  DOCKER_COMPOSE_FILE="${WP_DIR}/docker-compose.yml"
+  (cd "$(dirname "${DOCKER_COMPOSE_FILE}")" && docker-compose -f "${DOCKER_COMPOSE_FILE}" up -d) >> "${LOG_FILE}" 2>&1 || {
     log_error "Failed to start WordPress containers"
     tail -n 20 "${LOG_FILE}"
     exit 1
@@ -730,3 +732,41 @@ EOL
 }
 
 create_docker_compose
+
+# Start the containers
+if [ "$FORCE" = "true" ]; then
+  log_info "Stopping any existing containers..."
+  DOCKER_COMPOSE_FILE="${WP_DIR}/docker-compose.yml"
+  docker-compose -f "${DOCKER_COMPOSE_FILE}" down || true
+fi
+
+log_info "Starting containers..."
+DOCKER_COMPOSE_FILE="${WP_DIR}/docker-compose.yml"
+cd "$(dirname "${DOCKER_COMPOSE_FILE}")" && docker-compose -f "${DOCKER_COMPOSE_FILE}" up -d
+
+if [ $? -eq 0 ]; then
+  log_success "WordPress installation for ${CLIENT_ID} started successfully"
+  
+  # Wait for WordPress to initialize
+  log_info "Waiting for WordPress to initialize (this may take a moment)..."
+  sleep 10
+  
+  # Display access information
+  log_info "WordPress is now accessible at: http://${DOMAIN}"
+  log_info "Admin area: http://${DOMAIN}/wp-admin/"
+  log_info "Default credentials:"
+  log_info "- Username: admin"
+  log_info "- Password: See ${WP_DIR}/wp-config.php or ${WP_DIR}/.env"
+  
+  # Update component registry if available
+  if [ -f "${SCRIPT_DIR}/../utils/update_component_registry.sh" ]; then
+    "${SCRIPT_DIR}/../utils/update_component_registry.sh" --update-component wordpress --update-client "${CLIENT_ID}" --update-flag installed --update-value true
+  fi
+else
+  log_error "Failed to start WordPress containers"
+  exit 1
+fi
+
+# Final success message
+log_success "WordPress installation for ${CLIENT_ID} completed successfully"
+log_info "For complete documentation, see: /docs/pages/components/client_wordpress.md"
