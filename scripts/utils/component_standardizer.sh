@@ -18,6 +18,41 @@ fi
 # Check that we're running inside a container/VM
 exit_with_warning_if_host "component_standardizer"
 
+# Define essential functions if they don't exist
+if ! type ensure_directory_exists &>/dev/null; then
+  ensure_directory_exists() {
+    local dir="$1"
+    if [[ ! -d "$dir" ]]; then
+      mkdir -p "$dir"
+      log_info "Created directory: $dir"
+    fi
+  }
+fi
+
+if ! type log_warning &>/dev/null; then
+  log_warning() {
+    echo -e "[WARNING] $*"
+  }
+fi
+
+if ! type log_success &>/dev/null; then
+  log_success() {
+    echo -e "[SUCCESS] $*"
+  }
+fi
+
+if ! type log_error &>/dev/null; then
+  log_error() {
+    echo -e "[ERROR] $*"
+  }
+fi
+
+if ! type log_info &>/dev/null; then
+  log_info() {
+    echo -e "[INFO] $*"
+  }
+fi
+
 # Display usage information
 show_usage() {
   echo -e "${BOLD}AgencyStack Component Standardizer${NC}"
