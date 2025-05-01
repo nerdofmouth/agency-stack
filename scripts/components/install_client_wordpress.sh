@@ -771,4 +771,9 @@ fi
 log_success "WordPress installation for ${CLIENT_ID} completed successfully"
 log_info "For complete documentation, see: /docs/pages/components/client_wordpress.md"
 
+if [ -f "${SCRIPT_DIR}/../utils/update_component_registry.sh" ]; then
+  "${SCRIPT_DIR}/../utils/update_component_registry.sh" --update-component wordpress --update-client "${CLIENT_ID}" --update-flag installed --update-value true
+fi
+
+# Always exit cleanly
 exit 0
