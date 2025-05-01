@@ -57,6 +57,32 @@ is_running_in_container() {
   fi
 }
 
+# Function to exit with warning if running on host system (not in container/VM)
+# This enforces strict containerization per AgencyStack Charter v1.0.3
+exit_with_warning_if_host() {
+  local component_name="${1:-"component"}"
+  
+  if ! is_running_in_container; then
+    echo -e "${RED}[CRITICAL ERROR]${NC} Installation of ${BOLD}${component_name}${NC} blocked!" >&2
+    echo -e "${RED}[CRITICAL ERROR]${NC} AgencyStack Charter v1.0.3 requires STRICT CONTAINERIZATION!" >&2
+    echo -e "${RED}[CRITICAL ERROR]${NC} This script must run inside a container or VM environment." >&2
+    echo -e "${RED}[CRITICAL ERROR]${NC} Do NOT install components directly on host machines." >&2
+    echo -e "${YELLOW}[INSTRUCTION]${NC} Use Docker or VM to run this installation." >&2
+    echo -e "${YELLOW}[INSTRUCTION]${NC} See README_AGENT.md for proper environment setup." >&2
+    
+    # Log the violation attempt 
+    if [ -n "${LOG_FILE:-}" ]; then
+      echo "[$(date)] BLOCKED: Attempt to run ${component_name} installation on host system" >> "${LOG_FILE}"
+    fi
+    
+    # Exit with specific code 70 (EX_SOFTWARE from sysexits.h)
+    exit 70
+  else
+    echo -e "${GREEN}[ENVIRONMENT CHECK]${NC} Running in container/VM ✓" >&2
+    return 0
+  fi
+}
+
 # Initialize container detection flag
 CONTAINER_RUNNING=false
 
