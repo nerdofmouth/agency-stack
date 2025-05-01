@@ -403,36 +403,43 @@ create_env_file
 log_info "Creating database initialization script"
 mkdir -p "${WP_DIR}/init-scripts"
 
-# Use template if available, otherwise create directly
-DB_INIT_TEMPLATE="${SCRIPT_DIR}/templates/mariadb-init.sql"
-if [ -f "$DB_INIT_TEMPLATE" ]; then
-  log_info "Using database initialization template from repository"
-  # Copy and replace variables
-  sed -e "s/\${DB_NAME}/${WP_DB_NAME}/g" \
-      -e "s/\${DB_USER}/${WP_DB_USER}/g" \
-      -e "s/\${DB_PASSWORD}/${WP_DB_PASSWORD}/g" \
-      -e "s/\${DB_ADMIN_USER}/admin_${CLIENT_ID}/g" \
-      -e "s/\${DB_ADMIN_PASSWORD}/${MYSQL_ROOT_PASSWORD}/g" \
-      "$DB_INIT_TEMPLATE" > "${WP_DIR}/init-scripts/01-init-db.sql"
-  log_success "Database initialization script created from template"
-else
-  log_warning "Database initialization template not found at $DB_INIT_TEMPLATE"
-  cat > "${WP_DIR}/init-scripts/01-init-db.sql" <<EOL
+# Create direct initialization script - simplified for reliability
+log_info "Creating database initialization script"
+cat > "${WP_DIR}/init-scripts/01-init-db.sql" <<EOL
 -- AgencyStack WordPress Database Initialization
--- This script ensures proper user permissions for the WordPress database
+-- This script ensures proper user permissions for both local and remote connections
 
 -- Create database if not exists
 CREATE DATABASE IF NOT EXISTS \`${WP_DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- Recreate user with proper permissions (allow from any host)
+-- Drop existing users to prevent conflicts
 DROP USER IF EXISTS '${WP_DB_USER}'@'%';
 DROP USER IF EXISTS '${WP_DB_USER}'@'localhost';
 
+-- Create user with proper permissions FOR BOTH remote and local connections
+-- This is critical - MySQL treats connections differently based on origin
 CREATE USER '${WP_DB_USER}'@'%' IDENTIFIED BY '${WP_DB_PASSWORD}';
 GRANT ALL PRIVILEGES ON \`${WP_DB_NAME}\`.* TO '${WP_DB_USER}'@'%';
+
+CREATE USER '${WP_DB_USER}'@'localhost' IDENTIFIED BY '${WP_DB_PASSWORD}';
+GRANT ALL PRIVILEGES ON \`${WP_DB_NAME}\`.* TO '${WP_DB_USER}'@'localhost';
+
+-- Ensure permissions take effect
 FLUSH PRIVILEGES;
+
+-- Create test table to verify proper setup
+USE \`${WP_DB_NAME}\`;
+CREATE TABLE IF NOT EXISTS \`wp_agencystack_test\` (
+  \`id\` int(11) NOT NULL AUTO_INCREMENT,
+  \`test_value\` varchar(255) NOT NULL,
+  \`created_at\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (\`id\`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Insert test data
+INSERT INTO \`wp_agencystack_test\` (\`test_value\`) VALUES ('Database initialization successful - Connection test table');
 EOL
-fi
+log_success "Database initialization script created"
 
 # Create verification script for database connectivity
 log_info "Creating database verification script"
@@ -458,29 +465,44 @@ for i in {1..30}; do
   sleep 2
 done
 
+# Test connection as root user first to verify MySQL is working properly
+echo "Verifying MySQL root access..."
+if mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "SELECT 'Root connection successful';" 2>/dev/null; then
+  echo "✅ MySQL root access verified"
+else
+  echo "❌ MySQL root access failed - this indicates a deeper issue"
+  exit 1
+fi  
+
 # Verify user existence
 echo "Verifying database user exists..."
 mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "SELECT User, Host FROM mysql.user WHERE User='${WP_DB_USER}';" || echo "Failed to query users"
 
 # Verify user permissions
 echo "Verifying database user permissions..."
-mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "SHOW GRANTS FOR '${WP_DB_USER}'@'%';" || echo "Failed to show grants"
+mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "SHOW GRANTS FOR '${WP_DB_USER}'@'%';" && 
+mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "SHOW GRANTS FOR '${WP_DB_USER}'@'localhost';" || 
+echo "Failed to show grants"
 
 # Test connection as WordPress user
 echo "Testing connection as WordPress user..."
-if mysql -u ${WP_DB_USER} -p${WP_DB_PASSWORD} -e "USE ${WP_DB_NAME}; SELECT * FROM agencystack_db_test LIMIT 1;" 2>/dev/null; then
+if mysql -u ${WP_DB_USER} -p${WP_DB_PASSWORD} -e "USE ${WP_DB_NAME}; SELECT * FROM wp_agencystack_test;" 2>/dev/null; then
   echo "✅ Connection successful as WordPress user!"
 else
   echo "❌ Connection failed as WordPress user!"
   echo "Attempting to fix permissions..."
   mysql -u root -p${MYSQL_ROOT_PASSWORD} <<FIXSQL
     DROP USER IF EXISTS '${WP_DB_USER}'@'%';
+    DROP USER IF EXISTS '${WP_DB_USER}'@'localhost';
     CREATE USER '${WP_DB_USER}'@'%' IDENTIFIED BY '${WP_DB_PASSWORD}';
     GRANT ALL PRIVILEGES ON \`${WP_DB_NAME}\`.* TO '${WP_DB_USER}'@'%';
+    CREATE USER '${WP_DB_USER}'@'localhost' IDENTIFIED BY '${WP_DB_PASSWORD}';
+    GRANT ALL PRIVILEGES ON \`${WP_DB_NAME}\`.* TO '${WP_DB_USER}'@'localhost';
     FLUSH PRIVILEGES;
 FIXSQL
   echo "Permissions fixed, retesting connection..."
-  mysql -u ${WP_DB_USER} -p${WP_DB_PASSWORD} -e "USE ${WP_DB_NAME}; SELECT 'Connection test after fix';" || echo "Still failed after fix attempt"
+  mysql -u ${WP_DB_USER} -p${WP_DB_PASSWORD} -e "USE ${WP_DB_NAME}; SELECT 'Connection test after fix';" || 
+  echo "Still failed after fix attempt"
 fi
 
 echo "Database verification completed at \$(date)"
