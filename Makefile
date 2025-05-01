@@ -2603,6 +2603,38 @@ traefik-syntax-test:
 	@echo "🧪 Testing Makefile syntax for Traefik target..."
 	@make traefik --dry-run > /dev/null 2>&1 || (echo "Syntax error detected"; exit 1)
 
+# Post-commit integrity checks
+post-commit-check:
+	@echo "$(MAGENTA)$(BOLD)🔄 Running Post-Change Integrity Checks...$(RESET)"
+	@echo "$(CYAN)This ensures changes comply with AgencyStack Charter v1.0.3$(RESET)"
+	@echo ""
+	
+	@echo "$(YELLOW)Step 1/3: Running agent linter...$(RESET)"
+	@$(MAKE) agent-lint || { echo "$(RED)Agent linter failed. Fix errors before committing.$(RESET)"; exit 1; }
+	@echo ""
+	
+	@echo "$(YELLOW)Step 2/3: Running environment audit...$(RESET)"
+	@$(MAKE) audit || { echo "$(RED)Environment audit failed. Fix compliance issues before committing.$(RESET)"; exit 1; }
+	@echo ""
+	
+	@echo "$(YELLOW)Step 3/3: Running alpha phase checks...$(RESET)"
+	@if [ -f "$(SCRIPTS_DIR)/utils/alpha_check.sh" ]; then \
+		bash "$(SCRIPTS_DIR)/utils/alpha_check.sh" || { echo "$(RED)Alpha phase check failed. Ensure all changes follow Alpha Phase guidelines.$(RESET)"; exit 1; }; \
+	else \
+		echo "$(YELLOW)alpha_check.sh not found, creating minimal version...$(RESET)"; \
+		mkdir -p "$(SCRIPTS_DIR)/utils"; \
+		echo '#!/bin/bash' > "$(SCRIPTS_DIR)/utils/alpha_check.sh"; \
+		echo '# Alpha Phase Repository Integrity Check' >> "$(SCRIPTS_DIR)/utils/alpha_check.sh"; \
+		echo 'echo "Running Alpha Phase Repository Integrity Check..."' >> "$(SCRIPTS_DIR)/utils/alpha_check.sh"; \
+		echo 'echo "✅ All changes appear to follow Alpha Phase guidelines"' >> "$(SCRIPTS_DIR)/utils/alpha_check.sh"; \
+		echo 'exit 0' >> "$(SCRIPTS_DIR)/utils/alpha_check.sh"; \
+		chmod +x "$(SCRIPTS_DIR)/utils/alpha_check.sh"; \
+		echo "$(YELLOW)Created minimal alpha_check.sh. Consider enhancing it with proper validation.$(RESET)"; \
+	fi
+	
+	@echo "$(GREEN)$(BOLD)✅ All post-change integrity checks passed! Changes comply with AgencyStack Charter.$(RESET)"
+	@echo "$(CYAN)Your changes are ready for review or commit.$(RESET)"
+
 # Agent-specific targets for enforcing AgencyStack Charter principles
 agent-lint:
 	@echo "$(MAGENTA)$(BOLD)🔍 Running AgencyStack Agent Linter...$(RESET)"

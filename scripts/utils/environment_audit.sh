@@ -10,14 +10,19 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$(dirname "${SCRIPT_DIR}")")"
+COMPONENTS_DIR="${REPO_ROOT}/scripts/components"
+DOCS_DIR="${REPO_ROOT}/docs"
+PORTS_DOC="${DOCS_DIR}/pages/ports.md"
+REGISTRY_FILE="${REPO_ROOT}/component_registry.json"
 
 echo -e "${BLUE}${BOLD}🔍 AgencyStack Environment Audit${NC}"
-echo -e "${BLUE}Running compliance checks against Charter v1.0.3 principles...${NC}"
+echo -e "${BLUE}Running comprehensive compliance checks against Charter v1.0.3 principles...${NC}"
 echo ""
 
 ERRORS=0
@@ -65,77 +70,118 @@ for dir in "${SYSTEM_DIRS[@]}"; do
   fi
 done
 
-# Check for host environment validation
-echo -e "\n${BOLD}Checking for environment validation in scripts...${NC}"
-for script in "${REPO_ROOT}/scripts/components"/*.sh; do
-  if [ -f "$script" ]; then
-    script_name=$(basename "$script")
-    echo -n "Checking ${script_name}... "
-    
-    if ! grep -q "exit_with_warning_if_host" "$script"; then
-      echo -e "${RED}MISSING${NC}"
-      log_audit_issue "ERROR" "Missing exit_with_warning_if_host validation" "$script"
-    else
-      echo -e "${GREEN}VALIDATED${NC}"
-    fi
+# Comprehensive component script validation
+echo -e "\n${BOLD}Running comprehensive component script validation...${NC}"
+find "${COMPONENTS_DIR}" -name "install_*.sh" | while read -r script; do
+  component_name=$(basename "$script" | sed 's/^install_//;s/\.sh$//')
+  echo -e "${CYAN}Validating component: ${component_name}${NC}"
+  
+  # Check essential script requirements
+  echo -n "  - Sources common.sh: "
+  if grep -q "source.*utils/common.sh" "$script"; then
+    echo -e "${GREEN}YES${NC}"
+  else
+    echo -e "${RED}NO${NC}"
+    log_audit_issue "ERROR" "Missing common.sh sourcing" "$script"
   fi
-done
-
-# Check for .env files for each component
-echo -e "\n${BOLD}Checking for .env files in component installations...${NC}"
-for component_dir in /opt/agency_stack/clients/*/*/; do
-  if [ -d "$component_dir" ]; then
-    component_name=$(basename "$component_dir")
-    client_id=$(basename "$(dirname "$component_dir")")
-    env_file="${component_dir}/.env"
-    
-    echo -n "Checking ${client_id}/${component_name}... "
-    
-    if [ ! -f "$env_file" ]; then
-      echo -e "${YELLOW}NO .ENV${NC}"
-      log_audit_issue "WARNING" "Missing .env file for ${client_id}/${component_name}" "$component_dir"
-    else
-      echo -e "${GREEN}FOUND${NC}"
-    fi
+  
+  echo -n "  - Calls exit_with_warning_if_host: "
+  if grep -q "exit_with_warning_if_host" "$script"; then
+    echo -e "${GREEN}YES${NC}"
+  else
+    echo -e "${RED}NO${NC}"
+    log_audit_issue "ERROR" "Missing exit_with_warning_if_host check" "$script"
   fi
-done
-
-# Check for Makefile targets for components
-echo -e "\n${BOLD}Checking for standard Makefile targets...${NC}"
-for script in "${REPO_ROOT}/scripts/components"/*.sh; do
-  if [ -f "$script" ]; then
-    script_name=$(basename "$script")
-    component_name=${script_name#install_}
-    component_name=${component_name%.sh}
-    
-    echo -n "Checking Makefile targets for ${component_name}... "
-    
-    # Check for main installation target
-    if ! grep -q "^${component_name}:" "${REPO_ROOT}/Makefile" && ! grep -q "^${component_name}:" "${REPO_ROOT}/makefiles/components/"*.mk 2>/dev/null; then
-      echo -e "${YELLOW}MISSING${NC}"
-      log_audit_issue "WARNING" "Missing main Makefile target for ${component_name}"
+  
+  echo -n "  - Uses proper logging: "
+  if grep -q "log_info\|log_error\|log_warning\|log_success" "$script"; then
+    echo -e "${GREEN}YES${NC}"
+  else
+    echo -e "${RED}NO${NC}"
+    log_audit_issue "ERROR" "Missing standard logging functions" "$script"
+  fi
+  
+  # Check for .env.example
+  env_example="${COMPONENTS_DIR}/templates/${component_name}.env.example"
+  if [ ! -f "$env_example" ]; then
+    env_example="${REPO_ROOT}/templates/${component_name}.env.example"
+  fi
+  
+  echo -n "  - Has .env.example: "
+  if [ -f "$env_example" ]; then
+    echo -e "${GREEN}YES${NC}"
+  else
+    echo -e "${YELLOW}NO${NC}"
+    log_audit_issue "WARNING" "Missing .env.example file" "$env_example"
+  fi
+  
+  # Check component registry entry
+  echo -n "  - Has registry entry: "
+  if [ -f "$REGISTRY_FILE" ]; then
+    if grep -q "\"name\": *\"${component_name}\"" "$REGISTRY_FILE"; then
+      echo -e "${GREEN}YES${NC}"
     else
-      # Check for standard targets (status, logs, restart)
-      missing_targets=()
-      
-      if ! grep -q "^${component_name}-status:" "${REPO_ROOT}/Makefile" && ! grep -q "^${component_name}-status:" "${REPO_ROOT}/makefiles/components/"*.mk 2>/dev/null; then
-        missing_targets+=("${component_name}-status")
-      fi
-      
-      if ! grep -q "^${component_name}-logs:" "${REPO_ROOT}/Makefile" && ! grep -q "^${component_name}-logs:" "${REPO_ROOT}/makefiles/components/"*.mk 2>/dev/null; then
-        missing_targets+=("${component_name}-logs")
-      fi
-      
-      if ! grep -q "^${component_name}-restart:" "${REPO_ROOT}/Makefile" && ! grep -q "^${component_name}-restart:" "${REPO_ROOT}/makefiles/components/"*.mk 2>/dev/null; then
-        missing_targets+=("${component_name}-restart")
-      fi
-      
-      if [ ${#missing_targets[@]} -eq 0 ]; then
-        echo -e "${GREEN}COMPLETE${NC}"
+      echo -e "${YELLOW}NO${NC}"
+      log_audit_issue "WARNING" "Missing entry in component registry" "$REGISTRY_FILE"
+    fi
+  else
+    echo -e "${YELLOW}N/A (registry not found)${NC}"
+    log_audit_issue "WARNING" "Component registry file not found" "$REGISTRY_FILE"
+  fi
+  
+  # Check port documentation
+  echo -n "  - Has port documentation: "
+  if [ -f "$PORTS_DOC" ]; then
+    if grep -q -i "${component_name}" "$PORTS_DOC"; then
+      echo -e "${GREEN}YES${NC}"
+    else
+      # Only warn if the component likely has a port
+      if grep -q "PORT=\|--port" "$script"; then
+        echo -e "${YELLOW}NO${NC}"
+        log_audit_issue "WARNING" "Component uses ports but isn't documented" "$PORTS_DOC"
       else
-        echo -e "${YELLOW}PARTIAL${NC}"
-        log_audit_issue "WARNING" "Missing standard targets: ${missing_targets[*]}"
+        echo -e "${CYAN}N/A${NC}"
       fi
+    fi
+  else
+    echo -e "${YELLOW}N/A (ports doc not found)${NC}"
+    log_audit_issue "WARNING" "Ports documentation file not found" "$PORTS_DOC"
+  fi
+  
+  echo ""
+done
+
+# Check README_AGENT.md presence in key directories
+echo -e "${BOLD}Checking for README_AGENT.md files...${NC}"
+KEY_DIRS=(
+  "${REPO_ROOT}"
+  "${REPO_ROOT}/scripts"
+  "${REPO_ROOT}/scripts/utils"
+  "${REPO_ROOT}/docs"
+  "${REPO_ROOT}/clients"
+)
+
+for dir in "${KEY_DIRS[@]}"; do
+  if [ -d "$dir" ]; then
+    dir_name=$(basename "$dir")
+    if [ "$dir" = "$REPO_ROOT" ]; then
+      dir_name="root"
+    fi
+    
+    echo -n "Checking $dir_name directory... "
+    readme_file="${dir}/README_AGENT.md"
+    
+    if [ -f "$readme_file" ]; then
+      # Check it's not empty and references the Charter
+      if [ -s "$readme_file" ] && grep -q "Charter" "$readme_file"; then
+        echo -e "${GREEN}VALID${NC}"
+      else
+        echo -e "${YELLOW}INCOMPLETE${NC}"
+        log_audit_issue "WARNING" "README_AGENT.md exists but may be incomplete" "$readme_file"
+      fi
+    else
+      echo -e "${RED}MISSING${NC}"
+      log_audit_issue "ERROR" "Missing README_AGENT.md" "$dir"
     fi
   fi
 done
