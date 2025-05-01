@@ -962,8 +962,8 @@ etebase-logs:
 	@echo "$(MAGENTA)$(BOLD)📋 Viewing Etebase logs...$(RESET)"
 	@docker logs -f etebase-$(CLIENT_ID) 2>&1 | tee $(LOG_DIR)/components/etebase.log
 
-etebase-stop:
-	@echo "$(MAGENTA)$(BOLD)🛑 Stopping Etebase...$(RESET)"
+etebase-restart:
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting Etebase...$(RESET)"
 	@cd $(DOCKER_DIR)/etebase && docker-compose down
 
 etebase-start:
@@ -1367,7 +1367,7 @@ tailscale-restart:
 
 # builderio component targets
 builderio:
-	@echo "🔧 Installing builderio..."
+	@echo "$(MAGENTA)$(BOLD)🧩 Installing builderio..."
 	@$(SCRIPTS_DIR)/components/install_builderio.sh $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) \
 		$(if $(DOMAIN),--domain $(DOMAIN),) \
 		$(if $(PORT),--port $(PORT),) \
@@ -1380,7 +1380,7 @@ builderio:
 		$(if $(DISABLE_MONITORING),--disable-monitoring,)
 
 builderio-status:
-	@echo "🔍 Checking builderio status..."
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking builderio status..."
 		$(SCRIPTS_DIR)/components/status_builderio.sh; \
 	else \
 		echo "Status script not found. Checking service..."; \
@@ -1388,7 +1388,7 @@ builderio-status:
 	fi
 
 builderio-logs:
-	@echo "📜 Viewing builderio logs..."
+	@echo "$(MAGENTA)$(BOLD)📋 Viewing builderio logs..."
 		tail -n 50 "/var/log/agency_stack/components/builderio.log"; \
 	else \
 		echo "Log file not found. Trying alternative sources..."; \
@@ -1396,7 +1396,7 @@ builderio-logs:
 	fi
 
 builderio-restart:
-	@echo "🔄 Restarting builderio..."
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting builderio..."
 		$(SCRIPTS_DIR)/components/restart_builderio.sh; \
 	else \
 		echo "Restart script not found. Trying standard methods..."; \
@@ -1407,7 +1407,7 @@ builderio-restart:
 
 # calcom component targets
 calcom:
-	@echo "🔧 Installing calcom..."
+	@echo "$(MAGENTA)$(BOLD)📅 Installing calcom..."
 	@$(SCRIPTS_DIR)/components/install_calcom.sh $(if $(CLIENT_ID),--client-id $(CLIENT_ID),) \
 		$(if $(DOMAIN),--domain $(DOMAIN),) \
 		$(if $(PORT),--port $(PORT),) \
@@ -1420,7 +1420,7 @@ calcom:
 		$(if $(DISABLE_MONITORING),--disable-monitoring,)
 
 calcom-status:
-	@echo "🔍 Checking calcom status..."
+	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking calcom status..."
 		$(SCRIPTS_DIR)/components/status_calcom.sh; \
 	else \
 		echo "Status script not found. Checking service..."; \
@@ -1428,7 +1428,7 @@ calcom-status:
 	fi
 
 calcom-logs:
-	@echo "📜 Viewing calcom logs..."
+	@echo "$(MAGENTA)$(BOLD)📋 Viewing calcom logs..."
 		tail -n 50 "/var/log/agency_stack/components/calcom.log"; \
 	else \
 		echo "Log file not found. Trying alternative sources..."; \
@@ -1436,7 +1436,7 @@ calcom-logs:
 	fi
 
 calcom-restart:
-	@echo "🔄 Restarting calcom..."
+	@echo "$(MAGENTA)$(BOLD)🔄 Restarting calcom..."
 		$(SCRIPTS_DIR)/components/restart_calcom.sh; \
 	else \
 		echo "Restart script not found. Trying standard methods..."; \
@@ -2328,8 +2328,8 @@ beta-check-remote: validate
 	@echo "$(CYAN)Checking remote VM requirements...$(RESET)"
 	@ssh $(REMOTE_VM_SSH) "bash -s" << 'EOF' || exit 1
 	echo "CPU cores: $$(nproc)"
-	echo "Memory: $$(free -h | grep Mem | awk '{print \$$2}')"
-	echo "Disk space: $$(df -h / | awk 'NR==2 {print \$$4}') available"
+	echo "Memory: $$(free -h | grep Mem | awk '{print $$2}')"
+	echo "Disk space: $$(df -h / | awk 'NR==2 {print $$4}') available"
 	
 	# Check Docker
 	if command -v docker > /dev/null 2>&1; then \
@@ -2602,3 +2602,61 @@ traefik-keycloak-sso-restart:
 traefik-syntax-test:
 	@echo "🧪 Testing Makefile syntax for Traefik target..."
 	@make traefik --dry-run > /dev/null 2>&1 || (echo "Syntax error detected"; exit 1)
+
+# Agent-specific targets for enforcing AgencyStack Charter principles
+agent-lint:
+	@echo "$(MAGENTA)$(BOLD)🔍 Running AgencyStack Agent Linter...$(RESET)"
+	@if [ ! -f "$(SCRIPTS_DIR)/utils/agent_lint.sh" ]; then \
+		echo "$(YELLOW)Creating agent linter script...$(RESET)"; \
+		mkdir -p "$(SCRIPTS_DIR)/utils"; \
+		echo '#!/bin/bash' > "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo '# AgencyStack Agent Linter - Enforces Charter v1.0.3 principles' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo 'set -euo pipefail' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo '' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo 'SCRIPTS_DIR="$${1:-scripts/components}"' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo 'echo "Scanning $${SCRIPTS_DIR} for AgencyStack Charter compliance..."' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo 'ERRORS=0' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo '' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo '# Check for sourcing of common.sh' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo 'for script in "$${SCRIPTS_DIR}"/*.sh; do' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo '  if [ -f "$${script}" ]; then' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo '    if ! grep -q "source.*utils/common.sh" "$${script}"; then' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo '      echo "ERROR: $${script} does not source common.sh"' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo '      ERRORS=$$(($${ERRORS}+1))' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo '    fi' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo '' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo '    # Check for exit_with_warning_if_host call' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo '    if ! grep -q "exit_with_warning_if_host" "$${script}"; then' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo '      echo "ERROR: $${script} does not call exit_with_warning_if_host"' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo '      ERRORS=$$(($${ERRORS}+1))' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo '    fi' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo '' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo '    # Check for reimplementation of utility functions' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo '    for func in "log_info" "log_error" "log_warning" "log_success" "ensure_directory_exists" "check_prerequisites"; do' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo '      if grep -q "^$${func}()" "$${script}"; then' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo '        echo "ERROR: $${script} reimplements $${func} instead of using common.sh"' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo '        ERRORS=$$(($${ERRORS}+1))' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo '      fi' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo '    done' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo '  fi' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo 'done' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo '' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo 'if [ $${ERRORS} -gt 0 ]; then' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo '  echo "Found $${ERRORS} Charter compliance issues!"' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo '  exit 1' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo 'else' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo '  echo "All scripts pass Charter compliance checks ✓"' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		echo 'fi' >> "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+		chmod +x "$(SCRIPTS_DIR)/utils/agent_lint.sh"; \
+	fi
+	@bash "$(SCRIPTS_DIR)/utils/agent_lint.sh" "$(SCRIPTS_DIR)/components"
+	@echo "$(GREEN)Charter compliance check complete.$(RESET)"
+
+audit:
+	@echo "$(MAGENTA)$(BOLD)🔍 Running AgencyStack Environment Audit...$(RESET)"
+	@if [ ! -f "$(SCRIPTS_DIR)/utils/environment_audit.sh" ]; then \
+		echo "$(RED)Error: environment_audit.sh script not found. Create it first.$(RESET)"; \
+		exit 1; \
+	fi
+	@bash "$(SCRIPTS_DIR)/utils/environment_audit.sh"
+	@echo "$(GREEN)Environment audit complete.$(RESET)"
