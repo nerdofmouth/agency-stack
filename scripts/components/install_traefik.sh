@@ -1,19 +1,37 @@
 #!/bin/bash
+
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: traefik.sh
+# Path: /scripts/components/install_traefik.sh
+#
+if [ -f "${SCRIPT_DIR}/../utils/common.sh" ]; then
+else
+fi
+else
+fi
+else
+fi
+else
+fi
+else
+fi
+
+# Enforce containerization (prevent host contamination)
+
 # install_traefik.sh - Keycloak-integrated dashboard
 # Following AgencyStack Repository Integrity Policy
 
 set -e
 
 # Source common utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -f "${SCRIPT_DIR}/../utils/common.sh" ]; then
-  source "${SCRIPT_DIR}/../utils/common.sh"
-else
-  log_info() { echo "[INFO] $1"; }
-  log_success() { echo "[SUCCESS] $1"; }
-  log_warning() { echo "[WARNING] $1"; }
-  log_error() { echo "[ERROR] $1"; }
-fi
 
 # Detect environment (container vs host)
 if [[ -f "/.dockerenv" ]] || [[ -f "/proc/1/cgroup" && $(cat /proc/1/cgroup) == *"docker"* ]]; then
@@ -232,7 +250,6 @@ fi
 # Create run script
 log_info "Creating run script..."
 cat > "${INSTALL_DIR}/bin/run.sh" <<EOF
-#!/bin/bash
 
 # Source environment variables
 if [ -f "${INSTALL_DIR}/env.sh" ]; then
@@ -254,7 +271,6 @@ chmod +x "${INSTALL_DIR}/bin/run.sh"
 
 # Create environment file
 cat > "${INSTALL_DIR}/env.sh" <<EOF
-#!/bin/bash
 # Environment variables for Traefik
 export CLIENT_ID="${CLIENT_ID}"
 export DASHBOARD_PORT="${DASHBOARD_PORT}"
@@ -356,7 +372,6 @@ EOF
   # Create a host-accessible run script
   log_info "Creating direct run script with host networking..."
   cat > "${INSTALL_DIR}/bin/run-host.sh" <<EOF
-#!/bin/bash
 set -e
 
 # Create logs directory
@@ -398,7 +413,6 @@ EOF
       
       # Create a status script for monitoring
       cat > "${INSTALL_DIR}/bin/check-status.sh" <<'EOF'
-#!/bin/bash
 CONFIG_DIR="/opt/agency_stack/clients/default/traefik/config"
 PID_FILE="/opt/agency_stack/clients/default/traefik/traefik.pid"
 LOG_FILE="/opt/agency_stack/clients/default/logs/traefik.log"
@@ -457,7 +471,6 @@ EOF
       
       # Create restart script
       cat > "${INSTALL_DIR}/bin/restart.sh" <<'EOF'
-#!/bin/bash
 INSTALL_DIR="/opt/agency_stack/clients/default/traefik"
 LOG_DIR="/opt/agency_stack/clients/default/logs"
 
@@ -515,17 +528,9 @@ EOF
       # Create a verification script
       log_info "Creating host verification script..."
       cat > "${INSTALL_DIR}/scripts/verify-host.sh" <<'EOF'
-#!/bin/bash
 
 # Import common utilities if available
 if [[ -f "$(dirname "$0")/../../scripts/utils/common.sh" ]]; then
-  source "$(dirname "$0")/../../scripts/utils/common.sh"
-else
-  log_info() { echo "[INFO] $1"; }
-  log_success() { echo "[SUCCESS] $1"; }
-  log_warning() { echo "[WARNING] $1"; }
-  log_error() { echo "[ERROR] $1"; }
-fi
 
 # Configuration
 CLIENT_ID="${CLIENT_ID:-default}"
@@ -626,17 +631,9 @@ fi
 # Create verification script...
 mkdir -p "${INSTALL_DIR}/scripts"
 cat > "${INSTALL_DIR}/scripts/verify.sh" <<'EOF'
-#!/bin/bash
 
 # Source common functions
 if [[ -f /root/_repos/agency-stack/scripts/utils/common.sh ]]; then
-  source /root/_repos/agency-stack/scripts/utils/common.sh
-else
-  log_info() { echo "[INFO] $1"; }
-  log_success() { echo "[SUCCESS] $1"; }
-  log_warning() { echo "[WARNING] $1"; }
-  log_error() { echo "[ERROR] $1"; }
-fi
 
 # Configuration variables
 CLIENT_ID="${CLIENT_ID:-default}"
@@ -741,17 +738,9 @@ chmod +x "${INSTALL_DIR}/scripts/verify.sh"
 # Create a more thorough test script for TDD
 log_info "Creating TDD test script..."
 cat > "${INSTALL_DIR}/scripts/test.sh" <<'EOF'
-#!/bin/bash
 
 # Source common functions
 if [[ -f /root/_repos/agency-stack/scripts/utils/common.sh ]]; then
-  source /root/_repos/agency-stack/scripts/utils/common.sh
-else
-  log_info() { echo "[INFO] $1"; }
-  log_success() { echo "[SUCCESS] $1"; }
-  log_warning() { echo "[WARNING] $1"; }
-  log_error() { echo "[ERROR] $1"; }
-fi
 
 # Configuration variables
 CLIENT_ID="${CLIENT_ID:-default}"
@@ -867,17 +856,9 @@ chmod +x "${INSTALL_DIR}/scripts/test.sh"
 # Create integration test script
 log_info "Creating integration test script..."
 cat > "${INSTALL_DIR}/scripts/integration_test.sh" <<'EOF'
-#!/bin/bash
 
 # Source common functions
 if [[ -f /root/_repos/agency-stack/scripts/utils/common.sh ]]; then
-  source /root/_repos/agency-stack/scripts/utils/common.sh
-else
-  log_info() { echo "[INFO] $1"; }
-  log_success() { echo "[SUCCESS] $1"; }
-  log_warning() { echo "[WARNING] $1"; }
-  log_error() { echo "[ERROR] $1"; }
-fi
 
 # Configuration variables
 CLIENT_ID="${CLIENT_ID:-default}"

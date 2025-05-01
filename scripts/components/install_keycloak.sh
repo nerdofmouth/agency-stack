@@ -1,18 +1,24 @@
 #!/bin/bash
-# Source common utilities and logging functions
+
+# Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: keycloak.sh
+# Path: /scripts/components/install_keycloak.sh
+#
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 SCRIPTS_DIR="${ROOT_DIR}/scripts"
 
 # Source common utilities
-if [ -f "$(dirname "$0")/../utils/common.sh" ]; then
-  source "$(dirname "$0")/../utils/common.sh"
 elif [ -f "${SCRIPTS_DIR}/utils/common.sh" ]; then
-  source "${SCRIPTS_DIR}/utils/common.sh"
-else
   echo -e "\033[1;31m[ERROR] Could not locate common.sh\033[0m"
   exit 1
-fi
 
 # --- BEGIN: Preflight/Prerequisite Check ---
 preflight_check_agencystack || {
@@ -24,10 +30,8 @@ preflight_check_agencystack || {
 if [ -f /.dockerenv ] || grep -q docker /proc/1/cgroup; then
   CONTAINER_RUNNING="true"
   echo -e "${CYAN}[INFO] Running in container environment${NC}"
-else
   CONTAINER_RUNNING="false"
   echo -e "${CYAN}[INFO] Running in host environment${NC}"
-fi
 
 # Set CLIENT_ID to default if not specified
 CLIENT_ID="${CLIENT_ID:-default}"
@@ -142,7 +146,6 @@ done
 if [ -z "$DOMAIN" ] || [ -z "$ADMIN_EMAIL" ]; then
   log "ERROR" " --domain and --admin-email are required."
   exit 1
-fi
 
 log "INFO" "DOMAIN=$DOMAIN, ADMIN_EMAIL=$ADMIN_EMAIL, CLIENT_ID=$CLIENT_ID"
 
@@ -158,13 +161,11 @@ done
 if [ "$WITH_DEPS" = true ]; then
   log "INFO" "Installing dependencies..."
   # Add dependency install logic here
-fi
 
 # SSO readiness check
 if [ "$ENABLE_KEYCLOAK" = true ]; then
   log "INFO" "Performing Keycloak SSO readiness check..."
   # Add SSO readiness logic here
-fi
 
 log "INFO" "Installing Keycloak Docker container for $DOMAIN..."
 # Example Docker run (replace with actual logic)
@@ -183,7 +184,6 @@ NC='\033[0m' # No Color
 BOLD='\033[1m'
 
 # Variables
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 INSTALL_BASE_DIR="/opt/agency_stack"
 CONFIG_DIR="/opt/agency_stack"
@@ -233,7 +233,6 @@ if [ ! -w "$LOG_DIR" ] && [ ! -w "/var/log" ]; then
   INTEGRATION_LOG="${INTEGRATIONS_LOG_DIR}/keycloak.log"
   MAIN_INTEGRATION_LOG="${INTEGRATIONS_LOG_DIR}/integration.log"
   echo "Notice: Using local log directory for development: ${LOG_DIR}"
-fi
 
 # Ensure the log directory exists
 mkdir -p "$COMPONENTS_LOG_DIR"
@@ -377,7 +376,6 @@ if [ -z "$DOMAIN" ]; then
   echo -e "${RED}Error: --domain is required${NC}"
   echo -e "Use --help for usage information"
   exit 1
-fi
 
 # If we're only checking status, logs, restart, or running tests, we don't need admin email
 if [[ "$STATUS_ONLY" != "true" && "$LOGS_ONLY" != "true" && "$RESTART_ONLY" != "true" && "$TEST_ONLY" != "true" ]]; then
@@ -387,7 +385,6 @@ if [[ "$STATUS_ONLY" != "true" && "$LOGS_ONLY" != "true" && "$RESTART_ONLY" != "
     echo -e "Use --help for usage information"
     exit 1
   fi
-fi
 
 # Generate site name from domain for container naming
 SITE_NAME="$(parse_domain "$DOMAIN")"
@@ -417,7 +414,6 @@ if [ "$CONFIGURE_OAUTH_ONLY" = true ]; then
   
   log "INFO" "OAuth configuration completed" "${GREEN}OAuth configuration completed successfully!${NC}"
   exit 0
-fi
 
 # Main installation logic continues here for normal installation...
 log "INFO" "Starting Keycloak installation for ${DOMAIN}" "${CYAN}Starting Keycloak installation for ${DOMAIN}...${NC}"
@@ -426,12 +422,10 @@ log "INFO" "Starting Keycloak installation for ${DOMAIN}" "${CYAN}Starting Keycl
 if ! command -v docker &> /dev/null; then
   log "ERROR" "Docker is not installed" "${RED}Error: Docker is not installed. Please install Docker first.${NC}"
   exit 1
-fi
 
 if ! command -v docker-compose &> /dev/null; then
   log "ERROR" "Docker Compose is not installed" "${RED}Error: Docker Compose is not installed. Please install Docker Compose first.${NC}"
   exit 1
-fi
 
 # Generate a secure admin password if not provided
 ADMIN_PASSWORD=$(openssl rand -base64 12)
@@ -453,10 +447,8 @@ if [[ "$CONTAINER_RUNNING" == "true" ]]; then
   # Use user-writable paths inside the dev container to respect non-root user
   INSTALL_BASE_DIR="${HOME}/.agencystack"
   LOG_DIR="${HOME}/.logs/agency_stack/components"
-else
   INSTALL_BASE_DIR="/opt/agency_stack"
   LOG_DIR="/var/log/agency_stack/components"
-fi
 
 # Component specific directories
 KEYCLOAK_DIR="$(get_install_path keycloak "${CLIENT_ID}")"
@@ -555,7 +547,6 @@ if [[ "$STATUS_ONLY" == "true" ]]; then
   
   log "SUCCESS" "Status check completed successfully"
   exit 0
-fi
 
 if [[ "$RESTART_ONLY" == "true" ]]; then
   log "INFO" "Restarting Keycloak services..."
@@ -573,7 +564,6 @@ if [[ "$RESTART_ONLY" == "true" ]]; then
   fi
   
   exit 0
-fi
 
 if [[ "$LOGS_ONLY" == "true" ]]; then
   log "INFO" "Viewing Keycloak logs..."
@@ -590,7 +580,6 @@ if [[ "$LOGS_ONLY" == "true" ]]; then
   fi
   
   exit 0
-fi
 
 if [[ "$TEST_ONLY" == "true" ]]; then
   log "INFO" "Running Keycloak tests..."
@@ -613,7 +602,6 @@ if [[ "$TEST_ONLY" == "true" ]]; then
   
   log "SUCCESS" "All Keycloak tests PASSED"
   exit 0
-fi
 
 # Wait for Keycloak to start
 log "INFO" "Waiting for Keycloak to start..." "${CYAN}Waiting for Keycloak to start...${NC}"
@@ -642,7 +630,6 @@ done
 if [ $RETRIES -eq $MAX_RETRIES ]; then
   log "INFO" "Keycloak failed to start after ${MAX_RETRIES} attempts" "${YELLOW}Warning: Could not verify if Keycloak started properly after ${MAX_RETRIES} attempts. Will continue with installation, but you may need to check Keycloak status manually.${NC}"
   # Don't exit in failure mode as Keycloak might still be running
-fi
 
 # Create initial realm
 log "INFO" "Creating initial realm" "${CYAN}Creating initial realm...${NC}"
@@ -667,7 +654,6 @@ if [ -z "$ADMIN_TOKEN" ] || [ "$ADMIN_TOKEN" = "null" ]; then
     log "ERROR" "Failed to get admin token after retry" "${RED}Error: Failed to get admin token after retry.${NC}"
     log "INFO" "Continuing with installation, but realm setup failed" "${YELLOW}Continuing with installation, but realm setup failed. You'll need to manually set up the realm.${NC}"
   fi
-else
   # Create agency realm
   REALM_NAME="agency"
   if [ -n "$CLIENT_ID" ] && [ "$CLIENT_ID" != "default" ]; then
@@ -713,7 +699,6 @@ else
   else
     log "WARNING" "Failed to create realm" "${YELLOW}Warning: Failed to create realm. You may need to manually set up the realm.${NC}"
   fi
-fi
 
 # Start the Keycloak service (unless we're only checking status/logs/restart)
 if [[ "$STATUS_ONLY" != "true" && "$LOGS_ONLY" != "true" && "$RESTART_ONLY" != "true" && "$TEST_ONLY" != "true" ]]; then
@@ -790,7 +775,6 @@ EOL
   echo ""
   echo "Make sure to save these credentials securely!"
   echo "Credentials are stored in ${KEYCLOAK_DIR}/${DOMAIN}/"
-fi
 
 # Function to configure OAuth providers
 configure_oauth_providers() {
@@ -1361,10 +1345,8 @@ EOF
 # Configure OAuth providers if requested (moved to function)
 if [ "$ENABLE_OAUTH_GOOGLE" = true ] || [ "$ENABLE_OAUTH_GITHUB" = true ] || [ "$ENABLE_OAUTH_APPLE" = true ] || [ "$ENABLE_OAUTH_LINKEDIN" = true ] || [ "$ENABLE_OAUTH_MICROSOFT" = true ]; then
   configure_oauth_providers
-fi
 
 # Update component registry
 if [ "$ENABLE_OAUTH_GOOGLE" = true ] || [ "$ENABLE_OAUTH_GITHUB" = true ] || [ "$ENABLE_OAUTH_APPLE" = true ] || [ "$ENABLE_OAUTH_LINKEDIN" = true ] || [ "$ENABLE_OAUTH_MICROSOFT" = true ]; then
   log "INFO" "Updating component registry with OAuth IDP flag" "${BLUE}Updating component registry...${NC}"
   ${ROOT_DIR}/scripts/utils/update_component_registry.sh --update-component keycloak --update-flag oauth_idp_configured --update-value true
-fi

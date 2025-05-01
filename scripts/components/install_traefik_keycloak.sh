@@ -1,20 +1,20 @@
 #!/bin/bash
-#
-# Traefik-Keycloak Integration Installation Script for AgencyStack
-# This script installs and configures Traefik with Keycloak authentication following the SSO protocol
-#
 
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
   source "${SCRIPT_DIR}/../utils/common.sh"
-else
-  # Minimal logging functions if common.sh is not available
-  log_info() { echo "[INFO] $1"; }
-  log_success() { echo "[SUCCESS] $1"; }
-  log_warning() { echo "[WARNING] $1"; }
-  log_error() { echo "[ERROR] $1"; }
 fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: traefik_keycloak.sh
+# Path: /scripts/components/install_traefik_keycloak.sh
+#
+  # Minimal logging functions if common.sh is not available
+
+# Enforce containerization (prevent host contamination)
 
 # Parameters and defaults
 CLIENT_ID="${CLIENT_ID:-default}"
@@ -159,7 +159,6 @@ if [[ "$STATUS_ONLY" == "true" ]]; then
   
   log_success "Script completed successfully"
   exit 0
-fi
 
 # Check if we should only restart services
 if [[ "$RESTART_ONLY" == "true" ]]; then
@@ -178,7 +177,6 @@ if [[ "$RESTART_ONLY" == "true" ]]; then
   fi
   
   exit 0
-fi
 
 # Check if we should only view logs
 if [[ "$LOGS_ONLY" == "true" ]]; then
@@ -196,7 +194,6 @@ if [[ "$LOGS_ONLY" == "true" ]]; then
   fi
   
   exit 0
-fi
 
 # Create Docker Compose file
 create_docker_compose() {
@@ -362,7 +359,6 @@ TOKEN=$(get_token)
 if [ -z "$TOKEN" ]; then
   echo "Failed to get admin token"
   exit 1
-fi
 
 # Create traefik-dashboard client if it doesn't exist
 CLIENT_EXISTS=$(curl -s -H "Authorization: Bearer ${TOKEN}" \
@@ -391,9 +387,7 @@ if [ -z "$CLIENT_EXISTS" ]; then
     }'
   
   echo "Client created successfully"
-else
   echo "Client traefik-dashboard already exists"
-fi
 
 echo "Keycloak initialization complete."
 EOF
@@ -426,24 +420,18 @@ AUTH_RUNNING=\$(docker ps -q -f "name=traefik_forward_auth_\${CLIENT_ID}" 2>/dev
 
 if [ -n "\$TRAEFIK_RUNNING" ]; then
   echo "✅ Traefik is running"
-else
   echo "❌ Traefik is not running"
   exit 1
-fi
 
 if [ -n "\$KEYCLOAK_RUNNING" ]; then
   echo "✅ Keycloak is running"
-else
   echo "❌ Keycloak is not running"
   exit 1
-fi
 
 if [ -n "\$AUTH_RUNNING" ]; then
   echo "✅ Forward Auth is running"
-else
   echo "❌ Forward Auth is not running"
   exit 1
-fi
 
 # Check Traefik dashboard
 echo "Checking Traefik dashboard..."
@@ -452,20 +440,16 @@ if [[ "\$HTTP_CODE" == "200" ]]; then
   echo "ℹ️ Dashboard is accessible without authentication (HTTP \$HTTP_CODE)"
 elif [[ "\$HTTP_CODE" == "302" || "\$HTTP_CODE" == "401" || "\$HTTP_CODE" == "403" ]]; then
   echo "✅ Dashboard is protected by authentication (HTTP \$HTTP_CODE)"
-else
   echo "❌ Dashboard is not accessible (HTTP \$HTTP_CODE)"
   exit 1
-fi
 
 # Check Keycloak
 echo "Checking Keycloak..."
 KEYCLOAK_CODE=\$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:\${KEYCLOAK_PORT}" 2>/dev/null)
 if [[ "\$KEYCLOAK_CODE" == "200" || "\$KEYCLOAK_CODE" == "302" ]]; then
   echo "✅ Keycloak is accessible (HTTP \$KEYCLOAK_CODE)"
-else
   echo "❌ Keycloak is not accessible (HTTP \$KEYCLOAK_CODE)"
   exit 1
-fi
 
 echo "All verification checks completed."
 EOF
@@ -565,7 +549,6 @@ create_test_script() {
 # This script implements tests according to the AgencyStack TDD Protocol
 
 # Source the common utilities
-SCRIPT_DIR="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
 COMPONENT_DIR="\$(dirname "\$SCRIPT_DIR")"
 REPO_ROOT="/root/_repos/agency-stack"
 
@@ -580,13 +563,11 @@ AUTH_RUNNING=\$(docker ps -q -f "name=traefik_forward_auth_\${CLIENT_ID}" 2>/dev
 
 if [ -n "\$TRAEFIK_RUNNING" ] && [ -n "\$KEYCLOAK_RUNNING" ] && [ -n "\$AUTH_RUNNING" ]; then
   echo "✓ All containers are running"
-else
   echo "✗ Some containers are not running:"
   echo "  - Traefik: \$([ -n "\$TRAEFIK_RUNNING" ] && echo "Running" || echo "Not running")"
   echo "  - Keycloak: \$([ -n "\$KEYCLOAK_RUNNING" ] && echo "Running" || echo "Not running")"
   echo "  - Forward Auth: \$([ -n "\$AUTH_RUNNING" ] && echo "Running" || echo "Not running")"
   exit 1
-fi
 
 # Test 2: Verify HTTP endpoints
 echo "Test 2: Verifying HTTP endpoints..."
@@ -595,31 +576,25 @@ echo "Test 2: Verifying HTTP endpoints..."
 TRAEFIK_API_CODE=\$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${TRAEFIK_PORT}/api" 2>/dev/null)
 if [[ "\$TRAEFIK_API_CODE" == "200" ]]; then
   echo "✓ Traefik API is accessible (HTTP \$TRAEFIK_API_CODE)"
-else
   echo "✗ Traefik API not accessible (HTTP \$TRAEFIK_API_CODE)"
   echo "  Expected URL: http://localhost:${TRAEFIK_PORT}/api"
   exit 1
-fi
 
 # Traefik Dashboard
 TRAEFIK_DASH_CODE=\$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${TRAEFIK_PORT}/dashboard/" 2>/dev/null)
 if [[ "\$TRAEFIK_DASH_CODE" == "200" || "\$TRAEFIK_DASH_CODE" == "302" || "\$TRAEFIK_DASH_CODE" == "401" || "\$TRAEFIK_DASH_CODE" == "403" ]]; then
   echo "✓ Traefik Dashboard responds (HTTP \$TRAEFIK_DASH_CODE)"
-else
   echo "✗ Traefik Dashboard not accessible (HTTP \$TRAEFIK_DASH_CODE)"
   echo "  Expected URL: http://localhost:${TRAEFIK_PORT}/dashboard/"
   exit 1
-fi
 
 # Keycloak endpoint
 KEYCLOAK_CODE=\$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${KEYCLOAK_PORT}/auth/" 2>/dev/null)
 if [[ "\$KEYCLOAK_CODE" == "200" ]]; then
   echo "✓ Keycloak is accessible (HTTP \$KEYCLOAK_CODE)"
-else
   echo "✗ Keycloak not accessible (HTTP \$KEYCLOAK_CODE)"
   echo "  Expected URL: http://localhost:${KEYCLOAK_PORT}/auth/"
   exit 1
-fi
 
 # Test 3: Verify network connectivity
 echo "Test 3: Verifying network connectivity..."
@@ -628,10 +603,8 @@ NETWORK_EXISTS=\$(docker network ls | grep "\$NETWORK_NAME" | wc -l)
 
 if [[ "\$NETWORK_EXISTS" -gt 0 ]]; then
   echo "✓ Docker network \$NETWORK_NAME exists"
-else
   echo "✗ Docker network \$NETWORK_NAME does not exist"
   exit 1
-fi
 
 echo "=== All TDD protocol tests PASSED ==="
 exit 0
