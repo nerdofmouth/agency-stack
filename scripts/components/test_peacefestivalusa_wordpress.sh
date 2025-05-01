@@ -85,7 +85,18 @@ log_info "Test environment file created at $TEST_DIR/.env"
 
 # Test 1: Installation
 log_info "Testing WordPress installation..."
-run_test "Installation" "${SCRIPT_DIR}/install_client_wordpress.sh --client-id $CLIENT_ID --domain $DOMAIN --admin-email test@example.com --wp-port $TEST_PORT --db-port $TEST_DB_PORT --container-name-prefix $CONTAINER_PREFIX $FORCE"
+INSTALL_CMD="${SCRIPT_DIR}/install_client_wordpress.sh"
+INSTALL_ARGS="--client-id ${CLIENT_ID} --domain ${DOMAIN} --admin-email test@example.com"
+INSTALL_ARGS="${INSTALL_ARGS} --wp-port ${TEST_PORT} --db-port ${TEST_DB_PORT}" 
+INSTALL_ARGS="${INSTALL_ARGS} --container-name-prefix ${CONTAINER_PREFIX}"
+
+# Add force flag if specified
+if [ -n "$FORCE" ]; then
+  INSTALL_ARGS="${INSTALL_ARGS} ${FORCE}"
+fi
+
+log_info "Installation command: ${INSTALL_CMD} ${INSTALL_ARGS}"
+run_test "Installation" "${INSTALL_CMD} ${INSTALL_ARGS}"
 
 # Wait for containers to start
 log_info "Waiting for containers to initialize..."
