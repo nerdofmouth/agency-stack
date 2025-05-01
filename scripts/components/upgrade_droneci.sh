@@ -1,11 +1,20 @@
 #!/bin/bash
-# DroneCI Upgrade Script v2.25.0
-# AgencyStack Component: droneci
 
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: upgrade_droneci.sh
+# Path: /scripts/components/upgrade_droneci.sh
+#
 set -euo pipefail
 
 # Source common utilities
-source "$(dirname "$0")/../utils/common.sh"
 
 # Component configuration
 COMPONENT_NAME="droneci"
@@ -80,7 +89,6 @@ done
 if [ -z "$DOMAIN" ] || [ -z "$ADMIN_EMAIL" ]; then
   log_error "${LOG_FILE}" "Missing required parameters. Use --help for usage."
   exit 1
-fi
 
 # Set installation directory
 INSTALL_DIR="/opt/agency_stack/clients/${CLIENT_ID}/droneci"
@@ -89,14 +97,12 @@ INSTALL_DIR="/opt/agency_stack/clients/${CLIENT_ID}/droneci"
 if [ ! -f "${INSTALL_DIR}/.installed" ]; then
     log_error "${LOG_FILE}" "DroneCI not installed, cannot upgrade"
     exit 1
-fi
 
 # Check current version
 CURRENT_VERSION=$(grep -o "DRONE_VERSION=.*" "${INSTALL_DIR}/.env" 2>/dev/null | cut -d= -f2 | tr -d '"' || echo "unknown")
 if [ "$CURRENT_VERSION" == "2.25.0" ] && [ "$FORCE" != "true" ]; then
     log_info "${LOG_FILE}" "DroneCI already at v2.25.0, skipping upgrade"
     exit 0
-fi
 
 log_info "${LOG_FILE}" "Upgrading DroneCI from ${CURRENT_VERSION} to v2.25.0"
 
@@ -117,7 +123,6 @@ if grep -q "DRONE_RUNNER_VERSION" "${INSTALL_DIR}/.env"; then
     RUNNER_VERSION=$(grep -o "DRONE_RUNNER_VERSION=.*" "${INSTALL_DIR}/.env" | cut -d= -f2 | tr -d '"')
     # Update runner to latest compatible version
     RUNNER_VERSION="2.0.0"
-fi
 
 # Update environment file
 log_info "${LOG_FILE}" "Updating configuration"
@@ -131,11 +136,9 @@ sed -i "s|image: drone/drone-runner-docker:.*|image: drone/drone-runner-docker:$
 # Add new environment variables for v2.25.0
 if ! grep -q "DRONE_STARLARK_ENABLED" "${INSTALL_DIR}/.env"; then
     echo "DRONE_STARLARK_ENABLED=true" >> "${INSTALL_DIR}/.env"
-fi
 
 if ! grep -q "DRONE_VALIDATE_PLUGIN_SKIP" "${INSTALL_DIR}/.env"; then
     echo "DRONE_VALIDATE_PLUGIN_SKIP=true" >> "${INSTALL_DIR}/.env"
-fi
 
 # Keycloak SSO integration
 if [ "$ENABLE_KEYCLOAK" == "true" ]; then
@@ -161,7 +164,6 @@ DRONE_KEYCLOAK_CLIENT_SECRET=droneci-secret
 DRONE_KEYCLOAK_REALM=${CLIENT_ID}
 EOF
     fi
-fi
 
 # Gitea integration if enabled
 if [ "$ENABLE_GITEA" == "true" ]; then
@@ -186,7 +188,6 @@ DRONE_GITEA_CLIENT_SECRET=droneci-secret
 DRONE_GIT_ALWAYS_AUTH=true
 DRONE_GITEA_SKIP_VERIFY=false
 EOF
-fi
 
 # Pull updated images
 log_info "${LOG_FILE}" "Pulling new images"
@@ -214,7 +215,6 @@ if [ -n "$CONTAINER_STATUS" ]; then
     # Notify about re-adding repositories
     log_info "${LOG_FILE}" "NOTE: You may need to re-sync repositories in the DroneCI UI after this upgrade."
     log_info "${LOG_FILE}" "Access the DroneCI dashboard at: https://drone.${DOMAIN}"
-else
     log_error "${LOG_FILE}" "Upgrade failed: container is not running"
     log_info "${LOG_FILE}" "Attempting rollback from backup..."
     docker-compose down
@@ -224,4 +224,3 @@ else
     docker-compose up -d
     log_warning "${LOG_FILE}" "Rollback completed. Previous version restored."
     exit 1
-fi

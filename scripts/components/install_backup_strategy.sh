@@ -1,19 +1,17 @@
 #!/bin/bash
-# install_backup_strategy.sh - Encrypted offsite incremental backup system using Restic
-# https://stack.nerdofmouth.com
-#
-# This script sets up Restic backups with:
-# - Encryption for secure offsite storage
-# - Scheduled incremental backups
-# - Multiple backend support (S3, SFTP, local)
-# - Restore verification
-#
-# Author: AgencyStack Team
-# Version: 1.0.0
-# Created: 2025-04-07
 
-# --- BEGIN: Preflight/Prerequisite Check ---
-source "$(dirname "$0")/../utils/common.sh"
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: backup_strategy.sh
+# Path: /scripts/components/install_backup_strategy.sh
+#
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -31,7 +29,6 @@ AGENCY_SCRIPTS_DIR="${AGENCY_ROOT}/repo/scripts"
 AGENCY_UTILS_DIR="${AGENCY_SCRIPTS_DIR}/utils"
 
 # Import common utilities
-source "${AGENCY_UTILS_DIR}/common.sh"
 source "${AGENCY_UTILS_DIR}/log_helpers.sh"
 
 # Define component-specific variables
@@ -126,9 +123,7 @@ done
 # Normalize FORCE value for robustness
 if [[ "${FORCE}" =~ ^([Tt][Rr][Uu][Ee]|1)$ ]]; then
   FORCE=true
-else
   FORCE=false
-fi
 
 # Setup logging
 mkdir -p "$(dirname "${COMPONENT_LOG_FILE}")"
@@ -168,7 +163,6 @@ if [[ -f "${COMPONENT_INSTALLED_MARKER}" ]] && [[ "${FORCE}" != "true" ]]; then
   log "INFO" "Backup strategy already installed" "${GREEN}✅ Backup strategy already installed.${NC}"
   log "INFO" "Use --force to reinstall" "${CYAN}Use --force to reinstall.${NC}"
   exit 0
-fi
 
 # Create necessary directories
 log "INFO" "Creating necessary directories" "${CYAN}Creating necessary directories...${NC}"
@@ -184,7 +178,6 @@ if ! command -v restic &> /dev/null; then
   log "INFO" "Installing Restic backup tool" "${CYAN}Installing Restic backup tool...${NC}"
   apt-get update >> "${INSTALL_LOG}" 2>&1
   apt-get install -y restic >> "${INSTALL_LOG}" 2>&1
-fi
 
 # Create environment file template
 log "INFO" "Creating environment file template" "${CYAN}Creating environment file template...${NC}"
@@ -258,7 +251,6 @@ echo "Starting backup at \$(date)"
 if ! restic snapshots &> /dev/null; then
   echo "Initializing repository..."
   restic init
-fi
 
 # Run backup
 echo "Running backup..."
@@ -271,7 +263,6 @@ if [ -n "\$RETENTION_DAYS" ] || [ -n "\$RETENTION_WEEKS" ] || [ -n "\$RETENTION_
     \$([ -n "\$RETENTION_DAYS" ] && echo "--keep-daily \$RETENTION_DAYS") \\
     \$([ -n "\$RETENTION_WEEKS" ] && echo "--keep-weekly \$RETENTION_WEEKS") \\
     \$([ -n "\$RETENTION_MONTHS" ] && echo "--keep-monthly \$RETENTION_MONTHS")
-fi
 
 # Check repository integrity
 echo "Checking repository integrity..."
@@ -285,15 +276,12 @@ if [ -n "\$NOTIFICATION_EMAIL" ]; then
   SUBJECT="Backup \$([ \$CHECK_EXIT_CODE -eq 0 ] && echo "successful" || echo "failed") for ${DOMAIN}"
   BODY=\$(cat "\$LOG_FILE")
   echo -e "Subject: \$SUBJECT\n\n\$BODY" | sendmail -t "\$NOTIFICATION_EMAIL"
-fi
 
 if [ \$CHECK_EXIT_CODE -eq 0 ]; then
   echo "✅ Repository check passed!"
   exit 0
-else
   echo "❌ Repository check failed with exit code \$CHECK_EXIT_CODE"
   exit \$CHECK_EXIT_CODE
-fi
 EOL
 
 # Create restore script
@@ -349,7 +337,6 @@ if [ -z "\$TARGET_DIR" ]; then
   echo "Error: Target directory is required"
   print_usage
   exit 1
-fi
 
 mkdir -p "\$TARGET_DIR"
 
@@ -371,10 +358,8 @@ echo "Restoration completed at \$(date) with exit code \$RESTORE_EXIT_CODE"
 if [ \$RESTORE_EXIT_CODE -eq 0 ]; then
   echo "✅ Restoration successful!"
   exit 0
-else
   echo "❌ Restoration failed with exit code \$RESTORE_EXIT_CODE"
   exit \$RESTORE_EXIT_CODE
-fi
 EOL
 
 # Make scripts executable

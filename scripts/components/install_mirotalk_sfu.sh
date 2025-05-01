@@ -1,19 +1,17 @@
 #!/bin/bash
-# install_mirotalk_sfu.sh - Install and configure MiroTalk SFU for AgencyStack
-# https://stack.nerdofmouth.com
-#
-# This script sets up MiroTalk SFU with:
-# - Docker containerization
-# - Traefik integration with TLS
-# - Multi-tenant awareness
-# - AgencyStack dashboard integration
-#
-# Author: AgencyStack Team
-# Version: 1.0.0
-# Created: $(date +%Y-%m-%d)
 
-# --- BEGIN: Preflight/Prerequisite Check ---
-source "$(dirname "$0")/../utils/common.sh"
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: mirotalk_sfu.sh
+# Path: /scripts/components/install_mirotalk_sfu.sh
+#
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -21,8 +19,6 @@ preflight_check_agencystack || {
 # --- END: Preflight/Prerequisite Check ---
 
 # Source common utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../utils/common.sh"
 
 # Variables
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
@@ -137,13 +133,11 @@ if [ -z "$DOMAIN" ]; then
   log_error "--domain is required"
   echo -e "Use --help for usage information"
   exit 1
-fi
 
 if [ -z "$ADMIN_EMAIL" ]; then
   log_error "--admin-email is required"
   echo -e "Use --help for usage information"
   exit 1
-fi
 
 # Welcome message
 log_info "Starting MiroTalk SFU installation for ${DOMAIN}" "${BLUE}Starting MiroTalk SFU installation for ${DOMAIN}...${NC}"
@@ -152,7 +146,6 @@ log_info "Starting MiroTalk SFU installation for ${DOMAIN}" "${BLUE}Starting Mir
 if [ "$EUID" -ne 0 ]; then
   log_error "Please run as root or with sudo"
   exit 1
-fi
 
 # Create log directories if they don't exist
 mkdir -p "${LOG_DIR}"
@@ -166,12 +159,10 @@ if [ -n "$CLIENT_ID" ]; then
   INSTALL_DIR="${CLIENT_DIR}/mirotalk_sfu/${DOMAIN}"
   MIROTALK_CONTAINER="${CLIENT_ID}_mirotalk_sfu"
   NETWORK_NAME="${CLIENT_ID}_network"
-else
   CLIENT_DIR="${CONFIG_DIR}"
   INSTALL_DIR="${CONFIG_DIR}/mirotalk_sfu/${DOMAIN}"
   MIROTALK_CONTAINER="mirotalk_sfu_${SITE_NAME}"
   NETWORK_NAME="agency-network"
-fi
 
 # Check if MiroTalk SFU is already installed
 if docker ps -a --format '{{.Names}}' | grep -q "${MIROTALK_CONTAINER}"; then
@@ -203,7 +194,6 @@ if docker ps -a --format '{{.Names}}' | grep -q "${MIROTALK_CONTAINER}"; then
       exit 0
     fi
   fi
-fi
 
 # Check if Docker is installed
 if ! command -v docker &> /dev/null; then
@@ -225,13 +215,11 @@ if ! command -v docker &> /dev/null; then
     log_info "Use --with-deps to automatically install dependencies"
     exit 1
   fi
-fi
 
 # Check if Docker is running
 if ! docker info &> /dev/null; then
   log_error "Docker is not running"
   exit 1
-fi
 
 # Check if Docker Compose is installed
 if ! command -v docker-compose &> /dev/null; then
@@ -253,7 +241,6 @@ if ! command -v docker-compose &> /dev/null; then
     log_info "Use --with-deps to automatically install dependencies"
     exit 1
   fi
-fi
 
 # Check if network exists, create if it doesn't
 if ! docker network inspect "$NETWORK_NAME" &> /dev/null; then
@@ -264,9 +251,7 @@ if ! docker network inspect "$NETWORK_NAME" &> /dev/null; then
     log_error "Failed to create Docker network $NETWORK_NAME"
     exit 1
   fi
-else
   log_success "Docker network $NETWORK_NAME already exists"
-fi
 
 # Check for Traefik
 if ! docker ps --format '{{.Names}}' | grep -q "traefik"; then
@@ -285,9 +270,7 @@ if ! docker ps --format '{{.Names}}' | grep -q "traefik"; then
   else
     log_info "Use --with-deps to automatically install dependencies"
   fi
-else
   log_success "Traefik container found"
-fi
 
 log_info "Starting MiroTalk SFU installation for $DOMAIN"
 
@@ -323,7 +306,6 @@ $(if [ "$ENABLE_CLOUD" = true ]; then
 echo "TURN_URLS=turn:numb.viagenie.ca
 TURN_USERNAME=webrtc@live.com
 TURN_PASSWORD=muazkh"
-else
 echo "TURN_URLS=turn:localhost:3478?transport=tcp
 TURN_USERNAME=mirotalk
 TURN_PASSWORD=${TURN_SECRET}"
@@ -393,7 +375,6 @@ cd "${INSTALL_DIR}" && docker-compose up -d
 if [ $? -ne 0 ]; then
   log_error "Failed to start MiroTalk SFU stack"
   exit 1
-fi
 
 log_info "Waiting for MiroTalk SFU container to initialize"
 sleep 10
@@ -403,7 +384,6 @@ if ! docker ps --format '{{.Names}}' | grep -q "${MIROTALK_CONTAINER}"; then
   log_error "MiroTalk SFU container failed to start"
   docker logs "${MIROTALK_CONTAINER}" >> "${INSTALL_LOG}" 2>&1
   exit 1
-fi
 
 # Store credentials in a secure location
 log_info "Storing credentials"
@@ -485,7 +465,6 @@ if [ -f "$REGISTRY_FILE" ]; then
   chmod 644 "$REGISTRY_FILE"
   
   log_success "Updated component registry"
-else
   log_warning "Component registry file not found at ${REGISTRY_FILE}"
   
   # Create directory if it doesn't exist
@@ -521,7 +500,6 @@ EOF
   
   chmod 644 "$REGISTRY_FILE"
   log_success "Created new component registry"
-fi
 
 # Register in the dashboard if available
 DASHBOARD_DATA="${CONFIG_DIR}/dashboard/data/dashboard_data.json"
@@ -545,7 +523,6 @@ if [ -f "$DASHBOARD_DATA" ]; then
   chmod 644 "$DASHBOARD_DATA"
   
   log_success "Updated dashboard data"
-fi
 
 # Configure Prometheus metrics if enabled
 if [ "$ENABLE_METRICS" = true ] && [ -d "/opt/agency_stack/prometheus" ]; then
@@ -570,7 +547,6 @@ if [ "$ENABLE_METRICS" = true ] && [ -d "/opt/agency_stack/prometheus" ]; then
       docker exec prometheus curl -X POST http://localhost:9090/-/reload
     fi
   fi
-fi
 
 # Final message
 log_success "MiroTalk SFU installation completed successfully"
@@ -585,7 +561,6 @@ if [ "$ENABLE_METRICS" = true ]; then
   echo -e "${CYAN}Metrics URL: https://${DOMAIN}:3001/metrics${NC}"
   echo -e "${YELLOW}Metrics Auth Token: ${TURN_SECRET}${NC}"
   echo -e ""
-fi
 echo -e "${YELLOW}Note: Initial MiroTalk SFU setup may still be in progress.${NC}"
 echo -e "${YELLOW}If you encounter any issues, wait a few minutes and try again.${NC}"
 echo -e "${YELLOW}For more information, see: /docs/pages/components/mirotalk_sfu.md${NC}"

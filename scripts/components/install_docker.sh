@@ -12,6 +12,12 @@ exit_with_warning_if_host
 # AgencyStack Component Installer: docker.sh
 # Path: /scripts/components/install_docker.sh
 #
+
+# Enforce containerization (prevent host contamination)
+
+# AgencyStack Component Installer: docker.sh
+# Path: /scripts/components/install_docker.sh
+#
 set -euo pipefail
 
 # Define absolute paths - never rely on relative paths

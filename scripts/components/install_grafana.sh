@@ -1,13 +1,21 @@
 #!/bin/bash
-# install_grafana.sh - Installation script for Grafana
-# AgencyStack Team
 
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: grafana.sh
+# Path: /scripts/components/install_grafana.sh
+#
 set -e
 
 # --- BEGIN: Preflight/Prerequisite Check ---
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
-source "$REPO_ROOT/scripts/utils/common.sh"
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -135,13 +143,11 @@ if [ -z "$DOMAIN" ]; then
   echo -e "${RED}Error: --domain is required${NC}"
   echo -e "Use --help for usage information"
   exit 1
-fi
 
 if [ -z "$ADMIN_EMAIL" ]; then
   echo -e "${RED}Error: --admin-email is required${NC}"
   echo -e "Use --help for usage information"
   exit 1
-fi
 
 # Welcome message
 echo -e "${MAGENTA}${BOLD}AgencyStack Grafana Setup${NC}"
@@ -151,7 +157,6 @@ echo -e "=============================="
 if [ "$EUID" -ne 0 ]; then
   echo -e "${RED}Please run as root or with sudo${NC}"
   exit 1
-fi
 
 # Run system validation
 if [ -f "${REPO_ROOT}/scripts/utils/validate_system.sh" ]; then
@@ -160,9 +165,7 @@ if [ -f "${REPO_ROOT}/scripts/utils/validate_system.sh" ]; then
     echo -e "${RED}System validation failed. Please fix the issues and try again.${NC}"
     exit 1
   }
-else
   echo -e "${YELLOW}Warning: System validation script not found. Proceeding without validation.${NC}"
-fi
 
 # Create log directories if they don't exist
 mkdir -p "$LOG_DIR"
@@ -198,10 +201,8 @@ SITE_NAME=${DOMAIN//./_}
 if [ -n "$CLIENT_ID" ]; then
   GRAFANA_CONTAINER="${CLIENT_ID}_grafana"
   NETWORK_NAME="${CLIENT_ID}_network"
-else
   GRAFANA_CONTAINER="grafana_${SITE_NAME}"
   NETWORK_NAME="agency-network"
-fi
 
 # Check if Grafana is already installed
 if docker ps -a --format '{{.Names}}' | grep -q "$GRAFANA_CONTAINER"; then
@@ -231,7 +232,6 @@ if docker ps -a --format '{{.Names}}' | grep -q "$GRAFANA_CONTAINER"; then
       exit 0
     fi
   fi
-fi
 
 # Check if Docker is installed
 if ! command -v docker &> /dev/null; then
@@ -251,13 +251,11 @@ if ! command -v docker &> /dev/null; then
     log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
     exit 1
   fi
-fi
 
 # Check if Docker is running
 if ! docker info &> /dev/null; then
   log "ERROR: Docker is not running" "${RED}Docker is not running. Please start Docker first.${NC}"
   exit 1
-fi
 
 # Check if Docker Compose is installed
 if ! command -v docker-compose &> /dev/null; then
@@ -277,7 +275,6 @@ if ! command -v docker-compose &> /dev/null; then
     log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
     exit 1
   fi
-fi
 
 # Check if network exists, create if it doesn't
 if ! docker network inspect "$NETWORK_NAME" &> /dev/null; then
@@ -287,9 +284,7 @@ if ! docker network inspect "$NETWORK_NAME" &> /dev/null; then
     log "ERROR: Failed to create Docker network $NETWORK_NAME" "${RED}Failed to create Docker network $NETWORK_NAME. See log for details.${NC}"
     exit 1
   fi
-else
   log "INFO: Docker network $NETWORK_NAME already exists" "${GREEN}✅ Docker network $NETWORK_NAME already exists${NC}"
-fi
 
 # Check for Traefik
 if ! docker ps --format '{{.Names}}' | grep -q "traefik"; then
@@ -306,19 +301,15 @@ if ! docker ps --format '{{.Names}}' | grep -q "traefik"; then
   else
     log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
   fi
-else
   log "INFO: Traefik container found" "${GREEN}✅ Traefik container found${NC}"
-fi
 
 # Check for Loki
 log "INFO: Checking for Loki" "${CYAN}Checking for Loki integration...${NC}"
 if docker ps --format '{{.Names}}' | grep -q "loki"; then
   log "INFO: Loki container found, will configure integration" "${GREEN}✅ Loki found, will configure integration${NC}"
   HAS_LOKI=true
-else
   log "INFO: Loki container not found, skipping integration" "${YELLOW}⚠️ Loki not found, skipping log aggregation setup${NC}"
   HAS_LOKI=false
-fi
 
 log "INFO: Starting Grafana installation for $DOMAIN" "${BLUE}Starting Grafana installation for $DOMAIN...${NC}"
 
@@ -423,7 +414,6 @@ datasources:
     version: 1
 EOF
   integration_log "INFO: Configured Loki datasource" 
-fi
 
 # Create dashboard provisioning
 log "INFO: Creating dashboard provisioning" "${CYAN}Creating dashboard provisioning...${NC}"
@@ -595,7 +585,6 @@ cd "${GRAFANA_DIR}/${DOMAIN}" && docker-compose up -d
 if [ $? -ne 0 ]; then
   log "ERROR: Failed to start Grafana" "${RED}Failed to start Grafana. See log for details.${NC}"
   exit 1
-fi
 
 # Store credentials in a secure location
 log "INFO: Storing credentials" "${CYAN}Storing credentials...${NC}"
@@ -633,9 +622,7 @@ if [ -d "${CONFIG_DIR}/components" ]; then
   "status": "active"
 }
 EOF
-else
   log "WARNING: Components registry not found" "${YELLOW}Components registry not found, skipping registration${NC}"
-fi
 
 # Add to installed_components.txt
 INSTALLED_COMPONENTS_FILE="${CONFIG_DIR}/installed_components.txt"
@@ -644,16 +631,13 @@ log "INFO: Adding to installed components" "${CYAN}Adding to installed component
 # Create file if it doesn't exist
 if [ ! -f "$INSTALLED_COMPONENTS_FILE" ]; then
   echo "component|domain|version|status" > "$INSTALLED_COMPONENTS_FILE"
-fi
 
 # Check if component is already in the file
 if grep -q "grafana|${DOMAIN}|" "$INSTALLED_COMPONENTS_FILE"; then
   # Update the entry
   sed -i "s|grafana|${DOMAIN}|.*|grafana|${DOMAIN}|${GRAFANA_VERSION}|active|" "$INSTALLED_COMPONENTS_FILE"
-else
   # Add new entry
   echo "grafana|${DOMAIN}|${GRAFANA_VERSION}|active" >> "$INSTALLED_COMPONENTS_FILE"
-fi
 
 # Update dashboard status
 if [ -f "${CONFIG_DIR}/dashboard/status.json" ]; then
@@ -661,9 +645,7 @@ if [ -f "${CONFIG_DIR}/dashboard/status.json" ]; then
   # This is a placeholder for dashboard status update logic
   # In a real implementation, this would modify the dashboard status JSON
   # to include information about the Grafana installation
-else
   log "WARNING: Dashboard status file not found" "${YELLOW}Dashboard status file not found, skipping update${NC}"
-fi
 
 # Final message
 log "INFO: Grafana installation completed successfully" "${GREEN}${BOLD}✅ Grafana installed successfully!${NC}"
@@ -677,9 +659,7 @@ echo -e "${CYAN}Credentials saved to: ${CONFIG_DIR}/secrets/grafana/${DOMAIN}.en
 # Check for Loki integration
 if [ "$HAS_LOKI" = true ]; then
   echo -e "${GREEN}✅ Loki integration configured for log aggregation${NC}"
-else
   echo -e "${YELLOW}⚠️ Loki not installed. For complete monitoring, install Loki with:${NC}"
   echo -e "${CYAN}   make install-loki DOMAIN=loki.${DOMAIN}${NC}"
-fi
 
 exit 0

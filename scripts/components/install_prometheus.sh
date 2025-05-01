@@ -1,6 +1,17 @@
 #!/bin/bash
+
 # Source common utilities
-source "$(dirname "$0")/../utils/common.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: prometheus.sh
+# Path: /scripts/components/install_prometheus.sh
+#
         
 # install_prometheus.sh - Install and configure Prometheus monitoring for AgencyStack
 # [https://stack.nerdofmouth.com](https://stack.nerdofmouth.com)
@@ -30,7 +41,6 @@ NC='\033[0m' # No Color
 BOLD='\033[1m'
 
 # Variables
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 CONFIG_DIR="/opt/agency_stack"
 PROMETHEUS_DIR="${CONFIG_DIR}/prometheus"
@@ -261,7 +271,6 @@ if [ -z "$DOMAIN" ]; then
   echo -e "${RED}Error: Domain is required. Use --domain option.${NC}"
   show_help
   exit 1
-fi
 
 # Log function
 log() {
@@ -291,22 +300,18 @@ integration_log() {
     # Mark component as installed
     mark_installed "prometheus" "${COMPONENT_DIR}"
         
-log_success() {
   log "INFO" "$1" "${GREEN}$1${NC}"
 }
 
 # Info log
-log_info() {
   log "INFO" "$1" "${BLUE}$1${NC}"
 }
 
 # Warning log
-log_warning() {
   log "WARNING" "$1" "${YELLOW}$1${NC}"
 }
 
 # Error log
-log_error() {
   log "ERROR" "$1" "${RED}$1${NC}"
 }
 
@@ -1342,7 +1347,6 @@ main() {
 if [ "$(id -u)" -ne 0 ]; then
   log_error "This script must be run as root"
   exit 1
-fi
 
 # Run system validation
 if [ -f "${ROOT_DIR}/scripts/utils/validate_system.sh" ]; then
@@ -1351,9 +1355,7 @@ if [ -f "${ROOT_DIR}/scripts/utils/validate_system.sh" ]; then
     log_error "System validation failed. Please fix the issues and try again."
     exit 1
   }
-else
   log_warning "System validation script not found. Proceeding without validation."
-fi
 
 # Execute main function
 main

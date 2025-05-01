@@ -1,4 +1,20 @@
 #!/bin/bash
+
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: fix_fqdn_access_improved.sh
+# Path: /scripts/components/fix_fqdn_access_improved.sh
+#
+
+# Enforce containerization (prevent host contamination)
+
 # fix_fqdn_access_improved.sh - Improved Fix for FQDN Access
 #
 # This script provides a comprehensive solution for FQDN access issues
@@ -22,19 +38,15 @@ TRAEFIK_CONFIG_DIR="${TRAEFIK_DIR}/config"
 TRAEFIK_DYNAMIC_DIR="${TRAEFIK_CONFIG_DIR}/dynamic"
 
 # Log helpers (self-contained)
-log_info() {
   echo -e "\033[0;34m[INFO] $1\033[0m"
 }
 
-log_success() {
   echo -e "\033[0;32m[SUCCESS] $1\033[0m"
 }
 
-log_warning() {
   echo -e "\033[0;33m[WARNING] $1\033[0m"
 }
 
-log_error() {
   echo -e "\033[0;31m[ERROR] $1\033[0m" >&2
 }
 
@@ -179,9 +191,7 @@ if [ "${SKIP_DNS_CHECK}" = "false" ]; then
       log_warning "FQDN access may still fail without proper DNS resolution"
     fi
   fi
-else
   log_info "Skipping DNS resolution check"
-fi
 
 # Check and fix Traefik configuration
 if [ -d "${TRAEFIK_DIR}" ]; then
@@ -339,9 +349,7 @@ EOF
   else
     log_info "DRY RUN: Would restart Traefik"
   fi
-else
   log_error "Traefik directory not found: ${TRAEFIK_DIR}"
-fi
 
 # Test access to the dashboard via FQDN
 if [ "${DRY_RUN}" = "false" ]; then
@@ -370,9 +378,7 @@ if [ "${DRY_RUN}" = "false" ]; then
     log_warning "This may be due to DNS caching, try again in a few minutes."
     log_warning "In the meantime, use direct IP access: http://${SERVER_IP}:8888"
   fi
-else
   log_info "DRY RUN: Would test dashboard access via FQDN"
-fi
 
 log_info "==========================================================="
 log_info "DASHBOARD ACCESS URLS:"

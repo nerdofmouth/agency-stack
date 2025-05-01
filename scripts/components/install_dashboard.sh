@@ -12,6 +12,12 @@ exit_with_warning_if_host
 # AgencyStack Component Installer: dashboard.sh
 # Path: /scripts/components/install_dashboard.sh
 #
+
+# Enforce containerization (prevent host contamination)
+
+# AgencyStack Component Installer: dashboard.sh
+# Path: /scripts/components/install_dashboard.sh
+#
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1

@@ -1,9 +1,17 @@
 #!/bin/bash
-# install_dns.sh - Setup DNS for AgencyStack components
-# Part of the AgencyStack Alpha Phase
+
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: dns.sh
+# Path: /scripts/components/install_dns.sh
 #
-# --- BEGIN: Preflight/Prerequisite Check ---
-source "$(dirname "$0")/../utils/common.sh"
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -84,13 +92,11 @@ if [ -z "$DOMAIN" ]; then
   log_error "Domain is required"
   show_help
   exit 1
-fi
 
 if [ -z "$DNS_PROVIDER" ]; then
   log_error "DNS provider is required"
   show_help
   exit 1
-fi
 
 # Create directories
 mkdir -p "$DNS_CONFIG_DIR"
@@ -116,7 +122,6 @@ elif [ "$IP_DETECTION" = "interface" ]; then
 elif [ "$IP_DETECTION" = "manual" ] && [ -z "$PUBLIC_IP" ]; then
   log_error "Public IP is required when using manual IP detection"
   exit 1
-fi
 
 # Configure DNS based on provider
 if [ "$DNS_PROVIDER" = "cloudflare" ]; then
@@ -236,10 +241,8 @@ EOL
 elif [ "$DNS_PROVIDER" = "route53" ]; then
   log_warning "Route53 provider not yet implemented"
   exit 1
-else
   log_error "Unsupported DNS provider: $DNS_PROVIDER"
   exit 1
-fi
 
 log_success "DNS setup completed for $DOMAIN -> $PUBLIC_IP"
 echo ""

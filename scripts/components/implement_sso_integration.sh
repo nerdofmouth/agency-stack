@@ -1,18 +1,18 @@
 #!/bin/bash
-# implement_sso_integration.sh - Integrate components with Keycloak SSO
-# https://stack.nerdofmouth.com
-#
-# This script integrates components marked with 'sso: true' in the component registry
-# with Keycloak SSO following the AgencyStack Alpha Phase Directives.
-#
-# Author: AgencyStack Team
-# Version: 1.0.0
-# Created: 2025-04-10
 
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: implement_sso_integration.sh
+# Path: /scripts/components/implement_sso_integration.sh
+#
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
-source "${ROOT_DIR}/scripts/utils/common.sh"
 source "${ROOT_DIR}/scripts/utils/log_helpers.sh"
 source "${ROOT_DIR}/scripts/utils/keycloak_integration.sh"
 
@@ -113,36 +113,30 @@ if [ -z "$DOMAIN" ]; then
   echo -e "${RED}Error: Domain name is required. Use --domain to specify it.${NC}" >&2
   show_help
   exit 1
-fi
 
 if [ -z "$ADMIN_EMAIL" ]; then
   echo -e "${RED}Error: Admin email is required. Use --admin-email to specify it.${NC}" >&2
   show_help
   exit 1
-fi
 
 if [ -z "$COMPONENT" ]; then
   echo -e "${RED}Error: Component name is required. Use --component to specify it.${NC}" >&2
   show_help
   exit 1
-fi
 
 if [ -z "$FRAMEWORK" ]; then
   echo -e "${RED}Error: Framework type is required. Use --framework to specify it.${NC}" >&2
   show_help
   exit 1
-fi
 
 if [ -z "$COMPONENT_URL" ]; then
   echo -e "${RED}Error: Component URL is required. Use --component-url to specify it.${NC}" >&2
   show_help
   exit 1
-fi
 
 # Set up logging
 if [ "$VERBOSE" = true ]; then
   set -x
-fi
 
 # Helper function to check if component is SSO-enabled
 is_sso_enabled() {
@@ -269,13 +263,11 @@ if ! check_keycloak_available "$DOMAIN"; then
   log_error "Keycloak is not available for domain $DOMAIN. Please install and start Keycloak first."
   log_info "You can install Keycloak with: make install-keycloak DOMAIN=$DOMAIN ADMIN_EMAIL=$ADMIN_EMAIL"
   exit 1
-fi
 
 # Check if component is SSO-enabled
 if ! is_sso_enabled "$COMPONENT"; then
   log_error "Component $COMPONENT is not marked as SSO-enabled in the component registry. Set 'sso: true' in the registry first."
   exit 1
-fi
 
 # Check if Keycloak is installed and running
 log_info "Checking if Keycloak is available for domain $DOMAIN..."
@@ -283,26 +275,22 @@ if ! check_keycloak_available "$DOMAIN"; then
   log_error "Keycloak is not available for domain $DOMAIN. Please install and start Keycloak first."
   log_info "You can install Keycloak with: make install-keycloak DOMAIN=$DOMAIN ADMIN_EMAIL=$ADMIN_EMAIL"
   exit 1
-fi
 
 # Check for required dependencies
 if ! check_dependencies; then
   log_error "Missing required dependencies for Keycloak SSO integration."
   exit 1
-fi
 
 # Integrate component with Keycloak
 log_info "Integrating $COMPONENT with Keycloak SSO on domain $DOMAIN..."
 if ! integrate_with_keycloak "$DOMAIN" "$COMPONENT" "$FRAMEWORK" "$COMPONENT_URL"; then
   log_error "Failed to integrate $COMPONENT with Keycloak SSO."
   exit 1
-fi
 
 # Update component registry to set sso_configured flag
 log_info "Updating component registry to mark $COMPONENT as SSO-configured..."
 if ! update_sso_configured_flag "$COMPONENT"; then
   log_warning "Failed to update component registry. Please manually set 'sso_configured: true' for $COMPONENT in the registry."
-fi
 
 log_success "Successfully integrated $COMPONENT with Keycloak SSO on domain $DOMAIN"
 echo -e "${GREEN}✅ $COMPONENT has been integrated with Keycloak SSO${NC}"

@@ -1,10 +1,17 @@
 #!/bin/bash
-# Traefik SSO integration with Keycloak
-# This script configures Traefik dashboard to use Keycloak for authentication
 
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../../utils/common.sh"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: configure_traefik_client.sh
+# Path: /scripts/components/configure_traefik_client.sh
+#
 
 # Default values
 CLIENT_ID="default"
@@ -52,13 +59,11 @@ done
 if [[ -z "$DOMAIN" ]]; then
     log_error "Domain must be specified with --domain"
     exit 1
-fi
 
 # Ensure Keycloak is running
 if ! curl -s -k "https://${DOMAIN}/health" &>/dev/null; then
     log_error "Keycloak is not accessible at https://${DOMAIN}"
     exit 1
-fi
 
 log_info "Configuring Traefik dashboard authentication with Keycloak"
 
@@ -69,7 +74,6 @@ ADMIN_PASSWORD=$(cat "/opt/agency_stack/clients/${CLIENT_ID}/keycloak/secrets/ad
 if [[ -z "$ADMIN_PASSWORD" ]]; then
     log_error "Keycloak admin password not found at /opt/agency_stack/clients/${CLIENT_ID}/keycloak/secrets/admin_password.txt"
     exit 1
-fi
 
 ADMIN_TOKEN=$(curl -s -k -X POST "https://${DOMAIN}/realms/master/protocol/openid-connect/token" \
     -H "Content-Type: application/x-www-form-urlencoded" \
@@ -81,7 +85,6 @@ ADMIN_TOKEN=$(curl -s -k -X POST "https://${DOMAIN}/realms/master/protocol/openi
 if [[ -z "$ADMIN_TOKEN" || "$ADMIN_TOKEN" == "null" ]]; then
     log_error "Failed to get admin token from Keycloak"
     exit 1
-fi
 
 # Get Keycloak realm
 KEYCLOAK_REALM="${CLIENT_ID}"
@@ -129,7 +132,6 @@ if [[ -n "$CLIENT_ID_EXISTS" && "$FORCE" == "false" ]]; then
             -H "Authorization: Bearer ${ADMIN_TOKEN}" \
             -H "Content-Type: application/json" | jq -r '.value')
     fi
-else
     log_info "Creating new Traefik dashboard client"
     
     # Create Traefik client
@@ -232,7 +234,6 @@ else
                 "jsonType.label": "String"
             }
         }' > /dev/null
-fi
 
 # Save client information
 mkdir -p "${CLIENT_CONFIG_DIR}"

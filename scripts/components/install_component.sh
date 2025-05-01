@@ -1,20 +1,23 @@
 #!/bin/bash
-# install_component.sh - Installation script for component
-#
-# This script installs and configures component for AgencyStack
-# following the component installation conventions.
-#
-# Author: AgencyStack Team
-# Date: 2025-04-07
 
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: component.sh
+# Path: /scripts/components/install_component.sh
+#
 set -e
 
 # Use robust, portable path for helpers
 source "$(dirname "$0")/../utils/log_helpers.sh"
 
 # Source common utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../utils/common.sh"
 
 # Default configuration
 CLIENT_ID="${CLIENT_ID:-default}"

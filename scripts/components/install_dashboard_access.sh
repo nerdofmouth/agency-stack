@@ -1,15 +1,17 @@
 #!/bin/bash
-# install_dashboard_access.sh - Comprehensive Dashboard Access Solution
-#
-# This script ensures the dashboard is accessible via multiple methods
-# including FQDN and direct IP access, following AgencyStack Alpha Phase
-# Repository Integrity Policy.
-#
-# Author: AgencyStack Team
-# Date: 2025-04-10
 
-# --- BEGIN: Preflight/Prerequisite Check ---
-source "$(dirname "$0")/../utils/common.sh"
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: dashboard_access.sh
+# Path: /scripts/components/install_dashboard_access.sh
+#
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -19,7 +21,6 @@ preflight_check_agencystack || {
 set -e
 
 # Source common utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 UTILS_DIR="$(cd "${SCRIPT_DIR}/../utils" && pwd)"
 source "${UTILS_DIR}/log_helpers.sh"
 
@@ -212,7 +213,6 @@ if docker ps -a | grep -q "${CONTAINER_NAME}"; then
   else
     log_info "Container exists, using it (use --force to recreate)"
   fi
-fi
 
 # Create docker-compose.yml for main dashboard container
 log_cmd "Creating Docker compose file for main dashboard..."
@@ -339,9 +339,7 @@ EOF
   fi
 
   log_success "Traefik configuration created"
-else
   log_warning "Traefik configuration directory not found, skipping route creation"
-fi
 
 # Create fallback dashboard container
 log_cmd "Creating fallback dashboard container..."
@@ -401,9 +399,7 @@ if ! docker network ls | grep -q agency_stack; then
   log_info "Creating agency_stack network..."
   docker network create agency_stack
   log_success "Created agency_stack network"
-else
   log_success "agency_stack network already exists"
-fi
 
 # Start dashboard containers
 if [ "${DRY_RUN}" = "false" ]; then
@@ -428,9 +424,7 @@ if [ "${DRY_RUN}" = "false" ]; then
     cd "${TRAEFIK_DIR}" && docker-compose restart
     log_success "Traefik restarted"
   fi
-else
   log_info "Dry run mode, skipping container starts"
-fi
 
 # Create installation marker
 touch "${INSTALL_DIR}/.installed_ok"
@@ -464,7 +458,6 @@ if [ "${DRY_RUN}" = "false" ]; then
   test_url "http://${SERVER_IP}:${GUARANTEED_PORT}" "Direct IP (Guaranteed)" 2
   test_url "http://${DOMAIN}" "FQDN Root" 3
   test_url "http://${DOMAIN}/dashboard" "FQDN Path" 3
-fi
 
 log_info "==========================================================="
 log_info "DASHBOARD ACCESS URLS:"
