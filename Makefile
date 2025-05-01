@@ -952,7 +952,7 @@ etebase:
 
 etebase-status:
 	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking Etebase status...$(RESET)"
-		$(CONFIG_DIR)/monitoring/scripts/check_etebase-$(CLIENT_ID).sh; \
+		$(SCRIPTS_DIR)/components/status_etebase.sh; \
 	else \
 		echo "Status script not found. Checking service..."; \
 		docker ps -a | grep etebase-$(CLIENT_ID) || echo "$(RED)Etebase container not found$(RESET)"; \
