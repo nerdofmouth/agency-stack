@@ -472,6 +472,11 @@ make alpha-check
 *   Containers are disposable runtime artifacts.
 *   No container-originated changes allowed.
 
+**Proper Charter-Compliant Database Fix**
+*   We should update the repository scripts in /root/_repos/agency-stack/ with our fixes
+*   Then deploy using proper Makefile targets from the repository
+*   Ensure all tools are installed inside containers, not on the host
+
 * * *
 
 # 💡 Development Mindset
