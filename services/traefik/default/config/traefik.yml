@@ -6,13 +6,14 @@ entryPoints:
   web:
     address: ":80"
   dashboard:
-    address: ":8081"
+    address: ":8080"
 
 providers:
   file:
     directory: "/etc/traefik/dynamic"
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
 
-# Global configuration
-global:
-  checkNewVersion: false
-  sendAnonymousUsage: false
+log:
+  level: "INFO"

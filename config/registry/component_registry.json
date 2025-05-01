@@ -306,6 +306,27 @@
         },
         "description": "Content management system"
       },
+      "peacefestivalusa_wordpress": {
+        "name": "Peace Festival USA WordPress",
+        "category": "Content Management",
+        "version": "6.4.2",
+        "client_id": "peacefestivalusa",
+        "domain": "peacefestivalusa.nerdofmouth.com",
+        "integration_status": {
+          "installed": true,
+          "hardened": true,
+          "makefile": true,
+          "sso": false,
+          "dashboard": false,
+          "logs": true,
+          "docs": true,
+          "auditable": true,
+          "traefik_tls": false,
+          "multi_tenant": true,
+          "tdd_compliant": true
+        },
+        "description": "Multi-tenant WordPress deployment for Peace Festival USA using the AgencyStack architecture"
+      },
       "ghost": {
         "name": "Ghost",
         "category": "Content Management",

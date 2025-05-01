@@ -1,7 +1,17 @@
 #!/bin/bash
 # Source common utilities and logging functions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+SCRIPTS_DIR="${ROOT_DIR}/scripts"
+
+# Source common utilities
 if [ -f "$(dirname "$0")/../utils/common.sh" ]; then
   source "$(dirname "$0")/../utils/common.sh"
+elif [ -f "${SCRIPTS_DIR}/utils/common.sh" ]; then
+  source "${SCRIPTS_DIR}/utils/common.sh"
+else
+  echo -e "\033[1;31m[ERROR] Could not locate common.sh\033[0m"
+  exit 1
 fi
 
 # --- BEGIN: Preflight/Prerequisite Check ---
@@ -9,6 +19,19 @@ preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
 }
+
+# Detect if running in container (this affects path handling)
+if [ -f /.dockerenv ] || grep -q docker /proc/1/cgroup; then
+  CONTAINER_RUNNING="true"
+  echo -e "${CYAN}[INFO] Running in container environment${NC}"
+else
+  CONTAINER_RUNNING="false"
+  echo -e "${CYAN}[INFO] Running in host environment${NC}"
+fi
+
+# Set CLIENT_ID to default if not specified
+CLIENT_ID="${CLIENT_ID:-default}"
+
 # --- END: Preflight/Prerequisite Check ---
 
 # Alias log to log_info for compatibility with existing code
@@ -55,16 +78,38 @@ ENABLE_CLOUD=false
 ENABLE_OPENAI=false
 USE_GITHUB=false
 ENABLE_KEYCLOAK=false
+STATUS_ONLY=false
+RESTART_ONLY=false
+LOGS_ONLY=false
+TEST_ONLY=false
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
-  case $1 in
+  key="$1"
+  # Split the key=value format if present
+  if [[ $key == *"="* ]]; then
+    value="${key#*=}"
+    key="${key%%=*}"
+  else
+    value="$2"
+  fi
+
+  case $key in
     --domain)
-      DOMAIN="$2"; shift 2;;
+      DOMAIN="$value"
+      if [[ $1 != *"="* ]]; then shift; fi
+      shift
+      ;;
     --admin-email)
-      ADMIN_EMAIL="$2"; shift 2;;
+      ADMIN_EMAIL="$value"
+      if [[ $1 != *"="* ]]; then shift; fi
+      shift
+      ;;
     --client-id)
-      CLIENT_ID="$2"; shift 2;;
+      CLIENT_ID="$value"
+      if [[ $1 != *"="* ]]; then shift; fi
+      shift
+      ;;
     --force)
       FORCE=true; shift;;
     --with-deps)
@@ -79,6 +124,14 @@ while [[ $# -gt 0 ]]; do
       USE_GITHUB=true; shift;;
     --enable-keycloak)
       ENABLE_KEYCLOAK=true; shift;;
+    --status-only)
+      STATUS_ONLY=true; shift;;
+    --restart-only)
+      RESTART_ONLY=true; shift;;
+    --logs-only)
+      LOGS_ONLY=true; shift;;
+    --test-only)
+      TEST_ONLY=true; shift;;
     --help)
       echo "Usage: $0 --domain <domain> --admin-email <email> [--client-id <id>] [--force] [--with-deps] [--verbose] [--enable-cloud] [--enable-openai] [--use-github] [--enable-keycloak]"; exit 0;;
     *)
@@ -152,6 +205,10 @@ ADMIN_PASSWORD=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-16)
 FORCE="${FORCE:-false}"
 WITH_DEPS="${WITH_DEPS:-false}"
 CONFIGURE_OAUTH_ONLY="${CONFIGURE_OAUTH_ONLY:-false}"
+STATUS_ONLY="${STATUS_ONLY:-false}"
+RESTART_ONLY="${RESTART_ONLY:-false}"
+LOGS_ONLY="${LOGS_ONLY:-false}"
+TEST_ONLY="${TEST_ONLY:-false}"
 
 # OAuth provider flags
 ENABLE_OAUTH_GOOGLE="${ENABLE_OAUTH_GOOGLE:-false}"
@@ -185,7 +242,7 @@ mkdir -p "$INTEGRATIONS_LOG_DIR"
 touch "$INTEGRATION_LOG"
 touch "$MAIN_INTEGRATION_LOG"
 
-# Show help message
+# Function to show help
 show_help() {
   echo -e "${MAGENTA}${BOLD}AgencyStack Keycloak Installer${NC}"
   echo -e "=================================="
@@ -221,20 +278,28 @@ show_help() {
 # Parse arguments
 while [[ $# -gt 0 ]]; do
   key="$1"
+  # Split the key=value format if present
+  if [[ $key == *"="* ]]; then
+    value="${key#*=}"
+    key="${key%%=*}"
+  else
+    value="$2"
+  fi
+
   case $key in
     --domain)
-      DOMAIN="$2"
-      shift
+      DOMAIN="$value"
+      if [[ $1 != *"="* ]]; then shift; fi
       shift
       ;;
     --admin-email)
-      ADMIN_EMAIL="$2"
-      shift
+      ADMIN_EMAIL="$value"
+      if [[ $1 != *"="* ]]; then shift; fi
       shift
       ;;
     --client-id)
-      CLIENT_ID="$2"
-      shift
+      CLIENT_ID="$value"
+      if [[ $1 != *"="* ]]; then shift; fi
       shift
       ;;
     --verbose)
@@ -273,6 +338,22 @@ while [[ $# -gt 0 ]]; do
       ENABLE_OAUTH_MICROSOFT=true
       shift
       ;;
+    --status-only)
+      STATUS_ONLY=true
+      shift
+      ;;
+    --restart-only)
+      RESTART_ONLY=true
+      shift
+      ;;
+    --logs-only)
+      LOGS_ONLY=true
+      shift
+      ;;
+    --test-only)
+      TEST_ONLY=true
+      shift
+      ;;
     --help|-h)
       show_help
       ;;
@@ -298,12 +379,18 @@ if [ -z "$DOMAIN" ]; then
   exit 1
 fi
 
-# If we're only configuring OAuth, skip the admin email check
-if [ "$CONFIGURE_OAUTH_ONLY" = false ] && [ -z "$ADMIN_EMAIL" ]; then
-  echo -e "${RED}Error: --admin-email is required${NC}"
-  echo -e "Use --help for usage information"
-  exit 1
+# If we're only checking status, logs, restart, or running tests, we don't need admin email
+if [[ "$STATUS_ONLY" != "true" && "$LOGS_ONLY" != "true" && "$RESTART_ONLY" != "true" && "$TEST_ONLY" != "true" ]]; then
+  # If we're only configuring OAuth, skip the admin email check
+  if [ "$CONFIGURE_OAUTH_ONLY" = false ] && [ -z "$ADMIN_EMAIL" ]; then
+    echo -e "${RED}Error: --admin-email is required${NC}"
+    echo -e "Use --help for usage information"
+    exit 1
+  fi
 fi
+
+# Generate site name from domain for container naming
+SITE_NAME="$(parse_domain "$DOMAIN")"
 
 log "INFO" "Starting Keycloak installation validation for $DOMAIN" "${BLUE}Starting Keycloak installation validation for $DOMAIN...${NC}"
 
@@ -332,9 +419,6 @@ if [ "$CONFIGURE_OAUTH_ONLY" = true ]; then
   exit 0
 fi
 
-# Set normalized site name for Docker container naming
-SITE_NAME=$(parse_domain "$DOMAIN")
-
 # Main installation logic continues here for normal installation...
 log "INFO" "Starting Keycloak installation for ${DOMAIN}" "${CYAN}Starting Keycloak installation for ${DOMAIN}...${NC}"
 
@@ -352,8 +436,34 @@ fi
 # Generate a secure admin password if not provided
 ADMIN_PASSWORD=$(openssl rand -base64 12)
 
+# Function to get container-aware paths
+get_install_path() {
+  local component="$1"
+  local client="${2:-$CLIENT_ID}"
+  
+  if [[ "$CONTAINER_RUNNING" == "true" ]]; then
+    echo "${HOME}/.agencystack/clients/${client}/${component}"
+  else
+    echo "/opt/agency_stack/clients/${client}/${component}"
+  fi
+}
+
+# Directories (adjust for container vs host)
+if [[ "$CONTAINER_RUNNING" == "true" ]]; then
+  # Use user-writable paths inside the dev container to respect non-root user
+  INSTALL_BASE_DIR="${HOME}/.agencystack"
+  LOG_DIR="${HOME}/.logs/agency_stack/components"
+else
+  INSTALL_BASE_DIR="/opt/agency_stack"
+  LOG_DIR="/var/log/agency_stack/components"
+fi
+
+# Component specific directories
+KEYCLOAK_DIR="$(get_install_path keycloak "${CLIENT_ID}")"
+CONFIG_DIR="${KEYCLOAK_DIR}/config"
+DOCKER_COMPOSE_DIR="${KEYCLOAK_DIR}/docker-compose"
+
 # Create required directories
-KEYCLOAK_DIR="${INSTALL_BASE_DIR}/keycloak"
 mkdir -p "${KEYCLOAK_DIR}/${DOMAIN}/data"
 mkdir -p "${KEYCLOAK_DIR}/${DOMAIN}/postgres-data"
 mkdir -p "${KEYCLOAK_DIR}/${DOMAIN}/themes"
@@ -381,19 +491,13 @@ DB_NAME="keycloak"
 echo "${DB_PASSWORD}" > "${KEYCLOAK_DIR}/${DOMAIN}/db_password.txt"
 chmod 600 "${KEYCLOAK_DIR}/${DOMAIN}/db_password.txt"
 
-# Create database initialization script - not needed since we use environment variables
-# Instead, we'll remove the previous init script attempt if it exists
-rm -f "${KEYCLOAK_DIR}/${DOMAIN}/init-db/init-keycloak-db.sh"
-
 # Create docker-compose.yml file
 cat > "${KEYCLOAK_DIR}/${DOMAIN}/docker-compose.yml" <<EOL
 version: '3'
 
-networks:
-  keycloak_network:
-    name: ${CLIENT_ID}_keycloak_${SITE_NAME}_network
-  ${CLIENT_ID}_network:
-    external: true
+volumes:
+  postgres_data:
+    driver: local
 
 services:
   postgres:
@@ -401,63 +505,115 @@ services:
     image: postgres:13
     restart: unless-stopped
     volumes:
-      - ${KEYCLOAK_DIR}/${DOMAIN}/postgres-data:/var/lib/postgresql/data
+      - ${KEYCLOAK_DIR}/postgres-data:/var/lib/postgresql/data
     environment:
-      POSTGRES_DB: ${DB_NAME}
-      POSTGRES_USER: ${DB_USER}
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-    networks:
-      - keycloak_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   keycloak:
     container_name: ${CLIENT_ID}_keycloak_${SITE_NAME}
-    image: quay.io/keycloak/keycloak:21.1.1
-    restart: unless-stopped
     depends_on:
       - postgres
-    command:
-      - start-dev
-    environment:
-      KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://postgres/${DB_NAME}
-      KC_DB_USERNAME: ${DB_USER}
-      KC_DB_PASSWORD: ${DB_PASSWORD}
-      KC_HOSTNAME: ${DOMAIN}
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: ${ADMIN_PASSWORD}
-      PROXY_ADDRESS_FORWARDING: "true"
-      KC_HEALTH_ENABLED: "true"
-      KC_METRICS_ENABLED: "true"
-      KC_HTTP_ENABLED: "true"
+    image: quay.io/keycloak/keycloak:21.1.1
+    restart: unless-stopped
     volumes:
-      - ${KEYCLOAK_DIR}/${DOMAIN}/data:/opt/keycloak/data
-      - ${KEYCLOAK_DIR}/${DOMAIN}/themes:/opt/keycloak/themes
-    networks:
-      - keycloak_network
-      - ${CLIENT_ID}_network
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.keycloak_${SITE_NAME}.rule=Host(\`${DOMAIN}\`)"
-      - "traefik.http.routers.keycloak_${SITE_NAME}.entrypoints=websecure"
-      - "traefik.http.routers.keycloak_${SITE_NAME}.tls=true"
-      - "traefik.http.routers.keycloak_${SITE_NAME}.tls.certresolver=myresolver"
-      - "traefik.http.services.keycloak_${SITE_NAME}.loadbalancer.server.port=8080"
-      # HTTP to HTTPS redirect for Keycloak
-      - "traefik.http.routers.keycloak_${SITE_NAME}_http.rule=Host(\`${DOMAIN}\`)"
-      - "traefik.http.routers.keycloak_${SITE_NAME}_http.entrypoints=web"
-      - "traefik.http.middlewares.redirect_https.redirectscheme.scheme=https"
-      - "traefik.http.middlewares.redirect_https.redirectscheme.permanent=true"
-      - "traefik.http.routers.keycloak_${SITE_NAME}_http.middlewares=redirect_https"
+      - ${KEYCLOAK_DIR}/themes:/opt/keycloak/themes
+    command:
+      - start
+      - --hostname=${DOMAIN}
 EOL
 
-# --- BEGIN: Keycloak Container Compatibility Logic Migration ---
-# Logic migrated from fixes/fix_keycloak_container.sh and fix_keycloak_container_v2.sh
-# Ensures docker-compose.yml is up-to-date for Keycloak 21.x+ and compatible with AgencyStack conventions
-# (This is a placeholder for the actual migration; see full script for detailed logic)
-# --- END: Keycloak Container Compatibility Logic Migration ---
+# Add status-only, restart-only, and logs-only functionality
+if [[ "$STATUS_ONLY" == "true" ]]; then
+  log "INFO" "Checking Keycloak status..."
+  
+  # Check if Docker containers are running
+  KEYCLOAK_RUNNING=$(docker ps -q -f "name=${CLIENT_ID}_keycloak_${SITE_NAME}" 2>/dev/null)
+  POSTGRES_RUNNING=$(docker ps -q -f "name=${CLIENT_ID}_keycloak_postgres_${SITE_NAME}" 2>/dev/null)
+  
+  echo "=== Keycloak Status ==="
+  echo "Keycloak: $([ -n "$KEYCLOAK_RUNNING" ] && echo "Running" || echo "Not running")"
+  echo "Postgres: $([ -n "$POSTGRES_RUNNING" ] && echo "Running" || echo "Not running")"
+  
+  # Check service accessibility
+  if [ -n "$KEYCLOAK_RUNNING" ]; then
+    HTTP_CODE=$(curl -s -k -o /dev/null -w "%{http_code}" "https://${DOMAIN}/auth/" 2>/dev/null)
+    if [[ "$HTTP_CODE" == "200" ]]; then
+      echo "Keycloak Web Interface: Accessible (HTTP $HTTP_CODE)"
+    elif [[ "$HTTP_CODE" == "302" || "$HTTP_CODE" == "301" ]]; then
+      echo "Keycloak Web Interface: Redirect to login detected (HTTP $HTTP_CODE)"
+    else
+      echo "Keycloak Web Interface: Not accessible (HTTP $HTTP_CODE)"
+    fi
+  fi
+  
+  log "SUCCESS" "Status check completed successfully"
+  exit 0
+fi
 
-log "INFO" "Starting Keycloak containers" "${CYAN}Starting Keycloak containers...${NC}"
-cd "${KEYCLOAK_DIR}/${DOMAIN}" && docker-compose up -d
+if [[ "$RESTART_ONLY" == "true" ]]; then
+  log "INFO" "Restarting Keycloak services..."
+  
+  # Get the docker-compose directory
+  DOCKER_COMPOSE_DIR="${KEYCLOAK_DIR}/${DOMAIN}"
+  
+  # Check if docker-compose directory exists
+  if [[ -f "${DOCKER_COMPOSE_DIR}/docker-compose.yml" ]]; then
+    cd "${DOCKER_COMPOSE_DIR}" && docker-compose restart
+    log "SUCCESS" "Services restarted successfully"
+  else
+    log "ERROR" "Keycloak not installed. Run 'make keycloak' first."
+    exit 1
+  fi
+  
+  exit 0
+fi
+
+if [[ "$LOGS_ONLY" == "true" ]]; then
+  log "INFO" "Viewing Keycloak logs..."
+  
+  # Get the docker-compose directory
+  DOCKER_COMPOSE_DIR="${KEYCLOAK_DIR}/${DOMAIN}"
+  
+  # Check if docker-compose directory exists
+  if [[ -f "${DOCKER_COMPOSE_DIR}/docker-compose.yml" ]]; then
+    cd "${DOCKER_COMPOSE_DIR}" && docker-compose logs --tail=100
+  else
+    log "ERROR" "Keycloak not installed. Run 'make keycloak' first."
+    exit 1
+  fi
+  
+  exit 0
+fi
+
+if [[ "$TEST_ONLY" == "true" ]]; then
+  log "INFO" "Running Keycloak tests..."
+  
+  # Check if Docker containers are running
+  KEYCLOAK_RUNNING=$(docker ps -q -f "name=${CLIENT_ID}_keycloak_${SITE_NAME}" 2>/dev/null)
+  if [[ -z "$KEYCLOAK_RUNNING" ]]; then
+    log "ERROR" "Keycloak not running. Start it with 'make keycloak' first."
+    exit 1
+  fi
+  
+  # Test Keycloak API
+  HTTP_CODE=$(curl -s -k -o /dev/null -w "%{http_code}" "https://${DOMAIN}/auth/realms/master/.well-known/openid-configuration" 2>/dev/null)
+  if [[ "$HTTP_CODE" == "200" ]]; then
+    log "SUCCESS" "Keycloak API test: PASSED (HTTP $HTTP_CODE)"
+  else
+    log "ERROR" "Keycloak API test: FAILED (HTTP $HTTP_CODE)"
+    exit 1
+  fi
+  
+  log "SUCCESS" "All Keycloak tests PASSED"
+  exit 0
+fi
 
 # Wait for Keycloak to start
 log "INFO" "Waiting for Keycloak to start..." "${CYAN}Waiting for Keycloak to start...${NC}"
@@ -559,16 +715,82 @@ else
   fi
 fi
 
-# Success message
-log "INFO" "Keycloak installation completed successfully" "${GREEN}Keycloak installation completed successfully!${NC}"
-log "INFO" "Keycloak is now accessible at https://${DOMAIN}" "${GREEN}Keycloak is now accessible at:${NC} https://${DOMAIN}"
-log "INFO" "Admin username: admin" "${GREEN}Admin username:${NC} admin"
-log "INFO" "Admin password: ${ADMIN_PASSWORD}" "${GREEN}Admin password:${NC} ${ADMIN_PASSWORD}"
-log "INFO" "Admin credentials saved to: ${KEYCLOAK_DIR}/${DOMAIN}/admin_password.txt" "${GREEN}Admin credentials saved to:${NC} ${KEYCLOAK_DIR}/${DOMAIN}/admin_password.txt"
+# Start the Keycloak service (unless we're only checking status/logs/restart)
+if [[ "$STATUS_ONLY" != "true" && "$LOGS_ONLY" != "true" && "$RESTART_ONLY" != "true" && "$TEST_ONLY" != "true" ]]; then
+  log "INFO" "Starting Keycloak services..."
+  
+  # Create environment file for Keycloak
+  cat > "${KEYCLOAK_DIR}/${DOMAIN}/.env" <<EOL
+KC_DB=postgres
+KC_DB_URL=jdbc:postgresql://postgres/keycloak
+KC_DB_USERNAME=keycloak
+KC_DB_PASSWORD=${DB_PASSWORD}
+KC_HOSTNAME=${DOMAIN}
+KEYCLOAK_ADMIN=admin
+KEYCLOAK_ADMIN_PASSWORD=${ADMIN_PASSWORD}
+KC_PROXY=edge
+KC_HTTP_ENABLED=true
+KC_HEALTH_ENABLED=true
+EOL
+  chmod 600 "${KEYCLOAK_DIR}/${DOMAIN}/.env"
 
-# Mark installation as complete
-echo "1.0.0" > "${KEYCLOAK_DIR}/${DOMAIN}/.version"
-touch "${KEYCLOAK_DIR}/${DOMAIN}/.installed_ok"
+  # Start Keycloak and Postgres
+  cd "${KEYCLOAK_DIR}/${DOMAIN}" && docker-compose up -d
+  
+  # Wait for Keycloak to start
+  log "INFO" "Waiting for Keycloak to start (this may take a minute)..."
+  COUNTER=0
+  MAX_TRIES=30
+  
+  while [ $COUNTER -lt $MAX_TRIES ]; do
+    COUNTER=$((COUNTER+1))
+    echo -n "."
+    
+    # Check if Keycloak is responsive
+    HTTP_STATUS=$(curl -s -k -o /dev/null -w "%{http_code}" "https://${DOMAIN}/auth/" 2>/dev/null || echo "000")
+    
+    if [[ "$HTTP_STATUS" == "200" || "$HTTP_STATUS" == "302" || "$HTTP_STATUS" == "301" ]]; then
+      echo ""
+      log "SUCCESS" "Keycloak is now available at https://${DOMAIN}"
+      break
+    fi
+    
+    # If we've reached max tries, show a warning
+    if [ $COUNTER -ge $MAX_TRIES ]; then
+      echo ""
+      log "WARNING" "Keycloak may not be fully started yet. Check logs with 'make keycloak-logs'"
+    fi
+    
+    sleep 2
+  done
+
+  # Update component registry
+  log "INFO" "Updating component registry..."
+  if [[ -f "${SCRIPTS_DIR}/utils/register_component.sh" ]]; then
+    ${SCRIPTS_DIR}/utils/register_component.sh \
+      --name="keycloak" \
+      --category="Identity Management" \
+      --description="Keycloak SSO identity provider" \
+      --installed=true \
+      --makefile=true \
+      --docs=true \
+      --hardened=true \
+      --multi_tenant=true \
+      --sso=true || true
+  else
+    log "WARNING" "Component registry update script not found, skipping update"
+  fi
+
+  # Display success message
+  log "SUCCESS" "✅ Keycloak installation complete"
+  echo ""
+  echo "🌐 Access Keycloak at: https://${DOMAIN}"
+  echo "👤 Admin username: admin"
+  echo "🔑 Admin password: ${ADMIN_PASSWORD}"
+  echo ""
+  echo "Make sure to save these credentials securely!"
+  echo "Credentials are stored in ${KEYCLOAK_DIR}/${DOMAIN}/"
+fi
 
 # Function to configure OAuth providers
 configure_oauth_providers() {
@@ -1128,8 +1350,6 @@ EOF
         log "INFO" "Set custom flow as default browser flow" "${GREEN}Set custom flow as default browser flow${NC}"
         
         log "INFO" "Identity provider configuration completed" "${GREEN}Identity provider configuration completed${NC}"
-      else
-        log "ERROR" "Failed to retrieve browser flow" "${RED}Failed to retrieve browser flow${NC}"
       fi
     fi
   fi

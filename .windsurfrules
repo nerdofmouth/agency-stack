@@ -1,3 +1,281 @@
+# 🧠 AgencyStack Charter v1.0.3 (Operational Discipline)
+
+## 1. Purpose & Mission
+AgencyStack (Upstack.agency) is a sovereign, auditable, and repeatable infrastructure platform for small agencies, creators, and co-ops. It enables secure, multi-tenant, AI-enhanced, and customizable deployments—spanning foundational infrastructure, business productivity, communication, and AI-driven SaaS—using only repository-tracked, idempotent, and documented workflows.
+
+## 2. Core Principles
+- **Repository as Source of Truth:** All installation, configuration, and operational logic must be defined and tracked in the repository. Never modify live VMs directly.
+- **Idempotency & Automation:** All scripts, Makefile targets, and Docker builds must be rerunnable without harmful side effects.
+- **Auditability & Documentation:** Every component, script, and workflow must be documented in human-readable markdown in `/docs/pages/components/` and referenced in this Charter. Logs are stored under `/var/log/agency_stack/components/`.
+- **Sovereignty:** No dependency on external services unless explicitly enabled. All critical infrastructure is self-hosted and reproducible.
+- **Multi-Tenancy & Security:** Default to tenant isolation, strong authentication (Keycloak SSO), and strict resource boundaries. TLS is required for all networked services.
+- **Strategic Alignment:** All work must map to the current AgencyStack roadmap and phase objectives, from infrastructure to AI-driven SaaS and public launch.
+- **Proper Change Workflow:** All changes must be made in the local repo, tested, committed, and deployed only via tracked scripts or Makefile targets. No manual or post-hoc fixes.
+- **Component Consistency:** Every installable component must have: a tracked install script, Makefile targets, docs, registry entry, and logs.
+- **Debugging Discipline:** Extract configs from VMs, fix in repo, document, and redeploy. Never patch VMs directly.
+- **WSL2/Docker Mount Safety:** All Docker volume mounts must be rigorously validated to ensure file vs. directory type consistency. Never assume Docker will correctly handle a file vs. directory mismatch.
+- **Automated Remote Operations:** Use non-interactive SSH commands from host to execute scripted operations inside containers and VMs, maintaining repository integrity while enabling operational efficiency.
+- **Test-Driven Development:** All components must follow the TDD Protocol defined in [`tdd_protocol.md`](./tdd_protocol.md). Installation is not considered complete without passing tests at all levels. Tests must be included in the repository.
+- **Strict Containerization:** ❗ **NEVER** install any component directly on the host system. All services must be containerized (Docker) with proper isolation. Deployments must only be executed through repository-tracked scripts and Makefile targets that maintain containerization. Direct host-level installation commands must never be used.
+
+## 3. Directory & File Structure
+| Purpose | Path |
+|--------|------|
+| Install scripts | `/scripts/components/` |
+| Utility scripts | `/scripts/utils/` |
+| Mock/test code | `/scripts/mock/` |
+| Component docs | `/docs/pages/components/` |
+| Logs | `/var/log/agency_stack/components/<component>.log` |
+| Install output | `/opt/agency_stack/clients/${CLIENT_ID}/<component>/` |
+
+Never write to `/usr`, `$HOME`, or system paths unless explicitly instructed.
+
+### 3.1 Utility Scripts Library
+
+The `/scripts/utils/` directory contains reusable utility functions that should be used across component scripts to ensure consistency and reliability:
+
+| Script | Purpose |
+|--------|---------|
+| `common.sh` | Common functions, logging, error handling, and safety checks |
+| `setup_traefik_keycloak.sh` | Helper for Traefik and Keycloak integration |
+| `test_common.sh` | Common testing utilities and functions |
+| `tls_utils.sh` | TLS certificate generation and management |
+| `docker_utils.sh` | Docker-related helper functions |
+| `network_utils.sh` | Networking utilities and diagnostics |
+
+**Using Utility Scripts:**
+```bash
+# Source common utilities in component scripts
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Use common functions
+log_info "Starting installation..."
+check_prerequisites
+ensure_directory_exists "/path/to/dir"
+```
+
+## 4. Installation & Change Workflow
+1. Make changes ONLY to the local repository.
+2. Test locally where possible.
+3. Commit changes with descriptive messages.
+4. Transfer changes to remote VMs ONLY through:
+   - Git pull from authorized repositories
+   - Official installation scripts
+   - Makefile targets
+   - **Automated SSH commands from host to containers/VMs**
+5. Document all behavior and changes in the repo.
+6. When debugging, extract configs from VMs, fix in the repo, document, and redeploy.
+7. All fixes must be incorporated into the codebase for future deployments.
+8. For Docker/WSL environments, all file validations must explicitly check for and handle file vs. directory conflicts.
+
+## 5. Dev Container Build & Customization Policy
+- All dev containers are built from `Dockerfile.dev`, orchestrated by `scripts/utils/create_base_docker_dev.sh`.
+- Custom themes, shells, and tools are version-controlled and installed during build (never post-hoc inside running containers).
+- Default shell and prompt branding (e.g., AgencyStack Oh My Zsh theme) are set in the Dockerfile.
+- Any customization must be documented and referenced in this Charter.
+
+**Instruction:**
+> When updating the dev container environment, always:
+> - Add new tools, shells, or themes to `Dockerfile.dev`.
+> - Place custom themes or configs (e.g., `custom-themes/agency-jonathan.zsh-theme`) in the repository.
+> - Use `scripts/utils/create_base_docker_dev.sh` to build and run the container.
+> - Never make changes directly inside a running container that are not reflected in the repo.
+
+## 6. Remote Operation Imperatives (NEW)
+
+When operating on remote systems (containers, VMs, or cloud instances):
+
+1. **Command Automation:**
+   - Use non-interactive SSH commands from the host to execute operations
+   - Script and parameterize all operations that require multiple steps
+   - Store sensitive parameters in proper secrets management (not hardcoded)
+
+2. **Execution Workflow:**
+   - Use `ssh [user]@[host] -p [port] 'cd /path && command'` pattern for remote execution
+   - For containers: `docker exec [container_name] bash -c 'cd /path && command'`
+   - Always specify working directory explicitly with `cd` before command execution
+   - Set timeout and retry logic for unstable connections
+
+3. **Output Handling:**
+   - Capture command output for auditing and troubleshooting
+   - Parse key results to verify success/failure
+   - Log operations to both local and remote logs
+
+4. **Repository Alignment:**
+   - Remote commands should execute scripts from repository, not ad-hoc commands
+   - Pull repository changes before executing commands when needed
+   - Use repository-defined configurations and parameters
+
+5. **Docker-in-Docker Operations:**
+   - When Docker operations are needed inside containers, use socket mounting
+   - Document Docker socket security implications
+   - Validate Docker command execution permission before operations
+
+## 7. Makefile & Component Registry Standards
+- Every component must have Makefile targets: `make <component>`, `make <component>-status`, `make <component>-logs`, `make <component>-restart`, `make <component>-test` (optional).
+- All installable components must be tracked in `component_registry.json` with accurate flags and metadata (including SSO, monitoring, multi_tenant, etc).
+- SSO-enabled components must integrate with Keycloak and document their configuration. Add `sso_configured: true` only after live integration is tested.
+- All networked ports must be documented in `/docs/pages/ports.md` and reflected in the registry.
+
+## 8. Documentation & Auditability
+- All new features, fixes, and customizations must be documented in `/docs/pages/components/` and referenced in this Charter.
+- Use `/scripts/utils/` helpers for logging, validation, and registry updates.
+- Component documentation must include: Purpose, Paths, Logs, Ports, Restart methods, Security details.
+- Mock/test scripts (`/scripts/mock/`) are required for UI/LLM components.
+
+## 9. Docker Development Workflow
+
+1. **Host-to-Container Directionality**
+   - The host repository is the authoritative source of truth 
+   - Changes flow one-way from host to container, never container to host
+   - Container filesystem changes are considered disposable and experimental
+   - Permanent changes must be made on the host repository first
+
+2. **Repository Mounting Strategy**
+   - Use named volumes for repository persistence (`agencystack-dev_repo`)
+   - Implement explicit sync mechanism via `scripts/utils/sync_to_container.sh`
+   - Never bind-mount the repository directory directly to preserve filesystem boundaries
+   - All syncs are initiated from the host, maintaining the one-way flow principle
+
+3. **Docker-in-Docker Compatibility**
+   - All installation scripts must detect container environments via `is_running_in_container()`
+   - Use container-safe log directories (e.g., `$HOME/.logs/` inside containers) 
+   - Installation scripts must use container-friendly network detection
+   - Avoid absolute paths that assume host filesystem structure
+   - Component scripts must be idempotent and safely re-runnable in containers
+
+4. **Testing Protocol**
+   - Test all installation commands from within the container environment
+   - Verify proper network connectivity between containers
+   - Ensure configuration is properly generated in container paths
+   - Use `make <component>-test` to validate container installations
+   - Document container-specific configuration in component docs
+
+## 10. Security, SSO, & Testing
+- All networked services require TLS. Self-signed certificates are permitted only in dev environments.
+- Keycloak is the system-wide identity provider for SSO-enabled components. No alternative auth systems are permitted.
+- All component endpoints must have security tests (authentication, authorization, input validation).
+- Secrets must be stored in `/opt/agency_stack/clients/${CLIENT_ID}/.secrets/` (not in the repo) with appropriate permissions.
+- All component tests must pass with `make <component>-test` before production deployment.
+
+## 11. Docker & WSL Environment Rules
+- Container orchestration is via `docker-compose.yml` files stored in the repository.
+- Volume mounts must specify with absolute paths (e.g., `/opt/agency_stack/clients/${CLIENT_ID}/traefik/traefik.yml:/etc/traefik/traefik.yml:ro`).
+- All Docker volumes are created with specific naming conventions: `${COMPONENT_NAME}_${CLIENT_ID}_${PURPOSE}`.
+- WSL2 environments must validate file vs. directory conflicts explicitly before Docker operations.
+- Installation scripts must handle platform detection and WSL2-specific configurations.
+- No host-level changes should be made that aren't tracked in the repository or documented in this Charter.
+
+## 12. SSO Integration Requirements
+
+Based on the implementation experience with Traefik-Keycloak integration, the following requirements are now mandatory for all components with `sso: true` in the component registry:
+
+1. **Container Network Awareness**
+   - All SSO-enabled components must properly handle both internal container networking and external URL access
+   - Authentication URLs exposed to browsers must use externally accessible hostnames (typically localhost or domain names)
+   - Network configuration must be validated as part of component testing
+
+2. **OAuth2/OIDC Implementation Standards**
+   - Components must use explicit endpoint configuration rather than discovery when possible
+   - All redirect URIs must be properly registered with the identity provider
+   - Authentication flows must be thoroughly tested from end-to-end
+
+3. **URL Resolution Validation**
+   - Tests must validate that internal container hostnames are not exposed in redirect URLs
+   - Authentication flows must be verified from external client perspective
+   - Network resolution must be explicitly tested in containerized environments
+
+4. **Documentation Requirements**
+   - Clear troubleshooting guidance for common authentication issues
+   - Explicit documentation of network/hostname requirements
+   - User journey documentation for authentication flows
+
+These requirements build upon the SSO & Identity Management Protocol and apply to all components starting with the Beta milestone.
+
+## 13. Repository Integrity Enforcement Protocol
+
+To ensure absolute compliance with the Repository Integrity Policy across all components:
+
+1. **Repository-First Development Principle**
+   - **ALL modifications MUST happen in the repository first**
+   - NO direct modifications to running VMs or containers under any circumstances
+   - No debugging "quick fixes" that bypass repository code changes
+   - All container configurations must be defined, versioned, and tracked in repository files
+
+2. **One-Way Deployment Flow**
+   - Code flows from repository → VMs/containers, NEVER in reverse
+   - All runtime environments (VMs, containers) treated as reproducible artifacts
+   - Installation scripts must verify they're running from the repository context
+
+3. **Direct VM/Container Modification Prevention**
+   - Installation scripts must include safeguards against direct container modification
+   - Test routines must verify configuration originates from repository
+   - Any process that detects direct container/VM modification must fail loudly
+   - Critical paths must include manifest/checksum validation
+
+4. **Installation Path Verification**
+   - Every installation script must include:
+   ```bash
+   # Verify running from repository context
+   if [[ "$0" != *"/root/_repos/agency-stack/scripts/"* ]]; then
+     echo "ERROR: This script must be run from the repository context"
+     echo "Run with: /root/_repos/agency-stack/scripts/components/$(basename "$0")"
+     exit 1
+   fi
+   ```
+
+Violation of this protocol will result in immediate test failures and inability to progress to Beta stages.
+
+## 🧠 MINDSET FOR AGENCY STACK DEVELOPMENT
+
+### Core Development Principles
+
+1. **Container Isolation** - Development, testing, and all code execution MUST happen inside the container environment
+   - Never execute installation scripts directly on the host system
+   - All commands must be run through `docker exec -it --user developer agencystack-dev zsh` or equivalent
+   - Preserve host system integrity by maintaining container boundaries
+
+2. **Repository Integrity** - The repository is the single source of truth
+   - All changes must be committed to the repository before deployment
+   - Configuration should be repeatable across environments
+   - Installation scripts must handle docker-in-docker scenarios gracefully
+
+3. **Filesystem Respect** - Never write outside designated paths
+   - Use proper logging paths with fallbacks for permission issues
+   - Honor containerization boundaries for file operations
+   - Create idempotent scripts that clean up after themselves
+
+4. **Testing Discipline** - Every component must be testable in isolation
+   - Components should detect their environment and adapt accordingly
+   - Scripts must handle permission differences between host and container
+   - Network detection and adaptation must work in both direct and nested scenarios
+
+### Repository Mounting Strategy
+
+1. **Host-to-Container Directionality**
+   - The host repository is the authoritative source of truth 
+   - Changes flow one-way from host to container, never container to host
+   - Container filesystem changes are considered disposable and experimental
+   - Permanent changes must be made on the host repository first
+
+2. **Filesystem Boundaries**
+   - **Host Filesystem**: Source code, configuration files, and documentation
+     - Changes here are permanent and should be committed to git
+     - Never modify host filesystem from within containers
+   - **Container Filesystem**: Runtime artifacts, logs, and temporary data
+     - Generated during component installation and testing
+     - Disposable and recreatable from source code
+     - May include development databases, runtime files, and logs
+
+3. **Mounting Mechanisms**
+   - Use named volumes for persistence where required
+   - Implement deliberate sync mechanisms rather than bi-directional mounts
+   - Provide clear indicators of filesystem context in development tools
+
+
 # 🧠 AgencyStack IDE Agent + Infrastructure Install Rules v2.1 (Prototype Era)
 
 * * *
@@ -208,3 +486,172 @@ make alpha-check
 # 🚀 END OF INSTRUCTIONS v2.1
 
 * * *
+
+# AgencyStack Test-Driven Development Protocol
+
+## 1. Introduction
+
+This document establishes formal Test-Driven Development (TDD) protocols for all AgencyStack components. These protocols are to be considered mandatory for all new components and modifications to existing components.
+
+## 2. Core TDD Principles
+
+### 2.1 Test-First Development
+- Tests MUST be written before implementation code
+- No component functionality shall be considered complete without corresponding tests
+- Tests should verify both expected functionality and failure cases
+
+### 2.2 Multi-Level Testing Strategy
+
+All components must implement the following testing levels:
+
+1. **Unit Tests**: Test individual functions and classes in isolation
+   - Should test single responsibility units
+   - Should mock dependencies
+   - Should cover both success and failure paths
+
+2. **Integration Tests**: Test interactions between components
+   - Should verify correct communication between components
+   - Should validate data flow across boundaries
+   - Should test real dependencies where feasible
+
+3. **System Tests**: End-to-end verification
+   - Should test complete workflows
+   - Should use the actual runtime environment
+   - Should verify from user/API perspective
+
+### 2.3 Automated Verification
+
+- Tests MUST be automatically executed during installation
+- Tests MUST have clear pass/fail criteria
+- Failed tests should provide clear error messages
+- Failed tests should abort installation in production environments
+
+## 3. Implementation Requirements
+
+### 3.1 Test Script Architecture
+
+Each component must include three standard test scripts:
+
+1. `verify.sh`: Basic health check (fast, essential verification)
+2. `test.sh`: Comprehensive unit tests
+3. `integration_test.sh`: Cross-component testing
+
+### 3.2 Test Documentation
+
+Each component must document:
+- Testing strategy overview
+- Test commands and expected outcomes
+- Required test dependencies
+- How to interpret test failures
+
+### 3.3 Test Coverage Standards
+
+Components shall achieve minimum coverage levels:
+- Critical paths: 100% coverage
+- Core functionality: 90% coverage 
+- Edge cases: 80% coverage
+
+## 4. Testing Infrastructure
+
+### 4.1 Common Testing Utilities
+
+The repository shall provide common test utilities:
+- `/scripts/utils/test_common.sh`: Common test functions
+- `/scripts/utils/mock_services.sh`: Mock service creation
+- `/scripts/utils/test_assertions.sh`: Standard assertions
+
+### 4.2 Continuous Integration
+
+- CI pipelines must run all tests on each commit
+- Tests must pass on at least two reference environments
+- Test results should be auditable and persistent
+
+## 5. TDD Workflow
+
+1. Write tests that define expected behavior
+2. Verify tests fail (as implementation is missing)
+3. Implement minimum code to pass tests
+4. Refactor and improve implementation while keeping tests passing
+5. Review and document test coverage
+
+## 6. Compatibility with Repository Integrity Policy
+
+The TDD Protocol works in concert with the Repository Integrity Policy:
+- All test files must be defined within the repository
+- Test scripts must follow standard directory conventions
+- Tests must validate idempotent behavior
+- Tests must verify proper multi-tenancy
+
+## 7. Component Completion Criteria
+
+No component installation shall be considered complete until:
+1. All unit tests pass
+2. All integration tests pass
+3. System verification confirms functionality
+4. Test coverage meets minimum standards
+5. All tests are executable via standard commands
+
+## 8. Reporting and Metrics
+
+Testing shall generate:
+- Pass/fail summary for each test level
+- Coverage metrics by component
+- Execution time for performance benchmarking
+
+## 9. Authentication Integration Testing Requirements
+
+Based on lessons learned during Traefik-Keycloak SSO integration, the following specific requirements must be implemented for all authentication-related components:
+
+1. **Authentication Flow Verification**
+   - Tests must verify the entire authentication flow, not just endpoint availability
+   - OAuth2/OIDC redirects must be tested to ensure they use proper externally-accessible URLs
+   - Authentication callbacks must be verified with proper status codes
+
+2. **Container Network Validation**
+   - Tests must validate all components can communicate properly both via internal networks and external ports
+   - Hostname resolution tests must ensure internal container names are not exposed to external clients
+   - URL verification must confirm all OAuth-related URLs are properly reachable from both internal and external contexts
+
+3. **Multi-Tier Authentication Testing**
+   - Network level: Verify proper HTTP status codes and headers
+   - Application level: Validate authentication middleware and access control
+   - User experience level: Verify login processes complete successfully with proper redirection
+
+4. **Cross-Component Integration Verification**
+   - Tests must verify integration between all components (e.g., Traefik, Keycloak, OAuth2 Proxy)
+   - Explicit checks for URL consistency between client configuration and service configuration
+   - Verification of proper realm and client configuration in identity providers
+
+These requirements extend the existing TDD protocol for any component with `sso: true` in its component registry entry.
+
+## 10. Repository Integrity Verification Tests
+
+Every component must include mandatory repository integrity verification tests:
+
+1. **Installation Source Verification**
+   - Tests must verify scripts are running from the repository path
+   - All file paths used for installation must originate from the repository
+   - No runtime-generated files may be used that weren't defined in the repository
+
+2. **VM/Container Modification Detection**
+   - Tests must validate that files in VMs/containers match repository definitions
+   - Any detected direct modification to VM/container must cause test failure
+   - Container configurations must match repository-defined configurations
+
+3. **Deployment Path Validation**
+   - All file operations must be traced to their repository source
+   - Test must verify proper deployment channels were used:
+     - Git pulls from authorized repositories
+     - Official installation scripts run from repo context
+     - Makefile targets executed from repo context
+
+4. **Configuration Source Verification**
+   - All runtime configurations must be traceable to repository definitions
+   - No ad-hoc or manual configuration permitted
+   - Tests must verify configurations originate from repository files
+
+These tests are **mandatory** and must be implemented in *every* component. Failure to include repository integrity tests will automatically prevent component registry flag updates.
+
+---
+
+This protocol is effective as of April 25, 2025 and applies to all subsequent development.

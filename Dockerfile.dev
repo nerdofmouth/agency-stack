@@ -21,7 +21,10 @@ RUN apt-get update && apt-get install -y \
     ssh \
     openssh-server \
     bc \
-    dnsutils
+    dnsutils \
+    netcat-openbsd \
+    mysql-client \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Docker inside the container (Docker-in-Docker setup)
 RUN curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
