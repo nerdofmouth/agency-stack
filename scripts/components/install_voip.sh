@@ -1,6 +1,17 @@
 #!/bin/bash
+
 # Source common utilities
-source "$(dirname "$0")/../utils/common.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: voip.sh
+# Path: /scripts/components/install_voip.sh
+#
         
 # install_voip.sh - Install and configure VoIP for AgencyStack
 # https://stack.nerdofmouth.com
@@ -26,7 +37,6 @@ NC='\033[0m' # No Color
 BOLD='\033[1m'
 
 # Variables
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 CONFIG_DIR="/opt/agency_stack"
 VOIP_DIR="${CONFIG_DIR}/voip"
@@ -53,7 +63,6 @@ ENFORCE_HTTPS=true
 # Source the component_sso_helper.sh if available
 if [ -f "${SCRIPT_DIR}/../utils/component_sso_helper.sh" ]; then
   source "${SCRIPT_DIR}/../utils/component_sso_helper.sh"
-fi
 
 # Show help message
 show_help() {
@@ -148,13 +157,11 @@ if [ -z "$DOMAIN" ]; then
   echo -e "${RED}Error: --domain is required${NC}"
   echo -e "Use --help for usage information"
   exit 1
-fi
 
 if [ -z "$ADMIN_EMAIL" ]; then
   echo -e "${RED}Error: --admin-email is required${NC}"
   echo -e "Use --help for usage information"
   exit 1
-fi
 
 # Welcome message
 echo -e "${MAGENTA}${BOLD}AgencyStack VoIP Setup${NC}"
@@ -164,7 +171,6 @@ echo -e "=============================="
 if [ "$EUID" -ne 0 ]; then
   echo -e "${RED}Please run as root or with sudo${NC}"
   exit 1
-fi
 
 # Create log directories if they don't exist
 mkdir -p "$LOG_DIR"
@@ -202,12 +208,10 @@ if [ -n "$CLIENT_ID" ]; then
   FREESWITCH_CONTAINER="${CLIENT_ID}_freeswitch"
   POSTGRES_CONTAINER="${CLIENT_ID}_voip_postgres"
   NETWORK_NAME="${CLIENT_ID}_network"
-else
   FUSIONPBX_CONTAINER="fusionpbx_${SITE_NAME}"
   FREESWITCH_CONTAINER="freeswitch_${SITE_NAME}"
   POSTGRES_CONTAINER="voip_postgres_${SITE_NAME}"
   NETWORK_NAME="agency-network"
-fi
 
 # Check if VoIP is already installed
 if docker ps -a --format '{{.Names}}' | grep -q "$FUSIONPBX_CONTAINER"; then
@@ -237,7 +241,6 @@ if docker ps -a --format '{{.Names}}' | grep -q "$FUSIONPBX_CONTAINER"; then
       exit 0
     fi
   fi
-fi
 
 # Check if Docker is installed
 if ! command -v docker &> /dev/null; then
@@ -257,13 +260,11 @@ if ! command -v docker &> /dev/null; then
     log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
     exit 1
   fi
-fi
 
 # Check if Docker is running
 if ! docker info &> /dev/null; then
   log "ERROR: Docker is not running" "${RED}Docker is not running. Please start Docker first.${NC}"
   exit 1
-fi
 
 # Check if Docker Compose is installed
 if ! command -v docker-compose &> /dev/null; then
@@ -283,7 +284,6 @@ if ! command -v docker-compose &> /dev/null; then
     log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
     exit 1
   fi
-fi
 
 # Check if network exists, create if it doesn't
 if ! docker network inspect "$NETWORK_NAME" &> /dev/null; then
@@ -293,9 +293,7 @@ if ! docker network inspect "$NETWORK_NAME" &> /dev/null; then
     log "ERROR: Failed to create Docker network $NETWORK_NAME" "${RED}Failed to create Docker network $NETWORK_NAME. See log for details.${NC}"
     exit 1
   fi
-else
   log "INFO: Docker network $NETWORK_NAME already exists" "${GREEN}✅ Docker network $NETWORK_NAME already exists${NC}"
-fi
 
 # Check for Traefik
 if ! docker ps --format '{{.Names}}' | grep -q "traefik"; then
@@ -312,9 +310,7 @@ if ! docker ps --format '{{.Names}}' | grep -q "traefik"; then
   else
     log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
   fi
-else
   log "INFO: Traefik container found" "${GREEN}✅ Traefik container found${NC}"
-fi
 
 # Check if ports are available
 log "INFO: Checking for port availability" "${CYAN}Checking for port availability...${NC}"
@@ -538,7 +534,6 @@ if [ -f "${ROOT_DIR}/docs/pages/ports.md" ]; then
 
 These ports must be open in your firewall for proper VoIP functionality.
 EOF
-else
   # Create new ports documentation
   cat > "${ROOT_DIR}/docs/pages/ports.md" <<EOF
 # AgencyStack Port Configuration
@@ -555,7 +550,6 @@ This document outlines the ports used by various services in the AgencyStack.
 
 These ports must be open in your firewall for proper VoIP functionality.
 EOF
-fi
 
 # Start the VoIP stack
 log "INFO: Starting VoIP stack" "${CYAN}Starting VoIP stack...${NC}"
@@ -564,7 +558,6 @@ cd "${VOIP_DIR}/${DOMAIN}" && docker-compose up -d
 if [ $? -ne 0 ]; then
   log "ERROR: Failed to start VoIP stack" "${RED}Failed to start VoIP stack. See log for details.${NC}"
   exit 1
-fi
 
 # Wait for services to start
 log "INFO: Waiting for VoIP services to start (this may take a few minutes)" "${YELLOW}Waiting for VoIP services to start (this may take a few minutes)...${NC}"
@@ -575,10 +568,8 @@ log "INFO: Configuring firewall for VoIP" "${CYAN}Configuring firewall for VoIP.
 if command -v ufw &> /dev/null; then
   bash "${VOIP_DIR}/${DOMAIN}/setup_firewall.sh" >> "$INSTALL_LOG" 2>&1
   log "INFO: Firewall configured for VoIP" "${GREEN}Firewall configured for VoIP${NC}"
-else
   log "WARNING: UFW not installed, firewall not configured" "${YELLOW}UFW not installed, please configure your firewall manually${NC}"
   log "WARNING: VoIP requires SIP ports (5060/udp, 5061/tcp) and RTP ports (16384-32768/udp)" "${YELLOW}VoIP requires SIP ports (5060/udp, 5061/tcp) and RTP ports (16384-32768/udp)${NC}"
-fi
 
 # Store credentials in a secure location
 log "INFO: Storing credentials" "${CYAN}Storing credentials...${NC}"
@@ -631,16 +622,13 @@ if [ -d "${CONFIG_DIR}/components" ]; then
   }
 }
 EOF
-fi
 
 # Integrate with dashboard if available
 log "INFO: Checking for dashboard integration" "${CYAN}Checking for dashboard integration...${NC}"
 if [ -f "${ROOT_DIR}/scripts/dashboard/update_dashboard_data.sh" ]; then
   log "INFO: Updating dashboard with VoIP information" "${CYAN}Updating dashboard with VoIP information...${NC}"
   bash "${ROOT_DIR}/scripts/dashboard/update_dashboard_data.sh" "voip" "${DOMAIN}" "active"
-else
   log "INFO: Dashboard integration script not found, skipping" "${YELLOW}Dashboard integration script not found, skipping${NC}"
-fi
 
 # Update installed_components.txt
 if [ -f "${CONFIG_DIR}/installed_components.txt" ]; then
@@ -648,11 +636,9 @@ if [ -f "${CONFIG_DIR}/installed_components.txt" ]; then
     echo "voip|${DOMAIN}|$(date +"%Y-%m-%d")|active" >> "${CONFIG_DIR}/installed_components.txt"
     log "INFO: Updated installed components list" "${CYAN}Updated installed components list${NC}"
   fi
-else
   echo "component|domain|install_date|status" > "${CONFIG_DIR}/installed_components.txt"
   echo "voip|${DOMAIN}|$(date +"%Y-%m-%d")|active" >> "${CONFIG_DIR}/installed_components.txt"
   log "INFO: Created installed components list" "${CYAN}Created installed components list${NC}"
-fi
 
 # Display completion information
 log "INFO: VoIP installation completed successfully" "${GREEN}VoIP installation completed successfully!${NC}"
@@ -717,7 +703,6 @@ EOF
     log "WARNING: component_sso_helper.sh not found or not properly sourced" "${YELLOW}Keycloak SSO integration helper not available${NC}"
     log "INFO: Manual SSO configuration will be required" "${CYAN}Manual SSO configuration will be required${NC}"
   fi
-fi
 
 # Update component registry
 if [ -f "${ROOT_DIR}/scripts/utils/update_component_registry.sh" ]; then
@@ -738,7 +723,6 @@ if [ -f "${ROOT_DIR}/scripts/utils/update_component_registry.sh" ]; then
   fi
   
   bash "${ROOT_DIR}/scripts/utils/update_component_registry.sh" "${REGISTRY_ARGS[@]}"
-fi
 
 log "INFO: Installation complete" "${GREEN}Installation complete!${NC}"
 

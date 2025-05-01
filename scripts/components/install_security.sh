@@ -1,4 +1,20 @@
 #!/bin/bash
+
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: security.sh
+# Path: /scripts/components/install_security.sh
+#
+
+# Enforce containerization (prevent host contamination)
+
 # install_security.sh - Security hardening for AgencyStack
 # https://stack.nerdofmouth.com
 #
@@ -24,7 +40,6 @@ AGENCY_SCRIPTS_DIR="${AGENCY_ROOT}/repo/scripts"
 AGENCY_UTILS_DIR="${AGENCY_SCRIPTS_DIR}/utils"
 
 # Import common utilities
-source "${AGENCY_UTILS_DIR}/common.sh"
 source "${AGENCY_UTILS_DIR}/log_helpers.sh"
 
 # Define component-specific variables
@@ -204,7 +219,6 @@ mkdir -p "${INSTALL_DIR}/audit"
 # Update SSH port in UFW_PORTS if changed
 if [[ "${SSH_PORT}" != "22" ]]; then
   UFW_PORTS=("${SSH_PORT}" "80" "443")
-fi
 
 # Check for existing security installation
 if [[ -f "${COMPONENT_INSTALLED_MARKER}" ]] && [[ "${FORCE}" != "true" ]]; then
@@ -215,14 +229,12 @@ if [[ -f "${COMPONENT_INSTALLED_MARKER}" ]] && [[ "${FORCE}" != "true" ]]; then
     log "INFO" "Use --force to reinstall" "${CYAN}Use --force to reinstall.${NC}"
     exit 0
   fi
-fi
 
 # Check dependencies
 if [[ "${ENABLE_UFW}" == "true" ]] && ! command -v ufw &> /dev/null; then
   log "INFO" "Installing UFW package" "${CYAN}Installing UFW package...${NC}"
   apt-get update >> "${INSTALL_LOG}" 2>&1
   apt-get install -y ufw >> "${INSTALL_LOG}" 2>&1
-fi
 
 if [[ "${ENABLE_SYSTEM_HARDENING}" == "true" ]]; then
   log "INFO" "Installing security packages" "${CYAN}Installing security packages...${NC}"
@@ -236,7 +248,6 @@ if [[ "${ENABLE_SYSTEM_HARDENING}" == "true" ]]; then
     libpam-pwquality \
     debsums \
     needrestart >> "${INSTALL_LOG}" 2>&1
-fi
 
 # Configure UFW
 if [[ "${ENABLE_UFW}" == "true" ]]; then
@@ -292,7 +303,6 @@ if [[ "${ENABLE_UFW}" == "true" ]]; then
   
   # Save UFW rules to component directory
   ufw status verbose > "${COMPONENT_CONFIG_DIR}/ufw_rules.txt"
-fi
 
 # SSH Hardening
 if [[ "${ENABLE_SSH_HARDENING}" == "true" ]]; then
@@ -370,7 +380,6 @@ EOL
     # Save SSH configuration to component directory
     cp /etc/ssh/sshd_config.d/00-hardened.conf "${COMPONENT_CONFIG_DIR}/sshd_config.hardened"
   fi
-fi
 
 # System Hardening
 if [[ "${ENABLE_SYSTEM_HARDENING}" == "true" ]]; then
@@ -571,7 +580,6 @@ EOL
   if [ -f /etc/audit/rules.d/99-agencystack.rules ]; then
     cp /etc/audit/rules.d/99-agencystack.rules "${COMPONENT_CONFIG_DIR}/audit-rules.conf"
   fi
-fi
 
 # Run Security Audit
 if [[ "${ENABLE_AUDIT}" == "true" ]]; then
@@ -601,9 +609,7 @@ echo "Firewall Status:" >> "\${AUDIT_FILE}"
 echo "----------------" >> "\${AUDIT_FILE}"
 if command -v ufw &> /dev/null; then
   ufw status verbose >> "\${AUDIT_FILE}" 2>&1
-else
   echo "UFW not installed" >> "\${AUDIT_FILE}"
-fi
 echo "" >> "\${AUDIT_FILE}"
 
 # Check SSH configuration
@@ -612,10 +618,8 @@ echo "------------------" >> "\${AUDIT_FILE}"
 if [ -f /etc/ssh/sshd_config.d/00-hardened.conf ]; then
   echo "Hardened SSH configuration found." >> "\${AUDIT_FILE}"
   grep -v "^#" /etc/ssh/sshd_config.d/00-hardened.conf | grep -v "^$" >> "\${AUDIT_FILE}"
-else
   echo "Hardened SSH configuration not found." >> "\${AUDIT_FILE}"
   grep -v "^#" /etc/ssh/sshd_config | grep -v "^$" >> "\${AUDIT_FILE}"
-fi
 echo "" >> "\${AUDIT_FILE}"
 
 # Check system updates
@@ -623,7 +627,6 @@ echo "System Updates:" >> "\${AUDIT_FILE}"
 echo "---------------" >> "\${AUDIT_FILE}"
 if command -v apt &> /dev/null; then
   apt list --upgradable 2>/dev/null >> "\${AUDIT_FILE}"
-fi
 echo "" >> "\${AUDIT_FILE}"
 
 # Check for listening ports
@@ -633,7 +636,6 @@ if command -v ss &> /dev/null; then
   ss -tuln >> "\${AUDIT_FILE}"
 elif command -v netstat &> /dev/null; then
   netstat -tuln >> "\${AUDIT_FILE}"
-fi
 echo "" >> "\${AUDIT_FILE}"
 
 # Check for running services
@@ -660,7 +662,6 @@ ln -sf "\${AUDIT_FILE}" "\${AUDIT_DIR}/latest-audit.log"
 # Send email notification if requested
 if [ -n "\${ADMIN_EMAIL}" ]; then
   cat "\${AUDIT_FILE}" | mail -s "Security Audit Report for \${HOSTNAME}" "\${ADMIN_EMAIL}"
-fi
 
 echo "Security audit completed. Results saved to \${AUDIT_FILE}"
 EOL
@@ -678,7 +679,6 @@ EOL
   chmod +x /etc/cron.daily/security-audit
   
   log "SUCCESS" "Security audit setup completed" "${GREEN}✅ Security audit setup completed.${NC}"
-fi
 
 # Create installation marker
 touch "${COMPONENT_INSTALLED_MARKER}"
@@ -695,9 +695,7 @@ if [[ "${ENABLE_UFW}" == "true" ]]; then
   echo -e "${GREEN}✅ Firewall (UFW) configured and enabled${NC}"
   echo -e "   - Default: deny incoming, allow outgoing"
   echo -e "   - Allowed ports: ${UFW_PORTS[*]} ${ADDITIONAL_UFW_PORTS[*]}"
-else
   echo -e "${YELLOW}⚠️ Firewall (UFW) configuration was skipped${NC}"
-fi
 
 # SSH Status
 if [[ "${ENABLE_SSH_HARDENING}" == "true" ]]; then
@@ -705,9 +703,7 @@ if [[ "${ENABLE_SSH_HARDENING}" == "true" ]]; then
   echo -e "   - SSH running on port ${SSH_PORT}"
   echo -e "   - Root login: prohibit-password"
   echo -e "   - Password authentication: enabled"
-else
   echo -e "${YELLOW}⚠️ SSH hardening was skipped${NC}"
-fi
 
 # System Hardening Status
 if [[ "${ENABLE_SYSTEM_HARDENING}" == "true" ]]; then
@@ -724,9 +720,7 @@ if [[ "${ENABLE_SYSTEM_HARDENING}" == "true" ]]; then
   if command -v rkhunter &> /dev/null; then
     echo -e "   - RKHunter rootkit scanner configured"
   fi
-else
   echo -e "${YELLOW}⚠️ System hardening was skipped${NC}"
-fi
 
 # Audit Status
 if [[ "${ENABLE_AUDIT}" == "true" ]]; then
@@ -734,9 +728,7 @@ if [[ "${ENABLE_AUDIT}" == "true" ]]; then
   echo -e "   - Initial security audit completed"
   echo -e "   - Daily security audits scheduled"
   echo -e "   - Audit reports saved to ${INSTALL_DIR}/audit/"
-else
   echo -e "${YELLOW}⚠️ Security audit was skipped${NC}"
-fi
 
 echo
 echo -e "${GREEN}Security hardening is complete. The system is now better protected against common attacks.${NC}"

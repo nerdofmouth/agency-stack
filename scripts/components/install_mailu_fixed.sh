@@ -1,4 +1,20 @@
 #!/bin/bash
+
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: mailu_fixed.sh
+# Path: /scripts/components/install_mailu_fixed.sh
+#
+
+# Enforce containerization (prevent host contamination)
+
 # AgencyStack Component Installer: Mailu Email Server
 # Path: /scripts/components/install_mailu.sh
 #
@@ -9,7 +25,6 @@
 set -euo pipefail
 
 # Define absolute paths - never rely on relative paths
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 INSTALL_LOG="/var/log/agency_stack/components/install_mailu-$(date +%Y%m%d-%H%M%S).log"
 
@@ -120,7 +135,6 @@ echo -e "======================================"
 if [ "$CLIENT_ID" != "default" ]; then
   MAILU_DIR="${MAILU_DIR}/clients/${CLIENT_ID}"
   NETWORK_NAME="agency-network"
-fi
 
 # Check if Mailu is already installed
 if docker ps -a --format '{{.Names}}' | grep -q "${MAILU_CONTAINER}_admin"; then
@@ -151,7 +165,6 @@ if docker ps -a --format '{{.Names}}' | grep -q "${MAILU_CONTAINER}_admin"; then
       exit 0
     fi
   fi
-fi
 
 # Check if Docker is installed
 if ! command -v docker &> /dev/null; then
@@ -172,13 +185,11 @@ if ! command -v docker &> /dev/null; then
     log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
     exit 1
   fi
-fi
 
 # Check if Docker is running
 if ! docker info &> /dev/null; then
   log "ERROR: Docker is not running" "${RED}Docker is not running. Please start Docker first.${NC}"
   exit 1
-fi
 
 # Check if Docker Compose is installed
 if ! command -v docker-compose &> /dev/null; then
@@ -199,7 +210,6 @@ if ! command -v docker-compose &> /dev/null; then
     log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
     exit 1
   fi
-fi
 
 # Check if network exists, create if it doesn't
 if ! docker network inspect "$NETWORK_NAME" &> /dev/null; then
@@ -209,9 +219,7 @@ if ! docker network inspect "$NETWORK_NAME" &> /dev/null; then
     log "ERROR: Failed to create Docker network $NETWORK_NAME" "${RED}Failed to create Docker network $NETWORK_NAME. See log for details.${NC}"
     exit 1
   fi
-else
   log "INFO: Docker network $NETWORK_NAME already exists" "${GREEN}✅ Docker network $NETWORK_NAME already exists${NC}"
-fi
 
 # Check for Traefik
 if ! docker ps --format '{{.Names}}' | grep -q "traefik"; then
@@ -229,7 +237,6 @@ if ! docker ps --format '{{.Names}}' | grep -q "traefik"; then
   else
     log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
   fi
-fi
 
 # Check for port availability
 log "INFO: Checking for port availability" "${CYAN}Checking for port availability...${NC}"
@@ -426,7 +433,6 @@ cd "${MAILU_DIR}/${DOMAIN}" && docker-compose up -d
 if [ $? -ne 0 ]; then
   log "ERROR: Failed to start Mailu" "${RED}Failed to start Mailu. See log for details.${NC}"
   exit 1
-fi
 
 # Wait for Mailu to start
 log "INFO: Waiting for Mailu to start" "${CYAN}Waiting for Mailu to start...${NC}"
@@ -450,9 +456,7 @@ echo -e "${CYAN}Admin username: ${ADMIN_EMAIL%@*}@${EMAIL_DOMAIN}${NC}"
 if [ "$ADMIN_PASSWORD" = "$(openssl rand -base64 12)" ]; then
   echo -e "${CYAN}Admin password: $ADMIN_PASSWORD (randomly generated)${NC}"
   echo -e "${YELLOW}Make sure to save this password!${NC}"
-else
   echo -e "${CYAN}Admin password: (as provided)${NC}"
-fi
 echo -e "${CYAN}Webmail URL: https://${DOMAIN}/webmail/${NC}"
 echo -e "${YELLOW}Note: It might take a few minutes for all services to fully start.${NC}"
 

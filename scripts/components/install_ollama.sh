@@ -1,16 +1,17 @@
 #!/bin/bash
-# install_ollama.sh - AgencyStack Ollama LLM Service Integration
-# [https://stack.nerdofmouth.com](https://stack.nerdofmouth.com)
-#
-# Installs and configures Ollama for local LLM inference
-# Part of the AgencyStack AI Foundation
-#
-# Author: AgencyStack Team
-# Version: 1.0.0
-# Date: April 5, 2025
 
-# --- BEGIN: Preflight/Prerequisite Check ---
-source "$(dirname \"$0\")/../utils/common.sh"
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: ollama.sh
+# Path: /scripts/components/install_ollama.sh
+#
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -31,7 +32,6 @@ NC='\033[0m' # No Color
 BOLD='\033[1m'
 
 # Variables
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 CONFIG_DIR="/opt/agency_stack"
 LOG_DIR="/var/log/agency_stack"
@@ -566,10 +566,8 @@ if docker ps -q -f name=$CONTAINER_NAME | grep -q .; then
     MEMORY_USAGE=$(echo "$METRICS" | cut -d, -f1)
     API_CALLS=$(echo "$METRICS" | cut -d, -f2)
   fi
-else
   HEALTH="stopped"
   RUNNING="false"
-fi
 
 # Update dashboard
 update_dashboard "$RUNNING" "$HEALTH" "$LOADED_MODELS" "$API_CALLS" "$MEMORY_USAGE"
@@ -636,13 +634,11 @@ log() {
 if [ ! -f "$MODELS_FILE" ]; then
   log "ERROR" "Models file not found: $MODELS_FILE"
   exit 1
-fi
 
 # Extract models from JSON file
 if ! command -v jq &>/dev/null; then
   log "ERROR" "jq command not found, please install jq"
   exit 1
-fi
 
 # Get models list
 MODELS=$(jq -r '.models[]' "$MODELS_FILE")
@@ -651,7 +647,6 @@ MODELS=$(jq -r '.models[]' "$MODELS_FILE")
 if ! curl -s "http://localhost:11434/api/tags" &>/dev/null; then
   log "ERROR" "Ollama API not reachable. Make sure Ollama is running."
   exit 1
-fi
 
 # Pull each model
 for model in $MODELS; do
@@ -701,7 +696,6 @@ log() {
 if ! curl -s "http://localhost:11434/api/tags" &>/dev/null; then
   log "ERROR" "Ollama API not reachable. Make sure Ollama is running."
   exit 1
-fi
 
 # Get models list
 log "INFO" "Fetching available models..."
@@ -712,9 +706,7 @@ if command -v jq &>/dev/null; then
   echo "Available models:"
   echo "$RESPONSE" | jq -r '.models[] | "\(.name) - \(.size) - \(.modified)"' | \
     awk '{printf "%-20s %-15s %-20s\n", $1, $3, $5}'
-else
   echo "$RESPONSE"
-fi
 
 exit 0
 EOF
@@ -747,7 +739,6 @@ log() {
 if ! curl -s "http://localhost:11434/api/tags" &>/dev/null; then
   log "ERROR" "Ollama API not reachable. Make sure Ollama is running."
   exit 1
-fi
 
 # Check if model is available
 if ! curl -s "http://localhost:11434/api/tags" | grep -q "\"name\":\"$MODEL\""; then
@@ -755,7 +746,6 @@ if ! curl -s "http://localhost:11434/api/tags" | grep -q "\"name\":\"$MODEL\""; 
   curl -s "http://localhost:11434/api/tags" | grep -o '"name":"[^"]*"' | sed 's/"name":"//g' | sed 's/"//g'
   log "INFO" "You can pull the model using: ./pull_models.sh $CLIENT_ID"
   exit 1
-fi
 
 # Run inference
 log "INFO" "Testing API with model: $MODEL"

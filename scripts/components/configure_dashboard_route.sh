@@ -1,12 +1,20 @@
 #!/bin/bash
-# This script creates a Traefik dynamic configuration file to route traffic to the dashboard
-# Following the repository-first approach in the AgencyStack Alpha Phase Repository Integrity Policy
-
-set -e
 
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../utils/common.sh"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: configure_dashboard_route.sh
+# Path: /scripts/components/configure_dashboard_route.sh
+#
+set -e
+
+# Source common utilities
 source "${SCRIPT_DIR}/../utils/log_helpers.sh"
 
 # Configuration
@@ -64,7 +72,6 @@ if [ ! -d "$TRAEFIK_CONFIG_DIR" ]; then
   log_error "Traefik dynamic config directory not found: $TRAEFIK_CONFIG_DIR"
   log_info "Please install Traefik first with: make traefik DOMAIN=$DOMAIN"
   exit 1
-fi
 
 # Ensure Traefik is on the agency_stack network
 if ! docker network inspect agency_stack 2>/dev/null | grep -q "traefik_demo"; then
@@ -73,7 +80,6 @@ if ! docker network inspect agency_stack 2>/dev/null | grep -q "traefik_demo"; t
     log_warning "Failed to connect Traefik to agency_stack network, creating connection manually"
     # Try alternative approach if needed
   }
-fi
 
 # Configure Traefik to route traffic to the dashboard container
 # When containerized, the dashboard is on the agency_stack Docker network
@@ -102,7 +108,6 @@ if [[ "${ENFORCE_HTTPS}" == "true" ]]; then
       middlewares:
         - "https-redirect"
 EOF
-fi
 
 cat >> "${TRAEFIK_DYNAMIC_CONFIG_DIR}/dashboard-route.yml" <<EOF
     
@@ -125,7 +130,6 @@ middleware_list+=("dashboard-strip")
 
 if [[ "${ENFORCE_HTTPS}" == "true" ]]; then
   middleware_list+=("https-redirect")
-fi
 
 # Join the middleware list with commas
 middleware_string=$(IFS=,; echo "${middleware_list[*]}")
@@ -148,7 +152,6 @@ if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
       middlewares:
         - "keycloak-auth"
 EOF
-fi
 
 cat >> "${TRAEFIK_DYNAMIC_CONFIG_DIR}/dashboard-route.yml" <<EOF
       priority: 10000
@@ -173,7 +176,6 @@ middleware_list+=("dashboard-strip")
 
 if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
   middleware_list+=("keycloak-auth")
-fi
 
 # Join the middleware list with commas
 middleware_string=$(IFS=,; echo "${middleware_list[*]}")
@@ -195,12 +197,10 @@ if [[ "${USE_HOST_NETWORK}" == "true" ]]; then
   log_info "Using localhost URL for host network mode"
   # When using host network mode, Traefik can access the dashboard via localhost
   echo "          - url: \"http://localhost:${DASHBOARD_PORT}\"" >> "${TRAEFIK_DYNAMIC_CONFIG_DIR}/dashboard-route.yml"
-else
   log_info "Using host IP URL for bridge network mode"
   # When using bridge network mode, Traefik needs to access the dashboard via host IP
   HOST_IP=$(hostname -I | awk '{print $1}')
   echo "          - url: \"http://${HOST_IP}:${DASHBOARD_PORT}\"" >> "${TRAEFIK_DYNAMIC_CONFIG_DIR}/dashboard-route.yml"
-fi
 
 # Continue with the rest of the configuration
 cat >> "${TRAEFIK_DYNAMIC_CONFIG_DIR}/dashboard-route.yml" <<EOF
@@ -219,7 +219,6 @@ if [[ "${ENABLE_KEYCLOAK}" == "true" ]]; then
         address: "http://keycloak:8080/auth/realms/agencystack/protocol/openid-connect/auth"
         trustForwardHeader: true
 EOF
-fi
 
 if [[ "${ENFORCE_HTTPS}" == "true" ]]; then
   cat >> "${TRAEFIK_DYNAMIC_CONFIG_DIR}/dashboard-route.yml" <<EOF
@@ -227,7 +226,6 @@ if [[ "${ENFORCE_HTTPS}" == "true" ]]; then
       redirectScheme:
         scheme: "https"
 EOF
-fi
 
 log_success "Dashboard routing configuration created: ${TRAEFIK_DYNAMIC_CONFIG_DIR}/dashboard-route.yml"
 log_info "Dashboard access URLs:"
@@ -263,7 +261,6 @@ if ! curl -s http://127.0.0.1:${DASHBOARD_PORT} > /dev/null; then
     log_error "Dashboard service not found in PM2. Please reinstall the dashboard with: make dashboard DOMAIN=$DOMAIN"
     exit 1
   fi
-fi
 
 log_success "Dashboard routing configuration completed"
 exit 0

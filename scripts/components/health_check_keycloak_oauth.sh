@@ -1,22 +1,18 @@
 #!/bin/bash
-# health_check_keycloak_oauth.sh - Health checks for Keycloak OAuth providers
-# https://stack.nerdofmouth.com
-#
-# This script performs comprehensive health checks on Keycloak OAuth providers:
-# - Validates provider configuration
-# - Checks connectivity to provider endpoints
-# - Verifies JWT signature verification setup
-# - Validates redirect URI configurations
-# - Checks authentication flows
-#
-# Author: AgencyStack Team
-# Version: 1.0.0
-# Created: 2025-04-11
 
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: health_check_keycloak_oauth.sh
+# Path: /scripts/components/health_check_keycloak_oauth.sh
+#
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
-source "${SCRIPT_DIR}/../utils/common.sh"
 
 # Variables
 CONFIG_DIR="/opt/agency_stack"
@@ -33,7 +29,6 @@ if [ ! -w "$LOG_DIR" ] && [ ! -w "/var/log" ]; then
   COMPONENTS_LOG_DIR="${LOG_DIR}/components"
   LOG_FILE="${COMPONENTS_LOG_DIR}/keycloak_oauth_health.log"
   echo "Notice: Using local log directory for development: ${LOG_DIR}"
-fi
 
 # Ensure log directory exists
 mkdir -p "$COMPONENTS_LOG_DIR"
@@ -116,13 +111,11 @@ if [ -z "$DOMAIN" ]; then
   echo -e "${RED}Error: --domain is required${NC}"
   echo -e "Use --help for usage information"
   exit 1
-fi
 
 # Determine realm name
 REALM_NAME="agency"
 if [ -n "$CLIENT_ID" ]; then
   REALM_NAME="$CLIENT_ID"
-fi
 
 # Log initial execution information
 log "INFO" "Starting Keycloak OAuth providers health check for domain: $DOMAIN" true

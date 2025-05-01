@@ -1,13 +1,21 @@
 #!/bin/bash
-# install_documenso.sh - Installation script for Documenso
-# AgencyStack Team
 
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: documenso.sh
+# Path: /scripts/components/install_documenso.sh
+#
 set -e
 
 # --- BEGIN: Preflight/Prerequisite Check ---
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
-source "$REPO_ROOT/scripts/utils/common.sh"
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -18,9 +26,7 @@ preflight_check_agencystack || {
 source "$(dirname "$0")/../utils/log_helpers.sh"
 
 # Source common utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
-source "$REPO_ROOT/scripts/utils/common.sh"
 
 # Default configuration
 CLIENT_ID="${CLIENT_ID:-default}"

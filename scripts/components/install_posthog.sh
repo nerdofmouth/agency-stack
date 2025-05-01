@@ -1,6 +1,17 @@
 #!/bin/bash
+
 # Source common utilities
-source "$(dirname "$0")/../utils/common.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: posthog.sh
+# Path: /scripts/components/install_posthog.sh
+#
 
 # --- BEGIN: Preflight/Prerequisite Check ---
 preflight_check_agencystack || {
@@ -33,7 +44,6 @@ NC='\033[0m' # No Color
 BOLD='\033[1m'
 
 # Variables
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 CONFIG_DIR="/opt/agency_stack"
 POSTHOG_DIR="${CONFIG_DIR}/posthog"
@@ -135,13 +145,11 @@ if [ -z "$DOMAIN" ]; then
   echo -e "${RED}Error: --domain is required${NC}"
   echo -e "Use --help for usage information"
   exit 1
-fi
 
 if [ -z "$ADMIN_EMAIL" ]; then
   echo -e "${RED}Error: --admin-email is required${NC}"
   echo -e "Use --help for usage information"
   exit 1
-fi
 
 # Welcome message
 echo -e "${MAGENTA}${BOLD}AgencyStack PostHog Setup${NC}"
@@ -151,7 +159,6 @@ echo -e "=============================="
 if [ "$EUID" -ne 0 ]; then
   echo -e "${RED}Please run as root or with sudo${NC}"
   exit 1
-fi
 
 # Create log directories if they don't exist
 mkdir -p "$LOG_DIR"
@@ -190,13 +197,11 @@ if [ -n "$CLIENT_ID" ]; then
   REDIS_CONTAINER="${CLIENT_ID}_posthog_redis"
   CLICKHOUSE_CONTAINER="${CLIENT_ID}_posthog_clickhouse"
   NETWORK_NAME="${CLIENT_ID}_network"
-else
   POSTHOG_CONTAINER="posthog_${SITE_NAME}"
   POSTGRES_CONTAINER="posthog_postgres_${SITE_NAME}"
   REDIS_CONTAINER="posthog_redis_${SITE_NAME}"
   CLICKHOUSE_CONTAINER="posthog_clickhouse_${SITE_NAME}"
   NETWORK_NAME="agency-network"
-fi
 
 # Check if PostHog is already installed
 if docker ps -a --format '{{.Names}}' | grep -q "$POSTHOG_CONTAINER"; then
@@ -226,7 +231,6 @@ if docker ps -a --format '{{.Names}}' | grep -q "$POSTHOG_CONTAINER"; then
       exit 0
     fi
   fi
-fi
 
 # Check if Docker is installed
 if ! command -v docker &> /dev/null; then
@@ -246,13 +250,11 @@ if ! command -v docker &> /dev/null; then
     log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
     exit 1
   fi
-fi
 
 # Check if Docker is running
 if ! docker info &> /dev/null; then
   log "ERROR: Docker is not running" "${RED}Docker is not running. Please start Docker first.${NC}"
   exit 1
-fi
 
 # Check if Docker Compose is installed
 if ! command -v docker-compose &> /dev/null; then
@@ -272,7 +274,6 @@ if ! command -v docker-compose &> /dev/null; then
     log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
     exit 1
   fi
-fi
 
 # Check if network exists, create if it doesn't
 if ! docker network inspect "$NETWORK_NAME" &> /dev/null; then
@@ -282,9 +283,7 @@ if ! docker network inspect "$NETWORK_NAME" &> /dev/null; then
     log "ERROR: Failed to create Docker network $NETWORK_NAME" "${RED}Failed to create Docker network $NETWORK_NAME. See log for details.${NC}"
     exit 1
   fi
-else
   log "INFO: Docker network $NETWORK_NAME already exists" "${GREEN}✅ Docker network $NETWORK_NAME already exists${NC}"
-fi
 
 # Check for Traefik
 if ! docker ps --format '{{.Names}}' | grep -q "traefik"; then
@@ -301,9 +300,7 @@ if ! docker ps --format '{{.Names}}' | grep -q "traefik"; then
   else
     log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
   fi
-else
   log "INFO: Traefik container found" "${GREEN}✅ Traefik container found${NC}"
-fi
 
 log "INFO: Starting PostHog installation for $DOMAIN" "${BLUE}Starting PostHog installation for $DOMAIN...${NC}"
 
@@ -323,7 +320,6 @@ curl -sSL https://raw.githubusercontent.com/PostHog/posthog-docker/master/docker
 if [ $? -ne 0 ]; then
   log "ERROR: Failed to download PostHog configuration" "${RED}Failed to download PostHog configuration. See log for details.${NC}"
   exit 1
-fi
 
 # Create .env file for PostHog
 log "INFO: Creating PostHog environment configuration" "${CYAN}Creating PostHog environment configuration...${NC}"
@@ -397,7 +393,6 @@ cd "${POSTHOG_DIR}/${DOMAIN}" && docker-compose up -d
 if [ $? -ne 0 ]; then
   log "ERROR: Failed to start PostHog stack" "${RED}Failed to start PostHog stack. See log for details.${NC}"
   exit 1
-fi
 
 # Wait for PostHog to start
 log "INFO: Waiting for PostHog to start (this may take a few minutes)" "${YELLOW}Waiting for PostHog to start (this may take a few minutes)...${NC}"
@@ -452,16 +447,13 @@ if [ -d "${CONFIG_DIR}/components" ]; then
   "status": "active"
 }
 EOF
-fi
 
 # Integrate with dashboard if available
 log "INFO: Checking for dashboard integration" "${CYAN}Checking for dashboard integration...${NC}"
 if [ -f "${ROOT_DIR}/scripts/dashboard/update_dashboard_data.sh" ]; then
   log "INFO: Updating dashboard with PostHog information" "${CYAN}Updating dashboard with PostHog information...${NC}"
   bash "${ROOT_DIR}/scripts/dashboard/update_dashboard_data.sh" "posthog" "${DOMAIN}" "active"
-else
   log "INFO: Dashboard integration script not found, skipping" "${YELLOW}Dashboard integration script not found, skipping${NC}"
-fi
 
 # Update installed_components.txt
 if [ -f "${CONFIG_DIR}/installed_components.txt" ]; then
@@ -469,11 +461,9 @@ if [ -f "${CONFIG_DIR}/installed_components.txt" ]; then
     echo "posthog|${DOMAIN}|$(date +"%Y-%m-%d")|active" >> "${CONFIG_DIR}/installed_components.txt"
     log "INFO: Updated installed components list" "${CYAN}Updated installed components list${NC}"
   fi
-else
   echo "component|domain|install_date|status" > "${CONFIG_DIR}/installed_components.txt"
   echo "posthog|${DOMAIN}|$(date +"%Y-%m-%d")|active" >> "${CONFIG_DIR}/installed_components.txt"
   log "INFO: Created installed components list" "${CYAN}Created installed components list${NC}"
-fi
 
 # Final message
 log "INFO: PostHog installation completed successfully" "${GREEN}${BOLD}✅ PostHog installed successfully!${NC}"

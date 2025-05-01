@@ -1,4 +1,20 @@
 #!/bin/bash
+
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: tailscale.sh
+# Path: /scripts/components/install_tailscale.sh
+#
+
+# Enforce containerization (prevent host contamination)
+
 # AgencyStack Component Installer: Tailscale
 # Path: /scripts/components/install_tailscale.sh
 #
@@ -16,7 +32,6 @@ AGENCY_SCRIPTS_DIR="${AGENCY_ROOT}/repo/scripts"
 AGENCY_UTILS_DIR="${AGENCY_SCRIPTS_DIR}/utils"
 
 # Import common utilities
-source "${AGENCY_UTILS_DIR}/common.sh"
 source "${AGENCY_UTILS_DIR}/log_helpers.sh"
 
 # Define component-specific variables
@@ -122,7 +137,6 @@ if [ "$CLIENT_ID" != "default" ]; then
     CLIENT_DIR="${AGENCY_CLIENTS_DIR}/${CLIENT_ID}"
     COMPONENT_CLIENT_DIR="${CLIENT_DIR}/${COMPONENT}"
     mkdir -p "${COMPONENT_CLIENT_DIR}" 2>/dev/null || true
-fi
 
 # Start installation banner
 log_banner "AgencyStack Tailscale Installation" "${COMPONENT_LOG_FILE}"
@@ -131,7 +145,6 @@ log_banner "AgencyStack Tailscale Installation" "${COMPONENT_LOG_FILE}"
 if [[ -f "${COMPONENT_INSTALLED_MARKER}" && "${FORCE}" != "true" ]]; then
     log_info "Tailscale is already installed. Use --force to reinstall." "${COMPONENT_LOG_FILE}"
     exit 0
-fi
 
 # Create component directories
 log_info "Creating Tailscale directories" "${COMPONENT_LOG_FILE}"
@@ -148,11 +161,9 @@ if [ -f /etc/os-release ]; then
     OS_DISTRO="$ID"
     OS_VERSION="$VERSION_CODENAME"
     log_info "Detected OS: $OS_DISTRO $OS_VERSION" "${COMPONENT_LOG_FILE}"
-else
     OS_DISTRO="ubuntu"
     OS_VERSION="focal"
     log_warning "Could not detect OS distribution. Defaulting to Ubuntu Focal." "${COMPONENT_LOG_FILE}"
-fi
 
 # Add Tailscale's package signing key and repository according to OS
 case "$OS_DISTRO" in
@@ -201,7 +212,6 @@ cat > "${COMPONENT_CONFIG_DIR}/setup-tailscale.sh" <<EOL
 if [ "\$(id -u)" -ne 0 ]; then
   echo "This script must be run as root" >&2
   exit 1
-fi
 
 # Parse command line options
 ADVERTISE_ROUTES="${ADVERTISE_ROUTES}"
@@ -248,15 +258,12 @@ TAILSCALE_OPTS=""
 
 if [ -n "\$ADVERTISE_ROUTES" ]; then
   TAILSCALE_OPTS="\$TAILSCALE_OPTS --advertise-routes=\$ADVERTISE_ROUTES"
-fi
 
 if [ "\$ADVERTISE_EXIT_NODE" = true ]; then
   TAILSCALE_OPTS="\$TAILSCALE_OPTS --advertise-exit-node"
-fi
 
 if [ -n "\$HOSTNAME" ]; then
   TAILSCALE_OPTS="\$TAILSCALE_OPTS --hostname=\$HOSTNAME"
-fi
 
 # Setup Tailscale authentication
 echo "🔑 Starting Tailscale authentication..."
@@ -267,10 +274,8 @@ echo "🔗 A browser window will open for authentication (or use the provided UR
 if [ -n "\$TAILSCALE_OPTS" ]; then
   echo "🛰 Running: tailscale up \$TAILSCALE_OPTS"
   tailscale up \$TAILSCALE_OPTS
-else
   echo "🛰 Running: tailscale up"
   tailscale up
-fi
 
 # Check if tailscale is running and authenticated
 if tailscale status | grep -q "authenticated"; then
@@ -283,10 +288,8 @@ if tailscale status | grep -q "authenticated"; then
   # Show the tailscale IP address
   TAILSCALE_IP=\$(tailscale ip -4)
   echo "🌐 Tailscale IPv4 address: \$TAILSCALE_IP"
-else
   echo "❌ Tailscale setup failed or was not completed."
   echo "🔄 You can try again by running: tailscale up"
-fi
 EOL
 
 # Make the setup script executable

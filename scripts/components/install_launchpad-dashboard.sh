@@ -1,17 +1,20 @@
 #!/bin/bash
-# install_launchpad-dashboard.sh - Install and configure the Launchpad Dashboard for AgencyStack
-#
-# This script sets up a central dashboard for accessing all services
-# Part of AgencyStack (https://stack.nerdofmouth.com)
-#
-# Author: AgencyStack Team
-# Date: 2025-04-07
-
-set -e
 
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../utils/common.sh"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: launchpad-dashboard.sh
+# Path: /scripts/components/install_launchpad-dashboard.sh
+#
+set -e
+
+# Source common utilities
 
 # Use robust, portable path for helpers
 source "$(dirname "$0")/../utils/log_helpers.sh"
@@ -103,7 +106,6 @@ if check_installed; then
         log_success "Launchpad Dashboard is already installed. Use --force to reinstall." "${LOG_FILE}"
         exit 0
     fi
-fi
 
 # Create services configuration file
 log_banner "Creating configuration files" "${LOG_FILE}"
@@ -430,8 +432,6 @@ EOL
     log_info "Admin Password: change_me_now (please change this!)" "${LOG_FILE}"
     log_info "Credentials saved to: /opt/agency_stack/secrets/launchpad-dashboard/${DOMAIN}.env" "${LOG_FILE}"
     exit 0
-else
     log_error "Failed to start Launchpad Dashboard container" "${LOG_FILE}"
     log_info "Check the logs for more information" "${LOG_FILE}"
     exit 1
-fi

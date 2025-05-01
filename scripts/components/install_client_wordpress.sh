@@ -1,15 +1,17 @@
 #!/bin/bash
-# install_client_wordpress.sh - Multi-tenant WordPress installation for any client
-# Part of AgencyStack Alpha - https://stack.nerdofmouth.com
-#
-# Following the AgencyStack Charter v1.0.3 principles:
-# - Repository as Source of Truth
-# - Idempotency & Automation
-# - Multi-Tenancy & Security
-# - Component Consistency
-# - Strict Containerization
-# - Test-Driven Development
 
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: client_wordpress.sh
+# Path: /scripts/components/install_client_wordpress.sh
+#
 set -e
 
 # Verify running from repository context
@@ -17,19 +19,9 @@ if [[ "$0" != *"/root/_repos/agency-stack/scripts/"* ]]; then
   echo "ERROR: This script must be run from the repository context"
   echo "Run with: /root/_repos/agency-stack/scripts/components/$(basename "$0")"
   exit 1
-fi
 
 # Source common utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -f "${SCRIPT_DIR}/../utils/common.sh" ]; then
-  source "${SCRIPT_DIR}/../utils/common.sh"
-else
   # Minimal logging functions if common.sh is not found
-  log_info() { echo "[INFO] $1"; }
-  log_success() { echo "[SUCCESS] $1"; }
-  log_warning() { echo "[WARNING] $1"; }
-  log_error() { echo "[ERROR] $1"; }
-fi
 
 # Default values
 CLIENT_ID=""
@@ -59,7 +51,6 @@ if is_running_in_container; then
   CONTAINER_RUNNING="true"
   DID_MODE="true"
   log_info "Detected Docker-in-Docker environment, enabling container compatibility mode"
-fi
 
 # Show help message
 show_help() {
@@ -182,23 +173,19 @@ done
 if [ -z "$CLIENT_ID" ]; then
   log_error "Client ID is required. Use --client-id=<id>"
   exit 1
-fi
 
 if [ -z "$DOMAIN" ]; then
   log_error "Domain is required. Use --domain=<domain>"
   exit 1
-fi
 
 # Set paths based on Docker-in-Docker mode
 if [ "$CONTAINER_RUNNING" = "true" ] && [ "$DID_MODE" = "true" ]; then
   # In Docker-in-Docker, use the container paths
   INSTALL_BASE_DIR="${HOME}/.agencystack"
   LOG_DIR="${HOME}/.logs/agency_stack/components"
-else
   # Standard AgencyStack paths on host system
   INSTALL_BASE_DIR="/opt/agency_stack"
   LOG_DIR="/var/log/agency_stack/components"
-fi
 
 # Ensure the log directory exists
 mkdir -p "${LOG_DIR}" || true
@@ -469,7 +456,6 @@ done
 echo "Verifying MySQL root access..."
 if mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "SELECT 'Root connection successful';" 2>/dev/null; then
   echo "✅ MySQL root access verified"
-else
   echo "❌ MySQL root access failed - this indicates a deeper issue"
   exit 1
 fi  
@@ -488,7 +474,6 @@ echo "Failed to show grants"
 echo "Testing connection as WordPress user..."
 if mysql -u ${WP_DB_USER} -p${WP_DB_PASSWORD} -e "USE ${WP_DB_NAME}; SELECT * FROM wp_agencystack_test;" 2>/dev/null; then
   echo "✅ Connection successful as WordPress user!"
-else
   echo "❌ Connection failed as WordPress user!"
   echo "Attempting to fix permissions..."
   mysql -u root -p${MYSQL_ROOT_PASSWORD} <<FIXSQL
@@ -503,7 +488,6 @@ FIXSQL
   echo "Permissions fixed, retesting connection..."
   mysql -u ${WP_DB_USER} -p${WP_DB_PASSWORD} -e "USE ${WP_DB_NAME}; SELECT 'Connection test after fix';" || 
   echo "Still failed after fix attempt"
-fi
 
 echo "Database verification completed at \$(date)"
 EOL
@@ -550,7 +534,6 @@ EOL
 # Set network configuration
 if [ -z "$NETWORK_NAME" ]; then
   NETWORK_NAME="${CLIENT_ID}_wordpress_network"
-fi
 
 # Check if Docker network exists, create if it doesn't
 check_network() {

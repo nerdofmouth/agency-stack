@@ -1,11 +1,20 @@
 #!/bin/bash
-# Documenso Upgrade Script v1.4.2
-# AgencyStack Component: documenso
 
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: upgrade_documenso.sh
+# Path: /scripts/components/upgrade_documenso.sh
+#
 set -euo pipefail
 
 # Source common utilities
-source "$(dirname "$0")/../utils/common.sh"
 
 # Component configuration
 COMPONENT_NAME="documenso"
@@ -75,7 +84,6 @@ done
 if [ -z "$DOMAIN" ] || [ -z "$ADMIN_EMAIL" ]; then
   log_error "${LOG_FILE}" "Missing required parameters. Use --help for usage."
   exit 1
-fi
 
 # Set installation directory
 INSTALL_DIR="/opt/agency_stack/clients/${CLIENT_ID}/${COMPONENT_NAME}"
@@ -84,14 +92,12 @@ INSTALL_DIR="/opt/agency_stack/clients/${CLIENT_ID}/${COMPONENT_NAME}"
 if [ ! -f "${INSTALL_DIR}/.installed" ]; then
     log_error "${LOG_FILE}" "Documenso not installed, cannot upgrade"
     exit 1
-fi
 
 # Check current version
 CURRENT_VERSION=$(grep -o '"version": ".*"' "${INSTALL_DIR}/package.json" 2>/dev/null | cut -d'"' -f4 || echo "unknown")
 if [ "$CURRENT_VERSION" == "1.4.2" ] && [ "$FORCE" != "true" ]; then
     log_info "${LOG_FILE}" "Documenso already at v1.4.2, skipping upgrade"
     exit 0
-fi
 
 log_info "${LOG_FILE}" "Upgrading Documenso from ${CURRENT_VERSION} to v1.4.2"
 
@@ -148,13 +154,11 @@ KEYCLOAK_CLIENT_SECRET=documenso-secret
 KEYCLOAK_ISSUER=https://keycloak.${DOMAIN}/realms/${CLIENT_ID}
 EOF
     fi
-fi
 
 # Update connection strings for multi-tenant support
 if grep -q "multi_tenant: true" "/home/revelationx/CascadeProjects/foss-server-stack/config/registry/component_registry.json"; then
     log_info "${LOG_FILE}" "Configuring multi-tenant support"
     sed -i "s/^DATABASE_URL=.*/DATABASE_URL=postgresql:\/\/documenso:documenso@postgres-${CLIENT_ID}:5432\/documenso-${CLIENT_ID}/" .env
-fi
 
 # Restart the application
 log_info "${LOG_FILE}" "Starting upgraded service"
@@ -174,7 +178,6 @@ if [ -n "$CONTAINER_STATUS" ]; then
     mv "${COMPONENT_REGISTRY}.tmp" "$COMPONENT_REGISTRY"
     
     log_success "${LOG_FILE}" "Documenso upgraded successfully to v1.4.2"
-else
     log_error "${LOG_FILE}" "Upgrade failed: container is not running"
     log_info "${LOG_FILE}" "Attempting rollback from backup..."
     docker-compose down
@@ -184,4 +187,3 @@ else
     docker-compose up -d
     log_warning "${LOG_FILE}" "Rollback completed. Previous version restored."
     exit 1
-fi

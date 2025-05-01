@@ -1,16 +1,22 @@
 #!/bin/bash
-# fix_nginx_config.sh - Ensure Nginx config file is a file, not a directory, and create minimal config if missing
-# AgencyStack Alpha/Beta: WSL2 & Docker prototype fix sequence
 
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: fix_nginx_config.sh
+# Path: /scripts/components/fix_nginx_config.sh
+#
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 # Source common utilities if available
-if [ -f "$REPO_ROOT/scripts/utils/common.sh" ]; then
-  source "$REPO_ROOT/scripts/utils/common.sh"
-fi
 
 # Define colors for output
 RED='\033[0;31m'
@@ -32,7 +38,6 @@ mkdir -p "$NGINX_CONFIG_DIR"
 if [ -d "$NGINX_CONFIG_FILE" ]; then
   echo -e "${YELLOW}[WARN] Removing directory at $NGINX_CONFIG_FILE (should be a file)${NC}"
   rm -rf "$NGINX_CONFIG_FILE"
-fi
 
 # Create a minimal valid nginx config file if it doesn't exist
 if [ ! -f "$NGINX_CONFIG_FILE" ]; then
@@ -79,7 +84,6 @@ server {
     access_log /var/log/nginx/access.log;
 }
 EOF
-fi
 
 # Ensure proper permissions
 chmod 644 "$NGINX_CONFIG_FILE"

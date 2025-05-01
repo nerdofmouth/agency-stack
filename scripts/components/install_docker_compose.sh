@@ -1,18 +1,17 @@
 #!/bin/bash
-# install_docker_compose.sh - Docker Compose installation for AgencyStack
-# https://stack.nerdofmouth.com
-#
-# This script installs and configures Docker Compose with:
-# - Version selection
-# - System-wide installation
-# - Verification of binaries
-# - Integration with existing Docker installation
-#
-# Author: AgencyStack Team
-# Version: 1.0.0
-# Created: 2025-04-07
 
-# Set strict error handling
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: docker_compose.sh
+# Path: /scripts/components/install_docker_compose.sh
+#
 set -euo pipefail
 
 # Define absolute paths - never rely on relative paths
@@ -23,7 +22,6 @@ AGENCY_SCRIPTS_DIR="${AGENCY_ROOT}/repo/scripts"
 AGENCY_UTILS_DIR="${AGENCY_SCRIPTS_DIR}/utils"
 
 # Use a robust, portable path for common.sh
-source "$(dirname "$0")/../utils/common.sh"
 source "$(dirname "$0")/../utils/log_helpers.sh"
 
 # Define component-specific variables
@@ -179,7 +177,6 @@ if ! command -v docker &> /dev/null; then
     log "INFO" "Install Docker first or use --with-deps" "${CYAN}Install Docker first or use --with-deps flag.${NC}"
     exit 1
   fi
-fi
 
 # Check for existing Docker Compose installation
 if command -v docker-compose &> /dev/null && [[ "${FORCE}" != "true" ]]; then
@@ -197,7 +194,6 @@ if command -v docker-compose &> /dev/null && [[ "${FORCE}" != "true" ]]; then
     log "INFO" "Use --force to reinstall" "${CYAN}Use --force to reinstall.${NC}"
     exit 0
   fi
-fi
 
 # Download and install Docker Compose
 log "INFO" "Downloading Docker Compose" "${CYAN}Downloading Docker Compose...${NC}"
@@ -206,31 +202,25 @@ log "INFO" "Downloading Docker Compose" "${CYAN}Downloading Docker Compose...${N
 if [[ "${DOCKER_COMPOSE_VERSION}" == "latest" ]]; then
   DOWNLOAD_URL="https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64"
   log "INFO" "Using latest Docker Compose version" "${CYAN}Using latest Docker Compose version${NC}"
-else
   DOWNLOAD_URL="https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64"
   log "INFO" "Using Docker Compose version ${DOCKER_COMPOSE_VERSION}" "${CYAN}Using Docker Compose version ${DOCKER_COMPOSE_VERSION}${NC}"
-fi
 
 # Download to a temporary location
 TMP_DOWNLOAD="${INSTALL_DIR}/docker-compose-tmp"
 if [[ "${VERBOSE}" == "true" ]]; then
   curl -SL "${DOWNLOAD_URL}" -o "${TMP_DOWNLOAD}"
-else
   curl -SL "${DOWNLOAD_URL}" -o "${TMP_DOWNLOAD}" >> "${INSTALL_LOG}" 2>&1
-fi
 
 # Check if download was successful
 if [[ ! -f "${TMP_DOWNLOAD}" ]]; then
   log "ERROR" "Failed to download Docker Compose" "${RED}❌ Failed to download Docker Compose.${NC}"
   exit 1
-fi
 
 # Check file integrity
 FILE_SIZE=$(stat -c%s "${TMP_DOWNLOAD}")
 if [[ ${FILE_SIZE} -lt 1000000 ]]; then
   log "ERROR" "Downloaded file too small, likely not valid: ${FILE_SIZE} bytes" "${RED}❌ Downloaded file too small, likely not valid: ${FILE_SIZE} bytes.${NC}"
   exit 1
-fi
 
 # Make executable and move to final location
 chmod +x "${TMP_DOWNLOAD}"
@@ -243,10 +233,8 @@ if command -v docker-compose &> /dev/null; then
   
   # Save version information
   echo "${INSTALLED_VERSION}" > "${COMPONENT_DIR}/version.txt"
-else
   log "ERROR" "Docker Compose installation verification failed" "${RED}❌ Docker Compose installation verification failed.${NC}"
   exit 1
-fi
 
 # Create a simple Docker Compose test script
 log "INFO" "Creating test script" "${CYAN}Creating test script...${NC}"

@@ -1,21 +1,18 @@
 #!/bin/bash
-# install_fail2ban.sh - Intrusion prevention system for AgencyStack
-# https://stack.nerdofmouth.com
-#
-# This script installs and configures Fail2ban with:
-# - Optimized security rules
-# - Custom jails for AgencyStack services
-# - Notification configuration
-# - Integration with other security components
-#
-# Author: AgencyStack Team
-# Version: 1.0.0
-# Created: 2025-04-07
 
-# --- BEGIN: Preflight/Prerequisite Check ---
+# Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: fail2ban.sh
+# Path: /scripts/components/install_fail2ban.sh
+#
 REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
-source "$REPO_ROOT/scripts/utils/common.sh"
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -33,7 +30,6 @@ AGENCY_SCRIPTS_DIR="${AGENCY_ROOT}/repo/scripts"
 AGENCY_UTILS_DIR="${AGENCY_SCRIPTS_DIR}/utils"
 
 # Use a robust, portable path for common.sh
-source "$REPO_ROOT/scripts/utils/common.sh"
 source "$REPO_ROOT/scripts/utils/log_helpers.sh"
 
 # Define component-specific variables
@@ -230,7 +226,6 @@ if command -v fail2ban-server &> /dev/null && systemctl is-active --quiet fail2b
     log "INFO" "Use --force to reinstall" "${CYAN}Use --force to reinstall.${NC}"
     exit 0
   fi
-fi
 
 # Install Fail2ban package
 log "INFO" "Installing Fail2ban packages" "${CYAN}Installing Fail2ban packages...${NC}"
@@ -241,7 +236,6 @@ apt-get install -y fail2ban >> "${INSTALL_LOG}" 2>&1
 log "INFO" "Backing up original configuration" "${CYAN}Backing up original configuration...${NC}"
 if [ -f /etc/fail2ban/jail.conf ]; then
   cp /etc/fail2ban/jail.conf "${COMPONENT_CONFIG_DIR}/jail.conf.original"
-fi
 
 # Configure jail.local
 log "INFO" "Creating Fail2ban jail configuration" "${CYAN}Creating Fail2ban jail configuration...${NC}"
@@ -252,7 +246,6 @@ if [ -f /etc/fail2ban/jail.local ]; then
   cp /etc/fail2ban/jail.local "${COMPONENT_CONFIG_DIR}/jail.local.$(date +%Y%m%d%H%M%S)"
   # Remove existing file to avoid duplicate entries
   rm /etc/fail2ban/jail.local
-fi
 
 if [ "$TEST_MODE" = true ]; then
   log "WARNING" "Test mode: Using relaxed settings for testing" "${YELLOW}⚠️ Test mode: Using relaxed settings for testing${NC}"
@@ -274,7 +267,6 @@ sender = fail2ban@${DOMAIN}
 # Testing mode - reduced severity
 action = %(action_)s
 EOL
-else
   cat > /etc/fail2ban/jail.local <<EOL
 [DEFAULT]
 # "bantime" is the number of seconds that a host is banned.
@@ -292,7 +284,6 @@ destemail = ${ADMIN_EMAIL}
 sender = fail2ban@${DOMAIN}
 action = %(action_mwl)s
 EOL
-fi
 
 # Create SSH jail configuration
 log "INFO" "Creating SSH jail configuration" "${CYAN}Creating SSH jail configuration...${NC}"
@@ -300,7 +291,6 @@ log "INFO" "Creating SSH jail configuration" "${CYAN}Creating SSH jail configura
 # Check if SSH jail already exists
 if [ -f /etc/fail2ban/jail.d/sshd.conf ]; then
   log "INFO" "SSH jail already exists, skipping" "${CYAN}SSH jail already exists, skipping...${NC}"
-else
   cat > /etc/fail2ban/jail.d/sshd.conf <<EOL
 [sshd]
 enabled = true
@@ -309,7 +299,6 @@ filter = sshd
 logpath = /var/log/auth.log
 maxretry = 3
 EOL
-fi
 
 # Check if Traefik is installed and create a jail for it
 if docker ps --format '{{.Names}}' | grep -q "traefik"; then
@@ -339,7 +328,6 @@ failregex = ^.*"[A-Z]+ .*" (401|403) .*$
 ignoreregex =
 EOL
   fi
-fi
 
 # Check for Keycloak and add jail if needed
 if docker ps --format '{{.Names}}' | grep -q "keycloak"; then
@@ -369,7 +357,6 @@ failregex = ^.*Login failed.*username=.*$
 ignoreregex =
 EOL
   fi
-fi
 
 # Create a custom status monitoring script
 log "INFO" "Creating status monitoring script" "${CYAN}Creating status monitoring script...${NC}"
@@ -416,7 +403,6 @@ cat > "${INSTALL_DIR}/fail2ban-notify.sh" <<EOL
 if [ \$# -lt 3 ]; then
   echo "Usage: \$0 <jail> <ip> <failures>"
   exit 1
-fi
 
 JAIL="\$1"
 IP="\$2"
@@ -431,9 +417,7 @@ SUBJECT="[Fail2Ban] \$JAIL: banned \$IP from \$HOSTNAME"
 # Check if whois is installed
 if command -v whois &> /dev/null; then
   WHOIS=\$(whois \$IP 2>/dev/null || echo "No whois information available")
-else
   WHOIS="whois command not available"
-fi
 
 # Send email
 cat << EOF | /usr/sbin/sendmail -t
@@ -462,7 +446,6 @@ chmod +x "${INSTALL_DIR}/fail2ban-notify.sh"
 # Configure Fail2ban to use our notification script
 if [ -f /etc/fail2ban/action.d/custom-notify.conf ]; then
   log "INFO" "Custom notification action already exists, skipping" "${CYAN}Custom notification action already exists, skipping...${NC}"
-else
   cat > /etc/fail2ban/action.d/custom-notify.conf <<EOL
 [Definition]
 actionstart = 
@@ -471,12 +454,10 @@ actioncheck =
 actionban = ${INSTALL_DIR}/fail2ban-notify.sh <name> <ip> <failures>
 actionunban = 
 EOL
-fi
 
 # Add the custom action to the default jail only if it doesn't already exist
 if grep -q "custom-notify" /etc/fail2ban/jail.local; then
   log "INFO" "Custom notify action already in jail.local, skipping" "${CYAN}Custom notify action already in jail.local, skipping...${NC}"
-else
   log "INFO" "Adding custom notify action to jail.local" "${CYAN}Adding custom notify action to jail.local...${NC}"
   # Use sed to modify the existing action line rather than appending a duplicate
   # This ensures we don't create duplicate 'action' entries
@@ -488,7 +469,6 @@ else
     echo "action = %(action_)s
          custom-notify" >> /etc/fail2ban/jail.local
   fi
-fi
 
 # Copy the main configuration to component directory
 cp -r /etc/fail2ban/jail.d "${COMPONENT_CONFIG_DIR}/"
@@ -502,10 +482,8 @@ systemctl restart fail2ban >> "${INSTALL_LOG}" 2>&1
 # Check if Fail2ban is running
 if systemctl is-active --quiet fail2ban; then
   log "SUCCESS" "Fail2ban service is running" "${GREEN}✅ Fail2ban service is running.${NC}"
-else
   log "ERROR" "Fail2ban service failed to start" "${RED}❌ Fail2ban service failed to start. Check the logs.${NC}"
   exit 1
-fi
 
 # Create installation marker
 touch "${COMPONENT_INSTALLED_MARKER}"

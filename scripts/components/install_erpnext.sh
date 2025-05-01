@@ -1,25 +1,21 @@
 #!/bin/bash
-# install_erpnext.sh - Install and configure ERPNext for AgencyStack
-# https://stack.nerdofmouth.com
-#
-# This script sets up ERPNext using the official Frappe Docker deployment pattern with:
-# - MariaDB database
-# - Redis caching
-# - Nginx reverse proxy
-# - Traefik integration with TLS
-# - Keycloak SSO integration (optional)
-# - Auto-configured for multi-tenancy
-#
-# Author: AgencyStack Team
-# Version: 2.0.0
-# Created: $(date +%Y-%m-%d)
 
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: erpnext.sh
+# Path: /scripts/components/install_erpnext.sh
+#
 set -e
 
 # --- BEGIN: Preflight/Prerequisite Check ---
-SCRIPT_DIR="$(cd \"$(dirname \"${BASH_SOURCE[0]}\")" && pwd)"
 REPO_ROOT="$(dirname \"$(dirname \"$SCRIPT_DIR\")\")"
-source "$REPO_ROOT/scripts/utils/common.sh"
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -162,13 +158,11 @@ if [ -z "$DOMAIN" ]; then
   echo -e "${RED}Error: --domain is required${NC}"
   echo -e "Use --help for usage information"
   exit 1
-fi
 
 if [ -z "$ADMIN_EMAIL" ]; then
   echo -e "${RED}Error: --admin-email is required${NC}"
   echo -e "Use --help for usage information"
   exit 1
-fi
 
 # Welcome message
 echo -e "${MAGENTA}${BOLD}AgencyStack ERPNext Setup${NC}"
@@ -178,7 +172,6 @@ echo -e "=============================="
 if [ "$EUID" -ne 0 ]; then
   echo -e "${RED}Please run as root or with sudo${NC}"
   exit 1
-fi
 
 # Create log directories if they don't exist
 mkdir -p "$LOG_DIR"
@@ -216,12 +209,10 @@ if [ -n "$CLIENT_ID" ]; then
   MARIADB_CONTAINER="${CLIENT_ID}_erpnext_db"
   REDIS_CONTAINER="${CLIENT_ID}_erpnext_redis"
   NETWORK_NAME="${CLIENT_ID}_network"
-else
   ERP_CONTAINER="erpnext_${SITE_NAME}"
   MARIADB_CONTAINER="erpnext_db_${SITE_NAME}"
   REDIS_CONTAINER="erpnext_redis_${SITE_NAME}"
   NETWORK_NAME="agency-network"
-fi
 
 # Check if ERPNext is already installed
 if docker ps -a --format '{{.Names}}' | grep -q "$ERP_CONTAINER"; then
@@ -251,7 +242,6 @@ if docker ps -a --format '{{.Names}}' | grep -q "$ERP_CONTAINER"; then
       exit 0
     fi
   fi
-fi
 
 # Check if Docker is installed
 if ! command -v docker &> /dev/null; then
@@ -271,13 +261,11 @@ if ! command -v docker &> /dev/null; then
     log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
     exit 1
   fi
-fi
 
 # Check if Docker is running
 if ! docker info &> /dev/null; then
   log "ERROR: Docker is not running" "${RED}Docker is not running. Please start Docker first.${NC}"
   exit 1
-fi
 
 # Check if Docker Compose is installed
 if ! command -v docker-compose &> /dev/null; then
@@ -297,7 +285,6 @@ if ! command -v docker-compose &> /dev/null; then
     log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
     exit 1
   fi
-fi
 
 # Check if network exists, create if it doesn't
 if ! docker network inspect "$NETWORK_NAME" &> /dev/null; then
@@ -307,9 +294,7 @@ if ! docker network inspect "$NETWORK_NAME" &> /dev/null; then
     log "ERROR: Failed to create Docker network $NETWORK_NAME" "${RED}Failed to create Docker network $NETWORK_NAME. See log for details.${NC}"
     exit 1
   fi
-else
   log "INFO: Docker network $NETWORK_NAME already exists" "${GREEN}✅ Docker network $NETWORK_NAME already exists${NC}"
-fi
 
 # Check for Traefik
 if ! docker ps --format '{{.Names}}' | grep -q "traefik"; then
@@ -326,9 +311,7 @@ if ! docker ps --format '{{.Names}}' | grep -q "traefik"; then
   else
     log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
   fi
-else
   log "INFO: Traefik container found" "${GREEN}✅ Traefik container found${NC}"
-fi
 
 log "INFO: Starting ERPNext installation for $DOMAIN" "${BLUE}Starting ERPNext installation for $DOMAIN...${NC}"
 
@@ -347,7 +330,6 @@ git clone --depth 1 --branch "$FRAPPE_BRANCH" "$FRAPPE_DOCKER_REPO" "$FRAPPE_DOC
 if [ $? -ne 0 ]; then
   log "ERROR: Failed to clone Frappe Docker repository" "${RED}Failed to clone Frappe Docker repository. See log for details.${NC}"
   exit 1
-fi
 
 # Create ERPNext Docker Compose file
 log "INFO: Creating ERPNext Docker Compose file" "${CYAN}Creating ERPNext Docker Compose file...${NC}"
@@ -694,7 +676,6 @@ cd "${ERPS_DIR}/${DOMAIN}" && docker-compose up -d
 if [ $? -ne 0 ]; then
   log "ERROR: Failed to start ERPNext stack" "${RED}Failed to start ERPNext stack. See log for details.${NC}"
   exit 1
-fi
 
 log "INFO: Waiting for ERPNext containers to initialize" "${YELLOW}Waiting for ERPNext containers to initialize...${NC}"
 sleep 30
@@ -709,7 +690,6 @@ docker exec -it ${ERP_CONTAINER} bench new-site ${DOMAIN} \
 if [ $? -ne 0 ]; then
   log "ERROR: Failed to initialize ERPNext site" "${RED}Failed to initialize ERPNext site. See log for details.${NC}"
   exit 1
-fi
 
 # Install ERPNext app
 log "INFO: Installing ERPNext app and modules" "${CYAN}Installing ERPNext app and modules...${NC}"
@@ -734,7 +714,6 @@ if [ -n "$ADMIN_EMAIL" ]; then
   docker exec -it ${ERP_CONTAINER} bench --site ${DOMAIN} set-config mail_use_ssl "0"
   docker exec -it ${ERP_CONTAINER} bench --site ${DOMAIN} set-config mail_login "$ADMIN_EMAIL"
   docker exec -it ${ERP_CONTAINER} bench --site ${DOMAIN} set-config admin_email "$ADMIN_EMAIL"
-fi
 
 # Configure Keycloak SSO integration if enabled
 if [ "$ENABLE_SSO" = true ]; then
@@ -778,7 +757,6 @@ if [ "$ENABLE_SSO" = true ]; then
   echo -e "2. Create a client for ERPNext with client ID 'erpnext'"
   echo -e "3. Set Valid Redirect URIs to https://${DOMAIN}/api/method/oauth_provider.login_oauth"
   echo -e "4. Configure client roles and mappers as needed"
-fi
 
 # Configure the system
 log "INFO: Configuring ERPNext system settings" "${CYAN}Configuring ERPNext system settings...${NC}"
@@ -813,7 +791,6 @@ if [ -d "/opt/agency_stack/prometheus" ]; then
       docker exec prometheus curl -X POST http://localhost:9090/-/reload
     fi
   fi
-fi
 
 # Restart the services
 log "INFO: Restarting ERPNext services" "${CYAN}Restarting ERPNext services...${NC}"
@@ -906,7 +883,6 @@ if [ -f "$REGISTRY_FILE" ]; then
   chmod 644 "$REGISTRY_FILE"
   
   log "SUCCESS: Updated component registry" "${GREEN}✅ Updated component registry${NC}"
-else
   log "WARNING: Component registry file not found" "${YELLOW}⚠️ Component registry file not found at ${REGISTRY_FILE}${NC}"
   
   # Create directory if it doesn't exist
@@ -943,7 +919,6 @@ EOF
   
   chmod 644 "$REGISTRY_FILE"
   log "SUCCESS: Created new component registry" "${GREEN}✅ Created new component registry${NC}"
-fi
 
 # Record installation in dashboard data if available
 DASHBOARD_DATA="${CONFIG_DIR}/dashboard/data/dashboard_data.json"
@@ -967,7 +942,6 @@ if [ -f "$DASHBOARD_DATA" ]; then
   chmod 644 "$DASHBOARD_DATA"
   
   log "SUCCESS: Updated dashboard data" "${GREEN}✅ Updated dashboard data${NC}"
-fi
 
 # Final message
 log "INFO: ERPNext installation completed successfully" "${GREEN}${BOLD}✅ ERPNext installed successfully!${NC}"
@@ -985,7 +959,6 @@ echo -e "- Accounting"
 echo -e "- Events"
 if [ "$ENABLE_SSO" = true ]; then
   echo -e "- Keycloak SSO Integration"
-fi
 echo -e ""
 echo -e "${YELLOW}Note: Initial ERPNext setup may still be in progress.${NC}"
 echo -e "${YELLOW}If you encounter any issues, wait 5-10 minutes and try again.${NC}"
