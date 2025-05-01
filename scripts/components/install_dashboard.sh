@@ -1,9 +1,17 @@
 #!/bin/bash
-# Install AgencyStack Dashboard Component
-# Installs and configures the Next.js dashboard for monitoring component status
 
-# --- BEGIN: Preflight/Prerequisite Check ---
-source "$(dirname "$0")/../utils/common.sh"
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: dashboard.sh
+# Path: /scripts/components/install_dashboard.sh
+#
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -11,7 +19,6 @@ preflight_check_agencystack || {
 # --- END: Preflight/Prerequisite Check ---
 
 # Determine script path and repo root
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 # Set up logging
@@ -28,19 +35,15 @@ init_log() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO] ==========================================="
 }
 
-log_error() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] $1" | tee -a "$LOG_FILE" >&2
 }
 
-log_info() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO] $1" | tee -a "$LOG_FILE"
 }
 
-log_warning() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] [WARNING] $1" | tee -a "$LOG_FILE" >&2
 }
 
-log_success() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUCCESS] $1" | tee -a "$LOG_FILE"
 }
 
