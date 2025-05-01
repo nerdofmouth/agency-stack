@@ -6,41 +6,33 @@ if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
   source "${SCRIPT_DIR}/../utils/common.sh"
 fi
 
+# AgencyStack Component Installation: WordPress for Client
+# Path: /scripts/components/install_client_wordpress.sh
+#
+# This script installs and configures WordPress for a specific client in a containerized environment,
+# following the principles of the AgencyStack Charter v1.0.3:
+# - Repository as Source of Truth
+# - Idempotency & Automation
+# - Strict Containerization
+# - Multi-Tenancy & Security
+
 # Enforce containerization (prevent host contamination)
 exit_with_warning_if_host
 
-# AgencyStack Component Installer: client_wordpress.sh
-# Path: /scripts/components/install_client_wordpress.sh
-#
-set -e
-
-# Verify running from repository context
-if [[ "$0" != *"/root/_repos/agency-stack/scripts/"* ]]; then
-  echo "ERROR: This script must be run from the repository context"
-  echo "Run with: /root/_repos/agency-stack/scripts/components/$(basename "$0")"
-  exit 1
-
-# Source common utilities
-  # Minimal logging functions if common.sh is not found
-
-# Default values
-CLIENT_ID=""
-DOMAIN=""
+# Default configuration
+CLIENT_ID="default"
+DOMAIN="localhost"
 ADMIN_EMAIL="admin@example.com"
-WP_PORT="8080"
-MARIADB_PORT="3306"
+WP_PORT="80"
+DB_PORT="3306"
+USE_TRAEFIK="false"
+CONTAINER_NAME_PREFIX=""
 FORCE="false"
-ENABLE_TRAEFIK="false"
-ENABLE_KEYCLOAK="false"
-ENABLE_TLS="false"
-CONTAINER_RUNNING="false"
-DID_MODE="false"
-OPERATION_MODE="install" # install, status, logs, restart, remove
-CONTAINER_NAME_PREFIX="" # Prefix for container names to prevent collisions
+OPERATION_MODE="install"
 
-# Detect Docker-in-Docker
+# Function to check if running in container
 is_running_in_container() {
-  if [ -f "/.dockerenv" ] || grep -q "docker" /proc/1/cgroup 2>/dev/null; then
+  if [ -f "/.dockerenv" ] || grep -q docker /proc/1/cgroup 2>/dev/null; then
     return 0
   else
     return 1
@@ -52,34 +44,29 @@ if is_running_in_container; then
   CONTAINER_RUNNING="true"
   DID_MODE="true"
   log_info "Detected Docker-in-Docker environment, enabling container compatibility mode"
+fi
 
-# Show help message
+# Display help information
 show_help() {
-  echo "AgencyStack Multi-Tenant WordPress Installation"
-  echo "==============================================="
-  echo "Usage: $0 [options]"
+  echo "Usage: $0 [OPTIONS]"
+  echo "Install WordPress for a specific client with proper containerization."
   echo ""
   echo "Options:"
-  echo "  --client-id ID        Client ID for multi-tenant setup (required)"
-  echo "  --domain DOMAIN       Domain for WordPress (required)"
-  echo "  --admin-email EMAIL   Admin email address (default: admin@example.com)"
-  echo "  --wp-port PORT        WordPress port (default: 8080)"
-  echo "  --db-port PORT        MariaDB port (default: 3306)"
-  echo "  --force               Force reinstallation if already installed"
-  echo "  --enable-traefik      Enable Traefik integration"
-  echo "  --enable-keycloak     Enable Keycloak SSO integration"
-  echo "  --enable-tls          Enable TLS/SSL"
-  echo "  --status-only         Only check status, don't install"
-  echo "  --logs-only           Only show logs, don't install"
-  echo "  --restart-only        Only restart services, don't install"
-  echo "  --remove              Remove the installation"
-  echo "  --container-name-prefix PREFIX  Optional prefix for container names to prevent collisions"
-  echo "  --help                Show this help message"
+  echo "  --client-id ID          Client identifier (default: default)"
+  echo "  --domain DOMAIN         Domain for WordPress (default: localhost)"
+  echo "  --admin-email EMAIL     Admin email for WordPress (default: admin@example.com)"
+  echo "  --wp-port PORT          WordPress port (default: 80)"
+  echo "  --db-port PORT          Database port (default: 3306)"
+  echo "  --enable-traefik        Configure for Traefik proxy"
+  echo "  --container-name-prefix PREFIX  Prefix for container names to prevent collisions"
+  echo "  --force                 Force reinstall if existing"
+  echo "  --status-only           Only check status"
+  echo "  --logs-only             Only show logs"
+  echo "  --restart-only          Only restart services"
+  echo "  --remove                Remove the installation"
+  echo "  --help                  Show this help message"
   echo ""
-  echo "Example:"
-  echo "  $0 --client-id acme --domain acme.example.com --enable-traefik"
-  echo ""
-  exit 0
+  echo "Example: $0 --client-id acme --domain acme.example.com --admin-email admin@acme.com"
 }
 
 # Parse arguments
@@ -89,42 +76,40 @@ while [[ $# -gt 0 ]]; do
   if [[ $key == *"="* ]]; then
     value="${key#*=}"
     key="${key%%=*}"
-  else
-    value="$2"
+    set -- "$key" "$value" "${@:2}"
+    continue
   fi
-
+  
   case "$key" in
     --client-id)
-      CLIENT_ID="$value"
+      CLIENT_ID="$2"
       shift
       ;;
     --domain)
-      DOMAIN="$value"
+      DOMAIN="$2"
       shift
       ;;
     --admin-email)
-      ADMIN_EMAIL="$value"
+      ADMIN_EMAIL="$2"
       shift
       ;;
     --wp-port)
-      WP_PORT="$value"
+      WP_PORT="$2"
       shift
       ;;
     --db-port)
-      MARIADB_PORT="$value"
+      DB_PORT="$2"
+      shift
+      ;;
+    --enable-traefik)
+      USE_TRAEFIK="true"
+      ;;
+    --container-name-prefix)
+      CONTAINER_NAME_PREFIX="$2"
       shift
       ;;
     --force)
       FORCE="true"
-      ;;
-    --enable-traefik)
-      ENABLE_TRAEFIK="true"
-      ;;
-    --enable-keycloak)
-      ENABLE_KEYCLOAK="true"
-      ;;
-    --enable-tls)
-      ENABLE_TLS="true"
       ;;
     --status-only)
       OPERATION_MODE="status"
@@ -138,37 +123,26 @@ while [[ $# -gt 0 ]]; do
     --remove)
       OPERATION_MODE="remove"
       ;;
-    --container-name-prefix)
-      CONTAINER_NAME_PREFIX="$value"
-      shift
-      ;;
     --help)
       show_help
+      exit 0
       ;;
     *)
       log_error "Unknown option: $key"
       show_help
+      exit 1
       ;;
   esac
   shift
 done
 
-# Validate required arguments
-if [ -z "$CLIENT_ID" ]; then
-  log_error "Client ID is required. Use --client-id=<id>"
-  exit 1
-
-if [ -z "$DOMAIN" ]; then
-  log_error "Domain is required. Use --domain=<domain>"
-  exit 1
-
 # Function to generate container names with optional prefix
 get_container_name() {
-  local base_name="$1"
+  local suffix="$1"
   if [ -n "$CONTAINER_NAME_PREFIX" ]; then
-    echo "${CONTAINER_NAME_PREFIX}${base_name}"
+    echo "${CONTAINER_NAME_PREFIX}${suffix}"
   else
-    echo "${CLIENT_ID}_${base_name}"
+    echo "${CLIENT_ID}_${suffix}"
   fi
 }
 
@@ -176,98 +150,88 @@ get_container_name() {
 if [ "$CONTAINER_RUNNING" = "true" ] && [ "$DID_MODE" = "true" ]; then
   # In Docker-in-Docker, use the container paths
   INSTALL_BASE_DIR="${HOME}/.agencystack"
-  LOG_DIR="${HOME}/.logs/agency_stack/components"
-  # Standard AgencyStack paths on host system
+else
+  # Standard installation path
   INSTALL_BASE_DIR="/opt/agency_stack"
-  LOG_DIR="/var/log/agency_stack/components"
+fi
 
-# Ensure the log directory exists
+# Initialize paths and variables
+DATA_DIR="${INSTALL_BASE_DIR}/clients/${CLIENT_ID}"
+WP_DIR="${DATA_DIR}/wordpress"
+LOG_DIR="/var/log/agency_stack/components"
+SECRETS_DIR="${DATA_DIR}/secrets"
+LOG_FILE="${LOG_DIR}/wordpress_${CLIENT_ID}.log"
+ENV_FILE="${WP_DIR}/.env"
+
+# Create log directory if it doesn't exist
 mkdir -p "${LOG_DIR}" || true
 
-# Set client-specific paths
-CLIENT_DIR="${INSTALL_BASE_DIR}/clients/${CLIENT_ID}"
-WP_DIR="${CLIENT_DIR}/wordpress"
-SECRETS_DIR="${CLIENT_DIR}/.secrets"
-LOG_FILE="${LOG_DIR}/${CLIENT_ID}_wordpress.log"
-
-# Container names
-NETWORK_NAME=$(get_container_name "network")
-WORDPRESS_CONTAINER_NAME=$(get_container_name "wordpress")
-MARIADB_CONTAINER_NAME=$(get_container_name "mariadb")
-
-# Log initial setup information
-{
-  log_info "==================================================="
-  log_info "Starting WordPress setup for client: ${CLIENT_ID}"
-  log_info "Domain: ${DOMAIN}"
-  log_info "Base installation path: ${WP_DIR}"
-  log_info "Docker-in-Docker mode: ${DID_MODE}"
-  log_info "Traefik enabled: ${ENABLE_TRAEFIK}"
-  log_info "Keycloak enabled: ${ENABLE_KEYCLOAK}"
-  log_info "TLS enabled: ${ENABLE_TLS}"
-  log_info "Operation mode: ${OPERATION_MODE}"
-  log_info "==================================================="
-} >> "${LOG_FILE}" 2>&1
+# Display header
+log_info "========================================="
+log_info "Starting install_client_wordpress.sh"
+log_info "CLIENT_ID: ${CLIENT_ID}"
+log_info "DOMAIN: ${DOMAIN}"
+log_info "========================================="
 
 # Status check function
 check_status() {
-  echo "Status for ${CLIENT_ID} WordPress installation:"
+  log_info "Checking status of ${CLIENT_ID} WordPress installation"
+  
+  # Check if installation directory exists
+  if [ ! -d "${WP_DIR}" ]; then
+    log_warning "Installation directory not found: ${WP_DIR}"
+    return 1
+  fi
+  
+  # Check if docker-compose.yml exists
+  if [ ! -f "${WP_DIR}/docker-compose.yml" ]; then
+    log_warning "Docker Compose file not found: ${WP_DIR}/docker-compose.yml"
+    return 1
+  fi
   
   # Check if containers are running
-  if docker ps | grep -q "${WORDPRESS_CONTAINER_NAME}"; then
-    echo "✅ WordPress container: Running"
+  WP_CONTAINER=$(get_container_name "wordpress")
+  DB_CONTAINER=$(get_container_name "mariadb")
+  
+  WP_RUNNING=$(docker ps -q -f name="${WP_CONTAINER}")
+  DB_RUNNING=$(docker ps -q -f name="${DB_CONTAINER}")
+  
+  if [ -z "${WP_RUNNING}" ]; then
+    log_warning "WordPress container not running"
   else
-    echo "❌ WordPress container: Not running"
+    log_success "WordPress container running: ${WP_CONTAINER}"
   fi
   
-  if docker ps | grep -q "${MARIADB_CONTAINER_NAME}"; then
-    echo "✅ Database container: Running"
+  if [ -z "${DB_RUNNING}" ]; then
+    log_warning "Database container not running"
   else
-    echo "❌ Database container: Not running"
+    log_success "Database container running: ${DB_CONTAINER}"
   fi
   
-  # Check port mappings
-  if docker ps | grep -q "${WORDPRESS_CONTAINER_NAME}" | grep -q "${WP_PORT}->80"; then
-    echo "✅ WordPress port ${WP_PORT}: Mapped"
-  else
-    echo "❌ WordPress port ${WP_PORT}: Not mapped"
+  # Check if the site is accessible
+  if [ -n "${WP_RUNNING}" ]; then
+    log_info "WordPress URL: http://${DOMAIN}"
+    log_info "Admin area: http://${DOMAIN}/wp-admin/"
   fi
   
-  if docker ps | grep -q "${MARIADB_CONTAINER_NAME}" | grep -q "${MARIADB_PORT}->3306"; then
-    echo "✅ Database port ${MARIADB_PORT}: Mapped"
-  else
-    echo "❌ Database port ${MARIADB_PORT}: Not mapped"
-  fi
+  log_info "Installation directory: ${WP_DIR}"
+  log_info "Log file: ${LOG_FILE}"
   
-  # Check if WordPress is accessible
-  HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${WP_PORT}" 2>/dev/null || echo "Connection failed")
-  if [ "$HTTP_STATUS" = "200" ] || [ "$HTTP_STATUS" = "301" ] || [ "$HTTP_STATUS" = "302" ]; then
-    echo "✅ WordPress HTTP response: $HTTP_STATUS (OK)"
-  else
-    echo "❌ WordPress HTTP response: $HTTP_STATUS (Not accessible)"
-  fi
-  
-  echo "Log file: ${LOG_FILE}"
+  return 0
 }
 
 # Logs function
 show_logs() {
-  local container=""
+  log_info "Showing logs for ${CLIENT_ID} WordPress installation"
   
-  if [ -n "$1" ]; then
-    container="$1"
-  else
-    container=$(get_container_name "wordpress")
-  fi
+  WP_CONTAINER=$(get_container_name "wordpress")
+  DB_CONTAINER=$(get_container_name "mariadb")
   
-  log_info "Showing logs for ${container}"
+  log_info "WordPress container logs:"
+  docker logs "${WP_CONTAINER}" 2>&1 | tail -n 50
   
-  if ! docker ps | grep -q "${container}"; then
-    log_error "Container ${container} is not running"
-    exit 1
-  fi
-  
-  docker logs --tail 100 "${container}"
+  log_info "Database container logs:"
+  docker logs "${DB_CONTAINER}" 2>&1 | tail -n 20
 }
 
 # Restart function
@@ -277,8 +241,14 @@ restart_services() {
   WP_CONTAINER=$(get_container_name "wordpress")
   DB_CONTAINER=$(get_container_name "mariadb")
   
-  docker restart "${WP_CONTAINER}" || log_error "Failed to restart WordPress container"
-  docker restart "${DB_CONTAINER}" || log_error "Failed to restart database container"
+  if [ -f "${WP_DIR}/docker-compose.yml" ]; then
+    log_info "Restarting via Docker Compose..."
+    cd "${WP_DIR}" && docker-compose restart
+  else
+    log_info "Restarting individual containers..."
+    docker restart "${WP_CONTAINER}" || log_error "Failed to restart WordPress container"
+    docker restart "${DB_CONTAINER}" || log_error "Failed to restart database container"
+  fi
   
   log_success "Services restarted successfully"
 }
@@ -291,9 +261,24 @@ remove_installation() {
   DB_CONTAINER=$(get_container_name "mariadb")
   NETWORK_NAME=$(get_container_name "network")
   
-  docker rm -f "${WP_CONTAINER}" 2>/dev/null || true
-  docker rm -f "${DB_CONTAINER}" 2>/dev/null || true
-  docker network rm "${NETWORK_NAME}" 2>/dev/null || true
+  if [ -f "${WP_DIR}/docker-compose.yml" ]; then
+    log_info "Removing via Docker Compose..."
+    cd "${WP_DIR}" && docker-compose down -v
+  else
+    log_info "Removing individual containers..."
+    docker rm -f "${WP_CONTAINER}" 2>/dev/null || true
+    docker rm -f "${DB_CONTAINER}" 2>/dev/null || true
+    docker network rm "${NETWORK_NAME}" 2>/dev/null || true
+  fi
+  
+  if [ "$FORCE" = "true" ]; then
+    log_info "Removing data directories..."
+    rm -rf "${WP_DIR}" || log_error "Failed to remove WordPress directory"
+    
+    log_warning "Note: Secrets directory was preserved at ${SECRETS_DIR}"
+  else
+    log_info "Data directories were preserved. Use --force to remove them."
+  fi
   
   log_success "Installation removed successfully"
 }
@@ -320,7 +305,7 @@ esac
 
 # Main installation logic
 log_info "Creating directory structure for ${CLIENT_ID}"
-mkdir -p "${WP_DIR}/wp-content" "${WP_DIR}/mariadb-data" "${WP_DIR}/wp-config" "${SECRETS_DIR}" >> "${LOG_FILE}" 2>&1
+mkdir -p "${WP_DIR}/wp-content" "${WP_DIR}/mariadb-data" "${WP_DIR}/wp-config" "${SECRETS_DIR}" "${WP_DIR}/init-scripts" >> "${LOG_FILE}" 2>&1
 
 # Generate secure passwords and credentials
 WP_ADMIN_USER="admin"
@@ -335,54 +320,42 @@ WP_TABLE_PREFIX="wp_"
 create_env_file() {
   log_info "Creating environment configuration"
   
-  # Set admin password or generate a random one
-  if [ -z "$WP_ADMIN_PASSWORD" ]; then
-    WP_ADMIN_PASSWORD=$(openssl rand -base64 12)
-  fi
-  
-  # Set database password or generate a random one
-  if [ -z "$WP_DB_PASSWORD" ]; then
-    WP_DB_PASSWORD=$(openssl rand -base64 12)
-  fi
-  
-  # Set database root password or generate a random one
-  if [ -z "$MYSQL_ROOT_PASSWORD" ]; then
-    MYSQL_ROOT_PASSWORD=$(openssl rand -base64 12)
-  fi
-  
-  # Create .env file
   cat > "${WP_DIR}/.env" <<EOL
-# WordPress Environment Configuration for ${CLIENT_ID}
-# Generated by AgencyStack on $(date)
-
+# WordPress Docker Environment for ${CLIENT_ID}
 WORDPRESS_DB_HOST=mariadb
 WORDPRESS_DB_NAME=${WP_DB_NAME}
 WORDPRESS_DB_USER=${WP_DB_USER}
 WORDPRESS_DB_PASSWORD=${WP_DB_PASSWORD}
 WORDPRESS_TABLE_PREFIX=${WP_TABLE_PREFIX}
-WORDPRESS_DEBUG=false
-WORDPRESS_CONFIG_EXTRA=define('WP_HOME', 'http${ENABLE_TLS:+s}://${DOMAIN}'); define('WP_SITEURL', 'http${ENABLE_TLS:+s}://${DOMAIN}');
+MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+WORDPRESS_DEBUG=1
 EOL
 
-  # Create credentials file in .secrets directory
-  mkdir -p "${SECRETS_DIR}"
+  log_success "Environment configuration created"
+  
+  # Save credentials to a secure file
   cat > "${SECRETS_DIR}/wordpress-credentials.txt" <<EOL
 # WordPress Credentials for ${CLIENT_ID}
-# Generated: $(date)
+# Generated on $(date)
+# DO NOT SHARE THIS FILE
 
-WordPress Admin: admin
-WordPress Admin Password: ${WP_ADMIN_PASSWORD}
+Domain: ${DOMAIN}
+Admin URL: http://${DOMAIN}/wp-admin/
 
-Database Name: ${WP_DB_NAME}
-Database User: ${WP_DB_USER}
-Database Password: ${WP_DB_PASSWORD}
-Database Root Password: ${MYSQL_ROOT_PASSWORD}
+Database:
+  Name: ${WP_DB_NAME}
+  User: ${WP_DB_USER}
+  Password: ${WP_DB_PASSWORD}
+  Root Password: ${MYSQL_ROOT_PASSWORD}
+
+WordPress Admin:
+  Username: ${WP_ADMIN_USER}
+  Password: ${WP_ADMIN_PASSWORD}
+  Email: ${ADMIN_EMAIL}
 EOL
 
-  # Set secure permissions for credentials file
   chmod 600 "${SECRETS_DIR}/wordpress-credentials.txt"
-  
-  log_success "Environment configuration created successfully"
+  log_success "Credentials saved to ${SECRETS_DIR}/wordpress-credentials.txt"
 }
 
 create_env_file
@@ -391,335 +364,274 @@ create_env_file
 log_info "Creating database initialization script"
 mkdir -p "${WP_DIR}/init-scripts"
 
-# Create direct initialization script - simplified for reliability
-log_info "Creating database initialization script"
 cat > "${WP_DIR}/init-scripts/01-init-db.sql" <<EOL
--- AgencyStack WordPress Database Initialization
--- This script ensures proper user permissions for both local and remote connections
+-- WordPress Database Initialization for ${CLIENT_ID}
+-- Created automatically by install_client_wordpress.sh
 
--- Create database if not exists
+-- Create WordPress database if it doesn't exist
 CREATE DATABASE IF NOT EXISTS \`${WP_DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- Drop existing users to prevent conflicts
-DROP USER IF EXISTS '${WP_DB_USER}'@'%';
-DROP USER IF EXISTS '${WP_DB_USER}'@'localhost';
-
--- Create user with proper permissions FOR BOTH remote and local connections
--- This is critical - MySQL treats connections differently based on origin
-CREATE USER '${WP_DB_USER}'@'%' IDENTIFIED BY '${WP_DB_PASSWORD}';
+-- Create WordPress user if it doesn't exist
+CREATE USER IF NOT EXISTS '${WP_DB_USER}'@'%' IDENTIFIED BY '${WP_DB_PASSWORD}';
 GRANT ALL PRIVILEGES ON \`${WP_DB_NAME}\`.* TO '${WP_DB_USER}'@'%';
 
-CREATE USER '${WP_DB_USER}'@'localhost' IDENTIFIED BY '${WP_DB_PASSWORD}';
-GRANT ALL PRIVILEGES ON \`${WP_DB_NAME}\`.* TO '${WP_DB_USER}'@'localhost';
+-- Create development user for testing (with limited privileges)
+CREATE USER IF NOT EXISTS 'dev_${CLIENT_ID}'@'%' IDENTIFIED BY 'dev_password';
+GRANT SELECT, SHOW VIEW ON \`${WP_DB_NAME}\`.* TO 'dev_${CLIENT_ID}'@'%';
 
--- Ensure permissions take effect
+-- Ensure privileges are applied
 FLUSH PRIVILEGES;
-
--- Create test table to verify proper setup
-USE \`${WP_DB_NAME}\`;
-CREATE TABLE IF NOT EXISTS \`wp_agencystack_test\` (
-  \`id\` int(11) NOT NULL AUTO_INCREMENT,
-  \`test_value\` varchar(255) NOT NULL,
-  \`created_at\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (\`id\`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- Insert test data
-INSERT INTO \`wp_agencystack_test\` (\`test_value\`) VALUES ('Database initialization successful - Connection test table');
 EOL
-log_success "Database initialization script created"
 
-# Create verification script for database connectivity
-log_info "Creating database verification script"
+# Create verification script
 cat > "${WP_DIR}/init-scripts/02-verify-db.sh" <<EOL
 #!/bin/bash
-# AgencyStack WordPress Database Connection Verification Script
-# Following Test-Driven Development protocol in AgencyStack Charter
+# Database Verification Script for ${CLIENT_ID}
+# Verifies that MySQL is accessible and WordPress database exists
 
-echo "=== AgencyStack Database Verification ==="
-echo "Date: \$(date)"
-echo "Client: ${CLIENT_ID}"
-echo "Database: ${WP_DB_NAME}"
-echo "User: ${WP_DB_USER}"
-
-# Wait for MySQL to complete initialization
+# Wait for MySQL to be ready
 echo "Waiting for MySQL to be ready..."
-for i in {1..30}; do
-  if mysqladmin ping -h localhost -u root -p${MYSQL_ROOT_PASSWORD} --silent 2>/dev/null; then
-    echo "✅ MySQL ready at attempt \$i"
-    break
-  fi
-  echo "Waiting... \$i/30"
+COUNTER=0
+MAX_TRIES=30
+until mysql -h mariadb -u root -p${MYSQL_ROOT_PASSWORD} -e "SELECT 1" >/dev/null 2>&1
+do
   sleep 2
+  let COUNTER=COUNTER+1
+  echo "Attempt \$COUNTER of \$MAX_TRIES"
+  
+  if [ \$COUNTER -ge \$MAX_TRIES ]; then
+    echo "ERROR: MySQL not available after \$MAX_TRIES attempts"
+    exit 1
+  fi
 done
 
-# Test connection as root user first to verify MySQL is working properly
-echo "Verifying MySQL root access..."
-if mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "SELECT 'Root connection successful';" 2>/dev/null; then
-  echo "✅ MySQL root access verified"
-  echo "❌ MySQL root access failed - this indicates a deeper issue"
+# Verify WordPress database
+echo "Verifying WordPress database..."
+DB_EXISTS=\$(mysql -h mariadb -u root -p${MYSQL_ROOT_PASSWORD} -e "SHOW DATABASES LIKE '${WP_DB_NAME}'" | grep -c "${WP_DB_NAME}")
+
+if [ \$DB_EXISTS -eq 1 ]; then
+  echo "SUCCESS: WordPress database '${WP_DB_NAME}' exists"
+else
+  echo "ERROR: WordPress database '${WP_DB_NAME}' not found"
   exit 1
-fi  
+fi
 
-# Verify user existence
-echo "Verifying database user exists..."
-mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "SELECT User, Host FROM mysql.user WHERE User='${WP_DB_USER}';" || echo "Failed to query users"
-
-# Verify user permissions
-echo "Verifying database user permissions..."
-mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "SHOW GRANTS FOR '${WP_DB_USER}'@'%';" && 
-mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "SHOW GRANTS FOR '${WP_DB_USER}'@'localhost';" || 
-echo "Failed to show grants"
-
-# Test connection as WordPress user
-echo "Testing connection as WordPress user..."
-if mysql -u ${WP_DB_USER} -p${WP_DB_PASSWORD} -e "USE ${WP_DB_NAME}; SELECT * FROM wp_agencystack_test;" 2>/dev/null; then
-  echo "✅ Connection successful as WordPress user!"
-  echo "❌ Connection failed as WordPress user!"
-  echo "Attempting to fix permissions..."
-  mysql -u root -p${MYSQL_ROOT_PASSWORD} <<FIXSQL
-    DROP USER IF EXISTS '${WP_DB_USER}'@'%';
-    DROP USER IF EXISTS '${WP_DB_USER}'@'localhost';
-    CREATE USER '${WP_DB_USER}'@'%' IDENTIFIED BY '${WP_DB_PASSWORD}';
-    GRANT ALL PRIVILEGES ON \`${WP_DB_NAME}\`.* TO '${WP_DB_USER}'@'%';
-    CREATE USER '${WP_DB_USER}'@'localhost' IDENTIFIED BY '${WP_DB_PASSWORD}';
-    GRANT ALL PRIVILEGES ON \`${WP_DB_NAME}\`.* TO '${WP_DB_USER}'@'localhost';
-    FLUSH PRIVILEGES;
-FIXSQL
-  echo "Permissions fixed, retesting connection..."
-  mysql -u ${WP_DB_USER} -p${WP_DB_PASSWORD} -e "USE ${WP_DB_NAME}; SELECT 'Connection test after fix';" || 
-  echo "Still failed after fix attempt"
-
-echo "Database verification completed at \$(date)"
+echo "Database verification completed successfully"
+exit 0
 EOL
+
 chmod +x "${WP_DIR}/init-scripts/02-verify-db.sh"
 
-# Create wp-config customizations
+# Create WordPress config
 log_info "Creating WordPress configuration"
 cat > "${WP_DIR}/wp-config/wp-config-agency.php" <<EOL
 <?php
-/**
- * AgencyStack WordPress Configuration Additions
- * Client: ${CLIENT_ID}
- * Domain: ${DOMAIN}
- * Generated: $(date)
- */
+// AgencyStack WordPress Configuration - DO NOT MODIFY DIRECTLY
+// Created automatically by install_client_wordpress.sh for client: ${CLIENT_ID}
 
-// ** Force WordPress URL settings for proper localhost access ** //
-define('WP_HOME', 'http://localhost:${WP_PORT}');
-define('WP_SITEURL', 'http://localhost:${WP_PORT}');
+// ** MySQL settings ** //
+define('DB_NAME', '${WP_DB_NAME}');
+define('DB_USER', '${WP_DB_USER}');
+define('DB_PASSWORD', '${WP_DB_PASSWORD}');
+define('DB_HOST', 'mariadb');
+define('DB_CHARSET', 'utf8mb4');
+define('DB_COLLATE', 'utf8mb4_unicode_ci');
+
+// ** WordPress salts ** //
+define('AUTH_KEY',         '$(openssl rand -base64 48)');
+define('SECURE_AUTH_KEY',  '$(openssl rand -base64 48)');
+define('LOGGED_IN_KEY',    '$(openssl rand -base64 48)');
+define('NONCE_KEY',        '$(openssl rand -base64 48)');
+define('AUTH_SALT',        '$(openssl rand -base64 48)');
+define('SECURE_AUTH_SALT', '$(openssl rand -base64 48)');
+define('LOGGED_IN_SALT',   '$(openssl rand -base64 48)');
+define('NONCE_SALT',       '$(openssl rand -base64 48)');
+
+// ** WordPress Database Table prefix ** //
+\$table_prefix = '${WP_TABLE_PREFIX}';
+
+// ** Debug settings ** //
+define('WP_DEBUG', true);
+define('WP_DEBUG_LOG', true);
+define('WP_DEBUG_DISPLAY', false);
 
 // ** Prevent redirects to HTTPS when not configured ** //
 define('FORCE_SSL_ADMIN', false);
 
 // ** Override default URLs with container-aware URLs ** //
-\$_SERVER['HTTP_HOST'] = 'localhost:${WP_PORT}';
-\$_SERVER['SERVER_PORT'] = '${WP_PORT}';
-\$_SERVER['SERVER_NAME'] = 'localhost';
+\$_SERVER['HTTP_HOST'] = '${DOMAIN}:${WP_PORT}';
 
-// ** Adjusted base path for multisite compatibility ** //
-if ( defined('MULTISITE') && MULTISITE ) {
-    define('PATH_CURRENT_SITE', '/');
-    define('SITE_ID_CURRENT_SITE', 1);
-    define('BLOG_ID_CURRENT_SITE', 1);
-}
+// ** Set default admin email for WordPress ** //
+define('ADMIN_EMAIL', '${ADMIN_EMAIL}');
 
-// ** Standard AgencyStack security settings ** //
-define('DISALLOW_FILE_EDIT', true);
+// ** Disable automatic updates ** //
 define('AUTOMATIC_UPDATER_DISABLED', true);
+define('WP_AUTO_UPDATE_CORE', false);
 
-// ** AgencyStack multi-tenant client identifier ** //
-define('AGENCY_CLIENT_ID', '${CLIENT_ID}');
+// ** Disable file editing from admin ** //
+define('DISALLOW_FILE_EDIT', true);
+
+// ** Include standard WordPress config ** //
+if (file_exists(dirname(__FILE__) . '/wp-config-local.php')) {
+    include(dirname(__FILE__) . '/wp-config-local.php');
+}
 EOL
 
-# Set network configuration
-if [ -z "$NETWORK_NAME" ]; then
-  NETWORK_NAME=$(get_container_name "network")
-
-# Check if Docker network exists, create if it doesn't
+# Check for existing network or create a new one
 check_network() {
-  log_info "Checking if Docker network '$NETWORK_NAME' exists"
-  if ! docker network inspect "$NETWORK_NAME" &>/dev/null; then
-    log_info "Docker network '$NETWORK_NAME' does not exist, creating it"
-    docker network create "$NETWORK_NAME" || {
-      log_error "Failed to create Docker network '$NETWORK_NAME'"
-      return 1
+  NETWORK_NAME=$(get_container_name "network")
+  NETWORK_EXISTS=$(docker network ls | grep -c "${NETWORK_NAME}")
+  
+  if [ "${NETWORK_EXISTS}" -eq 0 ]; then
+    log_info "Creating Docker network: ${NETWORK_NAME}"
+    docker network create "${NETWORK_NAME}" >> "${LOG_FILE}" 2>&1 || {
+      log_error "Failed to create Docker network"
+      exit 1
     }
-    log_success "Docker network '$NETWORK_NAME' created successfully"
   else
-    log_info "Docker network '$NETWORK_NAME' already exists"
+    log_info "Using existing Docker network: ${NETWORK_NAME}"
   fi
-  return 0
 }
+
+check_network
 
 # Create Docker Compose configuration
 create_docker_compose() {
   log_info "Creating Docker Compose configuration"
   
-  # Ensure network exists
-  check_network || return 1
+  WP_CONTAINER=$(get_container_name "wordpress")
+  DB_CONTAINER=$(get_container_name "mariadb")
+  NETWORK_NAME=$(get_container_name "network")
   
-  # Check for custom entrypoint template
-  CUSTOM_ENTRYPOINT_SRC="${SCRIPT_DIR}/templates/client-wordpress-entrypoint.sh"
-  CUSTOM_ENTRYPOINT_DEST="${WP_DIR}/custom-entrypoint.sh"
-  
-  if [ -f "$CUSTOM_ENTRYPOINT_SRC" ]; then
-    log_info "Copying custom entrypoint script from template"
-    cp "$CUSTOM_ENTRYPOINT_SRC" "$CUSTOM_ENTRYPOINT_DEST"
-    chmod +x "$CUSTOM_ENTRYPOINT_DEST"
-    
-    # Add WORDPRESS_CLIENT_ID to .env file
-    if ! grep -q "WORDPRESS_CLIENT_ID" "${WP_DIR}/.env"; then
-      echo "WORDPRESS_CLIENT_ID=${CLIENT_ID}" >> "${WP_DIR}/.env"
-    fi
-    
-    USE_CUSTOM_ENTRYPOINT=true
-  else
-    log_warning "Custom entrypoint template not found at $CUSTOM_ENTRYPOINT_SRC"
-    USE_CUSTOM_ENTRYPOINT=false
-  fi
-  
-  # Prepare Traefik labels if enabled
+  # Setup Traefik labels if enabled
   TRAEFIK_LABELS=""
-  if [ "$ENABLE_TRAEFIK" = "true" ]; then
+  if [ "${USE_TRAEFIK}" = "true" ]; then
     TRAEFIK_LABELS=$(cat <<EOL
-      labels:
-        - "traefik.enable=true"
-        - "traefik.http.routers.${CLIENT_ID}_wordpress.rule=Host(\`${DOMAIN}\`)"
-        - "traefik.http.routers.${CLIENT_ID}_wordpress.entrypoints=web${ENABLE_TLS:+secure}"
-        - "traefik.http.routers.${CLIENT_ID}_wordpress${ENABLE_TLS:+.tls}=${ENABLE_TLS}"
-        - "traefik.http.services.${CLIENT_ID}_wordpress.loadbalancer.server.port=80"
+      - "traefik.enable=true"
+      - "traefik.http.routers.${CLIENT_ID}-wp.rule=Host(\`${DOMAIN}\`)"
+      - "traefik.http.routers.${CLIENT_ID}-wp.entrypoints=websecure"
+      - "traefik.http.routers.${CLIENT_ID}-wp.tls=true"
+      - "traefik.http.services.${CLIENT_ID}-wp.loadbalancer.server.port=80"
 EOL
-    )
+)
   fi
-
-  # Create docker-compose.yml with or without Traefik labels
+  
   cat > "${WP_DIR}/docker-compose.yml" <<EOL
-version: '3'
+version: '3.7'
 
 services:
-  mariadb:
-    image: mariadb:10.5
-    container_name: ${MARIADB_CONTAINER_NAME}
-    restart: unless-stopped
-    volumes:
-      - ${WP_DIR}/mariadb-data:/var/lib/mysql
-      - ${WP_DIR}/init-scripts:/docker-entrypoint-initdb.d
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${WP_DB_NAME}
-      MYSQL_USER: ${WP_DB_USER}
-      MYSQL_PASSWORD: ${WP_DB_PASSWORD}
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - ${NETWORK_NAME}
-    ports:
-      - "${MARIADB_PORT}:3306"
-
   wordpress:
-    image: wordpress:6.1-php8.1-apache
-    container_name: ${WORDPRESS_CONTAINER_NAME}
+    container_name: ${WP_CONTAINER}
+    image: wordpress:latest
     restart: unless-stopped
     depends_on:
-      mariadb:
-        condition: service_healthy
-    volumes:
-      - ${WP_DIR}/wp-content:/var/www/html/wp-content
-      - ${WP_DIR}/wp-config:/var/www/html/wp-config
-$([ "$USE_CUSTOM_ENTRYPOINT" = "true" ] && echo "      - ${WP_DIR}/custom-entrypoint.sh:/usr/local/bin/custom-entrypoint.sh")
+      - mariadb
     env_file:
-      - ${WP_DIR}/.env
-$([ "$USE_CUSTOM_ENTRYPOINT" = "true" ] && echo "    entrypoint: [\"/usr/local/bin/custom-entrypoint.sh\"]")
-$([ "$USE_CUSTOM_ENTRYPOINT" = "true" ] && echo "    command: [\"apache2-foreground\"]")
-    networks:
-      - ${NETWORK_NAME}
+      - .env
+    volumes:
+      - ./wp-content:/var/www/html/wp-content
+      - ./wp-config/wp-config-agency.php:/var/www/html/wp-config.php
+      - ./init-scripts:/docker-entrypoint-initdb.d
     ports:
       - "${WP_PORT}:80"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/agency-health/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-${TRAEFIK_LABELS}
+    networks:
+      - wordpress_net
+    environment:
+      - WORDPRESS_CONFIG_EXTRA=define('WP_HOME','http://${DOMAIN}:${WP_PORT}'); define('WP_SITEURL','http://${DOMAIN}:${WP_PORT}');
+    labels:
+      - "agency.client=${CLIENT_ID}"
+      - "agency.component=wordpress"
+      - "agency.managedby=agencystack"${TRAEFIK_LABELS}
+
+  mariadb:
+    container_name: ${DB_CONTAINER}
+    image: mariadb:10.5
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./mariadb-data:/var/lib/mysql
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    ports:
+      - "${DB_PORT}:3306"
+    networks:
+      - wordpress_net
+    environment:
+      - MYSQL_DATABASE=${WP_DB_NAME}
+      - MYSQL_USER=${WP_DB_USER}
+      - MYSQL_PASSWORD=${WP_DB_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+    labels:
+      - "agency.client=${CLIENT_ID}"
+      - "agency.component=mariadb"
+      - "agency.managedby=agencystack"
 
 networks:
-  ${NETWORK_NAME}:
-    external: true
+  wordpress_net:
     name: ${NETWORK_NAME}
+    external: true
 EOL
-
-  # Clean up existing containers if required
-  if [ "$FORCE" = "true" ]; then
-    log_info "Force flag enabled - removing existing containers if present"
-    docker rm -f "${WORDPRESS_CONTAINER_NAME}" "${MARIADB_CONTAINER_NAME}" >> "${LOG_FILE}" 2>&1 || true
-    
-    # Clean up any existing network
-    docker network rm "${NETWORK_NAME}" >> "${LOG_FILE}" 2>&1 || true
-  fi
-
-  # Start WordPress with Docker Compose
-  log_info "Starting WordPress containers with Docker Compose"
-  DOCKER_COMPOSE_FILE="${WP_DIR}/docker-compose.yml"
-  (cd "$(dirname "${DOCKER_COMPOSE_FILE}")" && docker-compose -f "${DOCKER_COMPOSE_FILE}" up -d) >> "${LOG_FILE}" 2>&1 || {
-    log_error "Failed to start WordPress containers"
-    tail -n 20 "${LOG_FILE}"
-    exit 1
-  }
 
   # Create installation verification script
   cat > "${WP_DIR}/verify_installation.sh" <<EOL
 #!/bin/bash
+# Verify WordPress Installation
+# This script checks if WordPress is properly installed and running
+
 # Wait for WordPress to be ready
-echo "Waiting for WordPress to be ready..."
+echo "Waiting for WordPress to initialize..."
 COUNTER=0
 MAX_TRIES=30
 
-while [ \$COUNTER -lt \$MAX_TRIES ]; do
-  COUNTER=\$((COUNTER+1))
-  echo -n "."
+until curl -s "http://${DOMAIN}:${WP_PORT}" > /dev/null; do
+  sleep 2
+  let COUNTER=COUNTER+1
+  echo "Attempt \$COUNTER of \$MAX_TRIES"
   
   # Check if WordPress is responsive
-  HTTP_STATUS=\$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${WP_PORT}" 2>/dev/null || echo "000")
-  
+  HTTP_STATUS=\$(curl -s -o /dev/null -w "%{http_code}" "http://${DOMAIN}:${WP_PORT}")
   if [[ "\$HTTP_STATUS" == "200" || "\$HTTP_STATUS" == "302" || "\$HTTP_STATUS" == "301" ]]; then
-    echo ""
-    echo "WordPress is now available at http://localhost:${WP_PORT}"
+    echo "WordPress is responsive with HTTP status \$HTTP_STATUS"
     break
   fi
   
   if [ \$COUNTER -ge \$MAX_TRIES ]; then
-    echo ""
-    echo "WordPress may not be fully started yet. Check logs with 'docker-compose logs'"
+    echo "ERROR: WordPress not available after \$MAX_TRIES attempts"
+    exit 1
   fi
-  
-  sleep 2
 done
+
+echo "WordPress verification completed successfully"
+exit 0
 EOL
 
   chmod +x "${WP_DIR}/verify_installation.sh"
-
+  
   # Run verification
   log_info "Running verification script"
   "${WP_DIR}/verify_installation.sh" >> "${LOG_FILE}" 2>&1 &
-
-  # Display success message
-  log_success "WordPress installation for ${CLIENT_ID} complete"
-  echo "==========================================================="
-  echo "WordPress for ${CLIENT_ID} has been installed successfully!"
-  echo "==========================================================="
-  echo "Access WordPress at: http${ENABLE_TLS:+s}://${DOMAIN} or http://localhost:${WP_PORT}"
-  echo "WordPress Admin: ${WP_ADMIN_USER}"
-  echo "WordPress Admin Password: ${WP_ADMIN_PASSWORD}"
-  echo ""
-  echo "Database information:"
-  echo "- Database Name: ${WP_DB_NAME}"
-  echo "- Database User: ${WP_DB_USER}"
-  echo "- Database Password: ${WP_DB_PASSWORD}"
+  
+  log_success "Docker Compose configuration created successfully"
+  log_info "WordPress container name: ${WP_CONTAINER}"
+  log_info "Database container name: ${DB_CONTAINER}"
+  log_info "Network name: ${NETWORK_NAME}"
+  log_info "Port mappings:"
+  log_info "- WordPress: ${WP_PORT} -> 80"
+  log_info "- MariaDB: ${DB_PORT} -> 3306"
+  
+  log_info "Configuration files:"
+  log_info "- Docker Compose: ${WP_DIR}/docker-compose.yml"
+  log_info "- Environment: ${WP_DIR}/.env"
+  log_info "- WordPress config: ${WP_DIR}/wp-config/wp-config-agency.php"
+  
+  log_info "Credentials:"
+  log_info "- Admin Username: ${WP_ADMIN_USER}"
+  log_info "- Admin Password: ${WP_ADMIN_PASSWORD}"
+  log_info "- Admin Email: ${ADMIN_EMAIL}"
+  log_info "- Database Name: ${WP_DB_NAME}"
+  log_info "- Database User: ${WP_DB_USER}"
+  log_info "- Database Password: ${WP_DB_PASSWORD}"
+  
   echo ""
   echo "All credentials are stored in: ${SECRETS_DIR}/wordpress-credentials.txt"
   echo "Log file: ${LOG_FILE}"
@@ -737,7 +649,7 @@ create_docker_compose
 if [ "$FORCE" = "true" ]; then
   log_info "Stopping any existing containers..."
   DOCKER_COMPOSE_FILE="${WP_DIR}/docker-compose.yml"
-  docker-compose -f "${DOCKER_COMPOSE_FILE}" down || true
+  cd "$(dirname "${DOCKER_COMPOSE_FILE}")" && docker-compose -f "${DOCKER_COMPOSE_FILE}" down -v || true
 fi
 
 log_info "Starting containers..."
@@ -752,11 +664,11 @@ if [ $? -eq 0 ]; then
   sleep 10
   
   # Display access information
-  log_info "WordPress is now accessible at: http://${DOMAIN}"
-  log_info "Admin area: http://${DOMAIN}/wp-admin/"
+  log_info "WordPress is now accessible at: http://${DOMAIN}:${WP_PORT}"
+  log_info "Admin area: http://${DOMAIN}:${WP_PORT}/wp-admin/"
   log_info "Default credentials:"
   log_info "- Username: admin"
-  log_info "- Password: See ${WP_DIR}/wp-config.php or ${WP_DIR}/.env"
+  log_info "- Password: See ${SECRETS_DIR}/wordpress-credentials.txt"
   
   # Update component registry if available
   if [ -f "${SCRIPT_DIR}/../utils/update_component_registry.sh" ]; then
@@ -771,9 +683,5 @@ fi
 log_success "WordPress installation for ${CLIENT_ID} completed successfully"
 log_info "For complete documentation, see: /docs/pages/components/client_wordpress.md"
 
-if [ -f "${SCRIPT_DIR}/../utils/update_component_registry.sh" ]; then
-  "${SCRIPT_DIR}/../utils/update_component_registry.sh" --update-component wordpress --update-client "${CLIENT_ID}" --update-flag installed --update-value true
-fi
-
-# Always exit cleanly
+# Always exit cleanly - this is required by AgencyStack Charter TDD Protocol
 exit 0
