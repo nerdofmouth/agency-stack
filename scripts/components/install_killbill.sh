@@ -1,18 +1,21 @@
 #!/bin/bash
-# install_killbill.sh - Installation script for Kill Bill
-#
-# This script installs and configures Kill Bill subscription and billing platform
-# for AgencyStack following the component installation conventions.
-#
-# Author: AgencyStack Team
-# Date: 2025-04-12
 
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: killbill.sh
+# Path: /scripts/components/install_killbill.sh
+#
 set -eo pipefail
 
 # --- BEGIN: Preflight/Prerequisite Check ---
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
-source "$REPO_ROOT/scripts/utils/common.sh"
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -23,9 +26,7 @@ preflight_check_agencystack || {
 source "$REPO_ROOT/scripts/utils/log_helpers.sh"
 
 # Source common utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
-source "$REPO_ROOT/scripts/utils/common.sh"
 
 # Default configuration
 CLIENT_ID="${CLIENT_ID:-default}"
@@ -147,7 +148,6 @@ log_info "Starting Kill Bill installation for domain: ${DOMAIN}"
 if [[ -z "${DOMAIN}" || "${DOMAIN}" == "localhost" ]]; then
     log_error "Domain name is required. Please specify with --domain"
     exit 1
-fi
 
 # Ensure directories exist
 log_cmd "Creating installation directories..."
@@ -161,7 +161,6 @@ if [[ -f "${INSTALL_DIR}/.installed" ]] && [[ "${FORCE}" != "true" ]]; then
     log_info "Kill Bill is already installed at ${INSTALL_DIR}"
     log_info "Use --force to reinstall"
     exit 0
-fi
 
 # Install dependencies if required
 if [[ "${WITH_DEPS}" == "true" ]]; then
@@ -182,13 +181,11 @@ if [[ "${WITH_DEPS}" == "true" ]]; then
         curl -L "https://github.com/docker/compose/releases/download/v2.17.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
         chmod +x /usr/local/bin/docker-compose
     fi
-fi
 
 # Check if Docker is running
 if ! docker info &> /dev/null; then
     log_error "Docker is not running. Please start Docker and try again."
     exit 1
-fi
 
 # Create docker-compose.yml
 log_cmd "Creating docker-compose configuration..."
@@ -406,7 +403,6 @@ done
 if [ $attempt -eq $max_attempts ]; then
     log_error "Kill Bill failed to start within the expected time"
     exit 1
-fi
 
 # Create admin user
 log_cmd "Creating admin user..."
@@ -426,7 +422,6 @@ curl -v \
 log_cmd "Registering Kill Bill component..."
 if [[ -f "${SCRIPT_DIR}/../utils/register_component.sh" ]]; then
     bash "${SCRIPT_DIR}/../utils/register_component.sh" "killbill" "${DOMAIN}" "${CLIENT_ID}"
-fi
 
 # Mark as installed
 echo "Installation completed on $(date)" > "${INSTALL_DIR}/.installed"

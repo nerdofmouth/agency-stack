@@ -1,14 +1,17 @@
 #!/bin/bash
-# install_dashboard_standalone.sh - Self-contained guaranteed dashboard installation
-#
-# This script ensures the dashboard is always accessible via multiple methods
-# following AgencyStack Alpha Phase Repository Integrity Policy.
-#
-# Author: AgencyStack Team
-# Date: 2025-04-10
 
-# --- BEGIN: Preflight/Prerequisite Check ---
-source "$(dirname "$0")/../utils/common.sh"
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: dashboard_standalone.sh
+# Path: /scripts/components/install_dashboard_standalone.sh
+#
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -18,19 +21,15 @@ preflight_check_agencystack || {
 set -e
 
 # Self-contained utilities
-log_info() {
   echo -e "\033[0;34m[INFO] $1\033[0m"
 }
 
-log_success() {
   echo -e "\033[0;32m[SUCCESS] $1\033[0m"
 }
 
-log_warning() {
   echo -e "\033[0;33m[WARNING] $1\033[0m"
 }
 
-log_error() {
   echo -e "\033[0;31m[ERROR] $1\033[0m" >&2
 }
 
@@ -103,9 +102,7 @@ mkdir -p "${STATIC_DIR}"
 if command -v nginx &>/dev/null; then
   NGINX_AVAILABLE=true
   log_info "Nginx is available for direct static hosting"
-else
   log_info "Nginx not found, will use Docker for hosting"
-fi
 
 # Create static dashboard file
 log_cmd "Creating static dashboard HTML..."
@@ -204,7 +201,6 @@ EOF
 if [ -f "${STATIC_HTML}" ]; then
   log_info "Found static dashboard template, using it..."
   cp "${STATIC_HTML}" "${STATIC_DIR}/index.html"
-fi
 
 log_success "Static dashboard page created"
 
@@ -347,9 +343,7 @@ http:
 EOF
 
   log_success "Traefik configuration created"
-else
   log_warning "Traefik configuration directory not found, skipping route creation"
-fi
 
 # Add special force configuration to Traefik for HTTP catchall
 TRAEFIK_MAIN_CONFIG="${TRAEFIK_CONFIG_DIR}/traefik.yml"
@@ -365,7 +359,6 @@ if [ -f "${TRAEFIK_MAIN_CONFIG}" ]; then
   sed -i '/to:/d' "${TRAEFIK_MAIN_CONFIG}"
   
   log_success "Updated Traefik configuration to allow HTTP"
-fi
 
 # Start the dashboard container
 log_cmd "Starting dashboard container..."
@@ -384,18 +377,15 @@ if grep -q "${DOMAIN}" /etc/hosts; then
   else
     log_success "Hosts file already has correct entry for ${DOMAIN}"
   fi
-else
   log_info "Adding domain to hosts file..."
   echo "${SERVER_IP} ${DOMAIN}" >> /etc/hosts
   log_success "Added domain to hosts file"
-fi
 
 # Restart Traefik if available
 if [ -d "${TRAEFIK_DIR}" ]; then
   log_cmd "Restarting Traefik to apply configuration changes..."
   cd "${TRAEFIK_DIR}" && docker-compose down && docker-compose up -d
   log_success "Traefik restarted"
-fi
 
 # Create installation marker
 touch "${INSTALL_DIR}/.installed_ok"
@@ -434,7 +424,6 @@ EOF
   
   systemctl restart nginx || log_warning "Failed to restart Nginx"
   log_success "Nginx configuration created"
-fi
 
 log_info "-----------------------------------------------------"
 log_info "DASHBOARD ACCESS URLS:"

@@ -1,19 +1,17 @@
 #!/bin/bash
-# install_loki.sh - Install and configure Grafana Loki for log aggregation in AgencyStack
-# https://stack.nerdofmouth.com
-#
-# This script sets up Loki with:
-# - Persistent storage for logs
-# - Integration with Grafana
-# - Docker log driver configuration
-# - Retention policies
-#
-# Author: AgencyStack Team
-# Version: 1.0.0
-# Created: $(date +%Y-%m-%d)
 
-# --- BEGIN: Preflight/Prerequisite Check ---
-source "$(dirname "$0")/../utils/common.sh"
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: loki.sh
+# Path: /scripts/components/install_loki.sh
+#
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -31,7 +29,6 @@ NC='\033[0m' # No Color
 BOLD='\033[1m'
 
 # Variables
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 CONFIG_DIR="/opt/agency_stack"
 LOKI_DIR="${CONFIG_DIR}/loki"
@@ -136,7 +133,6 @@ if [ -z "$DOMAIN" ]; then
   echo -e "${RED}Error: --domain is required${NC}"
   echo -e "Use --help for usage information"
   exit 1
-fi
 
 # Welcome message
 echo -e "${MAGENTA}${BOLD}AgencyStack Loki Setup${NC}"
@@ -146,7 +142,6 @@ echo -e "=============================="
 if [ "$EUID" -ne 0 ]; then
   echo -e "${RED}Please run as root or with sudo${NC}"
   exit 1
-fi
 
 # Run system validation
 if [ -f "${ROOT_DIR}/scripts/utils/validate_system.sh" ]; then
@@ -155,9 +150,7 @@ if [ -f "${ROOT_DIR}/scripts/utils/validate_system.sh" ]; then
     echo -e "${RED}System validation failed. Please fix the issues and try again.${NC}"
     exit 1
   }
-else
   echo -e "${YELLOW}Warning: System validation script not found. Proceeding without validation.${NC}"
-fi
 
 # Create log directories if they don't exist
 mkdir -p "$LOG_DIR"
@@ -194,11 +187,9 @@ if [ -n "$CLIENT_ID" ]; then
   LOKI_CONTAINER="${CLIENT_ID}_loki"
   PROMTAIL_CONTAINER="${CLIENT_ID}_promtail"
   NETWORK_NAME="${CLIENT_ID}_network"
-else
   LOKI_CONTAINER="loki_${SITE_NAME}"
   PROMTAIL_CONTAINER="promtail_${SITE_NAME}"
   NETWORK_NAME="agency-network"
-fi
 
 # Check if Loki is already installed
 if docker ps -a --format '{{.Names}}' | grep -q "$LOKI_CONTAINER"; then
@@ -226,7 +217,6 @@ if docker ps -a --format '{{.Names}}' | grep -q "$LOKI_CONTAINER"; then
       exit 0
     fi
   fi
-fi
 
 # Check if Docker is installed
 if ! command -v docker &> /dev/null; then
@@ -246,13 +236,11 @@ if ! command -v docker &> /dev/null; then
     log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
     exit 1
   fi
-fi
 
 # Check if Docker is running
 if ! docker info &> /dev/null; then
   log "ERROR: Docker is not running" "${RED}Docker is not running. Please start Docker first.${NC}"
   exit 1
-fi
 
 # Check if Docker Compose is installed
 if ! command -v docker-compose &> /dev/null; then
@@ -272,7 +260,6 @@ if ! command -v docker-compose &> /dev/null; then
     log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
     exit 1
   fi
-fi
 
 # Check if network exists, create if it doesn't
 if ! docker network inspect "$NETWORK_NAME" &> /dev/null; then
@@ -282,9 +269,7 @@ if ! docker network inspect "$NETWORK_NAME" &> /dev/null; then
     log "ERROR: Failed to create Docker network $NETWORK_NAME" "${RED}Failed to create Docker network $NETWORK_NAME. See log for details.${NC}"
     exit 1
   fi
-else
   log "INFO: Docker network $NETWORK_NAME already exists" "${GREEN}✅ Docker network $NETWORK_NAME already exists${NC}"
-fi
 
 # Check for Traefik
 if ! docker ps --format '{{.Names}}' | grep -q "traefik"; then
@@ -301,9 +286,7 @@ if ! docker ps --format '{{.Names}}' | grep -q "traefik"; then
   else
     log "INFO: Use --with-deps to automatically install dependencies" "${CYAN}Use --with-deps to automatically install dependencies${NC}"
   fi
-else
   log "INFO: Traefik container found" "${GREEN}✅ Traefik container found${NC}"
-fi
 
 log "INFO: Starting Loki installation for $DOMAIN" "${BLUE}Starting Loki installation for $DOMAIN...${NC}"
 
@@ -534,10 +517,8 @@ EOF
     log "WARNING: Grafana provisioning directory not found" "${YELLOW}⚠️ Grafana provisioning directory not found, skipping datasource creation${NC}"
     log "INFO: You will need to manually configure Loki datasource in Grafana" "${CYAN}You will need to manually configure Loki datasource in Grafana${NC}"
   fi
-else
   log "INFO: Grafana domain not specified, skipping datasource creation" "${CYAN}Grafana domain not specified, skipping datasource creation${NC}"
   log "INFO: You will need to manually configure Loki datasource in Grafana" "${CYAN}You will need to manually configure Loki datasource in Grafana${NC}"
-fi
 
 # Start Loki
 log "INFO: Starting Loki" "${CYAN}Starting Loki...${NC}"
@@ -546,7 +527,6 @@ cd "${LOKI_DIR}/${DOMAIN}" && docker-compose up -d
 if [ $? -ne 0 ]; then
   log "ERROR: Failed to start Loki" "${RED}Failed to start Loki. See log for details.${NC}"
   exit 1
-fi
 
 # Configure Docker daemon to use Loki log driver
 log "INFO: Checking Docker log driver configuration" "${CYAN}Checking Docker log driver configuration...${NC}"
@@ -563,7 +543,6 @@ if [ ! -f "/etc/docker/daemon.json" ]; then
   }
 }
 EOF
-fi
 
 # Register the installation in components registry
 if [ -d "${CONFIG_DIR}/components" ]; then
@@ -581,9 +560,7 @@ if [ -d "${CONFIG_DIR}/components" ]; then
   "retention_days": ${RETENTION_DAYS}
 }
 EOF
-else
   log "WARNING: Components registry not found" "${YELLOW}Components registry not found, skipping registration${NC}"
-fi
 
 # Add to installed_components.txt
 INSTALLED_COMPONENTS_FILE="${CONFIG_DIR}/installed_components.txt"
@@ -592,24 +569,19 @@ log "INFO: Adding to installed components" "${CYAN}Adding to installed component
 # Create file if it doesn't exist
 if [ ! -f "$INSTALLED_COMPONENTS_FILE" ]; then
   echo "component|domain|version|status" > "$INSTALLED_COMPONENTS_FILE"
-fi
 
 # Check if component is already in the file
 if grep -q "loki|${DOMAIN}|" "$INSTALLED_COMPONENTS_FILE"; then
   # Update the entry
   sed -i "s|loki|${DOMAIN}|.*|loki|${DOMAIN}|${LOKI_VERSION}|active|" "$INSTALLED_COMPONENTS_FILE"
-else
   # Add new entry
   echo "loki|${DOMAIN}|${LOKI_VERSION}|active" >> "$INSTALLED_COMPONENTS_FILE"
-fi
 
 # Update dashboard status
 if [ -f "${CONFIG_DIR}/dashboard/status.json" ]; then
   log "INFO: Updating dashboard status" "${CYAN}Updating dashboard status...${NC}"
   # This is a placeholder for dashboard status update logic
-else
   log "WARNING: Dashboard status file not found" "${YELLOW}Dashboard status file not found, skipping update${NC}"
-fi
 
 # Add integration information for other components
 log "INFO: Creating integration information" "${CYAN}Creating integration information...${NC}"
@@ -638,10 +610,8 @@ echo -e ""
 if [ -n "$GRAFANA_DOMAIN" ]; then
   echo -e "${CYAN}Loki is integrated with Grafana at https://${GRAFANA_DOMAIN}${NC}"
   echo -e "${CYAN}Log into Grafana to explore your logs${NC}"
-else
   echo -e "${CYAN}To integrate with Grafana, add a Loki datasource with URL:${NC}"
   echo -e "${CYAN}  http://${LOKI_CONTAINER}:3100${NC}"
-fi
 echo -e ""
 echo -e "${CYAN}Log retention is set to ${RETENTION_DAYS} days${NC}"
 

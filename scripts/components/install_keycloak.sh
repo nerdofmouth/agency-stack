@@ -12,6 +12,12 @@ exit_with_warning_if_host
 # AgencyStack Component Installer: keycloak.sh
 # Path: /scripts/components/install_keycloak.sh
 #
+
+# Enforce containerization (prevent host contamination)
+
+# AgencyStack Component Installer: keycloak.sh
+# Path: /scripts/components/install_keycloak.sh
+#
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 SCRIPTS_DIR="${ROOT_DIR}/scripts"
 

@@ -12,17 +12,12 @@ exit_with_warning_if_host
 # AgencyStack Component Installer: traefik.sh
 # Path: /scripts/components/install_traefik.sh
 #
-if [ -f "${SCRIPT_DIR}/../utils/common.sh" ]; then
-else
-fi
-else
-fi
-else
-fi
-else
-fi
-else
-fi
+
+# Enforce containerization (prevent host contamination)
+
+# AgencyStack Component Installer: traefik.sh
+# Path: /scripts/components/install_traefik.sh
+#
 
 # Enforce containerization (prevent host contamination)
 
@@ -37,7 +32,6 @@ set -e
 if [[ -f "/.dockerenv" ]] || [[ -f "/proc/1/cgroup" && $(cat /proc/1/cgroup) == *"docker"* ]]; then
   export INSIDE_CONTAINER=true
   log_info "Detected Docker container environment, using direct process management"
-fi
 
 # Debug: Output container detection
 log_info "Container detection: INSIDE_CONTAINER=${INSIDE_CONTAINER}"
@@ -111,7 +105,6 @@ if [[ "$ENABLE_KEYCLOAK" == "true" ]]; then
     echo "Use --admin-email to specify the admin email"
     exit 1
   fi
-fi
 
 log_info "Starting Traefik installation with dashboard..."
 
@@ -125,12 +118,10 @@ if [ ! -w "$(dirname ${BASE_DIR})" ]; then
   # Use current directory for development
   BASE_DIR="$(pwd)/traefik_${CLIENT_ID}"
   log_warning "Using fallback directory: ${BASE_DIR}"
-fi
 
 if [ ! -w "$(dirname ${LOG_DIR})" ]; then
   LOG_DIR="${BASE_DIR}/logs"
   log_warning "Using fallback logs directory: ${LOG_DIR}"
-fi
 
 INSTALL_DIR="${BASE_DIR}/traefik"
 CONFIG_DIR="${INSTALL_DIR}/config"
@@ -191,7 +182,6 @@ http:
       # In production, middleware would be configured here
 EOF
 
-else
   # Create standard configuration without authentication
   log_info "Creating Traefik configuration for binary installation without auth..."
   cat > "${CONFIG_DIR}/traefik.yml" <<EOF
@@ -218,7 +208,6 @@ providers:
     directory: "${CONFIG_DIR}/dynamic"
     watch: true
 EOF
-fi
 
 # Download Traefik binary
 log_info "Downloading Traefik binary..."
@@ -243,9 +232,7 @@ if [ ! -f "${TRAEFIK_BINARY}" ]; then
   rm -rf "${TMP_DIR}"
   
   log_success "Traefik binary downloaded to ${TRAEFIK_BINARY}"
-else
   log_info "Traefik binary already exists, skipping download"
-fi
 
 # Create run script
 log_info "Creating run script..."
@@ -254,7 +241,6 @@ cat > "${INSTALL_DIR}/bin/run.sh" <<EOF
 # Source environment variables
 if [ -f "${INSTALL_DIR}/env.sh" ]; then
   source "${INSTALL_DIR}/env.sh"
-fi
 
 # Run Traefik
 exec "${TRAEFIK_BINARY}" \
@@ -331,7 +317,6 @@ EOF
     log_info "  sudo systemctl enable ${TRAEFIK_SERVICE}"
     log_info "  sudo systemctl start ${TRAEFIK_SERVICE}"
   fi
-fi
 
 # For Docker-in-Docker environments or development
 if [[ "$INSIDE_CONTAINER" == "true" ]]; then
@@ -428,23 +413,17 @@ if [ -f "$PID_FILE" ]; then
   else
     echo "❌ Process: Not running (last PID: $PID)"
   fi
-else
   echo "❌ Process: No PID file found"
-fi
 
 # Check port binding
 if netstat -tuln | grep -q ":${DASHBOARD_PORT} "; then
   echo "✅ Port: ${DASHBOARD_PORT} is listening"
-else
   echo "❌ Port: ${DASHBOARD_PORT} is not listening"
-fi
 
 # Check dashboard access
 if curl -s -o /dev/null -I -w "%{http_code}" http://localhost:${DASHBOARD_PORT}/dashboard/; then
   echo "✅ Dashboard: Accessible from container"
-else
   echo "❌ Dashboard: Not accessible from container"
-fi
 
 # Show instructions for host testing
 echo ""
@@ -457,9 +436,7 @@ echo "Process network listeners:"
 LISTENERS=$(for pid in $(pgrep -f traefik); do ss -tulpn | grep "$pid"; done)
 if [ -n "$LISTENERS" ]; then
   echo "$LISTENERS"
-else
   echo "No network listeners found for Traefik"
-fi
 
 # Tail log
 echo ""
@@ -485,7 +462,6 @@ if [ -f "${INSTALL_DIR}/traefik.pid" ]; then
     echo "No running process with PID $PID"
   fi
   rm -f "${INSTALL_DIR}/traefik.pid"
-fi
 
 # Start new process
 echo "Starting Traefik..."
@@ -498,10 +474,8 @@ echo $NEW_PID > "${INSTALL_DIR}/traefik.pid"
 sleep 2
 if ps -p $NEW_PID > /dev/null; then
   echo "Process started successfully"
-else
   echo "Process failed to start. Check logs at ${LOG_DIR}/traefik.log"
   exit 1
-fi
 EOF
 
       chmod +x "${INSTALL_DIR}/bin/restart.sh"
@@ -530,7 +504,6 @@ EOF
       cat > "${INSTALL_DIR}/scripts/verify-host.sh" <<'EOF'
 
 # Import common utilities if available
-if [[ -f "$(dirname "$0")/../../scripts/utils/common.sh" ]]; then
 
 # Configuration
 CLIENT_ID="${CLIENT_ID:-default}"
@@ -561,10 +534,8 @@ if [[ -f "${INSTALL_DIR}/traefik.pid" ]]; then
     ps -ef | grep traefik | grep -v grep || echo "None"
     exit 1
   fi
-else
   log_error "No PID file found at ${INSTALL_DIR}/traefik.pid"
   exit 1
-fi
 
 # Step 2: Check for open port
 log_info "Step 2: Port binding check..."
@@ -573,12 +544,10 @@ if netstat -tuln | grep -q ":${DASHBOARD_PORT} "; then
   # Get process that's bound to the port
   PORT_PROCESS=$(netstat -tulpn | grep ":${DASHBOARD_PORT} " || echo "None")
   log_info "Port process: $PORT_PROCESS"
-else
   log_error "Port ${DASHBOARD_PORT} is not listening"
   log_info "Open ports: "
   netstat -tuln | grep LISTEN
   exit 1
-fi
 
 # Step 3: Dashboard HTTP check
 log_info "Step 3: Dashboard HTTP check..."
@@ -587,14 +556,12 @@ DASHBOARD_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$DASHBOARD_URL")
 
 if [[ "$DASHBOARD_STATUS" == "200" ]]; then
   log_success "Dashboard is accessible (HTTP $DASHBOARD_STATUS)"
-else
   log_error "Dashboard is NOT accessible (HTTP $DASHBOARD_STATUS)"
   log_info "Debug output:"
   curl -v "$DASHBOARD_URL" 2>&1 | head -20
   log_info "Traefik log tail:"
   tail -20 "$LOG_FILE"
   exit 1
-fi
 
 # Instructions for host testing
 log_info "==========================================="
@@ -626,14 +593,12 @@ EOF
     log_error "Failed to start Traefik process"
     exit 1
   fi
-fi
 
 # Create verification script...
 mkdir -p "${INSTALL_DIR}/scripts"
 cat > "${INSTALL_DIR}/scripts/verify.sh" <<'EOF'
 
 # Source common functions
-if [[ -f /root/_repos/agency-stack/scripts/utils/common.sh ]]; then
 
 # Configuration variables
 CLIENT_ID="${CLIENT_ID:-default}"
@@ -653,10 +618,8 @@ log_info "==========================================="
 echo "Testing Traefik process status..."
 if [ -f "${INSTALL_DIR}/traefik.pid" ] && ps -p $(cat "${INSTALL_DIR}/traefik.pid") > /dev/null; then
   echo "✅ Traefik process is running"
-else
   echo "❌ Traefik process is NOT running"
   exit 1
-fi
 
 # Check dashboard accessibility
 echo "Testing Traefik dashboard..."
@@ -673,7 +636,6 @@ if grep -q "insecure: true" "${CONFIG_DIR}/traefik.yml" && ! grep -q "traefik-fo
     echo "❌ Dashboard returned HTTP ${RESPONSE_CODE}"
     exit 1
   fi
-else
   echo "Authentication: Enabled (Keycloak)"
   # Test dashboard with authentication (should redirect to auth)
   RESPONSE_CODE=$(curl -s -o /dev/null -L -w "%{http_code}" "http://localhost:${DASHBOARD_PORT}/dashboard/")
@@ -695,7 +657,6 @@ else
     echo "❌ Auth middleware is missing"
     exit 1
   fi
-fi
 
 # Test Traefik API
 echo
@@ -703,20 +664,16 @@ echo "Testing Traefik API..."
 RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${DASHBOARD_PORT}/api/version")
 if [[ "$RESPONSE_CODE" == "200" || "$RESPONSE_CODE" == "302" ]]; then
   echo "✅ API is accessible (HTTP ${RESPONSE_CODE})"
-else
   echo "❌ API returned HTTP ${RESPONSE_CODE}"
   exit 1
-fi
 
 # Test Traefik logs
 echo
 echo "Testing Traefik logs..."
 if [[ -f "${LOG_DIR}/traefik.log" ]]; then
   echo "✅ Traefik logs are being generated"
-else
   echo "❌ No Traefik logs found"
   exit 1
-fi
 
 # TDD Summary
 echo
@@ -727,7 +684,6 @@ echo "✅ API access check: PASSED"
 echo "✅ Logs check: PASSED"
 if grep -q "traefik-forward-auth" "${INSTALL_DIR}/docker-compose.yml"; then
   echo "✅ Authentication check: PASSED" 
-fi
 echo "============================"
 
 log_success "Script completed successfully"
@@ -740,7 +696,6 @@ log_info "Creating TDD test script..."
 cat > "${INSTALL_DIR}/scripts/test.sh" <<'EOF'
 
 # Source common functions
-if [[ -f /root/_repos/agency-stack/scripts/utils/common.sh ]]; then
 
 # Configuration variables
 CLIENT_ID="${CLIENT_ID:-default}"
@@ -825,7 +780,6 @@ if grep -q "traefik-forward-auth" "${INSTALL_DIR}/docker-compose.yml"; then
   run_test "Authentication redirect" \
     "curl -s -o /dev/null -L -w '%{redirect_count}' 'http://localhost:${DASHBOARD_PORT}/dashboard/' | awk '{if (\$1 > 0) print \"redirects\"; else print \"no_redirect\";}'" \
     "redirects"
-fi
 
 # 6. Log Tests
 echo "=== Log Tests ==="
@@ -843,7 +797,6 @@ echo "API tests: $(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${DA
 
 if grep -q "traefik-forward-auth" "${INSTALL_DIR}/docker-compose.yml"; then
   echo "Authentication tests: $(grep -q "traefik-auth" "${CONFIG_DIR}/traefik.yml" && echo "✅ PASS" || echo "❌ FAIL")"
-fi
 
 echo "Log tests: $([ -d "${LOG_DIR}" ] && echo "✅ PASS" || echo "❌ FAIL")"
 echo "============================"
@@ -858,7 +811,6 @@ log_info "Creating integration test script..."
 cat > "${INSTALL_DIR}/scripts/integration_test.sh" <<'EOF'
 
 # Source common functions
-if [[ -f /root/_repos/agency-stack/scripts/utils/common.sh ]]; then
 
 # Configuration variables
 CLIENT_ID="${CLIENT_ID:-default}"
@@ -930,7 +882,6 @@ if grep -q "traefik-forward-auth" "${INSTALL_DIR}/docker-compose.yml"; then
     exit 1
   fi
   
-else
   echo "Testing Traefik without authentication"
   
   # 1. Verify systemd service status
@@ -951,16 +902,13 @@ else
     echo "❌ Dashboard is NOT accessible (HTTP ${RESPONSE_CODE})"
     exit 1
   fi
-fi
 
 # Final integration test result
 echo
 echo "======== INTEGRATION TEST SUMMARY ========"
 if grep -q "traefik-forward-auth" "${INSTALL_DIR}/docker-compose.yml"; then
   echo "Traefik + Keycloak Integration: $(systemctl is-active --quiet ${TRAEFIK_SERVICE} && echo "✅ PASS" || echo "❌ FAIL")"
-else
   echo "Traefik Basic Configuration: $(systemctl is-active --quiet ${TRAEFIK_SERVICE} && echo "✅ PASS" || echo "❌ FAIL")"
-fi
 echo "======================================"
 
 log_success "Integration tests completed"
@@ -999,9 +947,7 @@ if [[ "$ENABLE_KEYCLOAK" == "true" ]]; then
   echo "  Authentication: Enabled (Keycloak)"
   echo "  Keycloak Domain: ${KEYCLOAK_DOMAIN}"
   echo "  Keycloak Realm: ${KEYCLOAK_REALM}"
-else
   echo "  Authentication: Disabled (insecure mode)"
-fi
 echo ""
 echo "  To verify access, run: ${INSTALL_DIR}/scripts/verify.sh"
 echo "  To run TDD tests, run: ${INSTALL_DIR}/scripts/test.sh"

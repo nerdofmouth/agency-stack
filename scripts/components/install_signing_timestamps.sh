@@ -1,4 +1,20 @@
 #!/bin/bash
+
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: signing_timestamps.sh
+# Path: /scripts/components/install_signing_timestamps.sh
+#
+
+# Enforce containerization (prevent host contamination)
+
 # install_signing_timestamps.sh - Decentralized document signing & integrity verification
 # https://stack.nerdofmouth.com
 #
@@ -23,7 +39,6 @@ AGENCY_SCRIPTS_DIR="${AGENCY_ROOT}/repo/scripts"
 AGENCY_UTILS_DIR="${AGENCY_SCRIPTS_DIR}/utils"
 
 # Import common utilities
-source "${AGENCY_UTILS_DIR}/common.sh"
 source "${AGENCY_UTILS_DIR}/log_helpers.sh"
 
 # Define component-specific variables
@@ -157,7 +172,6 @@ if [[ -f "${COMPONENT_INSTALLED_MARKER}" ]] && [[ "${FORCE}" != "true" ]]; then
   log "INFO" "Signing timestamps already installed" "${GREEN}✅ Signing timestamps already installed.${NC}"
   log "INFO" "Use --force to reinstall" "${CYAN}Use --force to reinstall.${NC}"
   exit 0
-fi
 
 # Create necessary directories
 log "INFO" "Creating necessary directories" "${CYAN}Creating necessary directories...${NC}"
@@ -200,7 +214,6 @@ set -euo pipefail
 if [ "\$(id -u)" -ne 0 ]; then
   echo "This script must be run as root" >&2
   exit 1
-fi
 
 # Get hostname for the key
 HOSTNAME=\$(hostname)
@@ -253,14 +266,12 @@ set -euo pipefail
 if [ "\$(id -u)" -ne 0 ]; then
   echo "This script must be run as root" >&2
   exit 1
-fi
 
 # Check if a document was provided
 if [ \$# -lt 1 ]; then
   echo "Usage: \$0 <document_path> [description]"
   echo "Example: \$0 /path/to/contract.pdf 'Client X Contract'"
   exit 1
-fi
 
 DOCUMENT="\$1"
 DESCRIPTION="\${2:-Document signed on \$(date)}"
@@ -325,14 +336,12 @@ set -euo pipefail
 if [ "\$(id -u)" -ne 0 ]; then
   echo "This script must be run as root" >&2
   exit 1
-fi
 
 # Check if documents were provided
 if [ \$# -lt 2 ]; then
   echo "Usage: \$0 <document_path> <signature_path> [timestamp_path]"
   echo "Example: \$0 /path/to/contract.pdf /path/to/contract.pdf.asc /path/to/contract.pdf.ots"
   exit 1
-fi
 
 DOCUMENT="\$1"
 SIGNATURE="\$2"
@@ -368,9 +377,7 @@ EOF
 
 if [ \$GPG_EXIT -eq 0 ]; then
   echo "GPG Signature: VALID" >> "\$OUTPUT_DIR/verification-report.txt"
-else
   echo "GPG Signature: INVALID" >> "\$OUTPUT_DIR/verification-report.txt"
-fi
 
 # Verify timestamp if provided
 if [ -n "\$TIMESTAMP" ] && [ -f "\$TIMESTAMP" ]; then
@@ -384,16 +391,13 @@ if [ -n "\$TIMESTAMP" ] && [ -f "\$TIMESTAMP" ]; then
   else
     echo "OpenTimestamps: INVALID or INCOMPLETE" >> "\$OUTPUT_DIR/verification-report.txt"
   fi
-fi
 
 # Summarize verification result
 if [ \$GPG_EXIT -eq 0 ] && ([ -z "\$TIMESTAMP" ] || [ \$OTS_EXIT -eq 0 ]); then
   echo -e "\nOVERALL VERIFICATION: SUCCESSFUL" >> "\$OUTPUT_DIR/verification-report.txt"
   echo "✅ Document verification successful"
-else
   echo -e "\nOVERALL VERIFICATION: FAILED" >> "\$OUTPUT_DIR/verification-report.txt"
   echo "❌ Document verification failed"
-fi
 
 echo "📄 Verification report: \$OUTPUT_DIR/verification-report.txt"
 EOL
@@ -428,7 +432,6 @@ chmod +x "${SCRIPTS_DIR}/signing-log.sh"
 if [ "$WITH_DEPS" = true ]; then
   log "INFO" "Generating server GPG key" "${CYAN}Generating server GPG key...${NC}"
   "${SCRIPTS_DIR}/generate-server-key.sh" >> "${INSTALL_LOG}" 2>&1
-fi
 
 # Create installation marker
 touch "${COMPONENT_INSTALLED_MARKER}"

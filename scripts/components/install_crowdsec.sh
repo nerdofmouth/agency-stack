@@ -1,16 +1,20 @@
 #!/bin/bash
-# install_crowdsec.sh - Installation script for CrowdSec
-#
-# This script installs and configures CrowdSec for AgencyStack
-# following the component installation conventions.
-#
-# Author: AgencyStack Team
-# Date: 2025-04-10
 
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: crowdsec.sh
+# Path: /scripts/components/install_crowdsec.sh
+#
 set -e
 
 # --- BEGIN: Preflight/Prerequisite Check ---
-source "$(dirname "$0")/../utils/common.sh"
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -18,7 +22,6 @@ preflight_check_agencystack || {
 # --- END: Preflight/Prerequisite Check ---
 
 # Source common utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../utils/log_helpers.sh"
 
 # Default configuration
@@ -85,7 +88,6 @@ if [ -f "${INSTALL_DIR}/.installed" ] && [ "${FORCE}" != "true" ]; then
   log_info "CrowdSec is already installed for client ${CLIENT_ID}."
   log_info "Use --force to reinstall."
   exit 0
-fi
 
 # Ensure directories exist
 log_cmd "Creating installation directories..."
@@ -102,9 +104,7 @@ if ! docker network inspect "${CROWDSEC_NETWORK_NAME}" &>/dev/null; then
     exit 1
   }
   log_success "Created Docker network: ${CROWDSEC_NETWORK_NAME}"
-else
   log_info "Docker network ${CROWDSEC_NETWORK_NAME} already exists"
-fi
 
 # Create CrowdSec configuration files
 log_cmd "Creating CrowdSec configuration files..."
@@ -117,10 +117,8 @@ log_info "Generated local API key for CrowdSec"
 if [[ "${DOMAIN}" != "localhost" ]]; then
   CROWDSEC_ONLINE_API_KEY=$(openssl rand -hex 32)
   log_info "Generated online API key for CrowdSec dashboard"
-else
   CROWDSEC_ONLINE_API_KEY="local-mode-no-online-api"
   log_info "Running in local mode, no online API key generated"
-fi
 
 # Create config.yaml for CrowdSec
 cat > "${CONFIG_DIR}/config.yaml" <<EOF
@@ -305,8 +303,6 @@ if [ "$DRY_RUN" = false ]; then
   log_success "CrowdSec installation completed successfully!"
   log_info "CrowdSec dashboard available at: https://crowdsec.${DOMAIN}"
   log_info "Local API credentials saved to: ${CONFIG_DIR}/local_api_credentials.yaml"
-else
   log_info "Dry run mode: Skipping CrowdSec startup"
-fi
 
 exit 0

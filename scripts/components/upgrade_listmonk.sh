@@ -1,11 +1,20 @@
 #!/bin/bash
-# Listmonk Upgrade Script v4.1.0
-# AgencyStack Component: listmonk
 
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: upgrade_listmonk.sh
+# Path: /scripts/components/upgrade_listmonk.sh
+#
 set -euo pipefail
 
 # Source common utilities
-source "$(dirname "$0")/../utils/common.sh"
 
 # Component configuration
 COMPONENT_NAME="listmonk"
@@ -76,7 +85,6 @@ done
 if [ -z "$DOMAIN" ] || [ -z "$ADMIN_EMAIL" ]; then
   log_error "${LOG_FILE}" "Missing required parameters. Use --help for usage."
   exit 1
-fi
 
 # Update install directory with client ID
 INSTALL_DIR="/opt/agency_stack/clients/${CLIENT_ID}/${COMPONENT_NAME}"
@@ -85,14 +93,12 @@ INSTALL_DIR="/opt/agency_stack/clients/${CLIENT_ID}/${COMPONENT_NAME}"
 if [ ! -f "${INSTALL_DIR}/.installed" ]; then
     log_error "${LOG_FILE}" "Listmonk not installed, cannot upgrade"
     exit 1
-fi
 
 # Check current version
 CURRENT_VERSION=$(docker inspect --format='{{.Config.Image}}' listmonk-app-${CLIENT_ID} 2>/dev/null | grep -o 'v[0-9.]*' || echo "unknown")
 if [ "$CURRENT_VERSION" == "v4.1.0" ] && [ "$FORCE" != "true" ]; then
     log_info "${LOG_FILE}" "Listmonk already at v4.1.0, skipping upgrade"
     exit 0
-fi
 
 log_info "${LOG_FILE}" "Upgrading Listmonk from ${CURRENT_VERSION} to v4.1.0"
 
@@ -126,7 +132,6 @@ if [ -f "${INSTALL_DIR}/config.toml" ]; then
     allow_wipe = true
 EOF
     fi
-fi
 
 # Pull new image
 log_info "${LOG_FILE}" "Pulling new image"
@@ -159,7 +164,6 @@ if [ "$ENABLE_KEYCLOAK" == "true" ]; then
     name_claim = "name"
 EOF
     fi
-fi
 
 # Start upgraded service
 log_info "${LOG_FILE}" "Starting upgraded service"
@@ -183,7 +187,6 @@ if [ -n "$CONTAINER_STATUS" ]; then
     mv "${COMPONENT_REGISTRY}.tmp" "$COMPONENT_REGISTRY"
     
     log_success "${LOG_FILE}" "Listmonk upgraded successfully to v4.1.0"
-else
     log_error "${LOG_FILE}" "Upgrade failed: container is not running"
     log_info "${LOG_FILE}" "Attempting rollback from backup..."
     docker-compose down
@@ -193,4 +196,3 @@ else
     docker-compose up -d
     log_warning "${LOG_FILE}" "Rollback completed. Previous version restored."
     exit 1
-fi

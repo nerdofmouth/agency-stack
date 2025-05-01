@@ -12,6 +12,12 @@ exit_with_warning_if_host
 # AgencyStack Component Installer: wordpress.sh
 # Path: /scripts/components/install_wordpress.sh
 #
+
+# Enforce containerization (prevent host contamination)
+
+# AgencyStack Component Installer: wordpress.sh
+# Path: /scripts/components/install_wordpress.sh
+#
 set -e
 
 REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"

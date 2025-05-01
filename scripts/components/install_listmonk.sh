@@ -1,16 +1,17 @@
 #!/bin/bash
-# install_listmonk.sh - AgencyStack Listmonk Email Newsletter Component Installer
-# [https://stack.nerdofmouth.com](https://stack.nerdofmouth.com)
-#
-# Installs and configures Listmonk with hardened settings
-# Part of the AgencyStack Email & Communication suite
-#
-# Author: AgencyStack Team
-# Version: 1.0.0
-# Date: April 5, 2025
 
-# --- BEGIN: Preflight/Prerequisite Check ---
-source "$(dirname "$0")/../utils/common.sh"
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: listmonk.sh
+# Path: /scripts/components/install_listmonk.sh
+#
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -31,7 +32,6 @@ NC='\033[0m' # No Color
 BOLD='\033[1m'
 
 # Variables
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 CONFIG_DIR="/opt/agency_stack"
 LOG_DIR="/var/log/agency_stack"
@@ -884,23 +884,19 @@ if [ -z "$DOMAIN" ]; then
   echo -e "${RED}Error: Domain name is required.${NC} Use --domain to specify."
   echo -e "Use --help for usage information"
   exit 1
-fi
 
 # If Mailu parameters are not provided, use defaults
 if [ -z "$MAILU_DOMAIN" ]; then
   MAILU_DOMAIN="mail.${DOMAIN/lists./}"
   log "INFO" "Mailu domain not specified, using default: ${MAILU_DOMAIN}"
-fi
 
 if [ -z "$MAILU_USER" ]; then
   MAILU_USER="listmonk@${DOMAIN/lists./}"
   log "INFO" "Mailu user not specified, using default: ${MAILU_USER}"
-fi
 
 if [ -z "$MAILU_PASSWORD" ]; then
   log "WARN" "Mailu password not specified. SMTP may not work properly."
   MAILU_PASSWORD="password_not_set"
-fi
 
 # Run the installer
 install_listmonk

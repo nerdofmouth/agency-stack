@@ -1,5 +1,21 @@
 #!/bin/bash
 
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: traefik_registry_ai_dashboard.sh
+# Path: /scripts/components/traefik_registry_ai_dashboard.sh
+#
+
+# Enforce containerization (prevent host contamination)
+
+
 # Setup Traefik configuration
 setup_traefik() {
   log "INFO" "Setting up Traefik configuration..."

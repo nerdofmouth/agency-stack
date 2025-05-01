@@ -12,6 +12,12 @@ exit_with_warning_if_host
 # AgencyStack Component Installer: traefik_keycloak.sh
 # Path: /scripts/components/install_traefik_keycloak.sh
 #
+
+# Enforce containerization (prevent host contamination)
+
+# AgencyStack Component Installer: traefik_keycloak.sh
+# Path: /scripts/components/install_traefik_keycloak.sh
+#
   # Minimal logging functions if common.sh is not available
 
 # Enforce containerization (prevent host contamination)

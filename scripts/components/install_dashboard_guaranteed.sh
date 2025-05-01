@@ -1,16 +1,20 @@
 #!/bin/bash
-# install_dashboard_guaranteed.sh - Guaranteed access dashboard installation
-#
-# This script ensures the dashboard is always accessible via multiple methods
-# following AgencyStack Alpha Phase Repository Integrity Policy.
-#
-# Author: AgencyStack Team
-# Date: 2025-04-10
 
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: dashboard_guaranteed.sh
+# Path: /scripts/components/install_dashboard_guaranteed.sh
+#
 set -e
 
 # --- BEGIN: Preflight/Prerequisite Check ---
-source "$(dirname "$0")/../utils/common.sh"
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -18,7 +22,6 @@ preflight_check_agencystack || {
 # --- END: Preflight/Prerequisite Check ---
 
 # Source common utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 UTILS_DIR="$(cd "${SCRIPT_DIR}/../utils" && pwd)"
 source "${UTILS_DIR}/log_helpers.sh"
 
@@ -87,9 +90,7 @@ mkdir -p "${STATIC_DIR}"
 if command -v nginx &>/dev/null; then
   NGINX_AVAILABLE=true
   log_info "Nginx is available for direct static hosting"
-else
   log_info "Nginx not found, will use Docker for hosting"
-fi
 
 # Create static dashboard file
 log_cmd "Creating static dashboard HTML..."
@@ -188,7 +189,6 @@ EOF
 if [ -f "${STATIC_HTML}" ]; then
   log_info "Found static dashboard template, using it..."
   cp "${STATIC_HTML}" "${STATIC_DIR}/index.html"
-fi
 
 log_success "Static dashboard page created"
 
@@ -316,9 +316,7 @@ http:
 EOF
 
   log_success "Traefik configuration created"
-else
   log_warning "Traefik configuration directory not found, skipping route creation"
-fi
 
 # Start the dashboard container
 log_cmd "Starting dashboard container..."
@@ -337,18 +335,15 @@ if grep -q "${DOMAIN}" /etc/hosts; then
   else
     log_success "Hosts file already has correct entry for ${DOMAIN}"
   fi
-else
   log_info "Adding domain to hosts file..."
   echo "${SERVER_IP} ${DOMAIN}" >> /etc/hosts
   log_success "Added domain to hosts file"
-fi
 
 # Restart Traefik if available
 if [ -d "${TRAEFIK_DIR}" ]; then
   log_cmd "Restarting Traefik to apply configuration changes..."
   cd "${TRAEFIK_DIR}" && docker-compose down && docker-compose up -d
   log_success "Traefik restarted"
-fi
 
 # Create installation marker
 touch "${INSTALL_DIR}/.installed_ok"

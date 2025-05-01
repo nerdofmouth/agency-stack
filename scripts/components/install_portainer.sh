@@ -1,16 +1,20 @@
 #!/bin/bash
-# install_portainer.sh - Installation script for portainer
-#
-# This script installs and configures portainer for AgencyStack
-# following the component installation conventions.
-#
-# Author: AgencyStack Team
-# Date: 2025-04-07
 
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: portainer.sh
+# Path: /scripts/components/install_portainer.sh
+#
 set -e
 
 # --- BEGIN: Preflight/Prerequisite Check ---
-source "$(dirname \"$0\")/../utils/common.sh"
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -21,8 +25,6 @@ preflight_check_agencystack || {
 source "$(dirname "$0")/../utils/log_helpers.sh"
 
 # Source common utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../utils/common.sh"
 
 # Default configuration
 CLIENT_ID="${CLIENT_ID:-default}"

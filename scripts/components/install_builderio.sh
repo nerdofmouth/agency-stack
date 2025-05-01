@@ -1,18 +1,21 @@
 #!/bin/bash
-# install_builderio.sh - Installation script for builderio
-#
-# This script installs and configures builderio for AgencyStack
-# following the component installation conventions.
-#
-# Author: AgencyStack Team
-# Date: 2025-04-07
 
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: builderio.sh
+# Path: /scripts/components/install_builderio.sh
+#
 set -e
 
 # --- BEGIN: Preflight/Prerequisite Check ---
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
-source "$REPO_ROOT/scripts/utils/common.sh"
 preflight_check_agencystack || {
   echo -e "[ERROR] Preflight checks failed. Resolve issues before proceeding."
   exit 1
@@ -20,9 +23,7 @@ preflight_check_agencystack || {
 # --- END: Preflight/Prerequisite Check ---
 
 # Source common utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
-source "$REPO_ROOT/scripts/utils/common.sh"
 
 # Default configuration
 CLIENT_ID="${CLIENT_ID:-default}"
@@ -94,9 +95,7 @@ done
 # Normalize FORCE value for robustness
 if [[ "${FORCE}" =~ ^([Tt][Rr][Uu][Ee]|1)$ ]]; then
   FORCE=true
-else
   FORCE=false
-fi
 
 log_info "Starting builderio installation..."
 
@@ -115,7 +114,6 @@ if [[ -f "${INSTALLED_MARKER}" && "${FORCE}" != "true" ]]; then
     echo "${CURRENT_VERSION}" > "${VERSION_FILE}"
     exit 0
   fi
-fi
 
 # Ensure directories exist
 log_cmd "Creating installation directories..."

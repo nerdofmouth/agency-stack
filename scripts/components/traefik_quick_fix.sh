@@ -1,5 +1,21 @@
 #!/bin/bash
 
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "${SCRIPT_DIR}/../utils/common.sh"
+fi
+
+# Enforce containerization (prevent host contamination)
+exit_with_warning_if_host
+
+# AgencyStack Component Installer: traefik_quick_fix.sh
+# Path: /scripts/components/traefik_quick_fix.sh
+#
+
+# Enforce containerization (prevent host contamination)
+
+
 # Quick fix script to make Traefik dashboard accessible from host
 # Following the AgencyStack Repository Integrity Policy
 
@@ -60,7 +76,5 @@ if [ "$(docker ps -q -f name=traefik_default)" ]; then
     echo "⚠️ Dashboard returned HTTP $HTTP_CODE - might need a moment to initialize"
     echo "Please try opening http://localhost:8081/dashboard/ manually in a few seconds"
   fi
-else
   echo "❌ Failed to start Traefik container"
   docker logs traefik_default
-fi
