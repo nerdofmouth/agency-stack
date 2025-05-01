@@ -85,15 +85,30 @@ log_info "Test environment file created at $TEST_DIR/.env"
 
 # Test 1: Installation
 log_info "Testing WordPress installation..."
-run_test "Installation" "${SCRIPT_DIR}/install_client_wordpress.sh --client-id $CLIENT_ID --domain $DOMAIN --admin-email test@example.com --wp-port $TEST_PORT --db-port $TEST_DB_PORT --container-name-prefix $CONTAINER_PREFIX --enable-traefik $FORCE"
+run_test "Installation" "${SCRIPT_DIR}/install_client_wordpress.sh --client-id $CLIENT_ID --domain $DOMAIN --admin-email test@example.com --wp-port $TEST_PORT --db-port $TEST_DB_PORT --container-name-prefix $CONTAINER_PREFIX $FORCE"
 
 # Wait for containers to start
 log_info "Waiting for containers to initialize..."
-sleep 5
+sleep 20
+
+# Check if docker is running
+log_info "Checking Docker service..."
+docker ps > /dev/null 2>&1 || {
+  log_error "Docker service is not running or not accessible"
+  exit 1
+}
 
 # Test 2: Container Status
-run_test "WordPress container running" "docker ps | grep -q '${CONTAINER_PREFIX}wordpress'"
-run_test "Database container running" "docker ps | grep -q '${CONTAINER_PREFIX}db'"
+log_info "Checking container status..."
+WP_CONTAINER="${CONTAINER_PREFIX}wordpress"
+DB_CONTAINER="${CONTAINER_PREFIX}mariadb"
+
+run_test "WordPress container running" "docker ps -a | grep -q '${WP_CONTAINER}'"
+run_test "Database container running" "docker ps -a | grep -q '${DB_CONTAINER}'"
+
+# Display docker info for debugging
+log_info "Docker container status for ${CONTAINER_PREFIX}* containers:"
+docker ps -a | grep "${CONTAINER_PREFIX}" || true
 
 # Test 3: WordPress Web Access
 if [ "$DOMAIN" = "localhost:8080" ]; then
@@ -103,7 +118,7 @@ else
 fi
 
 # Test 4: Database Connection
-run_test "Database connection" "docker exec ${CONTAINER_PREFIX}db mysql -u root -proot_test_password -e 'SHOW DATABASES;' | grep -q wordpress_test"
+run_test "Database connection" "docker exec ${CONTAINER_PREFIX}mariadb mysql -u root -proot_test_password -e 'SHOW DATABASES;' | grep -q wordpress_test"
 
 # Test 5: WordPress Configuration
 run_test "WordPress configuration" "docker exec ${CONTAINER_PREFIX}wordpress ls -la /var/www/html/wp-config.php | grep -q wp-config.php"
