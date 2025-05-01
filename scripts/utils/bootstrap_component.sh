@@ -642,87 +642,210 @@ make ${COMPONENT_NAME}-restart
 - TLS is recommended for production environments
 EOL
 
-# Create Makefile entry
-log_info "Creating Makefile entry..."
-cat > "${MAKEFILE_DIR}/${COMPONENT_NAME}.mk" << EOL
-# ${COMPONENT_NAME} Makefile targets
-# Created: $(date)
-# Following AgencyStack Charter v1.0.3 principles
-
-${COMPONENT_NAME}:
-	@echo "$(MAGENTA)$(BOLD)🚀 Installing ${COMPONENT_NAME}...$(RESET)"
-	@\$(SCRIPTS_DIR)/components/${INSTALL_SCRIPT_NAME} --domain \$(DOMAIN) --admin-email \$(ADMIN_EMAIL) \$(if \$(CLIENT_ID),--client-id \$(CLIENT_ID),) \$(if \$(PORT),--port \$(PORT),) \$(if \$(VERSION),--version \$(VERSION),) \$(if \$(FORCE),--force,) \$(if \$(WITH_DEPS),--with-deps,) \$(if \$(VERBOSE),--verbose,)
-
-${COMPONENT_NAME}-status:
-	@echo "$(MAGENTA)$(BOLD)ℹ️ Checking ${COMPONENT_NAME} status...$(RESET)"
-	@if [ -f "\$(SCRIPTS_DIR)/components/status_${COMPONENT_NAME}.sh" ]; then \\
-		\$(SCRIPTS_DIR)/components/status_${COMPONENT_NAME}.sh \$(if \$(CLIENT_ID),--client-id \$(CLIENT_ID),); \\
-	else \\
-		echo "Status script not found. Checking service..."; \\
-		CLIENT_ID=\${CLIENT_ID:-default}; \\
-		if docker ps | grep -q "\$\${CLIENT_ID}_${COMPONENT_NAME}"; then \\
-			echo "$(GREEN)${COMPONENT_NAME} is running.$(RESET)"; \\
-		else \\
-			echo "$(RED)${COMPONENT_NAME} is not running.$(RESET)"; \\
-		fi \\
-	fi
-
-${COMPONENT_NAME}-logs:
-	@echo "$(MAGENTA)$(BOLD)📋 Viewing ${COMPONENT_NAME} logs...$(RESET)"
-	@if [ -f "/var/log/agency_stack/components/${COMPONENT_NAME}.log" ]; then \\
-		tail -n 50 "/var/log/agency_stack/components/${COMPONENT_NAME}.log"; \\
-	else \\
-		echo "Log file not found. Trying alternative sources..."; \\
-		CLIENT_ID=\${CLIENT_ID:-default}; \\
-		docker logs -f "\$\${CLIENT_ID}_${COMPONENT_NAME}" 2>&1 | tee /dev/null; \\
-	fi
-
-${COMPONENT_NAME}-restart:
-	@echo "$(MAGENTA)$(BOLD)🔄 Restarting ${COMPONENT_NAME}...$(RESET)"
-	@if [ -f "\$(SCRIPTS_DIR)/components/restart_${COMPONENT_NAME}.sh" ]; then \\
-		\$(SCRIPTS_DIR)/components/restart_${COMPONENT_NAME}.sh \$(if \$(CLIENT_ID),--client-id \$(CLIENT_ID),); \\
-	else \\
-		echo "Restart script not found. Trying standard methods..."; \\
-		CLIENT_ID=\${CLIENT_ID:-default}; \\
-		cd "/opt/agency_stack/clients/\$\${CLIENT_ID}/${COMPONENT_NAME}" && docker-compose restart; \\
-	fi
-
-${COMPONENT_NAME}-test:
-	@echo "$(MAGENTA)$(BOLD)🧪 Testing ${COMPONENT_NAME}...$(RESET)"
-	@if [ -f "\$(SCRIPTS_DIR)/components/test_${COMPONENT_NAME}.sh" ]; then \\
-		\$(SCRIPTS_DIR)/components/test_${COMPONENT_NAME}.sh \$(if \$(CLIENT_ID),--client-id \$(CLIENT_ID),) \$(if \$(DOMAIN),--domain \$(DOMAIN),); \\
-	else \\
-		echo "$(RED)Test script not found for ${COMPONENT_NAME}.$(RESET)"; \\
-		exit 1; \\
-	fi
-EOL
-
-# Update ports documentation if ports specified
-if [[ -n "$COMPONENT_PORTS" && -f "$PORTS_DOC" ]]; then
-  log_info "Updating ports documentation..."
+# Update component registry
+update_component_registry() {
+  log_info "Updating component registry..."
   
-  # Prepare ports entry
-  ports_entry="| ${COMPONENT_NAME} | ${COMPONENT_PORTS} | Component description |"
+  # Path to component registry
+  REGISTRY_PATH="${REPO_ROOT}/component_registry.json"
   
-  # Check if ports.md exists and has a table structure
-  if grep -q "| Component | Ports | Description |" "$PORTS_DOC"; then
-    # Append to existing table, skipping if entry already exists
-    if ! grep -q "| ${COMPONENT_NAME} |" "$PORTS_DOC"; then
-      sed -i "/| --- | --- | --- |/a\\${ports_entry}" "$PORTS_DOC"
-    fi
+  # Create registry if it doesn't exist
+  if [[ ! -f "$REGISTRY_PATH" ]]; then
+    log_info "Creating new component registry..."
+    echo '{"components":[]}' > "$REGISTRY_PATH"
+  fi
+
+  # Check if component already exists in registry
+  if jq -e ".components[] | select(.name == \"${COMPONENT_NAME}\")" "$REGISTRY_PATH" >/dev/null 2>&1; then
+    log_warning "Component ${COMPONENT_NAME} already exists in registry. Updating..."
+    # Update existing entry
+    tmp=$(mktemp)
+    jq --arg name "$COMPONENT_NAME" \
+       --arg description "$COMPONENT_DESCRIPTION" \
+       --arg ports "$COMPONENT_PORTS" \
+       --arg dependencies "$COMPONENT_DEPENDENCIES" \
+       --arg template "$TEMPLATE_TYPE" \
+       --arg client_specific "$IS_CLIENT_SPECIFIC" \
+       '.components = [.components[] | if .name == $name then {
+          "name": $name,
+          "description": $description,
+          "ports": ($ports | split(",")),
+          "dependencies": ($dependencies | split(",")),
+          "template": $template,
+          "client_specific": ($client_specific == "true"),
+          "added_date": (now | strftime("%Y-%m-%d")),
+          "last_updated": (now | strftime("%Y-%m-%d"))
+        } else . end]' "$REGISTRY_PATH" > "$tmp" && mv "$tmp" "$REGISTRY_PATH"
   else
-    # Create new ports document with proper structure
-    cat > "$PORTS_DOC" << EOL
+    # Add new component entry
+    tmp=$(mktemp)
+    jq --arg name "$COMPONENT_NAME" \
+       --arg description "$COMPONENT_DESCRIPTION" \
+       --arg ports "$COMPONENT_PORTS" \
+       --arg dependencies "$COMPONENT_DEPENDENCIES" \
+       --arg template "$TEMPLATE_TYPE" \
+       --arg client_specific "$IS_CLIENT_SPECIFIC" \
+       '.components += [{
+          "name": $name,
+          "description": $description,
+          "ports": ($ports | split(",")),
+          "dependencies": ($dependencies | split(",")),
+          "template": $template,
+          "client_specific": ($client_specific == "true"),
+          "added_date": (now | strftime("%Y-%m-%d")),
+          "last_updated": (now | strftime("%Y-%m-%d"))
+        }]' "$REGISTRY_PATH" > "$tmp" && mv "$tmp" "$REGISTRY_PATH"
+  fi
+  
+  log_success "Component ${COMPONENT_NAME} registered in component_registry.json"
+}
+
+# Update ports documentation
+update_ports_doc() {
+  if [[ -n "$COMPONENT_PORTS" ]]; then
+    log_info "Updating ports documentation..."
+    PORTS_DOC="${REPO_ROOT}/docs/pages/ports.md"
+    
+    # Ensure the ports doc directory exists
+    mkdir -p "$(dirname "$PORTS_DOC")"
+    
+    # Prepare ports entry
+    IFS=',' read -ra PORT_ARRAY <<< "$COMPONENT_PORTS"
+    PORT_ENTRIES=""
+    for port in "${PORT_ARRAY[@]}"; do
+      PORT_ENTRIES="${PORT_ENTRIES}${PORT_ENTRIES:+, }$port"
+    done
+    
+    ports_entry="| ${COMPONENT_NAME} | ${PORT_ENTRIES} | ${COMPONENT_DESCRIPTION} |"
+    
+    # Create or update ports document
+    if [[ ! -f "$PORTS_DOC" ]]; then
+      # Create new ports document with proper structure
+      cat > "$PORTS_DOC" << EOL
 # AgencyStack Port Assignments
 
-This document tracks port assignments for all AgencyStack components.
+This document tracks port assignments for all AgencyStack components to maintain
+operational clarity and prevent conflicts. Each component has its dedicated ports
+that should not overlap with others.
 
 | Component | Ports | Description |
 | --- | --- | --- |
 ${ports_entry}
 EOL
+      log_success "Created ports.md with ${COMPONENT_NAME} entry"
+    else
+      # Append to existing ports document if entry doesn't exist
+      if ! grep -q "| ${COMPONENT_NAME} |" "$PORTS_DOC"; then
+        # Check if the ports table exists
+        if grep -q "| Component | Ports | Description |" "$PORTS_DOC"; then
+          # Append to existing table
+          sed -i "/| --- | --- | --- |/a\\${ports_entry}" "$PORTS_DOC"
+        else
+          # Add table if it doesn't exist
+          cat >> "$PORTS_DOC" << EOL
+
+| Component | Ports | Description |
+| --- | --- | --- |
+${ports_entry}
+EOL
+        fi
+        log_success "Updated ports.md with ${COMPONENT_NAME} entry"
+      else
+        log_info "Component ${COMPONENT_NAME} already documented in ports.md"
+      fi
+    fi
+  else
+    log_info "No ports specified, skipping ports documentation update"
   fi
-fi
+}
+
+# Create Makefile entries creation function
+create_makefile_entries() {
+  log_info "Creating Makefile entries..."
+  
+  # Create the component makefile
+  cat > "${REPO_ROOT}/makefiles/components/${COMPONENT_NAME}.mk" << EOL
+# ${COMPONENT_NAME}.mk - Makefile targets for ${COMPONENT_NAME}
+# Generated by bootstrap_component.sh following AgencyStack Charter v1.0.3
+
+# Colors for output
+CYAN := \$(shell tput setaf 6 2>/dev/null || echo '')
+GREEN := \$(shell tput setaf 2 2>/dev/null || echo '')
+YELLOW := \$(shell tput setaf 3 2>/dev/null || echo '')
+MAGENTA := \$(shell tput setaf 5 2>/dev/null || echo '')
+BOLD := \$(shell tput bold 2>/dev/null || echo '')
+RESET := \$(shell tput sgr0 2>/dev/null || echo '')
+
+# Directories
+SCRIPTS_DIR := \$(REPO_ROOT)/scripts
+COMPONENTS_DIR := \$(SCRIPTS_DIR)/components
+
+# Component installation target
+${COMPONENT_NAME}:
+	@echo "\$(CYAN)\$(BOLD)🚀 Installing ${COMPONENT_NAME}...\$(RESET)"
+	@\$(COMPONENTS_DIR)/install_${COMPONENT_NAME}.sh \$(if \$(CLIENT_ID),--client-id \$(CLIENT_ID),) \$(if \$(DOMAIN),--domain \$(DOMAIN),)
+
+# Component status check target
+${COMPONENT_NAME}-status:
+	@echo "\$(CYAN)\$(BOLD)ℹ️ Checking ${COMPONENT_NAME} status...\$(RESET)"
+	@\$(COMPONENTS_DIR)/verify_${COMPONENT_NAME}.sh \$(if \$(CLIENT_ID),--client-id \$(CLIENT_ID),) \$(if \$(DOMAIN),--domain \$(DOMAIN),)
+
+# Component logs viewing target
+${COMPONENT_NAME}-logs:
+	@echo "\$(MAGENTA)\$(BOLD)📋 Viewing ${COMPONENT_NAME} logs...\$(RESET)"
+	@if [ -f "/var/log/agency_stack/components/${COMPONENT_NAME}.log" ]; then \\
+		tail -n 50 /var/log/agency_stack/components/${COMPONENT_NAME}.log; \\
+	else \\
+		echo "\$(YELLOW)No log file found for ${COMPONENT_NAME}\$(RESET)"; \\
+	fi
+
+# Component restart target
+${COMPONENT_NAME}-restart:
+	@echo "\$(YELLOW)\$(BOLD)🔄 Restarting ${COMPONENT_NAME}...\$(RESET)"
+	@\$(COMPONENTS_DIR)/install_${COMPONENT_NAME}.sh --restart-only \$(if \$(CLIENT_ID),--client-id \$(CLIENT_ID),) \$(if \$(DOMAIN),--domain \$(DOMAIN),)
+
+# Component test targets (following TDD Protocol)
+${COMPONENT_NAME}-verify:
+	@echo "\$(GREEN)\$(BOLD)✅ Verifying ${COMPONENT_NAME}...\$(RESET)"
+	@\$(COMPONENTS_DIR)/verify_${COMPONENT_NAME}.sh \$(if \$(CLIENT_ID),--client-id \$(CLIENT_ID),) \$(if \$(DOMAIN),--domain \$(DOMAIN),)
+
+${COMPONENT_NAME}-test:
+	@echo "\$(MAGENTA)\$(BOLD)🧪 Testing ${COMPONENT_NAME}...\$(RESET)"
+	@\$(COMPONENTS_DIR)/test_${COMPONENT_NAME}.sh \$(if \$(CLIENT_ID),--client-id \$(CLIENT_ID),) \$(if \$(DOMAIN),--domain \$(DOMAIN),)
+
+${COMPONENT_NAME}-integration-test:
+	@echo "\$(MAGENTA)\$(BOLD)🔄 Running integration tests for ${COMPONENT_NAME}...\$(RESET)"
+	@\$(COMPONENTS_DIR)/integration_test_${COMPONENT_NAME}.sh \$(if \$(CLIENT_ID),--client-id \$(CLIENT_ID),) \$(if \$(DOMAIN),--domain \$(DOMAIN),)
+
+# Add this component to phony targets
+.PHONY: ${COMPONENT_NAME} ${COMPONENT_NAME}-status ${COMPONENT_NAME}-logs ${COMPONENT_NAME}-restart ${COMPONENT_NAME}-verify ${COMPONENT_NAME}-test ${COMPONENT_NAME}-integration-test
+EOL
+
+  # Add include statement to main Makefile if not already present
+  if ! grep -q "include makefiles/components/${COMPONENT_NAME}.mk" "${REPO_ROOT}/Makefile"; then
+    # Add the include statement after the last existing include for makefiles/components/*.mk
+    sed -i '/include makefiles\/components\/.*\.mk/a include makefiles/components/'${COMPONENT_NAME}'.mk' "${REPO_ROOT}/Makefile" || \
+    # If sed fails, append to the end of the file
+    echo "include makefiles/components/${COMPONENT_NAME}.mk" >> "${REPO_ROOT}/Makefile"
+  fi
+  
+  log_success "Created Makefile entries for ${COMPONENT_NAME}"
+}
+
+# Main execution
+# Validation and setup
+validate_inputs
+create_directories
+
+# Create component files
+create_install_script
+create_restart_handler
+create_env_file
+create_test_scripts
+update_component_registry
+update_ports_doc
+create_makefile_entries
+create_documentation
 
 # Log the results
 log_success "✅ Successfully bootstrapped ${COMPONENT_NAME} component!"
