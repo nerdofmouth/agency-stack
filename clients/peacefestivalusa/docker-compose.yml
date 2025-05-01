@@ -1,0 +1,85 @@
+version: '3.8'
+
+# AgencyStack WordPress Container for PeaceFestivalUSA
+# Following AgencyStack Charter v1.0.3 principles of Strict Containerization
+# This docker-compose configuration ensures all components are properly isolated
+
+services:
+  wordpress:
+    image: wordpress:6.4-php8.2-apache
+    container_name: ${CLIENT_ID:-peacefestivalusa}_wordpress
+    restart: always
+    environment:
+      - WORDPRESS_DB_HOST=db
+      - WORDPRESS_DB_USER=${WORDPRESS_DB_USER:-wordpress}
+      - WORDPRESS_DB_PASSWORD=${WORDPRESS_DB_PASSWORD:-wordpress_password}
+      - WORDPRESS_DB_NAME=${WORDPRESS_DB_NAME:-wordpress}
+      - WORDPRESS_TABLE_PREFIX=${WORDPRESS_TABLE_PREFIX:-wp_}
+      # Security settings as per Charter
+      - WORDPRESS_DEBUG=${WORDPRESS_DEBUG:-false}
+      - WORDPRESS_CONFIG_EXTRA=define('WP_MEMORY_LIMIT', '256M'); define('FS_METHOD', 'direct');
+    volumes:
+      - ${DATA_DIR:-/opt/agency_stack/clients/peacefestivalusa}/wordpress:/var/www/html
+      - ${DATA_DIR:-/opt/agency_stack/clients/peacefestivalusa}/wordpress-custom:/var/www/html/wp-content/custom
+      - ${LOGS_DIR:-/var/log/agency_stack/clients/peacefestivalusa}/wordpress:/var/www/html/wp-content/logs
+    networks:
+      - peacefestival_network
+      - traefik_network
+    depends_on:
+      - db
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.wordpress-peacefestival.rule=Host(`${DOMAIN:-peacefestivalusa.nerdofmouth.com}`)"
+      - "traefik.http.routers.wordpress-peacefestival.entrypoints=websecure"
+      - "traefik.http.routers.wordpress-peacefestival.tls.certresolver=letsencrypt"
+      - "traefik.http.services.wordpress-peacefestival.loadbalancer.server.port=80"
+      - "com.agency_stack.component=wordpress"
+      - "com.agency_stack.client=peacefestivalusa"
+      - "com.agency_stack.managed=true"
+
+  db:
+    image: mariadb:10.11
+    container_name: ${CLIENT_ID:-peacefestivalusa}_db
+    restart: always
+    environment:
+      - MYSQL_DATABASE=${WORDPRESS_DB_NAME:-wordpress}
+      - MYSQL_USER=${WORDPRESS_DB_USER:-wordpress}
+      - MYSQL_PASSWORD=${WORDPRESS_DB_PASSWORD:-wordpress_password}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-root_password}
+    volumes:
+      - ${DATA_DIR:-/opt/agency_stack/clients/peacefestivalusa}/db_data:/var/lib/mysql
+      - ${DATA_DIR:-/opt/agency_stack/clients/peacefestivalusa}/backups:/backups
+    networks:
+      - peacefestival_network
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    labels:
+      - "com.agency_stack.component=mariadb"
+      - "com.agency_stack.client=peacefestivalusa"
+      - "com.agency_stack.managed=true"
+
+  # Separate adminer container for database management (optional)
+  adminer:
+    image: adminer:latest
+    container_name: ${CLIENT_ID:-peacefestivalusa}_adminer
+    restart: always
+    networks:
+      - peacefestival_network
+      - traefik_network
+    depends_on:
+      - db
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.adminer-peacefestival.rule=Host(`admin.${DOMAIN:-peacefestivalusa.nerdofmouth.com}`)"
+      - "traefik.http.routers.adminer-peacefestival.entrypoints=websecure"
+      - "traefik.http.routers.adminer-peacefestival.tls.certresolver=letsencrypt"
+      - "traefik.http.services.adminer-peacefestival.loadbalancer.server.port=8080"
+      - "com.agency_stack.component=adminer"
+      - "com.agency_stack.client=peacefestivalusa"
+      - "com.agency_stack.managed=true"
+
+networks:
+  peacefestival_network:
+    driver: bridge
+  traefik_network:
+    external: true
+    name: ${TRAEFIK_NETWORK:-traefik_network}
