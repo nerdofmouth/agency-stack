@@ -770,3 +770,5 @@ fi
 # Final success message
 log_success "WordPress installation for ${CLIENT_ID} completed successfully"
 log_info "For complete documentation, see: /docs/pages/components/client_wordpress.md"
+
+exit 0
