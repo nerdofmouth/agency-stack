@@ -1,0 +1,34 @@
+version: '3.7'
+
+# MCP Server Containerization
+# Following AgencyStack Charter v1.0.3 principles:
+# - Strict Containerization
+# - Repository as Source of Truth
+# - Multi-Tenancy & Security
+
+services:
+  mcp-server:
+    container_name: mcp-server
+    build: .
+    ports:
+      - "${MCP_PORT:-3000}:3000"
+    volumes:
+      - ./:/app
+      - /var/log/agency_stack/components/mcp/${CLIENT_ID:-agencystack}:/app/logs
+    restart: unless-stopped
+    environment:
+      - CLIENT_ID=${CLIENT_ID:-agencystack}
+      - NODE_ENV=production
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    networks:
+      - mcp-network
+    labels:
+      - "agency.client=${CLIENT_ID:-agencystack}"
+      - "agency.component=mcp_server"
+      - "agency.managedby=agencystack"
+      - "agency.environment=${ENVIRONMENT:-development}"
+
+networks:
+  mcp-network:
+    name: mcp-network
+    driver: bridge
