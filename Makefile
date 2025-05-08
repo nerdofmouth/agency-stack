@@ -2698,3 +2698,44 @@ audit:
 	fi
 	@bash "$(SCRIPTS_DIR)/utils/environment_audit.sh"
 	@echo "$(GREEN)Environment audit complete.$(RESET)"
+# MCP Server Targets
+# Following AgencyStack Charter v1.0.3 principles
+
+.PHONY: install-mcp launch-mcp stop-mcp reinstall-mcp check-mcp
+
+# Install MCP server for a client
+install-mcp:
+	@echo "Installing MCP server..."
+	@bash $(CURDIR)/scripts/components/install_mcp_server.sh $(CLIENT_ID)
+
+# Launch MCP server
+launch-mcp:
+	@echo "Launching MCP server..."
+	@bash $(CURDIR)/scripts/components/launch_mcp_server.sh $(CLIENT_ID)
+
+# Stop MCP server
+stop-mcp:
+	@echo "Stopping MCP server..."
+	@cd /opt/agency_stack/clients/$(CLIENT_ID)/mcp && docker-compose down || true
+
+# Reinstall MCP server
+reinstall-mcp: stop-mcp
+	@echo "Reinstalling MCP server..."
+	@bash $(SCRIPTS_DIR)/components/install_mcp_server.sh $(CLIENT_ID)
+	@bash $(SCRIPTS_DIR)/components/launch_mcp_server.sh $(CLIENT_ID)
+
+# Check MCP server status
+check-mcp:
+	@echo "Checking MCP server status..."
+	@if docker ps | grep -q "mcp-server"; then \
+		echo "MCP server is running"; \
+		echo "Access URL: http://localhost:3000"; \
+		curl -s http://localhost:3000/health | jq || echo "API not responding"; \
+	else \
+		echo "MCP server is not running"; \
+	fi
+
+# Deploy WordPress with MCP validation
+deploy-wordpress-mcp: launch-mcp
+	@echo "Deploying WordPress with MCP validation..."
+	@node $(SCRIPTS_DIR)/components/mcp/deploy-wordpress.js
