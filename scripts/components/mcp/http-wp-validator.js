@@ -15,6 +15,10 @@
 const http = require('http');
 const https = require('https');
 const url = require('url');
+const fs = require('fs');
+const path = require('path');
+const child_process = require('child_process');
+const os = require('os');
 
 // Logger for debugging container network issues
 const logger = {
@@ -78,16 +82,102 @@ function normalizeContainerUrl(targetUrl) {
   return targetUrl;
 }
 
+/**
+ * Detect environment type to determine proper URL handling
+ * Following AgencyStack Charter requirements for container networking
+ */
+function detectEnvironment() {
+  // Check if running in Docker container
+  const isContainer = fs.existsSync('/.dockerenv');
+  
+  // Check for WSL environment
+  let isWSL = false;
+  try {
+    const osRelease = fs.readFileSync('/proc/sys/kernel/osrelease', 'utf8').toLowerCase();
+    isWSL = osRelease.includes('microsoft') || osRelease.includes('wsl');
+  } catch (err) {
+    // Not WSL if file doesn't exist
+  }
+  
+  return { isContainer, isWSL };
+}
+
+/**
+ * Get network configuration from bridge file if available
+ */
+function getNetworkConfig() {
+  // Try to read network configuration
+  let config = null;
+  const scriptDir = path.dirname(require.main ? require.main.filename : __filename);
+  const repoRoot = path.resolve(scriptDir, '../../..');
+  const configPaths = [
+    '/etc/agency_stack/network/config.json',  // Container path
+    path.join(repoRoot, 'configs/network/bridge_config.json') // Repo path
+  ];
+  
+  for (const configPath of configPaths) {
+    try {
+      if (fs.existsSync(configPath)) {
+        console.log(`Loading network config from ${configPath}`);
+        config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        break;
+      }
+    } catch (err) {
+      console.log(`Error reading network config from ${configPath}: ${err.message}`);
+    }
+  }
+  
+  return config;
+}
+
+/**
+ * Map URL for proper container-to-container or host-to-container communication
+ * This follows the AgencyStack Charter principle of ensuring containerization
+ */
+function mapUrl(url) {
+  // Parse original URL
+  const parsedUrl = new URL(url);
+  const { isContainer, isWSL } = detectEnvironment();
+  const config = getNetworkConfig();
+  
+  // Only modify URL if we're in a container and have a config
+  if (isContainer && config && parsedUrl.hostname === 'localhost') {
+    // Map localhost:8082 to wordpress:8082 for container-to-container communication
+    if (parsedUrl.port === '8082') {
+      console.log('Detected WordPress URL, remapping for container access');
+      parsedUrl.hostname = 'wordpress';
+    }
+    // Map localhost:3000 to mcp-server:3000 for container-to-container communication
+    else if (parsedUrl.port === '3000') {
+      console.log('Detected MCP Server URL, remapping for container access');
+      parsedUrl.hostname = 'mcp-server';
+    }
+  } else if (isWSL && parsedUrl.hostname === 'localhost') {
+    // Keep localhost, as it will resolve correctly in WSL
+    console.log('WSL environment detected, keeping localhost');
+  }
+  
+  return parsedUrl.toString();
+}
+
 // Helper function to perform HTTP request and return content
 function makeRequest(targetUrl) {
   // Normalize URL for container environment
   const normalizedUrl = normalizeContainerUrl(targetUrl);
+  
+  // Map the URL according to environment for proper container networking
+  const mappedUrl = mapUrl(normalizedUrl);
+  
+  if (mappedUrl !== normalizedUrl) {
+    console.log(`Remapped URL: ${normalizedUrl} -> ${mappedUrl}`);
+  }
+  
   return new Promise((resolve, reject) => {
     // Parse the URL to determine http vs https
-    const parsedUrl = url.parse(normalizedUrl);
+    const parsedUrl = new URL(mappedUrl);
     const httpModule = parsedUrl.protocol === 'https:' ? https : http;
     
-    logger.info(`Making request to: ${normalizedUrl} (normalized from ${targetUrl})`);
+    logger.info(`Making request to: ${mappedUrl} (normalized from ${targetUrl})`);
     
     // Set timeout to avoid hanging requests
     const timeoutMs = 10000; // 10 seconds
@@ -95,7 +185,7 @@ function makeRequest(targetUrl) {
     const options = {
       hostname: parsedUrl.hostname,
       port: parsedUrl.port || (parsedUrl.protocol === 'https:' ? 443 : 80),
-      path: parsedUrl.path,
+      path: parsedUrl.pathname + parsedUrl.search,
       method: 'GET',
       headers: {
         'User-Agent': 'AgencyStack-MCP-Validator/1.0',
@@ -112,7 +202,7 @@ function makeRequest(targetUrl) {
       
       // Handle redirects (e.g., for wp-admin) with special handling for containerized environments
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        logger.debug(`Redirect detected from ${normalizedUrl} to ${res.headers.location}`);
+        logger.debug(`Redirect detected from ${mappedUrl} to ${res.headers.location}`);
         
         // Special handling for WordPress container redirects that often point to wrong ports
         const redirectUrl = res.headers.location;
@@ -133,8 +223,8 @@ function makeRequest(targetUrl) {
             
             // For container redirects, use the original hostname but update the path
             try {
-              const redirectUrlObj = url.parse(redirectUrl);
-              const newPath = redirectUrlObj.path || '/';
+              const redirectUrlObj = new URL(redirectUrl);
+              const newPath = redirectUrlObj.pathname + redirectUrlObj.search;
               
               // Create a normalized redirect URL using the original container network mapping
               const containerRedirectUrl = `${parsedUrl.protocol}//${parsedUrl.hostname}:${options.port}${newPath}`;
@@ -301,6 +391,62 @@ async function validateWordPressSite(targetUrl) {
   return results;
 }
 
+// Network diagnostic function to help troubleshoot container connectivity
+// Follows AgencyStack Charter principle of Auditability & Documentation
+async function diagnoseNetworkIssues(targetUrl) {
+  const diagnostics = {
+    timestamp: new Date().toISOString(),
+    url: targetUrl,
+    environment: detectEnvironment(),
+    networkConfig: getNetworkConfig(),
+    dnsResolution: null,
+    ping: null,
+    curl: null
+  };
+  
+  // Parse URL to get hostname
+  const parsedUrl = new URL(targetUrl);
+  const hostname = parsedUrl.hostname;
+  
+  try {
+    // DNS lookup
+    diagnostics.dnsResolution = await new Promise((resolve) => {
+      require('dns').lookup(hostname, (err, address) => {
+        if (err) resolve({ success: false, error: err.message });
+        else resolve({ success: true, address });
+      });
+    });
+    
+    // Ping test (only works in container with appropriate privileges)
+    try {
+      const pingOutput = child_process.execSync(`ping -c 1 -W 2 ${hostname}`, { timeout: 3000 }).toString();
+      diagnostics.ping = { success: true, output: pingOutput };
+    } catch (err) {
+      diagnostics.ping = { success: false, error: err.message };
+    }
+    
+    // Curl test
+    try {
+      const curlOutput = child_process.execSync(`curl -sI ${targetUrl}`, { timeout: 5000 }).toString();
+      diagnostics.curl = { success: true, output: curlOutput };
+    } catch (err) {
+      diagnostics.curl = { success: false, error: err.message };
+    }
+  } catch (err) {
+    console.error(`Error during network diagnostics: ${err.message}`);
+  }
+  
+  return diagnostics;
+}
+
+// Export validation function and network utilities
+module.exports = {
+  validateWordPressSite,
+  diagnoseNetworkIssues,
+  detectEnvironment,
+  mapUrl
+};
+
 // If script is run directly, execute validation with command line arguments
 if (require.main === module) {
   const siteUrl = process.argv[2] || 'http://localhost:8082';
@@ -315,6 +461,3 @@ if (require.main === module) {
       process.exit(1);
     });
 }
-
-// Export the validation function
-module.exports = { validateWordPressSite };
