@@ -1,0 +1,35 @@
+{
+  "mcpServers": {
+    "context7": {
+      "command": "node",
+      "args": ["/root/_repos/agency-stack/scripts/components/mcp/context7-dev.js"],
+      "env": {
+        "CLIENT_ID": "agencystack",
+        "MCP_PORT": "3007"
+      }
+    },
+    "puppeteer": {
+      "command": "curl",
+      "args": ["-X", "POST", "-H", "Content-Type: application/json", "-d", "{}", "http://localhost:3000/puppeteer"],
+      "env": {}
+    },
+    "taskmaster-ai": {
+      "command": "curl",
+      "args": ["-X", "POST", "-H", "Content-Type: application/json", "-d", "{}", "http://localhost:3000/taskmaster"],
+      "env": {
+        "ANTHROPIC_API_KEY": "REMOVED_SECRET",
+        "PERPLEXITY_API_KEY": "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"
+      }
+    },
+    "taskmaster-ai2": {
+      "command": "node",
+      "args": ["/root/_repos/agency-stack/scripts/components/mcp/taskmaster-dev.js"],
+      "env": {
+        "CLIENT_ID": "agencystack",
+        "MCP_PORT": "3008",
+        "ANTHROPIC_API_KEY": "REMOVED_SECRET",
+        "PERPLEXITY_API_KEY": "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"
+      }
+    }
+  }
+}

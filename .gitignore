@@ -1,0 +1,26 @@
+# MCP Server
+scripts/components/mcp/mcp_server.log
+
+# Docker
+scripts/components/mcp/docker-compose.yml
+
+# Node
+scripts/components/mcp/node_modules
+scripts/components/mcp/package-lock.json
+node_modules
+
+# Development specific files
+scripts/components/mcp/package.json
+
+# Logs
+*.log
+logs
+
+# Environment variables
+.env
+.env.local
+
+# IDE files
+.idea/
+.vscode/
+*.iml

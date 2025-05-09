@@ -1,0 +1,32 @@
+{
+  "mcpServers": {
+    "context7": {
+      "command": "node",
+      "args": ["/root/_repos/agency-stack/scripts/components/mcp/server.js", "--context7-mode"],
+      "env": {
+        "CLIENT_ID": "peacefestivalusa",
+        "MCP_PORT": "3007"
+      }
+    },
+    "puppeteer": {
+      "command": "curl",
+      "args": ["-X", "POST", "-H", "Content-Type: application/json", "-d", "{}", "http://localhost:3000/puppeteer"],
+      "env": {}
+    },
+    "taskmaster-ai": {
+      "command": "curl",
+      "args": ["-X", "POST", "-H", "Content-Type: application/json", "-d", "{\"task\":\"Generate a deployment plan following AgencyStack Charter principles\"}", "http://localhost:3000/taskmaster"],
+      "env": {}
+    },
+    "taskmaster-advanced": {
+      "command": "docker",
+      "args": ["exec", "mcp-server", "curl", "-X", "POST", "-H", "Content-Type: application/json", "-d", "{\"task\":\"$TASK\", \"advanced_search\": true}", "http://localhost:3000/taskmaster"],
+      "env": {}
+    },
+    "taskmaster-research": {
+      "command": "docker",
+      "args": ["exec", "-e", "PERPLEXITY_API_KEY=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", "mcp-server", "curl", "-X", "POST", "-H", "Content-Type: application/json", "-d", "{\"task\":\"$TASK\", \"advanced_search\": true}", "http://localhost:3000/taskmaster"],
+      "env": {}
+    }
+  }
+}

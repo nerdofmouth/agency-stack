@@ -662,4 +662,83 @@ These tests are **mandatory** and must be implemented in *every* component. Fail
 
 ---
 
-This protocol is effective as of April 25, 2025 and applies to all subsequent development.
+# Instructions for Adding and Using MCP Services in AgencyStack Projects
+Following the AgencyStack Charter principles of Repository as Source of Truth, Strict Containerization, and Component Consistency, here are comprehensive instructions for integrating MCP services into your development workflows:
+
+1. MCP Services Overview
+The following MCP services are now available in your development environment:
+
+| Service | Port | Endpoint | Purpose | |---------|------|----------|---------| | Enhanced MCP Server | 3000 | /health, /puppeteer, /taskmaster | Core service with Puppeteer and Taskmaster capabilities | | Context7 Service | 3007 | /health, /context7 | Context-aware deployment planning | | Taskmaster Service | 3008 | /health, /taskmaster | Task orchestration and workflow automation |
+
+2. Integration Instructions
+A. Basic Service Calls
+
+# Health check
+curl http://localhost:3000/health
+
+# Script analysis using Puppeteer
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"task":"script_analysis","repository":"/path/to/repo"}' \
+  http://localhost:3000/puppeteer
+
+# Interface validation using Puppeteer
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"task":"interface_validation","url":"http://your-app-url","checks":[{"selector":".element","shouldExist":true}]}' \
+  http://localhost:3000/puppeteer
+
+# Task processing using Taskmaster
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"task":"Your detailed task description"}' \
+  http://localhost:3000/taskmaster
+B. Integration with Shell Scripts
+Add to your component scripts:
+
+# Source MCP utility functions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../../utils/mcp_utils.sh"
+
+# Use MCP services
+function deploy_with_context7() {
+  local client_id="$1"
+  local component="$2"
+  
+  log_info "Generating deployment plan with Context7..."
+  context7_response=$(call_context7 "${client_id}" "${component}")
+  
+  # Process the response
+  # ...
+}
+C. Integration with JavaScript/TypeScript
+// mcp-service.js
+import axios from 'axios';
+
+const MCP_SERVER_URL = process.env.NEXT_PUBLIC_MCP_SERVER_URL || 'http://localhost:3000';
+const CONTEXT7_URL = process.env.NEXT_PUBLIC_CONTEXT7_URL || 'http://localhost:3007';
+
+export async function analyzeScript(repository, patterns = []) {
+  try {
+    const response = await axios.post(`${MCP_SERVER_URL}/puppeteer`, {
+      task: 'script_analysis',
+      repository,
+      patterns
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error analyzing script:', error);
+    throw error;
+  }
+}
+
+export async function createDeploymentPlan(clientId, components) {
+  try {
+    const response = await axios.post(`${CONTEXT7_URL}/context7`, {
+      context: 'deployment_planning',
+      client_id: clientId,
+      components
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error creating deployment plan:', error);
+    throw error;
+  }
+}

@@ -1,0 +1,22 @@
+FROM node:18-alpine
+
+# Create app directory following AgencyStack Charter principles
+WORKDIR /app
+
+# Install app dependencies
+COPY package*.json ./
+RUN npm install --only=production
+
+# Bundle app source - Repository as Source of Truth principle
+COPY . .
+
+# Set environment variables
+ENV CONTEXT7_PORT=3007
+ENV CLIENT_ID=peacefestivalusa
+ENV NODE_ENV=production
+
+# Expose port
+EXPOSE 3007
+
+# Start the Context7 server
+CMD ["node", "context7-server.js"]
