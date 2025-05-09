@@ -1,0 +1,45 @@
+{
+  "client_id": "peacefestivalusa",
+  "host_machine": "172.31.112.1",
+  "wsl": "172.31.115.189",
+  "docker_network": "mcp-servers_mcp-network",
+  "containers": {
+    "wordpress": {
+      "name": "wordpress",
+      "host_port": 8082,
+      "container_port": 80
+    },
+    "mcp_server": {
+      "name": "mcp-server",
+      "host_port": 3000,
+      "container_port": 3000
+    },
+    "traefik": {
+      "name": "traefik",
+      "host_port": 8080,
+      "container_port": 8080
+    },
+    "nextjs_control_panel": {
+      "name": "nextjs-control-panel",
+      "host_port": 8090,
+      "container_port": 3000
+    },
+    "dashboard_ui": {
+      "name": "dashboard-ui",
+      "host_port": 8091,
+      "container_port": 3000
+    }
+  },
+  "urls": {
+    "wordpress": {
+      "from_host": "http://localhost:8082",
+      "from_container": "http://wordpress:80",
+      "from_wsl": "http://localhost:8082"
+    },
+    "mcp_server": {
+      "from_host": "http://localhost:3000",
+      "from_container": "http://mcp-server:3000",
+      "from_wsl": "http://localhost:3000"
+    }
+  }
+}
