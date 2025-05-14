@@ -1,0 +1,54 @@
+{
+  "lessons": [
+    {
+      "id": 1,
+      "title": "Database Connection Testing is Critical",
+      "category": "Deployment",
+      "lesson": "Always include database connection testing in the deployment process. The WordPress database connection error we encountered could have been detected earlier with properly integrated tests.",
+      "solution": "Integrate database connectivity checks in the deployment workflow. Add a health check endpoint (agencystack-health.php) that verifies database connections and returns diagnostics in JSON format.",
+      "charter_principles": ["Strict Containerization", "TDD Protocol", "Auditability & Documentation"],
+      "project": "peacefestivalusa",
+      "date": "2025-05-14"
+    },
+    {
+      "id": 2,
+      "title": "Path Resolution in Docker-in-Docker Environments",
+      "category": "Architecture",
+      "lesson": "Makefile targets referenced scripts with incorrect paths (/scripts/components/... instead of relative paths), causing failures in Docker-in-Docker environments.",
+      "solution": "Always use relative paths in Makefiles, referencing variables like $(SCRIPTS_DIR) instead of hardcoded absolute paths. Follow AgencyStack Charter directory structure conventions.",
+      "charter_principles": ["Repository as Source of Truth", "Proper Change Workflow"],
+      "project": "peacefestivalusa",
+      "date": "2025-05-14"
+    },
+    {
+      "id": 3,
+      "title": "Environment Variable Consistency",
+      "category": "Configuration",
+      "lesson": "Inconsistent environment variables between WordPress and MariaDB containers led to database connection failures. WordPress expected 'wordpress' as password but MariaDB was configured with 'change_this_password'.",
+      "solution": "Create a unified environment configuration file (.env) with consistent variable values. Generate secure passwords dynamically and share them across services.",
+      "charter_principles": ["Idempotency & Automation", "Multi-Tenancy & Security"],
+      "project": "peacefestivalusa",
+      "date": "2025-05-14"
+    },
+    {
+      "id": 4,
+      "title": "Unified Testing Framework",
+      "category": "Quality",
+      "lesson": "Multiple test scripts existed but weren't properly integrated into the deployment process. Tests in utils/ and components/ directories with overlapping functionality.",
+      "solution": "Consolidate testing scripts and integrate them directly into the deployment process. Follow the TDD Protocol defined in AgencyStack Charter.",
+      "charter_principles": ["TDD Protocol", "Component Consistency"],
+      "project": "peacefestivalusa",
+      "date": "2025-05-14"
+    },
+    {
+      "id": 5,
+      "title": "Health Check Integration",
+      "category": "Monitoring",
+      "lesson": "Missing health check endpoints made it difficult to diagnose issues in deployed services.",
+      "solution": "Add standardized health check endpoints to all services. Deploy agencystack-health.php with WordPress installations to provide JSON-based diagnostics.",
+      "charter_principles": ["Auditability & Documentation", "Proper Change Workflow"],
+      "project": "peacefestivalusa",
+      "date": "2025-05-14"
+    }
+  ]
+}

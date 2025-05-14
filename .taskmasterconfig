@@ -1,0 +1,103 @@
+{
+  "config": {
+    "name": "AgencyStack PeaceFestivalUSA",
+    "description": "AgencyStack deployment configuration for the PeaceFestivalUSA client",
+    "version": "1.0.3",
+    "project": {
+      "root": "/root/_repos/agency-stack",
+      "clientId": "peacefestivalusa",
+      "repositoryUrl": "https://github.com/nerdofmouth/agency-stack",
+      "branch": "client/peacefestivalusa",
+      "primaryFocus": "client_deployment"
+    },
+    "logging": {
+      "path": "/var/log/agency_stack/components/taskmaster-ai.log",
+      "level": "info",
+      "format": "json",
+      "rotation": {
+        "enabled": true,
+        "maxSize": "10MB",
+        "maxFiles": 5
+      }
+    },
+    "tasks": {
+      "deployment": {
+        "scriptPath": "/root/_repos/agency-stack/scripts/components/deploy_multi_client.sh",
+        "configPath": "/root/_repos/agency-stack/clients/peacefestivalusa/.env.production",
+        "wordpressPath": "/root/_repos/agency-stack/scripts/components/install_peacefestivalusa_wordpress_did.sh"
+      },
+      "testing": {
+        "enabled": true,
+        "testProtocol": "/root/_repos/agency-stack/docs/pages/deployments/peacefestivalusa.md",
+        "validateDeployment": true,
+        "runPostDeploymentChecks": true
+      }
+    },
+    "models": {
+      "default": "claude-3-5-sonnet",
+      "allowed": ["claude-3-haiku", "claude-3-5-sonnet", "gpt-4", "gpt-4-turbo"],
+      "capabilities": {
+        "coding": true,
+        "toolUse": true,
+        "planning": true
+      }
+    },
+    "tools": [
+      {
+        "name": "git",
+        "enabled": true,
+        "permissions": ["read", "commit"],
+        "workingDirectory": "/root/_repos/agency-stack"
+      },
+      {
+        "name": "docker",
+        "enabled": true,
+        "permissions": ["run", "build"],
+        "containerization": "strict"
+      },
+      {
+        "name": "shell",
+        "enabled": true,
+        "permissions": ["exec"],
+        "scriptTypes": ["bash", "sh", "zsh"],
+        "trackChanges": true
+      },
+      {
+        "name": "web",
+        "enabled": true,
+        "permissions": ["get", "post"],
+        "allowedDomains": ["*"]
+      },
+      {
+        "name": "mcp",
+        "enabled": true,
+        "servers": ["github", "puppeteer", "fetch", "sequentialthinking", "sqlite"]
+      }
+    ],
+    "constraints": {
+      "followAgencyStackCharter": true,
+      "enforceRepositoryIntegrity": true,
+      "requireDocumentation": true,
+      "preferContainerization": true,
+      "maintainIdempotency": true,
+      "strictChangeWorkflow": true,
+      "noDirectVmModifications": true,
+      "properComponentRegistration": true,
+      "validateWSL2DockerMounts": true,
+      "componentConsistency": {
+        "requireInstallScript": true,
+        "requireMakefileTargets": true,
+        "requireDocs": true,
+        "requireRegistryEntry": true,
+        "requireLogging": true
+      }
+    },
+    "directories": {
+      "installScripts": "/scripts/components/",
+      "utilityScripts": "/scripts/utils/",
+      "componentDocs": "/docs/pages/components/",
+      "logs": "/var/log/agency_stack/components/",
+      "installOutput": "/opt/agency_stack/clients/peacefestivalusa/"
+    }
+  }
+}

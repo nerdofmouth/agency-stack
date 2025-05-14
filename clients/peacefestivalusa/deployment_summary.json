@@ -1,0 +1,13 @@
+{
+  "client": "peacefestivalusa",
+  "domain": "peacefestivalusa.alpha.nerdofmouth.com",
+  "localDomain": "peacefestivalusa.localhost:8082",
+  "deployedAt": "2025-05-14T18:25:01.803Z",
+  "components": [
+    "wordpress",
+    "mariadb",
+    "traefik",
+    "keycloak"
+  ],
+  "charterCompliant": true
+}

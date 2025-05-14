@@ -1,0 +1,36 @@
+FROM ubuntu:22.04
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    make \
+    openssh-client \
+    ca-certificates \
+    gnupg \
+    lsb-release
+
+# Setup Docker repos (for DinD operation)
+RUN mkdir -p /etc/apt/keyrings && \
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null && \
+    apt-get update && apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+# Set working directory
+WORKDIR /agency_stack
+
+# Copy repository
+COPY . .
+
+# Create required directories as specified in the AgencyStack Charter
+RUN mkdir -p /var/log/agency_stack/components && \
+    mkdir -p /opt/agency_stack/clients/peacefestivalusa
+
+# Set environment variables
+ENV CLIENT_ID=peacefestivalusa
+ENV DOMAIN=localhost
+ENV WP_PORT=8082
+ENV DB_PORT=33061
+
+# Entry point for deployment
+ENTRYPOINT ["/bin/bash"]
