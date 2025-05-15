@@ -56,7 +56,7 @@ fi
 # Display usage information
 show_usage() {
   echo -e "${BOLD}AgencyStack Component Standardizer${NC}"
-  echo "Standardizes component scripts to comply with Charter v1.0.3 requirements"
+  echo "Standardizes component scripts to comply with Charter v1.0.3 requirements, including header and logging fixes (consolidated from charter_compliance_fix.sh)"
   echo ""
   echo "Usage:"
   echo "  $(basename "$0") <component_name|--all> [options]"
@@ -178,7 +178,72 @@ check_component_docs() {
   return 0
 }
 
-# Standardize script header
+# Charter Compliance: Standardize script header and logging
+fix_script_header() {
+  local script="$1"
+  local script_basename=$(basename "$script")
+  # Create backup
+  cp "$script" "${script}.bak"
+  # Extract original script content without any header or sourcing logic (for preservation)
+  local script_content
+  local content_start_line
+  content_start_line=$(grep -n -m 1 -E "^[^#].*$" "$script" | cut -d: -f1)
+  awk -v start="$content_start_line" 'NR >= start &&
+    !/SCRIPT_DIR=/ &&
+    !/source.*common\.sh/ &&
+    !/exit_with_warning_if_host/ &&
+    !/^if.*common\.sh/ &&
+    !/^else$/ &&
+    !/^fi$/ &&
+    !/log_info\(\)/ &&
+    !/log_error\(\)/ &&
+    !/log_warning\(\)/ &&
+    !/log_success\(\)/' "$script" > "${script}.content"
+  script_content=$(cat "${script}.content")
+  rm "${script}.content"
+  # Create standardized header
+  cat > "$script" << EOL
+#!/bin/bash
+# AgencyStack Charter Compliance Standard Header
+SCRIPT_DIR="\$(cd \"\$(dirname \"\${BASH_SOURCE[0]}\")\" && pwd)"
+if [[ -f "\${SCRIPT_DIR}/../utils/common.sh" ]]; then
+  source "\${SCRIPT_DIR}/../utils/common.sh"
+fi
+exit_with_warning_if_host
+# AgencyStack Component Installer: \${script_basename/install_/}
+# Path: /scripts/components/\${script_basename}
+#
+EOL
+  # Append original script content
+  echo "$script_content" >> "$script"
+  chmod +x "$script"
+  log_success "✅ Standardized header for $script_basename with proper sourcing and host check"
+}
+
+# Charter Compliance: Check for standard logging
+check_logging() {
+  local script="$1"
+  local script_basename=$(basename "$script")
+  # Skip if already using standard logging
+  if grep -q "log_info\|log_error\|log_warning\|log_success" "$script"; then
+    # Check if it's reimplementing log functions
+    if grep -q "log_info()\|log_error()\|log_warning()\|log_success()" "$script"; then
+      log_warning "⚠️ Script $script_basename reimplements logging functions. This requires manual review."
+      return 1
+    else
+      log_info "✓ Script $script_basename already uses standard logging"
+      return 0
+    fi
+  fi
+  log_warning "⚠️ Script $script_basename does not use standard logging functions. Manual review required."
+  return 1
+}
+
+# Standardize script header (legacy alias for backward compatibility)
+standardize_header() {
+  fix_script_header "$1"
+}
+
 standardize_header() {
   local file="$1"
   local component="$2"
@@ -343,48 +408,54 @@ create_missing_registry_entry() {
 # Standardize a single component
 standardize_component() {
   local component="$1"
-  local install_script="${REPO_ROOT}/scripts/components/install_${component}.sh"
-  
-  if [[ ! -f "$install_script" ]]; then
-    log_error "Component install script not found: $install_script"
+  local script="${REPO_ROOT}/scripts/components/install_${component}.sh"
+  if [[ ! -f "$script" ]]; then
+    log_error "Component script not found: $script"
     return 1
   fi
-  
-  log_info "Standardizing ${component}..."
-  
-  # First run basic syntax repair
-  if [[ -f "${SCRIPT_DIR}/syntax_repair.sh" ]]; then
-    "${SCRIPT_DIR}/syntax_repair.sh" "$component" $([ "$VERBOSE" = "true" ] && echo "--verbose") $([ "$DRY_RUN" = "true" ] && echo "--dry-run") $([ "$BACKUP" = "false" ] && echo "--no-backup")
-  fi
-  
-  # Standardize header
-  standardize_header "$install_script" "$component"
-  
-  # Check and create missing TDD Protocol test scripts
+  log_info "Standardizing $component for Charter compliance..."
+  create_backup "$script"
+  # Charter compliance: fix header and check logging
+  fix_script_header "$script"
+  check_logging "$script"
+  check_test_scripts "$component"
+  check_env_example "$component"
+  check_registry_entry "$component"
+  check_component_docs "$component"
   create_missing_test_scripts "$component"
-  
-  # Check and create missing Makefile entries
   create_missing_makefile_entries "$component"
-  
-  # Check and create missing documentation
   create_missing_documentation "$component"
-  
-  # Check and create missing registry entry
   create_missing_registry_entry "$component"
-  
-  log_success "Completed standardization for ${component}"
+  log_success "Component $component standardized."
 }
 
 # Process all components
 standardize_all_components() {
-  log_info "Standardizing all components..."
-  
-  find "${REPO_ROOT}/scripts/components" -name "install_*.sh" | while read -r script; do
-    component=$(basename "$script" | sed 's/^install_//;s/\.sh$//')
-    standardize_component "$component"
+  log_info "Standardizing all components for Charter compliance..."
+  local components_dir="${REPO_ROOT}/scripts/components"
+  local fixed_count=0
+  local review_needed_count=0
+  for script in "$components_dir"/install_*.sh; do
+    local component_name
+    component_name=$(basename "$script" | sed 's/^install_//;s/\.sh$//')
+    create_backup "$script"
+    fix_script_header "$script"
+    check_logging "$script" || review_needed_count=$((review_needed_count+1))
+    check_test_scripts "$component_name"
+    check_env_example "$component_name"
+    check_registry_entry "$component_name"
+    check_component_docs "$component_name"
+    create_missing_test_scripts "$component_name"
+    create_missing_makefile_entries "$component_name"
+    create_missing_documentation "$component_name"
+    create_missing_registry_entry "$component_name"
+    fixed_count=$((fixed_count+1))
+    log_success "Component $component_name standardized."
   done
-  
-  log_success "Completed standardization for all components"
+  log_success "✅ Fixed $fixed_count component scripts"
+  if [[ $review_needed_count -gt 0 ]]; then
+    log_warning "⚠️ $review_needed_count scripts need manual review for logging compliance."
+  fi
 }
 
 # Main execution
