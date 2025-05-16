@@ -38,11 +38,11 @@ fi
 # exit_with_warning_if_host
 
 # AgencyStack Component Installer: peacefestivalusa_wordpress.sh
-# Path: /scripts/components/install_peacefestivalusa_wordpress.sh
 #
-if [[ "$0" != *"/root/_repos/agency-stack/scripts/"* ]]; then
-  echo "ERROR: This script must be run from the repository context"
-  echo "Run with: /root/_repos/agency-stack/scripts/components/$(basename "$0")"
+# Flexible repo context check: must be inside scripts/components/ of a valid AgencyStack repo (with .git, scripts/, docs/)
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+if [[ ! -d "$REPO_ROOT/.git" || ! -d "$REPO_ROOT/scripts" || ! -d "$REPO_ROOT/docs" ]]; then
+  echo "ERROR: This script must be run from inside a valid AgencyStack repository clone (missing .git/scripts/docs in: $REPO_ROOT)"
   exit 1
 fi
 
