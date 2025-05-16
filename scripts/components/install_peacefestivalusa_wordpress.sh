@@ -29,10 +29,12 @@ done
 
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+echo "[DEBUG] SCRIPT_DIR is: $SCRIPT_DIR"
+echo "[DEBUG] Checking for: ${SCRIPT_DIR}/../utils/common.sh"
 if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
   source "${SCRIPT_DIR}/../utils/common.sh"
 else
-  echo "ERROR: Could not find common.sh"
+  echo "ERROR: Could not find common.sh at ${SCRIPT_DIR}/../utils/common.sh"
   exit 1
 fi
 
