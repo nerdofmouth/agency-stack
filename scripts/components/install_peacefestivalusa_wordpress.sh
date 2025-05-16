@@ -83,7 +83,7 @@ for arg in "$@"; do
   fi
 done
 
-if [ "${ALLOW_VM_INSTALL}" = "true" ] || [ "$ALLOW_VM_INSTALL_FLAG" = "true" ]; then
+if [[ "$ALLOW_VM_INSTALL" == "true" || "$ALLOW_VM_INSTALL_FLAG" == "true" ]]; then
   log_warning "Container/VM check bypassed: user asserts this is a dedicated, sovereign VM (per AgencyStack Charter)."
 else
   if is_running_in_container; then
