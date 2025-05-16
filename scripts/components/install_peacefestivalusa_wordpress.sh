@@ -57,10 +57,10 @@ elif is_dev_container; then
   log_info "Running in host environment"
 fi
 
-# Client-specific variables
-CLIENT_ID="peacefestivalusa"
-DOMAIN="peacefestivalusa.nerdofmouth.com"
-ADMIN_EMAIL="${ADMIN_EMAIL:-admin@peacefestivalusa.com}"
+# Client-specific variables (multi-client ready)
+CLIENT_ID="${CLIENT_ID:-}"
+DOMAIN="${DOMAIN:-}"
+ADMIN_EMAIL="${ADMIN_EMAIL:-admin@${CLIENT_ID}.nerdofmouth.com}"
 WP_ADMIN_USER="admin"
 WP_ADMIN_PASSWORD=$(openssl rand -base64 12)
 WP_DB_NAME="${CLIENT_ID}_wordpress"
@@ -68,6 +68,47 @@ WP_DB_USER="${CLIENT_ID}_wp"
 WP_TABLE_PREFIX="wp_"
 WP_PORT="${WP_PORT:-8082}"
 MARIADB_PORT="${MARIADB_PORT:-3306}"
+
+# Parse arguments (support --client-id and --domain)
+while [[ $# -gt 0 ]]; do
+  key="$1"
+  if [[ $key == *"="* ]]; then
+    value="${key#*=}"
+    key="${key%%=*}"
+  else
+    value=""
+  fi
+  case $key in
+    --client-id)
+      CLIENT_ID="$2"; shift ;;
+    --client-id=*)
+      CLIENT_ID="$value" ;;
+    --domain)
+      DOMAIN="$2"; shift ;;
+    --domain=*)
+      DOMAIN="$value" ;;
+    --admin-email)
+      ADMIN_EMAIL="$2"; shift ;;
+    --admin-email=*)
+      ADMIN_EMAIL="$value" ;;
+    # (other flags remain unchanged)
+    *)
+      # existing flag parsing here
+      ;;
+  esac
+  shift
+done
+
+# Validate CLIENT_ID
+if [ -z "$CLIENT_ID" ]; then
+  echo "[ERROR] CLIENT_ID is required. Use --client-id <id> or set CLIENT_ID env variable."
+  echo "Usage: $0 --client-id <id> [--domain <domain>] [other options]"
+  exit 1
+fi
+# Default DOMAIN if not set
+if [ -z "$DOMAIN" ]; then
+  DOMAIN="${CLIENT_ID}.nerdofmouth.com"
+fi
 
 # Initialize operation flags
 STATUS_ONLY="${STATUS_ONLY:-false}"
