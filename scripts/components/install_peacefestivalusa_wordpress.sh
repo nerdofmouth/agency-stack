@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# --- Argument Parsing (single block) ---
+# --- Argument Parsing (single block, must be at top) ---
 CLIENT_ID="${CLIENT_ID:-}"
 DOMAIN="${DOMAIN:-}"
 ADMIN_EMAIL="${ADMIN_EMAIL:-}"
@@ -40,7 +40,11 @@ while [[ $# -gt 0 ]]; do
     *)
       shift ;;
   esac
-done
+ done
+
+# --- DEBUG: Print VM install flags ---
+echo "[DEBUG] ALLOW_VM_INSTALL: $ALLOW_VM_INSTALL"
+echo "[DEBUG] ALLOW_VM_INSTALL_FLAG: $ALLOW_VM_INSTALL_FLAG"
 
 # --- Source common utilities (single block, with debug) ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
