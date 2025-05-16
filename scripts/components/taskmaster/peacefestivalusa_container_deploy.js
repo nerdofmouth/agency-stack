@@ -16,7 +16,7 @@ const execAsync = util.promisify(exec);
 
 // AgencyStack Charter-compliant paths
 const REPO_ROOT = path.resolve(__dirname, '../../../');
-const LOG_DIR = '/var/log/agency_stack/components';
+const LOG_DIR = '/var/log/home/developer/agency-stack/components';
 const CLIENT_ID = 'peacefestivalusa';
 const LOG_FILE = path.join(LOG_DIR, `${CLIENT_ID}_deployment.log`);
 
@@ -83,8 +83,8 @@ async function runInDevContainer() {
   log('Checking for existing dev container', 'INFO');
   
   // Check if container exists
-  const { stdout: containerCheck } = await execAsync('docker ps -a --filter "name=agency-stack-dev" --format "{{.Names}}"');
-  const containerExists = containerCheck.trim() === 'agency-stack-dev';
+  const { stdout: containerCheck } = await execAsync('docker ps -a --filter "name=agencystack-dev" --format "{{.Names}}"');
+  const containerExists = containerCheck.trim() === 'agencystack-dev';
   
   if (!containerExists) {
     log('Creating development container following AgencyStack Charter principles', 'INFO');
@@ -95,10 +95,10 @@ async function runInDevContainer() {
     log('Development container already exists', 'INFO');
     
     // Make sure the container is running
-    const { stdout: containerStatus } = await execAsync('docker inspect --format="{{.State.Running}}" agency-stack-dev');
+    const { stdout: containerStatus } = await execAsync('docker inspect --format="{{.State.Running}}" agencystack-dev');
     if (containerStatus.trim() !== 'true') {
       log('Starting existing container', 'INFO');
-      await executeCommand('docker start agency-stack-dev');
+      await executeCommand('docker start agencystack-dev');
     }
   }
   
@@ -106,10 +106,10 @@ async function runInDevContainer() {
   log('Running peacefestivalusa deployment in container', 'INFO');
   
   // Setup WordPress and dependencies
-  await executeCommand('docker exec -it agency-stack-dev bash -c "cd /agency_stack && bash scripts/components/install_peacefestivalusa_wordpress.sh --domain peacefestivalusa.localhost --wordpress-port 8082 --admin-email admin@peacefestivalusa.com"');
+  await executeCommand('docker exec -it agencystack-dev bash -c "cd /home/developer/agency-stack && bash scripts/components/install_peacefestivalusa_wordpress.sh --domain peacefestivalusa.localhost --wordpress-port 8082 --admin-email admin@peacefestivalusa.com"');
   
   // Check deployment status
-  await executeCommand('docker exec -it agency-stack-dev bash -c "cd /agency_stack && bash scripts/components/install_peacefestivalusa_wordpress.sh --status"');
+  await executeCommand('docker exec -it agencystack-dev bash -c "cd /home/developer/agency-stack && bash scripts/components/install_peacefestivalusa_wordpress.sh --status"');
   
   // Generate a summary of what was deployed
   log('Deployment complete! Summary:', 'SUCCESS');
@@ -120,7 +120,7 @@ async function runInDevContainer() {
   log('', 'INFO');
   log('NEXT STEPS:', 'INFO');
   log('1. To work with the deployed services:', 'INFO');
-  log('   docker exec -it agency-stack-dev bash', 'COMMAND');
+  log('   docker exec -it agencystack-dev bash', 'COMMAND');
   log('2. For remote deployment, follow the AgencyStack Charter remote workflow:', 'INFO');
   log('   - Add SSH key to the remote server', 'INFO');
   log('   - Execute deploy_peacefestivalusa.sh within the container', 'INFO');
@@ -139,8 +139,8 @@ async function main() {
       log('Running in container environment - proceeding with direct execution', 'INFO');
       
       // Create directories as per Charter
-      await executeCommand('mkdir -p /var/log/agency_stack/components');
-      await executeCommand('mkdir -p /opt/agency_stack/clients/peacefestivalusa');
+      await executeCommand('mkdir -p /var/log/home/developer/agency-stack/components');
+      await executeCommand('mkdir -p /opt/home/developer/agency-stack/clients/peacefestivalusa');
       
       // Install WordPress
       log('Installing PeaceFestivalUSA WordPress', 'INFO');

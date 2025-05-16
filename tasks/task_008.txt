@@ -1,0 +1,11 @@
+# Task ID: 8
+# Title: Systematic audit and fix of install_peacefestivalusa_wordpress.sh block structure
+# Status: done
+# Dependencies: None
+# Priority: high
+# Description: Audit all if/fi, while/done, and heredoc pairs. Remove duplicate flag logic. Refactor for maintainability. Ensure script passes bash -n syntax check.
+# Details:
+
+
+# Test Strategy:
+

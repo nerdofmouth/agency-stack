@@ -39,7 +39,7 @@ echo ""
 echo -e "${YELLOW}Testing access from within container:${RESET}"
 echo -e "${YELLOW}-----------------------------------${RESET}"
 echo -e "Running tests inside container..."
-docker exec -it --user developer agencystack-dev zsh -c "cd ~/agency-stack && bash /opt/agency_stack/clients/default/traefik/test-connection.sh" || echo -e "${RED}Failed to run tests in container${RESET}"
+docker exec -it --user developer agencystack-dev zsh -c "cd /home/developer/agency-stack && bash /opt/agency_stack/clients/default/traefik/test-connection.sh" || echo -e "${RED}Failed to run tests in container${RESET}"
 
 echo ""
 echo -e "${BLUE}============================================${RESET}"

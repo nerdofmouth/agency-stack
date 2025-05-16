@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y \
     bc \
     dnsutils \
     netcat-openbsd \
-    mysql-client \
+    mariadb-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Docker inside the container (Docker-in-Docker setup)

@@ -51,32 +51,32 @@ echo -e "${BLUE}Script: ${CYAN}${SCRIPT_PATH}${NC}"
 
 # Step 1: Create temp directory in container
 echo -e "${YELLOW}Creating temporary installation directory in container...${NC}"
-docker exec "$CONTAINER_NAME" bash -c "mkdir -p /tmp/agency_stack_install"
+docker exec "$CONTAINER_NAME" bash -c "mkdir -p /tmp/home/developer/agency-stack_install"
 
 # Step 2: Copy necessary files from repository to container
 echo -e "${YELLOW}Copying installation scripts to container...${NC}"
 
 # First, copy the component script itself
-docker cp "$SCRIPT_PATH" "$CONTAINER_NAME:/tmp/agency_stack_install/$(basename "$SCRIPT_PATH")"
+docker cp "$SCRIPT_PATH" "$CONTAINER_NAME:/tmp/home/developer/agency-stack_install/$(basename "$SCRIPT_PATH")"
 
 # Copy common utilities that might be needed
 if [ -f "scripts/utils/common.sh" ]; then
-  docker cp "scripts/utils/common.sh" "$CONTAINER_NAME:/tmp/agency_stack_install/common.sh"
+  docker cp "scripts/utils/common.sh" "$CONTAINER_NAME:/tmp/home/developer/agency-stack_install/common.sh"
 fi
 
 # Copy component registry utilities if they exist
 if [ -f "scripts/utils/update_component_registry.sh" ]; then
-  docker cp "scripts/utils/update_component_registry.sh" "$CONTAINER_NAME:/tmp/agency_stack_install/update_component_registry.sh"
+  docker cp "scripts/utils/update_component_registry.sh" "$CONTAINER_NAME:/tmp/home/developer/agency-stack_install/update_component_registry.sh"
 fi
 
 # Step 3: Create necessary directories in container
 echo -e "${YELLOW}Creating necessary installation directories...${NC}"
-docker exec "$CONTAINER_NAME" bash -c "mkdir -p /opt/agency_stack/clients/default"
-docker exec "$CONTAINER_NAME" bash -c "mkdir -p /var/log/agency_stack/components"
+docker exec "$CONTAINER_NAME" bash -c "mkdir -p /opt/home/developer/agency-stack/clients/default"
+docker exec "$CONTAINER_NAME" bash -c "mkdir -p /var/log/home/developer/agency-stack/components"
 
 # Step 4: Execute installation
 echo -e "${YELLOW}Executing installation command...${NC}"
-docker exec -t "$CONTAINER_NAME" bash -c "cd /tmp/agency_stack_install && sudo bash $(basename "$SCRIPT_PATH") $EXTRA_ARGS"
+docker exec -t "$CONTAINER_NAME" bash -c "cd /tmp/home/developer/agency-stack_install && sudo bash $(basename "$SCRIPT_PATH") $EXTRA_ARGS"
 EXIT_CODE=$?
 
 if [ $EXIT_CODE -eq 0 ]; then
@@ -87,6 +87,6 @@ fi
 
 # Step 5: Cleanup
 echo -e "${YELLOW}Cleaning up temporary files...${NC}"
-docker exec "$CONTAINER_NAME" bash -c "rm -rf /tmp/agency_stack_install"
+docker exec "$CONTAINER_NAME" bash -c "rm -rf /tmp/home/developer/agency-stack_install"
 
 exit $EXIT_CODE

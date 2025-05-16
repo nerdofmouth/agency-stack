@@ -41,3 +41,14 @@
 ### Details:
 
 
+## 6. Test and document containerized deployment workflow for PeaceFestivalUSA [pending]
+### Dependencies: None
+### Description: Run and validate the new dev container workflow for PeaceFestivalUSA using custom arguments/configs. Update documentation and task process to reflect containerized, argument-driven deployment and testing.
+### Details:
+- Update Dockerfile.dev to replace mysql-client with mariadb-client
+- Rebuild dev container
+- Run install_peacefestivalusa_wordpress.sh inside the dev container with custom arguments
+- Validate deployment and test scripts
+- Document the workflow and update process docs
+- Ensure this workflow is reflected in the AgencyStack operational discipline and task management system
+

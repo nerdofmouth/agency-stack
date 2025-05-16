@@ -401,7 +401,7 @@
       "description": "Audit all if/fi, while/done, and heredoc pairs. Remove duplicate flag logic. Refactor for maintainability. Ensure script passes bash -n syntax check.",
       "details": "",
       "testStrategy": "",
-      "status": "done",
+      "status": "pending",
       "dependencies": [],
       "priority": "high",
       "subtasks": []

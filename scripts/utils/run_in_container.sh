@@ -72,7 +72,7 @@ if [ "$MOUNT_REPO" = true ]; then
 fi
 
 if [ "$MOUNT_LOGS" = true ]; then
-  MOUNTS="$MOUNTS -v /var/log/agency_stack:/var/log/agency_stack"
+  MOUNTS="$MOUNTS -v /var/log/agencystack-dev:/var/log/agency_stack"
 fi
 
 if [ "$MOUNT_DATA" = true ]; then
@@ -83,11 +83,11 @@ fi
 MOUNTS="$MOUNTS -v /var/run/docker.sock:/var/run/docker.sock"
 
 # Echo the command for debugging
-echo "Running: docker run -it --rm $MOUNTS $CONTAINER_IMAGE /bin/bash -c \"cd /agency_stack && $SCRIPT_PATH $SCRIPT_ARGS\""
+echo "Running: docker run -it --rm $MOUNTS $CONTAINER_IMAGE /bin/bash -c \"cd /home/developer/agency-stack && $SCRIPT_PATH $SCRIPT_ARGS\""
 
 # Run the script in a container
 docker run -it --rm \
   $MOUNTS \
   --network host \
   "$CONTAINER_IMAGE" \
-  /bin/bash -c "cd /agency_stack && apt-get update && apt-get install -y curl docker.io && $SCRIPT_PATH $SCRIPT_ARGS"
+  /bin/bash -c "cd /home/developer/agency-stack && apt-get update && apt-get install -y curl docker.io && $SCRIPT_PATH $SCRIPT_ARGS"
