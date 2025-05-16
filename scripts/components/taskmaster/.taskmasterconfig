@@ -1,0 +1,21 @@
+{
+  "clientId": "peacefestivalusa",
+  "projectRoot": "/root/_repos/agency-stack",
+  "logDir": "/var/log/agency_stack/components",
+  "apiKeys": {
+    "anthropic": "OBFUSCATED",
+    "perplexity": "OBFUSCATED",
+    "openai": "OBFUSCATED",
+    "google": "OBFUSCATED",
+    "mistral": "OBFUSCATED",
+    "openrouter": "OBFUSCATED",
+    "xai": "OBFUSCATED",
+    "azure": "OBFUSCATED"
+  },
+  "mcp": {
+    "enabled": true,
+    "port": 3009,
+    "host": "localhost"
+  },
+  "charter": "AgencyStack Charter v1.0.3"
+}
