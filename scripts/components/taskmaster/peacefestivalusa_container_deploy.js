@@ -106,10 +106,10 @@ async function runInDevContainer() {
   log('Running peacefestivalusa deployment in container', 'INFO');
   
   // Setup WordPress and dependencies
-  await executeCommand('docker exec -it agency-stack-dev bash -c "cd /agency_stack && bash scripts/components/install_peacefestivalusa_wordpress_did.sh --domain peacefestivalusa.localhost --wordpress-port 8082 --admin-email admin@peacefestivalusa.com"');
+  await executeCommand('docker exec -it agency-stack-dev bash -c "cd /agency_stack && bash scripts/components/install_peacefestivalusa_wordpress.sh --domain peacefestivalusa.localhost --wordpress-port 8082 --admin-email admin@peacefestivalusa.com"');
   
   // Check deployment status
-  await executeCommand('docker exec -it agency-stack-dev bash -c "cd /agency_stack && bash scripts/components/install_peacefestivalusa_wordpress_did.sh --status"');
+  await executeCommand('docker exec -it agency-stack-dev bash -c "cd /agency_stack && bash scripts/components/install_peacefestivalusa_wordpress.sh --status"');
   
   // Generate a summary of what was deployed
   log('Deployment complete! Summary:', 'SUCCESS');
@@ -123,7 +123,7 @@ async function runInDevContainer() {
   log('   docker exec -it agency-stack-dev bash', 'COMMAND');
   log('2. For remote deployment, follow the AgencyStack Charter remote workflow:', 'INFO');
   log('   - Add SSH key to the remote server', 'INFO');
-  log('   - Execute deploy_peacefestivalusa_remote.sh within the container', 'INFO');
+  log('   - Execute deploy_peacefestivalusa.sh within the container', 'INFO');
 }
 
 // Main function
@@ -144,11 +144,11 @@ async function main() {
       
       // Install WordPress
       log('Installing PeaceFestivalUSA WordPress', 'INFO');
-      await executeCommand('bash scripts/components/install_peacefestivalusa_wordpress_did.sh --domain peacefestivalusa.localhost --wordpress-port 8082 --admin-email admin@peacefestivalusa.com');
+      await executeCommand('bash scripts/components/install_peacefestivalusa_wordpress.sh --domain peacefestivalusa.localhost --wordpress-port 8082 --admin-email admin@peacefestivalusa.com');
       
       // Check status
       log('Checking installation status', 'INFO');
-      await executeCommand('bash scripts/components/install_peacefestivalusa_wordpress_did.sh --status');
+      await executeCommand('bash scripts/components/install_peacefestivalusa_wordpress.sh --status');
       
     } else {
       // Not in container, use Charter-compliant dev container

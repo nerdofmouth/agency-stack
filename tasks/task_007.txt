@@ -1,0 +1,61 @@
+# Task ID: 7
+# Title: Validate and classify all scripts and key files as usable, redundant, or irrelevant
+# Status: pending
+# Dependencies: None
+# Priority: high
+# Description: Inventory all scripts and key files. Determine which are actively executed or referenced, which are stand-alone duplicates or redundant, and which are irrelevant/disposable. Document findings to prioritize further review and consolidation.
+# Details:
+A comprehensive checklist for manual verification and merging before removing redundant PeaceFestivalUSA scripts has been generated and is available at `/scripts/classification_merge_checklist.md`. This checklist will guide the consolidation process for identified redundant scripts.
+
+# Test Strategy:
+Use the generated merge checklist to verify that all functionality from redundant scripts is properly integrated into main scripts before removal. Test each merged feature individually and then perform integration testing of the consolidated scripts.
+
+# Subtasks:
+## 1. Inventory All Scripts and Key Files [pending]
+### Dependencies: None
+### Description: Compile a comprehensive list of all scripts and key files within the target environment, including their locations and basic metadata.
+### Details:
+Scan directories and repositories for scripts and key files. Record file names, paths, sizes, modification dates, and any available descriptions. Use automation tools where possible to ensure completeness and accuracy.
+
+## 2. Identify Execution and Reference Status [pending]
+### Dependencies: 7.1
+### Description: Determine which scripts and key files are actively executed or referenced by other systems, applications, or processes.
+### Details:
+Analyze logs, configuration files, and codebases to trace execution and references. Use static analysis tools and search for file invocations in scripts, schedulers, and deployment pipelines.
+
+## 3. Detect Redundant or Duplicate Files [pending]
+### Dependencies: 7.2
+### Description: Identify scripts and key files that are stand-alone duplicates or serve redundant purposes within the environment.
+### Details:
+Compare file contents using checksums or diff tools to find duplicates. Review file purposes and overlap in functionality to flag redundancies. Document findings with references to original and duplicate locations.
+
+## 4. Classify Files as Usable, Redundant, or Irrelevant [pending]
+### Dependencies: 7.3
+### Description: Categorize each script and key file based on its execution status and redundancy analysis into usable, redundant, or irrelevant/disposable.
+### Details:
+Apply clear criteria: 'Usable' for actively referenced/executed files, 'Redundant' for duplicates or overlapping functionality, and 'Irrelevant' for files not referenced or obsolete. Document the rationale for each classification.
+
+## 5. Document Findings and Prioritize for Review [pending]
+### Dependencies: 7.4
+### Description: Create a detailed report summarizing the inventory, classifications, and recommendations for further review and consolidation.
+### Details:
+Prepare a structured document or spreadsheet listing all files, their classifications, and notes on priority for review or consolidation. Highlight critical files and those requiring immediate attention.
+
+## 6. Implement PeaceFestivalUSA Script Merge Checklist [done]
+### Dependencies: 7.5
+### Description: Use the generated merge checklist to consolidate redundant PeaceFestivalUSA scripts into main scripts while preserving all functionality.
+### Details:
+Follow the checklist at `/scripts/classification_merge_checklist.md` to merge specific features including: Docker-in-Docker support, test logic, environment config saving, SSH/remote logic, file/DB sync, dry-run options, HTTP-only mode, Traefik/test artifact logic, and TDD logic into appropriate main scripts.
+
+## 7. Verify Merged Functionality Before Removal [done]
+### Dependencies: 7.6
+### Description: Thoroughly test all merged functionality to ensure no features or capabilities are lost during consolidation.
+### Details:
+Verify each item on the merge checklist including: Docker-in-Docker support, test environment configuration, SSH/remote capabilities, file/DB synchronization, dry-run functionality, HTTP-only mode, Traefik integration, test artifact handling, and TDD logic.
+
+## 8. Document Changes and Remove Redundant Scripts [done]
+### Dependencies: 7.7
+### Description: Document all changes made during the consolidation process and safely remove redundant scripts after verification.
+### Details:
+Create comprehensive documentation of all merged features and their new locations. Update any references to old scripts in documentation, configuration files, and other scripts. After thorough verification, remove redundant scripts.
+

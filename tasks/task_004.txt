@@ -1,0 +1,37 @@
+# Task ID: 4
+# Title: Validate all install scripts and Makefile targets for idempotency and auditability
+# Status: pending
+# Dependencies: None
+# Priority: high
+# Description: Test all install scripts and Makefile targets to ensure they are idempotent, rerunnable, and produce auditable logs. Address any issues found.
+# Details:
+
+
+# Test Strategy:
+
+
+# Subtasks:
+## 1. Test each install script for idempotency [pending]
+### Dependencies: None
+### Description: Run each install script multiple times to ensure it can be rerun without harmful side effects. Document any issues found.
+### Details:
+
+
+## 2. Test each Makefile target for idempotency and correct dependency tracking [pending]
+### Dependencies: None
+### Description: Run each Makefile target repeatedly and in different orders to ensure proper idempotency and dependency management. Document all findings.
+### Details:
+
+
+## 3. Ensure all scripts and targets produce auditable logs in /var/log/agency_stack/components/ [pending]
+### Dependencies: None
+### Description: Verify that all install scripts and Makefile targets output logs to /var/log/agency_stack/components/. Update scripts as needed for auditability.
+### Details:
+
+
+## 4. Document any failures and fix issues in scripts/targets as needed [pending]
+### Dependencies: None
+### Description: For any failures or issues found during idempotency or auditability testing, document and resolve them in the repository.
+### Details:
+
+

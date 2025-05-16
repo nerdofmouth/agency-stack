@@ -1,0 +1,37 @@
+# Task ID: 5
+# Title: Ensure all changes are repository-tracked and follow the proper change workflow
+# Status: pending
+# Dependencies: None
+# Priority: high
+# Description: Verify that all modifications are made in the repository, tracked via version control, and deployed only using approved workflows. No direct modifications to live VMs or containers.
+# Details:
+
+
+# Test Strategy:
+
+
+# Subtasks:
+## 1. Verify all modifications are committed to the repo before deployment [pending]
+### Dependencies: None
+### Description: Ensure every change is committed to the repository before any deployment or operational use. Review commit logs for completeness.
+### Details:
+
+
+## 2. Ensure no direct modifications are made to live VMs or containers [pending]
+### Dependencies: None
+### Description: Audit all operational changes to confirm they are made via repository-tracked scripts, Makefile targets, or automated SSH—not direct intervention.
+### Details:
+
+
+## 3. Confirm all deployments use tracked scripts, Makefile targets, or automated SSH commands [pending]
+### Dependencies: None
+### Description: Review and enforce that all deployments are performed using repository-tracked, auditable methods only.
+### Details:
+
+
+## 4. Review commit messages and PRs for auditability and documentation [pending]
+### Dependencies: None
+### Description: Check that all commit messages and pull requests are clear, descriptive, and document the rationale for changes.
+### Details:
+
+

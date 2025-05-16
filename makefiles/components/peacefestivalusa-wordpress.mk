@@ -22,7 +22,7 @@ peacefestivalusa-wordpress:
 # Docker-in-Docker specific target for peacefestivalusa-wordpress
 peacefestivalusa-wordpress-did:
 	@echo "🐳 Installing WordPress for Peace Festival USA in Docker-in-Docker environment..."
-	@$(SCRIPTS_DIR)/components/install_peacefestivalusa_wordpress_did.sh \
+	@$(SCRIPTS_DIR)/components/install_peacefestivalusa_wordpress.sh \
 		--domain=$(DOMAIN) \
 		--admin-email=$(ADMIN_EMAIL) \
 		--wordpress-port=$(WP_PORT) \

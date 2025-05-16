@@ -109,7 +109,7 @@ const deploymentSteps = {
     // PeaceFestivalUSA WordPress Installation
     log('Installing PeaceFestivalUSA WordPress', 'INFO');
     await executeCommand(
-      'bash scripts/components/install_peacefestivalusa_wordpress_did.sh ' +
+      'bash scripts/components/install_peacefestivalusa_wordpress.sh ' +
       '--domain peacefestivalusa.localhost ' +
       '--wordpress-port 8082 ' +
       '--admin-email admin@peacefestivalusa.com'
@@ -125,7 +125,7 @@ const deploymentSteps = {
     
     // Check container status
     log('Checking container status', 'INFO');
-    await executeCommand('bash scripts/components/install_peacefestivalusa_wordpress_did.sh --status');
+    await executeCommand('bash scripts/components/install_peacefestivalusa_wordpress.sh --status');
     
     return true;
   },
@@ -182,7 +182,7 @@ Host peacefestival
       
       // Execute remote deployment
       await executeCommand(
-        `bash scripts/components/deploy_peacefestivalusa_remote.sh ` +
+        `bash scripts/components/deploy_peacefestivalusa.sh ` +
         `--remote-host alpha.nerdofmouth.com ` +
         `--remote-user agencystack ` +
         `--ssh-key ${sshKeyPath} ` +

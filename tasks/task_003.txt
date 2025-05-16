@@ -1,0 +1,37 @@
+# Task ID: 3
+# Title: Update documentation to reflect current operational discipline and workflows
+# Status: pending
+# Dependencies: None
+# Priority: high
+# Description: Update all relevant documentation to accurately reflect AgencyStack’s Charter, TDD protocol, and operational discipline. Ensure all changes are referenced and auditable.
+# Details:
+
+
+# Test Strategy:
+
+
+# Subtasks:
+## 1. Update component docs to reference the latest workflows and Charter [pending]
+### Dependencies: None
+### Description: Update documentation in /docs/pages/components/ to reference the latest AgencyStack workflows, Charter, and operational discipline.
+### Details:
+
+
+## 2. Add missing documentation for any new or changed scripts/utilities [pending]
+### Dependencies: None
+### Description: Ensure all new or updated scripts and utilities are fully documented. Add missing docs as needed.
+### Details:
+
+
+## 3. Ensure all documentation includes TDD protocol and idempotency requirements [pending]
+### Dependencies: None
+### Description: Review and update all documentation to explicitly reference TDD protocol and idempotency requirements for each component or workflow.
+### Details:
+
+
+## 4. Review and update the Charter if new patterns or requirements are discovered [pending]
+### Dependencies: None
+### Description: If new operational patterns or requirements are discovered, update the Charter and reference them in relevant docs.
+### Details:
+
+

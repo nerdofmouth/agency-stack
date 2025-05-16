@@ -1,0 +1,40 @@
+# AgencyStack Review & Consolidation PRD
+
+## Objective
+Complete a comprehensive review and consolidation of all scripts, documentation, and configuration files in the AgencyStack repository to ensure consistency, auditability, and alignment with the AgencyStack Charter and operational discipline.
+
+## Goals
+- Ensure all scripts, docs, and configs are complete, consistent, and up-to-date.
+- Consolidate and deduplicate overlapping logic or documentation.
+- Update documentation to accurately reflect current workflows, TDD, and operational discipline.
+- Validate all install scripts and Makefile targets for idempotency and auditability.
+- Ensure all changes are repository-tracked and follow the proper change workflow.
+- Prepare a summary report of findings and next steps.
+
+## Scope
+- All scripts in /scripts/components/ and /scripts/utils/
+- All docs in /docs/pages/components/
+- All Makefile targets and install scripts
+- All configuration files relevant to installation, deployment, and operation
+
+## Deliverables
+- A set of actionable tasks and subtasks for review, consolidation, documentation, and validation
+- Updated and consolidated scripts, docs, and configs
+- A summary report documenting the process, findings, and recommendations
+
+## Constraints
+- All changes must be made in the repository and be auditable
+- No direct modifications to live VMs or containers
+- All scripts and workflows must be idempotent and rerunnable
+- Documentation must be clear, concise, and referenced in the Charter
+
+## Success Criteria
+- All scripts, docs, and configs are consistent, deduplicated, and up-to-date
+- Documentation accurately reflects operational discipline
+- All install scripts and Makefile targets pass TDD and idempotency checks
+- Summary report is complete and actionable
+
+## Timeline
+- Immediate: Task planning and scoping
+- Short-term: Review, consolidation, and documentation
+- Final: Validation and summary report

@@ -16,6 +16,7 @@ if [[ "$0" != *"/root/_repos/agency-stack/scripts/"* ]]; then
   echo "ERROR: This script must be run from the repository context"
   echo "Run with: /root/_repos/agency-stack/scripts/components/$(basename "$0")"
   exit 1
+fi
 
 # Source common utilities and logging functions
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
@@ -54,6 +55,7 @@ elif is_dev_container; then
   CONTAINER_RUNNING="false"
   DID_MODE="false"
   log_info "Running in host environment"
+fi
 
 # Client-specific variables
 CLIENT_ID="peacefestivalusa"
@@ -148,6 +150,60 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Early exit blocks for special flags
+if [ "$STATUS_ONLY" = "true" ]; then
+  log_info "Checking WordPress installation status for ${CLIENT_ID} (${DOMAIN})..."
+  WP_RUNNING=$(docker ps -q -f "name=${WORDPRESS_CONTAINER_NAME}" 2>/dev/null)
+  DB_RUNNING=$(docker ps -q -f "name=${MARIADB_CONTAINER_NAME}" 2>/dev/null)
+  echo "=== WordPress Status ==="
+  echo "WordPress: $([ -n "$WP_RUNNING" ] && echo "Running" || echo "Not running")"
+  echo "Database: $([ -n "$DB_RUNNING" ] && echo "Running" || echo "Not running")"
+  if [ -n "$WP_RUNNING" ]; then
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://${DOMAIN}" 2>/dev/null)
+    echo "Website: $([ "$HTTP_CODE" = "200" ] && echo "Accessible (HTTP $HTTP_CODE)" || echo "Not accessible (HTTP $HTTP_CODE)")"
+  fi
+  exit 0
+fi
+if [ "$LOGS_ONLY" = "true" ]; then
+  log_info "Viewing WordPress logs for ${CLIENT_ID} (${DOMAIN})..."
+  if [ -f "${WP_DIR}/docker-compose.yml" ]; then
+    cd "${WP_DIR}" && docker-compose logs --tail=100
+  else
+    log_error "Docker Compose file not found for ${CLIENT_ID} WordPress."
+    exit 1
+  fi
+  exit 0
+fi
+if [ "$RESTART_ONLY" = "true" ]; then
+  log_info "Restarting WordPress services for ${CLIENT_ID} (${DOMAIN})..."
+  if [ -f "${WP_DIR}/docker-compose.yml" ]; then
+    cd "${WP_DIR}" && docker-compose restart
+    log_success "WordPress services restarted successfully."
+  else
+    log_error "Docker Compose file not found for ${CLIENT_ID} WordPress."
+    exit 1
+  fi
+  exit 0
+fi
+if [ "$TEST_ONLY" = "true" ]; then
+  log_info "Testing WordPress installation for ${CLIENT_ID} (${DOMAIN})..."
+  WP_RUNNING=$(docker ps -q -f "name=${WORDPRESS_CONTAINER_NAME}" 2>/dev/null)
+  DB_RUNNING=$(docker ps -q -f "name=${MARIADB_CONTAINER_NAME}" 2>/dev/null)
+  if [ -z "$WP_RUNNING" ] || [ -z "$DB_RUNNING" ]; then
+    log_error "WordPress or Database container not running. Start with 'make wordpress CLIENT_ID=${CLIENT_ID}' first."
+    exit 1
+  fi
+  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://${DOMAIN}/wp-json" 2>/dev/null)
+  if [ "$HTTP_CODE" = "200" ]; then
+    log_success "WordPress API test: PASSED (HTTP $HTTP_CODE)"
+  else
+    log_error "WordPress API test: FAILED (HTTP $HTTP_CODE)"
+    exit 1
+  fi
+  log_success "All WordPress tests PASSED"
+  exit 0
+fi
+
 # Force DID_MODE based on parameter if provided
 if [ "$DID_MODE" = "true" ]; then
   CONTAINER_RUNNING="true"
@@ -161,6 +217,7 @@ if [ "$DID_MODE" = "true" ]; then
   else
     log_warning "Docker network configuration function not found"
   fi
+fi
 
 # Set paths based on environment
 if [ "$CONTAINER_RUNNING" = "true" ]; then
@@ -174,9 +231,11 @@ if [ "$CONTAINER_RUNNING" = "true" ]; then
     INSTALL_BASE_DIR="${HOME}/agency_stack"
     LOG_DIR="${HOME}/logs/agency_stack/components"
   fi
+else
   # Host system paths
   INSTALL_BASE_DIR="/opt/agency_stack"
   LOG_DIR="/var/log/agency_stack/components"
+fi
 
 # Ensure log directory exists
 mkdir -p "$LOG_DIR"
@@ -208,77 +267,7 @@ if [ "$CONTAINER_RUNNING" = "true" ] && [ "$DID_MODE" = "true" ]; then
   WP_DIR="${INSTALL_BASE_DIR}/clients/${CLIENT_ID}/wordpress"
 
 mkdir -p "${WP_DIR}"
-
-# Status-only check
-if [ "$STATUS_ONLY" = "true" ]; then
-  log_info "Checking WordPress installation status for ${CLIENT_ID} (${DOMAIN})..."
-  
-  WP_RUNNING=$(docker ps -q -f "name=${WORDPRESS_CONTAINER_NAME}" 2>/dev/null)
-  DB_RUNNING=$(docker ps -q -f "name=${MARIADB_CONTAINER_NAME}" 2>/dev/null)
-  
-  echo "=== WordPress Status ==="
-  echo "WordPress: $([ -n "$WP_RUNNING" ] && echo "Running" || echo "Not running")"
-  echo "Database: $([ -n "$DB_RUNNING" ] && echo "Running" || echo "Not running")"
-  
-  # Check if site is accessible
-  if [ -n "$WP_RUNNING" ]; then
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://${DOMAIN}" 2>/dev/null)
-    echo "Website: $([ "$HTTP_CODE" = "200" ] && echo "Accessible (HTTP $HTTP_CODE)" || echo "Not accessible (HTTP $HTTP_CODE)")"
-  fi
-  
-  exit 0
-
-# Logs-only check
-if [ "$LOGS_ONLY" = "true" ]; then
-  log_info "Viewing WordPress logs for ${CLIENT_ID} (${DOMAIN})..."
-  
-  if [ -f "${WP_DIR}/docker-compose.yml" ]; then
-    cd "${WP_DIR}" && docker-compose logs --tail=100
-  else
-    log_error "Docker Compose file not found for ${CLIENT_ID} WordPress."
-    exit 1
-  fi
-  
-  exit 0
-
-# Restart-only operation
-if [ "$RESTART_ONLY" = "true" ]; then
-  log_info "Restarting WordPress services for ${CLIENT_ID} (${DOMAIN})..."
-  
-  if [ -f "${WP_DIR}/docker-compose.yml" ]; then
-    cd "${WP_DIR}" && docker-compose restart
-    log_success "WordPress services restarted successfully."
-  else
-    log_error "Docker Compose file not found for ${CLIENT_ID} WordPress."
-    exit 1
-  fi
-  
-  exit 0
-
-# Test-only operation
-if [ "$TEST_ONLY" = "true" ]; then
-  log_info "Testing WordPress installation for ${CLIENT_ID} (${DOMAIN})..."
-  
-  # Check if containers are running
-  WP_RUNNING=$(docker ps -q -f "name=${WORDPRESS_CONTAINER_NAME}" 2>/dev/null)
-  DB_RUNNING=$(docker ps -q -f "name=${MARIADB_CONTAINER_NAME}" 2>/dev/null)
-  
-  if [ -z "$WP_RUNNING" ] || [ -z "$DB_RUNNING" ]; then
-    log_error "WordPress or Database container not running. Start with 'make wordpress CLIENT_ID=${CLIENT_ID}' first."
-    exit 1
-  fi
-  
-  # Test WordPress API endpoint
-  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://${DOMAIN}/wp-json" 2>/dev/null)
-  if [ "$HTTP_CODE" = "200" ]; then
-    log_success "WordPress API test: PASSED (HTTP $HTTP_CODE)"
-  else
-    log_error "WordPress API test: FAILED (HTTP $HTTP_CODE)"
-    exit 1
-  fi
-  
-  log_success "All WordPress tests PASSED"
-  exit 0
+fi
 
 # Main installation logic
 log_info "Starting WordPress installation for ${CLIENT_ID} at ${DOMAIN}..."
@@ -422,6 +411,8 @@ if [ -f "${SCRIPT_DIR}/templates/wordpress-entrypoint.sh" ]; then
   # Copy and customize the entrypoint script
   cp "${SCRIPT_DIR}/templates/wordpress-entrypoint.sh" "${WP_DIR}/custom-entrypoint.sh"
   chmod +x "${WP_DIR}/custom-entrypoint.sh"
+  log_success "Custom entrypoint script created from template"
+else
   log_warning "Entrypoint template not found, creating basic entrypoint"
   cat > "${WP_DIR}/custom-entrypoint.sh" <<'EOL'
 #!/bin/bash
@@ -439,6 +430,7 @@ if [ ! -f /tmp/.packages-installed ]; then
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
   touch /tmp/.packages-installed
+fi
 
 # Function to check if MySQL is ready
 function wait_for_db() {
@@ -485,7 +477,8 @@ wait_for_db
 exec docker-entrypoint.sh "$@"
 EOL
   chmod +x "${WP_DIR}/custom-entrypoint.sh"
-log_success "Custom entrypoint script created from template"
+fi
+
 
 # Create WordPress config
 mkdir -p "${WP_DIR}/wp-config"
@@ -619,12 +612,14 @@ WP_RUNNING=\$(docker ps -q -f "name=\${WORDPRESS_CONTAINER_NAME}" 2>/dev/null)
 if [ -z "\$WP_RUNNING" ]; then
   echo "WordPress container not running"
   exit 1
+fi
 
 # Check if WordPress is accessible
 HTTP_CODE=\$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${WP_PORT}" 2>/dev/null)
 if [ "\$HTTP_CODE" != "200" ]; then
   echo "WordPress not accessible (HTTP \$HTTP_CODE)"
   exit 1
+fi
 
 echo "WordPress installation verified successfully"
 exit 0
@@ -635,16 +630,19 @@ chmod +x "${WP_DIR}/verify_wordpress.sh"
 if ! docker network ls | grep -q "${NETWORK_NAME}"; then
   log_info "Creating Docker network: ${NETWORK_NAME}"
   docker network create "${NETWORK_NAME}" || log_error "Failed to create network ${NETWORK_NAME}"
+fi
 
 # Check if Traefik network exists, create if not
 if ! docker network ls | grep -q "traefik-keycloak-default"; then
   log_info "Creating Traefik network: traefik-keycloak-default"
   docker network create traefik-keycloak-default || log_error "Failed to create Traefik network"
+fi
 
 # Remove existing containers if they exist and force is enabled
 if [ "$FORCE" = "true" ]; then
   log_info "Force flag enabled - removing existing containers if present..."
   docker rm -f "${WORDPRESS_CONTAINER_NAME}" "${MARIADB_CONTAINER_NAME}" 2>/dev/null || true
+fi
 
 # Start WordPress with Docker Compose
 log_info "Starting WordPress containers with Docker Compose..."
@@ -678,12 +676,15 @@ if [ -f /tmp/wp-config-agency.php ]; then
   echo "?>" >> /var/www/html/wp-config.php
   
   echo "[$(date)] WordPress configuration updated successfully!"
+else
   echo "[$(date)] Custom configuration file not found!"
+fi
+
 EOF
   
   # Make script executable
   chmod +x "${WP_DIR}/configure_wordpress.sh"
-
+fi
 cd "${WP_DIR}" && docker-compose up -d
 
 # For Docker-in-Docker, run the configuration script
@@ -691,6 +692,7 @@ if [ "$DID_MODE" = "true" ]; then
   log_info "Running WordPress configuration in Docker-in-Docker environment"
   docker cp "${WP_DIR}/configure_wordpress.sh" "${WORDPRESS_CONTAINER_NAME}:/configure_wordpress.sh"
   docker exec -it "${WORDPRESS_CONTAINER_NAME}" bash -c "chmod +x /configure_wordpress.sh && /configure_wordpress.sh" || log_warning "Error running configuration script"
+fi
 
 # Wait for WordPress to be ready
 log_info "Waiting for WordPress to start (this may take a minute)..."
@@ -739,6 +741,7 @@ if [ -f "${SCRIPTS_DIR}/utils/register_component.sh" ]; then
     --docs=true \
     --hardened=true \
     --multi_tenant=true || true
+fi
 
 # Display success message
 log_success "✅ WordPress installation for ${CLIENT_ID} complete"
@@ -764,5 +767,6 @@ Database User: ${WP_DB_USER}
 Database Password: ${WP_DB_PASSWORD}
 EOL
 chmod 600 "${INSTALL_BASE_DIR}/clients/${CLIENT_ID}/.secrets/wordpress-credentials.txt"
+fi
 
 exit 0

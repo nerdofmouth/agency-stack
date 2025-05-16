@@ -1,0 +1,390 @@
+{
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Review all scripts, docs, and configs for completeness and consistency",
+      "description": "Systematically review all scripts in /scripts/components/ and /scripts/utils/, all docs in /docs/pages/components/, and all relevant configuration files to ensure they are complete, consistent, and up-to-date.",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [
+        {
+          "id": 1,
+          "title": "Review all scripts in /scripts/components/ for completeness",
+          "description": "Check all scripts in /scripts/components/ for completeness, including inputs, outputs, and error handling. Cross-check with the inventory/classification report.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 1
+        },
+        {
+          "id": 2,
+          "title": "Review all scripts in /scripts/utils/ for completeness and reusability",
+          "description": "Ensure all scripts in /scripts/utils/ are complete and reusable. Document any gaps or issues found.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 1
+        },
+        {
+          "id": 3,
+          "title": "Review all docs in /docs/pages/components/ for accuracy and coverage",
+          "description": "Audit documentation in /docs/pages/components/ for accuracy and coverage of all components and workflows.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 1
+        },
+        {
+          "id": 4,
+          "title": "Review all configuration files for completeness and alignment",
+          "description": "Check all relevant configuration files for completeness and alignment with operational discipline. Document any issues found.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 1
+        },
+        {
+          "id": 5,
+          "title": "Cross-check reviewed items with the inventory/classification report",
+          "description": "Ensure all reviewed scripts, docs, and configs are cross-checked against the inventory/classification findings for completeness.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 1
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Consolidate and deduplicate overlapping logic or documentation",
+      "description": "Identify and merge duplicate or overlapping logic and documentation across scripts and docs. Ensure a single source of truth for each component and process.",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [
+        {
+          "id": 1,
+          "title": "Identify overlapping scripts or logic in /scripts/components/ and /scripts/utils/",
+          "description": "Scan /scripts/components/ and /scripts/utils/ for overlapping or duplicate scripts and logic. Document all overlaps for consolidation.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 2
+        },
+        {
+          "id": 2,
+          "title": "Identify duplicated or outdated documentation in /docs/pages/components/",
+          "description": "Audit /docs/pages/components/ for duplicated or outdated documentation. Flag all issues for consolidation or removal.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 2
+        },
+        {
+          "id": 3,
+          "title": "Propose consolidation plans for each set of overlaps/duplicates",
+          "description": "For each identified overlap or duplicate, propose a clear consolidation plan and document the rationale.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 2
+        },
+        {
+          "id": 4,
+          "title": "Merge or remove redundant files, ensuring all changes are tracked in the repo",
+          "description": "Execute consolidation by merging or removing redundant files/scripts/docs. Ensure all changes are repository-tracked and auditable.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 2
+        },
+        {
+          "id": 5,
+          "title": "Update references in docs and scripts to point to consolidated sources",
+          "description": "Update all documentation and scripts to reference only the consolidated, authoritative sources. Remove references to deprecated or removed files.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 2
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Update documentation to reflect current operational discipline and workflows",
+      "description": "Update all relevant documentation to accurately reflect AgencyStack’s Charter, TDD protocol, and operational discipline. Ensure all changes are referenced and auditable.",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [
+        {
+          "id": 1,
+          "title": "Update component docs to reference the latest workflows and Charter",
+          "description": "Update documentation in /docs/pages/components/ to reference the latest AgencyStack workflows, Charter, and operational discipline.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 3
+        },
+        {
+          "id": 2,
+          "title": "Add missing documentation for any new or changed scripts/utilities",
+          "description": "Ensure all new or updated scripts and utilities are fully documented. Add missing docs as needed.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 3
+        },
+        {
+          "id": 3,
+          "title": "Ensure all documentation includes TDD protocol and idempotency requirements",
+          "description": "Review and update all documentation to explicitly reference TDD protocol and idempotency requirements for each component or workflow.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 3
+        },
+        {
+          "id": 4,
+          "title": "Review and update the Charter if new patterns or requirements are discovered",
+          "description": "If new operational patterns or requirements are discovered, update the Charter and reference them in relevant docs.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 3
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Validate all install scripts and Makefile targets for idempotency and auditability",
+      "description": "Test all install scripts and Makefile targets to ensure they are idempotent, rerunnable, and produce auditable logs. Address any issues found.",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [
+        {
+          "id": 1,
+          "title": "Test each install script for idempotency",
+          "description": "Run each install script multiple times to ensure it can be rerun without harmful side effects. Document any issues found.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 4
+        },
+        {
+          "id": 2,
+          "title": "Test each Makefile target for idempotency and correct dependency tracking",
+          "description": "Run each Makefile target repeatedly and in different orders to ensure proper idempotency and dependency management. Document all findings.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 4
+        },
+        {
+          "id": 3,
+          "title": "Ensure all scripts and targets produce auditable logs in /var/log/agency_stack/components/",
+          "description": "Verify that all install scripts and Makefile targets output logs to /var/log/agency_stack/components/. Update scripts as needed for auditability.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 4
+        },
+        {
+          "id": 4,
+          "title": "Document any failures and fix issues in scripts/targets as needed",
+          "description": "For any failures or issues found during idempotency or auditability testing, document and resolve them in the repository.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 4
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Ensure all changes are repository-tracked and follow the proper change workflow",
+      "description": "Verify that all modifications are made in the repository, tracked via version control, and deployed only using approved workflows. No direct modifications to live VMs or containers.",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [
+        {
+          "id": 1,
+          "title": "Verify all modifications are committed to the repo before deployment",
+          "description": "Ensure every change is committed to the repository before any deployment or operational use. Review commit logs for completeness.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 5
+        },
+        {
+          "id": 2,
+          "title": "Ensure no direct modifications are made to live VMs or containers",
+          "description": "Audit all operational changes to confirm they are made via repository-tracked scripts, Makefile targets, or automated SSH—not direct intervention.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 5
+        },
+        {
+          "id": 3,
+          "title": "Confirm all deployments use tracked scripts, Makefile targets, or automated SSH commands",
+          "description": "Review and enforce that all deployments are performed using repository-tracked, auditable methods only.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 5
+        },
+        {
+          "id": 4,
+          "title": "Review commit messages and PRs for auditability and documentation",
+          "description": "Check that all commit messages and pull requests are clear, descriptive, and document the rationale for changes.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 5
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Prepare a summary report of findings and next steps",
+      "description": "Document the review and consolidation process, summarize findings, and outline actionable next steps for continuous improvement.",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [
+        {
+          "id": 1,
+          "title": "Summarize key findings from the review, consolidation, and validation steps",
+          "description": "Aggregate and summarize all major findings from the review, consolidation, and validation tasks into a clear, actionable summary.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 6
+        },
+        {
+          "id": 2,
+          "title": "List actionable next steps and recommendations for continuous improvement",
+          "description": "Based on findings, prepare a prioritized list of next steps and recommendations for ongoing improvement of AgencyStack.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 6
+        },
+        {
+          "id": 3,
+          "title": "Share the report with stakeholders and incorporate feedback",
+          "description": "Distribute the summary report to all relevant stakeholders, collect feedback, and incorporate it into the documentation and future plans.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 6
+        },
+        {
+          "id": 4,
+          "title": "Archive the report in the repository for future reference",
+          "description": "Ensure the final summary report is stored in the repository in a discoverable location for future audits and reference.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 6
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Validate and classify all scripts and key files as usable, redundant, or irrelevant",
+      "description": "Inventory all scripts and key files. Determine which are actively executed or referenced, which are stand-alone duplicates or redundant, and which are irrelevant/disposable. Document findings to prioritize further review and consolidation.",
+      "status": "pending",
+      "dependencies": [],
+      "priority": "high",
+      "details": "A comprehensive checklist for manual verification and merging before removing redundant PeaceFestivalUSA scripts has been generated and is available at `/scripts/classification_merge_checklist.md`. This checklist will guide the consolidation process for identified redundant scripts.",
+      "testStrategy": "Use the generated merge checklist to verify that all functionality from redundant scripts is properly integrated into main scripts before removal. Test each merged feature individually and then perform integration testing of the consolidated scripts.",
+      "subtasks": [
+        {
+          "id": 1,
+          "title": "Inventory All Scripts and Key Files",
+          "description": "Compile a comprehensive list of all scripts and key files within the target environment, including their locations and basic metadata.",
+          "dependencies": [],
+          "details": "Scan directories and repositories for scripts and key files. Record file names, paths, sizes, modification dates, and any available descriptions. Use automation tools where possible to ensure completeness and accuracy.",
+          "status": "pending",
+          "testStrategy": "Verify the inventory against known directories and repositories. Cross-check with team members to ensure no files are missed."
+        },
+        {
+          "id": 2,
+          "title": "Identify Execution and Reference Status",
+          "description": "Determine which scripts and key files are actively executed or referenced by other systems, applications, or processes.",
+          "dependencies": [
+            1
+          ],
+          "details": "Analyze logs, configuration files, and codebases to trace execution and references. Use static analysis tools and search for file invocations in scripts, schedulers, and deployment pipelines.",
+          "status": "pending",
+          "testStrategy": "Spot-check a sample of identified files by simulating or reviewing execution paths to confirm active use."
+        },
+        {
+          "id": 3,
+          "title": "Detect Redundant or Duplicate Files",
+          "description": "Identify scripts and key files that are stand-alone duplicates or serve redundant purposes within the environment.",
+          "dependencies": [
+            2
+          ],
+          "details": "Compare file contents using checksums or diff tools to find duplicates. Review file purposes and overlap in functionality to flag redundancies. Document findings with references to original and duplicate locations.",
+          "status": "pending",
+          "testStrategy": "Manually review flagged duplicates and redundancies to confirm accuracy. Validate with stakeholders if necessary."
+        },
+        {
+          "id": 4,
+          "title": "Classify Files as Usable, Redundant, or Irrelevant",
+          "description": "Categorize each script and key file based on its execution status and redundancy analysis into usable, redundant, or irrelevant/disposable.",
+          "dependencies": [
+            3
+          ],
+          "details": "Apply clear criteria: 'Usable' for actively referenced/executed files, 'Redundant' for duplicates or overlapping functionality, and 'Irrelevant' for files not referenced or obsolete. Document the rationale for each classification.",
+          "status": "pending",
+          "testStrategy": "Review a sample of classifications with team members to ensure consistency and correctness."
+        },
+        {
+          "id": 5,
+          "title": "Document Findings and Prioritize for Review",
+          "description": "Create a detailed report summarizing the inventory, classifications, and recommendations for further review and consolidation.",
+          "dependencies": [
+            4
+          ],
+          "details": "Prepare a structured document or spreadsheet listing all files, their classifications, and notes on priority for review or consolidation. Highlight critical files and those requiring immediate attention.",
+          "status": "pending",
+          "testStrategy": "Share the report with stakeholders for feedback and validation. Adjust documentation based on input received."
+        },
+        {
+          "id": 6,
+          "title": "Implement PeaceFestivalUSA Script Merge Checklist",
+          "description": "Use the generated merge checklist to consolidate redundant PeaceFestivalUSA scripts into main scripts while preserving all functionality.",
+          "dependencies": [
+            5
+          ],
+          "details": "Follow the checklist at `/scripts/classification_merge_checklist.md` to merge specific features including: Docker-in-Docker support, test logic, environment config saving, SSH/remote logic, file/DB sync, dry-run options, HTTP-only mode, Traefik/test artifact logic, and TDD logic into appropriate main scripts.",
+          "status": "done",
+          "testStrategy": "Test each merged feature individually to ensure functionality is preserved. Perform integration testing of consolidated scripts to verify all features work together properly."
+        },
+        {
+          "id": 7,
+          "title": "Verify Merged Functionality Before Removal",
+          "description": "Thoroughly test all merged functionality to ensure no features or capabilities are lost during consolidation.",
+          "dependencies": [
+            6
+          ],
+          "details": "Verify each item on the merge checklist including: Docker-in-Docker support, test environment configuration, SSH/remote capabilities, file/DB synchronization, dry-run functionality, HTTP-only mode, Traefik integration, test artifact handling, and TDD logic.",
+          "status": "done",
+          "testStrategy": "Create test cases for each merged feature. Compare behavior of original scripts with consolidated scripts to ensure identical functionality."
+        },
+        {
+          "id": 8,
+          "title": "Document Changes and Remove Redundant Scripts",
+          "description": "Document all changes made during the consolidation process and safely remove redundant scripts after verification.",
+          "dependencies": [
+            7
+          ],
+          "details": "Create comprehensive documentation of all merged features and their new locations. Update any references to old scripts in documentation, configuration files, and other scripts. After thorough verification, remove redundant scripts.",
+          "status": "done",
+          "testStrategy": "Verify that all documentation is accurate and complete. Test that removal of redundant scripts does not break any functionality."
+        }
+      ]
+    }
+  ]
+}
