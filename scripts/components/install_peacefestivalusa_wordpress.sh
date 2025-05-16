@@ -60,6 +60,9 @@ if [[ ! -d "$REPO_ROOT/.git" || ! -d "$REPO_ROOT/scripts" || ! -d "$REPO_ROOT/do
 fi
 
 # --- VM/Container Policy Enforcement (single block) ---
+is_dev_container() {
+  if [ -f "/.dockerenv" ] || grep -q "docker\|lxc" /proc/1/cgroup 2>/dev/null; then
+    if [ -d "/workspaces" ] || [ -d "/home/vscode" ]; then
       return 0 # true, we're in a dev container
     fi
   fi
