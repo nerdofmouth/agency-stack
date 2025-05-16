@@ -31,6 +31,9 @@ done
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
   source "${SCRIPT_DIR}/../utils/common.sh"
+else
+  echo "ERROR: Could not find common.sh"
+  exit 1
 fi
 
 # Enforce containerization (prevent host contamination)
