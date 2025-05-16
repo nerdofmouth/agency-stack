@@ -1,10 +1,16 @@
 #!/bin/bash
 
-# Parse arguments (support --client-id, --domain, --admin-email, --force, etc.)
+# --- Argument Parsing (single block) ---
 CLIENT_ID="${CLIENT_ID:-}"
 DOMAIN="${DOMAIN:-}"
 ADMIN_EMAIL="${ADMIN_EMAIL:-}"
 ALLOW_VM_INSTALL_FLAG=false
+STATUS_ONLY="${STATUS_ONLY:-false}"
+LOGS_ONLY="${LOGS_ONLY:-false}"
+RESTART_ONLY="${RESTART_ONLY:-false}"
+TEST_ONLY="${TEST_ONLY:-false}"
+FORCE="${FORCE:-false}"
+DID_MODE="${DID_MODE:-false}"
 while [[ $# -gt 0 ]]; do
   key="$1"
   case $key in
@@ -22,12 +28,20 @@ while [[ $# -gt 0 ]]; do
       ADMIN_EMAIL="${key#*=}"; shift ;;
     --force)
       ALLOW_VM_INSTALL_FLAG=true; shift ;;
+    --status-only)
+      STATUS_ONLY=true; shift ;;
+    --logs-only)
+      LOGS_ONLY=true; shift ;;
+    --restart-only)
+      RESTART_ONLY=true; shift ;;
+    --test-only)
+      TEST_ONLY=true; shift ;;
     *)
       shift ;;
   esac
 done
 
-# Source common utilities
+# --- Source common utilities (single block, with debug) ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo "[DEBUG] SCRIPT_DIR is: $SCRIPT_DIR"
 echo "[DEBUG] Checking for: ${SCRIPT_DIR}/../utils/common.sh"
@@ -38,30 +52,14 @@ else
   exit 1
 fi
 
-# Enforce containerization (prevent host contamination)
-# (Handled below with ALLOW_VM_INSTALL/--force logic; see AgencyStack Charter)
-# exit_with_warning_if_host
-
-# AgencyStack Component Installer: peacefestivalusa_wordpress.sh
-#
-# Flexible repo context check: must be inside scripts/components/ of a valid AgencyStack repo (with .git, scripts/, docs/)
+# --- Flexible repo context check (single block) ---
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 if [[ ! -d "$REPO_ROOT/.git" || ! -d "$REPO_ROOT/scripts" || ! -d "$REPO_ROOT/docs" ]]; then
   echo "ERROR: This script must be run from inside a valid AgencyStack repository clone (missing .git/scripts/docs in: $REPO_ROOT)"
   exit 1
 fi
 
-# Source common utilities and logging functions
-ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-SCRIPTS_DIR="${ROOT_DIR}/scripts"
-
-  echo "ERROR: Could not find common.sh"
-  exit 1
-
-# Check if running in development container
-is_dev_container() {
-  if [ -f "/.dockerenv" ] || grep -q "docker\|lxc" /proc/1/cgroup 2>/dev/null; then
-    if [ -d "/workspaces" ] || [ -d "/home/vscode" ]; then
+# --- VM/Container Policy Enforcement (single block) ---
       return 0 # true, we're in a dev container
     fi
   fi
