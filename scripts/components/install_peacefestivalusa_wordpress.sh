@@ -1,41 +1,30 @@
 #!/bin/bash
 
-# Parse arguments (support --client-id, --domain, --force, etc.)
+# Parse arguments (support --client-id, --domain, --admin-email, --force, etc.)
 CLIENT_ID="${CLIENT_ID:-}"
 DOMAIN="${DOMAIN:-}"
 ADMIN_EMAIL="${ADMIN_EMAIL:-}"
 ALLOW_VM_INSTALL_FLAG=false
-for ((i=1; i<=$#; i++)); do
-  key="${!i}"
-  if [[ $key == *"="* ]]; then
-    value="${key#*=}"
-    key="${key%%=*}"
-  else
-    value=""
-  fi
+while [[ $# -gt 0 ]]; do
+  key="$1"
   case $key in
     --client-id)
-      CLIENT_ID="${!((i+1))}" ;;
+      CLIENT_ID="$2"; shift 2 ;;
     --client-id=*)
-      CLIENT_ID="$value" ;;
+      CLIENT_ID="${key#*=}"; shift ;;
     --domain)
-      DOMAIN="${!((i+1))}" ;;
+      DOMAIN="$2"; shift 2 ;;
     --domain=*)
-      DOMAIN="$value" ;;
+      DOMAIN="${key#*=}"; shift ;;
     --admin-email)
-      ADMIN_EMAIL="${!((i+1))}" ;;
+      ADMIN_EMAIL="$2"; shift 2 ;;
     --admin-email=*)
-      ADMIN_EMAIL="$value" ;;
+      ADMIN_EMAIL="${key#*=}"; shift ;;
     --force)
-      ALLOW_VM_INSTALL_FLAG=true ;;
-    # Add other flags as needed
+      ALLOW_VM_INSTALL_FLAG=true; shift ;;
+    *)
+      shift ;;
   esac
-  # Do not shift here to preserve positional args for bash for-loop
-  # All flags should be read before any logic uses them
-  # This is a pure parse pass
-  # No logic that uses CLIENT_ID, DOMAIN, etc. should appear before this block
-  # End of argument parsing
-  # Next: source utilities, perform checks, etc.
 done
 
 # Source common utilities
