@@ -1,5 +1,43 @@
 #!/bin/bash
 
+# Parse arguments (support --client-id, --domain, --force, etc.)
+CLIENT_ID="${CLIENT_ID:-}"
+DOMAIN="${DOMAIN:-}"
+ADMIN_EMAIL="${ADMIN_EMAIL:-}"
+ALLOW_VM_INSTALL_FLAG=false
+for ((i=1; i<=$#; i++)); do
+  key="${!i}"
+  if [[ $key == *"="* ]]; then
+    value="${key#*=}"
+    key="${key%%=*}"
+  else
+    value=""
+  fi
+  case $key in
+    --client-id)
+      CLIENT_ID="${!((i+1))}" ;;
+    --client-id=*)
+      CLIENT_ID="$value" ;;
+    --domain)
+      DOMAIN="${!((i+1))}" ;;
+    --domain=*)
+      DOMAIN="$value" ;;
+    --admin-email)
+      ADMIN_EMAIL="${!((i+1))}" ;;
+    --admin-email=*)
+      ADMIN_EMAIL="$value" ;;
+    --force)
+      ALLOW_VM_INSTALL_FLAG=true ;;
+    # Add other flags as needed
+  esac
+  # Do not shift here to preserve positional args for bash for-loop
+  # All flags should be read before any logic uses them
+  # This is a pure parse pass
+  # No logic that uses CLIENT_ID, DOMAIN, etc. should appear before this block
+  # End of argument parsing
+  # Next: source utilities, perform checks, etc.
+done
+
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
