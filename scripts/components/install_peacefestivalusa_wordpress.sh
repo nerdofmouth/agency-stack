@@ -34,7 +34,8 @@ if [[ -f "${SCRIPT_DIR}/../utils/common.sh" ]]; then
 fi
 
 # Enforce containerization (prevent host contamination)
-exit_with_warning_if_host
+# (Handled below with ALLOW_VM_INSTALL/--force logic; see AgencyStack Charter)
+# exit_with_warning_if_host
 
 # AgencyStack Component Installer: peacefestivalusa_wordpress.sh
 # Path: /scripts/components/install_peacefestivalusa_wordpress.sh
