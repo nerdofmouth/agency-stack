@@ -212,8 +212,17 @@ To ensure absolute compliance with the Repository Integrity Policy across all co
 
 3. **Direct VM/Container Modification Prevention**
    - Installation scripts must include safeguards against direct container modification
+   - A remote, isolated VM provisioned for a client (or-multi-client use) is considered a valid, sovereign deployment target. Installation is only prohibited on the AgencyStack management host or any shared infrastructure not dedicated to a client.
    - Test routines must verify configuration originates from repository
-   - Any process that detects direct container/VM modification must fail loudly
+   - Any process that detects direct container/VM modification must fail loudly with above exception:
+   ```bash
+   echo "[CRITICAL ERROR] AgencyStack Charter v1.0.3 requires STRICT CONTAINERIZATION or approved, dedicated VM deployment!"
+   echo "[CRITICAL ERROR] This script must run inside a Docker container, LXC, or a remote, dedicated VM provisioned for a single or multi-client use."
+   echo "[CRITICAL ERROR] Do NOT install components directly on the AgencyStack management host or any shared infrastructure."
+   echo "[INSTRUCTION] If this is a dedicated VM, re-run with ALLOW_VM_INSTALL=true or --force to proceed."
+   echo "[INSTRUCTION] See README_AGENT.md and Charter for policy details."
+   exit 70
+   ```
    - Critical paths must include manifest/checksum validation
 
 4. **Installation Path Verification**

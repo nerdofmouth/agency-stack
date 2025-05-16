@@ -35,26 +35,41 @@ is_dev_container() {
   return 1 # false
 }
 
-# Set Docker-in-Docker detection
-if is_running_in_container; then
-  CONTAINER_RUNNING="true"
-  DID_MODE="true"
-  log_info "Detected Docker-in-Docker environment, adjusting for container compatibility"
-  
-  # Source Docker networking configuration
-  if type configure_docker_network_mode &>/dev/null; then
-    configure_docker_network_mode
-    log_info "Configured Docker networking for container environment"
-  else
-    log_warning "Docker network configuration function not found"
+# Set Docker-in-Docker detection and VM override
+ALLOW_VM_INSTALL_FLAG=false
+for arg in "$@"; do
+  if [[ "$arg" == "--force" ]]; then
+    ALLOW_VM_INSTALL_FLAG=true
+    break
   fi
-elif is_dev_container; then
-  CONTAINER_RUNNING="true"
-  DID_MODE="false"
-  log_info "Detected development container environment"
-  CONTAINER_RUNNING="false"
-  DID_MODE="false"
-  log_info "Running in host environment"
+done
+
+if [ "${ALLOW_VM_INSTALL}" = "true" ] || [ "$ALLOW_VM_INSTALL_FLAG" = "true" ]; then
+  log_warning "Container/VM check bypassed: user asserts this is a dedicated, sovereign VM (per AgencyStack Charter)."
+else
+  if is_running_in_container; then
+    CONTAINER_RUNNING="true"
+    DID_MODE="true"
+    log_info "Detected Docker-in-Docker environment, adjusting for container compatibility"
+    # Source Docker networking configuration
+    if type configure_docker_network_mode &>/dev/null; then
+      configure_docker_network_mode
+      log_info "Configured Docker networking for container environment"
+    else
+      log_warning "Docker network configuration function not found"
+    fi
+  elif is_dev_container; then
+    CONTAINER_RUNNING="true"
+    DID_MODE="false"
+    log_info "Detected development container environment"
+  else
+    echo "[CRITICAL ERROR] AgencyStack Charter v1.0.3 requires STRICT CONTAINERIZATION or approved, dedicated VM deployment!"
+    echo "[CRITICAL ERROR] This script must run inside a Docker container, LXC, or a remote, dedicated VM provisioned for a single client."
+    echo "[CRITICAL ERROR] Do NOT install components directly on the AgencyStack management host or any shared infrastructure."
+    echo "[INSTRUCTION] If this is a dedicated VM, re-run with ALLOW_VM_INSTALL=true or --force to proceed."
+    echo "[INSTRUCTION] See README_AGENT.md and Charter for policy details."
+    exit 70
+  fi
 fi
 
 # Client-specific variables (multi-client ready)
