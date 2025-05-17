@@ -6,11 +6,11 @@
 set -e
 LOGDIR="/var/log/agency_stack/components"
 LOGFILE="$LOGDIR/base_cli_tools.log"
-sudo mkdir -p "$LOGDIR"
-sudo touch "$LOGFILE"
+mkdir -p "$LOGDIR"
+touch "$LOGFILE"
 
 log() {
-  echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1" | sudo tee -a "$LOGFILE"
+  echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOGFILE"
 }
 
 log "Starting base CLI tools installation..."
