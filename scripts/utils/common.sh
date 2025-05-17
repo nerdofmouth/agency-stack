@@ -108,7 +108,11 @@ ensure_log_directory() {
   local log_dir="$1"
   
   # Create the directory if it doesn't exist
-  mkdir -p "$log_dir" 2>/dev/null || true
+  if [[ "$log_dir" == /var/log/agency_stack* ]]; then
+    sudo mkdir -p "$log_dir" 2>/dev/null || true
+  else
+    mkdir -p "$log_dir" 2>/dev/null || true
+  fi
   
   # Check if we can write to it
   if [ ! -w "$log_dir" ]; then
@@ -184,7 +188,11 @@ log_info() {
     # Adjust log path if needed
     if [ -n "${LOG_FILE:-}" ]; then
         local adjusted_log_file="$(adjust_log_path "$LOG_FILE")"
-        echo "[$timestamp] [INFO] $message" >> "$adjusted_log_file" 2>/dev/null || true
+        if [[ "$adjusted_log_file" == /var/log/agency_stack* ]]; then
+            echo "[$timestamp] [INFO] $message" | sudo tee -a "$adjusted_log_file" > /dev/null
+        else
+            echo "[$timestamp] [INFO] $message" >> "$adjusted_log_file" 2>/dev/null || true
+        fi
     fi
     
     # Always output to console
@@ -199,7 +207,11 @@ log_success() {
     # Log to file if LOG_FILE is defined
     if [ -n "${LOG_FILE:-}" ]; then
         local adjusted_log_file="$(adjust_log_path "$LOG_FILE")"
-        echo "[$timestamp] [SUCCESS] ${message}" >> "$adjusted_log_file" 2>/dev/null || true
+        if [[ "$adjusted_log_file" == /var/log/agency_stack* ]]; then
+            echo "[$timestamp] [SUCCESS] ${message}" | sudo tee -a "$adjusted_log_file" > /dev/null
+        else
+            echo "[$timestamp] [SUCCESS] ${message}" >> "$adjusted_log_file" 2>/dev/null || true
+        fi
     fi
 }
 
@@ -211,7 +223,11 @@ log_warning() {
     # Log to file if LOG_FILE is defined
     if [ -n "${LOG_FILE:-}" ]; then
         local adjusted_log_file="$(adjust_log_path "$LOG_FILE")"
-        echo "[$timestamp] [WARNING] ${message}" >> "$adjusted_log_file" 2>/dev/null || true
+        if [[ "$adjusted_log_file" == /var/log/agency_stack* ]]; then
+            echo "[$timestamp] [WARNING] ${message}" | sudo tee -a "$adjusted_log_file" > /dev/null
+        else
+            echo "[$timestamp] [WARNING] ${message}" >> "$adjusted_log_file" 2>/dev/null || true
+        fi
     fi
 }
 
@@ -544,9 +560,92 @@ EOF
 # Set trap for cleanup
 trap cleanup EXIT
 
+# --- BEGIN: AgencyStack Standardized Log File Handling ---
+
+# Check if a path is privileged (requiring sudo)
+is_privileged_path() {
+  local path="$1"
+  # Check if path starts with /var/log/agency_stack
+  if [[ "$path" == /var/log/agency_stack* ]]; then
+    return 0  # True, path is privileged
+  else
+    return 1  # False, path is not privileged
+  fi
+}
+
+# Create a directory with appropriate privileges
+ensure_directory_exists() {
+  local dir_path="$1"
+  
+  if is_privileged_path "$dir_path"; then
+    # Use sudo for privileged paths
+    sudo mkdir -p "$dir_path" 2>/dev/null || true
+    # Ensure appropriate ownership if specified
+    if [[ -n "${2:-}" ]]; then
+      sudo chown "$2" "$dir_path" 2>/dev/null || true
+    fi
+  else
+    # Regular mkdir for non-privileged paths
+    mkdir -p "$dir_path" 2>/dev/null || true
+  fi
+}
+
+# Create or touch a log file with appropriate privileges
+ensure_log_file() {
+  local log_file="$1"
+  
+  # Create parent directory if it doesn't exist
+  ensure_directory_exists "$(dirname "$log_file")"
+  
+  # Create/touch the file with appropriate privileges
+  if is_privileged_path "$log_file"; then
+    # Use sudo tee for privileged paths
+    echo "" | sudo tee -a "$log_file" > /dev/null 2>&1 || true
+    # Ensure appropriate ownership if specified
+    if [[ -n "${2:-}" ]]; then
+      sudo chown "$2" "$log_file" 2>/dev/null || true
+    fi
+  else
+    # Regular touch for non-privileged paths
+    touch "$log_file" 2>/dev/null || true
+  fi
+}
+
+# Write content to a log file with appropriate privileges
+write_to_log_file() {
+  local log_file="$1"
+  local content="$2"
+  
+  # Ensure the log file exists
+  if [[ ! -f "$log_file" ]]; then
+    ensure_log_file "$log_file"
+  fi
+  
+  # Write to the file with appropriate privileges
+  if is_privileged_path "$log_file"; then
+    # Use sudo tee for privileged paths
+    echo "$content" | sudo tee -a "$log_file" > /dev/null 2>&1 || true
+  else
+    # Regular redirection for non-privileged paths
+    echo "$content" >> "$log_file" 2>/dev/null || true
+  fi
+}
+
+# Append timestamp and log level to content and write to log file
+log_to_file() {
+  local log_file="$1"
+  local level="$2"
+  local message="$3"
+  local timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
+  
+  write_to_log_file "$log_file" "[$timestamp] [$level] $message"
+}
+
+# --- END: AgencyStack Standardized Log File Handling ---
+
 # Display script start banner
-log_info "==========================================="
+log_info "===========================================" 
 log_info "Starting $(basename "$0")"
 log_info "CLIENT_ID: ${CLIENT_ID}"
 log_info "DOMAIN: ${DOMAIN}"
-log_info "==========================================="
+log_info "============================================"

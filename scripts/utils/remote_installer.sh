@@ -28,8 +28,18 @@ else
     local level="$1"
     local message="$2"
     local color_message="${3:-$message}"
+    local log_file="/var/log/agency_stack/remote_installer.log"
+    
+    # Display to console
     echo -e "${color_message}"
-    echo "[$(date +'%Y-%m-%d %H:%M:%S')] [$level] $message" >> "/var/log/agency_stack/remote_installer.log"
+    
+    # Create log directory if it doesn't exist
+    if [[ ! -d "/var/log/agency_stack" ]]; then
+      sudo mkdir -p "/var/log/agency_stack" 2>/dev/null || true
+    fi
+    
+    # Write to log file with proper privilege handling
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] [$level] $message" | sudo tee -a "$log_file" > /dev/null 2>&1 || true
   }
 fi
 

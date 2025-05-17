@@ -30,8 +30,8 @@ if [ ! -w "$LOG_DIR" ] && [ ! -w "/var/log" ]; then
 fi
 
 # Ensure log directory exists
-mkdir -p "$COMPONENTS_LOG_DIR"
-touch "$LOG_FILE"
+ensure_directory_exists "$COMPONENTS_LOG_DIR"
+ensure_log_file "$LOG_FILE"
 
 # Check if component registry exists
 if [ ! -f "$COMPONENT_REGISTRY" ]; then
@@ -41,9 +41,14 @@ fi
 
 # Log function
 log() {
-  local timestamp=$(date +"%Y-%m-%d %H:%M:%S")
-  echo "[$timestamp] $1" >> "$LOG_FILE"
-  echo -e "$1"
+  local level="${2:-INFO}"
+  local message="$1"
+  
+  # Write to log file using standardized function
+  log_to_file "$LOG_FILE" "$level" "$message"
+  
+  # Also display to console
+  echo -e "[$level] $message"
 }
 
 # Function to update Keycloak in component registry
