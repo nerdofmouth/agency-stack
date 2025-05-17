@@ -46,6 +46,18 @@ while [[ $# -gt 0 ]]; do
 echo "[DEBUG] ALLOW_VM_INSTALL: $ALLOW_VM_INSTALL"
 echo "[DEBUG] ALLOW_VM_INSTALL_FLAG: $ALLOW_VM_INSTALL_FLAG"
 
+# --- AgencyStack Charter Policy Enforcement ---
+if [[ "$ALLOW_VM_INSTALL" != "true" && "$ALLOW_VM_INSTALL_FLAG" != "true" ]]; then
+  echo "[CRITICAL ERROR] AgencyStack Charter v1.0.3 requires STRICT CONTAINERIZATION or approved, dedicated VM deployment!"
+  echo "[CRITICAL ERROR] This script must run inside a Docker container, LXC, or a remote, dedicated VM provisioned for a single client."
+  echo "[CRITICAL ERROR] Do NOT install components directly on the AgencyStack management host or any shared infrastructure."
+  echo "[INSTRUCTION] If this is a dedicated VM, re-run with ALLOW_VM_INSTALL=true or --force to proceed."
+  echo "[INSTRUCTION] See README_AGENT.md and Charter for policy details."
+  exit 70
+else
+  echo "[INFO] Policy bypass: proceeding with install (ALLOW_VM_INSTALL: $ALLOW_VM_INSTALL, ALLOW_VM_INSTALL_FLAG: $ALLOW_VM_INSTALL_FLAG)"
+fi
+
 # --- Source common utilities (single block, with debug) ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo "[DEBUG] SCRIPT_DIR is: $SCRIPT_DIR"
