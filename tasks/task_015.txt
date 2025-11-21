@@ -1,0 +1,11 @@
+# Task ID: 15
+# Title: Implement permission-aware directory creation utility
+# Status: pending
+# Dependencies: None
+# Priority: high
+# Description: Create a robust utility function that properly creates directories with correct ownership and permissions, using sudo when appropriate for privileged paths.
+# Details:
+The utility should detect when paths require elevated privileges (e.g., /var/log/agency_stack) and use sudo appropriately. It should be idempotent, handle errors gracefully, and work consistently across different environments (VM, container, dev environment). This utility will be used by all component scripts to ensure consistent directory creation patterns that follow Charter principles.
+
+# Test Strategy:
+Test in both privileged and unprivileged contexts, verify idempotency through repeated executions, and ensure proper error handling when permissions are insufficient.

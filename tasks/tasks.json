@@ -405,6 +405,270 @@
       "dependencies": [],
       "priority": "high",
       "subtasks": []
+    },
+    {
+      "id": 9,
+      "title": "Patch all privileged log file creation in /scripts/utils/ and /scripts/components/",
+      "description": "Ensure all log file creation (touch, echo, tee) in /scripts/utils/ and /scripts/components/ use sudo tee for /var/log/agency_stack paths. Prevent permission errors for privileged log paths. Idempotent and compatible with both privileged and unprivileged environments.",
+      "details": "Replace all direct touch/echo to privileged log files with conditional use of sudo tee. Ensure no ad-hoc fixes; all logic must be in repo scripts/utilities.",
+      "testStrategy": "",
+      "status": "in-progress",
+      "dependencies": [],
+      "priority": "high",
+      "subtasks": [
+        {
+          "id": 1,
+          "title": "Audit log file creation in /scripts/utils/",
+          "description": "Search for all instances of touch, echo, and tee in utility scripts. Identify patterns used for log file paths and permissions.",
+          "details": "",
+          "status": "done",
+          "dependencies": [],
+          "parentTaskId": 9
+        },
+        {
+          "id": 2,
+          "title": "Audit log file creation in /scripts/components/",
+          "description": "Focus on component installation scripts. Identify specific permission models used across components.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 9
+        },
+        {
+          "id": 3,
+          "title": "Standardize privileged path detection",
+          "description": "Create consistent pattern for detecting /var/log/agency_stack paths. Implement robust path validation logic compliant with AgencyStack Charter v1.0.3.",
+          "details": "",
+          "status": "done",
+          "dependencies": [],
+          "parentTaskId": 9
+        },
+        {
+          "id": 4,
+          "title": "Implement sudo tee pattern for all identified instances",
+          "description": "Apply conditional sudo based on path for all log file operations. Ensure idempotency with proper error handling.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 9
+        },
+        {
+          "id": 5,
+          "title": "Verify fixes across different environments",
+          "description": "Test in container, VM, and development environments. Validate specifically with Peace Festival USA deployment to ensure all privileged log operations work correctly.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 9
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Audit all install and utility scripts for AgencyStack Charter compliance",
+      "description": "Systematically audit all scripts in /scripts/components/ and /scripts/utils/ for strict compliance with AgencyStack Charter v1.0.3: containerization, idempotency, no direct host modifications, all changes tracked in-repo.",
+      "details": "Document any gaps or issues found. Refactor scripts as needed to ensure all operational logic is repository-driven, idempotent, and auditable.",
+      "testStrategy": "",
+      "status": "pending",
+      "dependencies": [],
+      "priority": "high",
+      "subtasks": []
+    },
+    {
+      "id": 11,
+      "title": "Document logging and permission fixes in component docs and Charter",
+      "description": "Document all recent fixes, lessons learned, and logging/permission handling strategies in /docs/pages/components/ and reference in the Charter.",
+      "status": "pending",
+      "dependencies": [],
+      "priority": "high",
+      "details": "Update documentation to reflect new patterns for privileged path handling, particularly focusing on sudo implementation for privileged paths and ensuring multi-environment compatibility. This documentation task should be completed after the practical fixes are implemented to ensure all lessons learned are captured accurately. Documentation should follow best practices including visual aids where appropriate to explain complex permission handling flows.",
+      "testStrategy": "Have a peer review the documentation to verify it accurately reflects the implemented fixes and is clear enough to guide future development. Test the documentation by having a team member use it to understand and potentially replicate the permission handling patterns in a new context.",
+      "subtasks": [
+        {
+          "id": 11.1,
+          "title": "Document sudo implementation patterns for privileged paths",
+          "status": "pending",
+          "description": "Create detailed documentation on how sudo is used for handling privileged paths, including code examples and best practices."
+        },
+        {
+          "id": 11.2,
+          "title": "Document multi-environment compatibility solutions",
+          "status": "pending",
+          "description": "Document strategies implemented for ensuring logging and permission handling works consistently across different environments."
+        },
+        {
+          "id": 11.3,
+          "title": "Update Charter with references to new documentation",
+          "status": "pending",
+          "description": "Add references in the Charter document pointing to the newly created documentation on permission handling and logging strategies."
+        },
+        {
+          "id": 11.4,
+          "title": "Create visual diagrams for permission flows",
+          "status": "pending",
+          "description": "Develop diagrams that visually represent the permission handling flows to make the documentation more accessible and easier to understand."
+        },
+        {
+          "id": 11.5,
+          "title": "Schedule documentation review session",
+          "status": "pending",
+          "description": "Organize a review session with the development team to ensure the documentation accurately reflects all implemented fixes and follows team documentation standards."
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "Update WordPress and infrastructure docs for current best practices",
+      "description": "Review and update documentation for WordPress deployment and supporting infrastructure to reflect current best practices and Charter alignment.",
+      "details": "Ensure all client-specific logic is multi-tenant ready and does not break AgencyStack patterns. Documentation should be actionable and clear for future deployments.",
+      "testStrategy": "",
+      "status": "pending",
+      "dependencies": [],
+      "priority": "high",
+      "subtasks": []
+    },
+    {
+      "id": 13,
+      "title": "Verify Peace Festival USA deployment scripts for idempotency and syntax",
+      "description": "Ensure all Peace Festival USA deployment scripts pass bash -n syntax check and are fully idempotent. This task is of the highest priority as it directly impacts Peace Festival USA client deployment and must be completed immediately after logging fixes.",
+      "status": "pending",
+      "dependencies": [],
+      "priority": "highest",
+      "details": "Test scripts for re-runnability and correct error handling. Refactor as needed to meet Charter standards. Prioritize this verification and refactoring work directly after logging-related fixes to avoid deployment delays for the client.",
+      "testStrategy": "1. Run each deployment script with 'bash -n' to check for syntax errors.\n2. Execute each script multiple times in a clean and pre-existing environment to verify idempotency (no unintended side effects or failures on repeated runs).\n3. Confirm proper error handling and clear exit codes in all scripts.\n4. Document any changes or refactoring performed to achieve idempotency and syntax compliance.\n5. Coordinate with the logging fixes team to ensure this task is started immediately after their completion.",
+      "subtasks": [
+        {
+          "id": 1,
+          "title": "Run syntax verification on all scripts",
+          "description": "Execute bash -n on all Peace Festival USA scripts. Document and fix any syntax errors in accordance with AgencyStack Charter principles.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 13
+        },
+        {
+          "id": 2,
+          "title": "Test idempotency of install scripts",
+          "description": "Run install scripts in clean environment, then immediately run again to verify no errors or unintended changes. Ensures full compliance with AgencyStack Charter's idempotency requirements.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 13
+        },
+        {
+          "id": 3,
+          "title": "Validate error handling and exit codes",
+          "description": "Test Peace Festival USA scripts with various error conditions. Ensure proper exit codes and error messages following AgencyStack Charter's auditability requirements.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 13
+        },
+        {
+          "id": 4,
+          "title": "Test script performance with patched logging",
+          "description": "Verify Peace Festival USA scripts work with new logging approach. Ensure no permission errors in VM environment while maintaining full repository integrity and idempotency.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 13
+        },
+        {
+          "id": 5,
+          "title": "Create comprehensive deployment verification test",
+          "description": "Develop end-to-end test for full Peace Festival USA deployment. Document expected outcomes and verification points in accordance with AgencyStack Charter's test-driven development protocol.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 13
+        },
+        {
+          "id": 6,
+          "title": "Update deployment documentation",
+          "description": "Reflect any changes made during verification in the repository documentation. Document any gotchas or special considerations to ensure future deployments benefit from current learnings.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 13
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "title": "Create log handling pattern library in utils directory",
+      "description": "Develop a standardized log handling pattern library in scripts/utils/ that properly handles privileged paths, implements idempotent file creation, and follows Charter principles.",
+      "details": "This library should provide standardized functions for log file creation, rotation, and writing that automatically detect privileged paths and use the appropriate sudo/tee patterns. All components should eventually migrate to use this pattern library instead of implementing their own log handling logic. This ensures consistent behavior across all AgencyStack components.",
+      "testStrategy": "Implement unit tests that verify the library works in both privileged and unprivileged environments. Test idempotency by running functions multiple times. Verify sudo patterns work correctly by testing in environments with different permission models.",
+      "status": "pending",
+      "dependencies": [],
+      "priority": "high",
+      "subtasks": [
+        {
+          "id": 1,
+          "title": "Design library API and function signatures",
+          "description": "Define consistent function naming and parameter patterns for log handling. Document expected behaviors and error handling according to AgencyStack Charter principles.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 14
+        },
+        {
+          "id": 2,
+          "title": "Implement core log creation functions",
+          "description": "Write create_log_file() with privilege awareness. Add ensure_log_directory() with proper permissions. Ensure full compliance with AgencyStack Charter's repository-as-source-of-truth principle.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 14
+        },
+        {
+          "id": 3,
+          "title": "Implement log writing functions",
+          "description": "Create write_to_log() with privilege detection. Add timestamp and formatting standardization. Maintain strict compliance with AgencyStack Charter v1.0.3 containerization and repository integrity principles.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 14
+        },
+        {
+          "id": 4,
+          "title": "Implement log rotation and management",
+          "description": "Add size-based and time-based rotation logic. Ensure rotated logs maintain proper permissions and follow AgencyStack directory conventions for component logs.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 14
+        },
+        {
+          "id": 5,
+          "title": "Create migration guide for existing scripts",
+          "description": "Document how to convert existing log handling to new library. Provide examples for common patterns. Ensure alignment with AgencyStack Charter's repository integrity and documentation requirements.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 14
+        },
+        {
+          "id": 6,
+          "title": "Add comprehensive testing",
+          "description": "Create test suite for all functions in privileged/unprivileged contexts. Verify idempotency and error handling. Follows AgencyStack test-driven development protocol.",
+          "details": "",
+          "status": "pending",
+          "dependencies": [],
+          "parentTaskId": 14
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "title": "Implement permission-aware directory creation utility",
+      "description": "Create a robust utility function that properly creates directories with correct ownership and permissions, using sudo when appropriate for privileged paths.",
+      "details": "The utility should detect when paths require elevated privileges (e.g., /var/log/agency_stack) and use sudo appropriately. It should be idempotent, handle errors gracefully, and work consistently across different environments (VM, container, dev environment). This utility will be used by all component scripts to ensure consistent directory creation patterns that follow Charter principles.",
+      "testStrategy": "Test in both privileged and unprivileged contexts, verify idempotency through repeated executions, and ensure proper error handling when permissions are insufficient.",
+      "status": "pending",
+      "dependencies": [],
+      "priority": "high",
+      "subtasks": []
     }
   ]
 }

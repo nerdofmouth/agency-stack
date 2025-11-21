@@ -1,0 +1,43 @@
+# Task ID: 9
+# Title: Patch all privileged log file creation in /scripts/utils/ and /scripts/components/
+# Status: in-progress
+# Dependencies: None
+# Priority: high
+# Description: Ensure all log file creation (touch, echo, tee) in /scripts/utils/ and /scripts/components/ use sudo tee for /var/log/agency_stack paths. Prevent permission errors for privileged log paths. Idempotent and compatible with both privileged and unprivileged environments.
+# Details:
+Replace all direct touch/echo to privileged log files with conditional use of sudo tee. Ensure no ad-hoc fixes; all logic must be in repo scripts/utilities.
+
+# Test Strategy:
+
+
+# Subtasks:
+## 1. Audit log file creation in /scripts/utils/ [done]
+### Dependencies: None
+### Description: Search for all instances of touch, echo, and tee in utility scripts. Identify patterns used for log file paths and permissions.
+### Details:
+
+
+## 2. Audit log file creation in /scripts/components/ [pending]
+### Dependencies: None
+### Description: Focus on component installation scripts. Identify specific permission models used across components.
+### Details:
+
+
+## 3. Standardize privileged path detection [done]
+### Dependencies: None
+### Description: Create consistent pattern for detecting /var/log/agency_stack paths. Implement robust path validation logic compliant with AgencyStack Charter v1.0.3.
+### Details:
+
+
+## 4. Implement sudo tee pattern for all identified instances [pending]
+### Dependencies: None
+### Description: Apply conditional sudo based on path for all log file operations. Ensure idempotency with proper error handling.
+### Details:
+
+
+## 5. Verify fixes across different environments [pending]
+### Dependencies: None
+### Description: Test in container, VM, and development environments. Validate specifically with Peace Festival USA deployment to ensure all privileged log operations work correctly.
+### Details:
+
+

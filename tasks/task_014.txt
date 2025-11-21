@@ -1,0 +1,49 @@
+# Task ID: 14
+# Title: Create log handling pattern library in utils directory
+# Status: pending
+# Dependencies: None
+# Priority: high
+# Description: Develop a standardized log handling pattern library in scripts/utils/ that properly handles privileged paths, implements idempotent file creation, and follows Charter principles.
+# Details:
+This library should provide standardized functions for log file creation, rotation, and writing that automatically detect privileged paths and use the appropriate sudo/tee patterns. All components should eventually migrate to use this pattern library instead of implementing their own log handling logic. This ensures consistent behavior across all AgencyStack components.
+
+# Test Strategy:
+Implement unit tests that verify the library works in both privileged and unprivileged environments. Test idempotency by running functions multiple times. Verify sudo patterns work correctly by testing in environments with different permission models.
+
+# Subtasks:
+## 1. Design library API and function signatures [pending]
+### Dependencies: None
+### Description: Define consistent function naming and parameter patterns for log handling. Document expected behaviors and error handling according to AgencyStack Charter principles.
+### Details:
+
+
+## 2. Implement core log creation functions [pending]
+### Dependencies: None
+### Description: Write create_log_file() with privilege awareness. Add ensure_log_directory() with proper permissions. Ensure full compliance with AgencyStack Charter's repository-as-source-of-truth principle.
+### Details:
+
+
+## 3. Implement log writing functions [pending]
+### Dependencies: None
+### Description: Create write_to_log() with privilege detection. Add timestamp and formatting standardization. Maintain strict compliance with AgencyStack Charter v1.0.3 containerization and repository integrity principles.
+### Details:
+
+
+## 4. Implement log rotation and management [pending]
+### Dependencies: None
+### Description: Add size-based and time-based rotation logic. Ensure rotated logs maintain proper permissions and follow AgencyStack directory conventions for component logs.
+### Details:
+
+
+## 5. Create migration guide for existing scripts [pending]
+### Dependencies: None
+### Description: Document how to convert existing log handling to new library. Provide examples for common patterns. Ensure alignment with AgencyStack Charter's repository integrity and documentation requirements.
+### Details:
+
+
+## 6. Add comprehensive testing [pending]
+### Dependencies: None
+### Description: Create test suite for all functions in privileged/unprivileged contexts. Verify idempotency and error handling. Follows AgencyStack test-driven development protocol.
+### Details:
+
+

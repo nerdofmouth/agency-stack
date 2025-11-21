@@ -1,0 +1,53 @@
+# Task ID: 13
+# Title: Verify Peace Festival USA deployment scripts for idempotency and syntax
+# Status: pending
+# Dependencies: None
+# Priority: highest
+# Description: Ensure all Peace Festival USA deployment scripts pass bash -n syntax check and are fully idempotent. This task is of the highest priority as it directly impacts Peace Festival USA client deployment and must be completed immediately after logging fixes.
+# Details:
+Test scripts for re-runnability and correct error handling. Refactor as needed to meet Charter standards. Prioritize this verification and refactoring work directly after logging-related fixes to avoid deployment delays for the client.
+
+# Test Strategy:
+1. Run each deployment script with 'bash -n' to check for syntax errors.
+2. Execute each script multiple times in a clean and pre-existing environment to verify idempotency (no unintended side effects or failures on repeated runs).
+3. Confirm proper error handling and clear exit codes in all scripts.
+4. Document any changes or refactoring performed to achieve idempotency and syntax compliance.
+5. Coordinate with the logging fixes team to ensure this task is started immediately after their completion.
+
+# Subtasks:
+## 1. Run syntax verification on all scripts [pending]
+### Dependencies: None
+### Description: Execute bash -n on all Peace Festival USA scripts. Document and fix any syntax errors in accordance with AgencyStack Charter principles.
+### Details:
+
+
+## 2. Test idempotency of install scripts [pending]
+### Dependencies: None
+### Description: Run install scripts in clean environment, then immediately run again to verify no errors or unintended changes. Ensures full compliance with AgencyStack Charter's idempotency requirements.
+### Details:
+
+
+## 3. Validate error handling and exit codes [pending]
+### Dependencies: None
+### Description: Test Peace Festival USA scripts with various error conditions. Ensure proper exit codes and error messages following AgencyStack Charter's auditability requirements.
+### Details:
+
+
+## 4. Test script performance with patched logging [pending]
+### Dependencies: None
+### Description: Verify Peace Festival USA scripts work with new logging approach. Ensure no permission errors in VM environment while maintaining full repository integrity and idempotency.
+### Details:
+
+
+## 5. Create comprehensive deployment verification test [pending]
+### Dependencies: None
+### Description: Develop end-to-end test for full Peace Festival USA deployment. Document expected outcomes and verification points in accordance with AgencyStack Charter's test-driven development protocol.
+### Details:
+
+
+## 6. Update deployment documentation [pending]
+### Dependencies: None
+### Description: Reflect any changes made during verification in the repository documentation. Document any gotchas or special considerations to ensure future deployments benefit from current learnings.
+### Details:
+
+

@@ -679,7 +679,6 @@ The following MCP services are now available in your development environment:
 2. Integration Instructions
 A. Basic Service Calls
 
-
 ## 🧠 AgencyStack MCP Server Usage Guide (Current Environment)
 
 This environment is equipped with several MCP servers, each serving a distinct purpose. Use the following guidance to leverage them effectively for documentation, research, planning, automation, and persistent learning:
@@ -737,6 +736,16 @@ This environment is equipped with several MCP servers, each serving a distinct p
 
 ---
 
+### 6. Perplexity Research & Web Search
+
+- **perplexity-mcp**  
+  Use for live research, summarization, and up-to-date web search via Perplexity AI.  
+  *Example:*  
+  - Retrieve recent developments, synthesize research, or answer technical questions using the Perplexity MCP server.  
+  - **Important:** Ensure PATH and environment variables are set explicitly in non-interactive shells (see setup notes).
+
+---
+
 ### 📝 General Instructions
 
 - Always ensure MCP services are running in-container or via WSL2 as defined in the current configuration.
@@ -744,6 +753,12 @@ This environment is equipped with several MCP servers, each serving a distinct p
 - Log all significant learnings and decisions in the sqlite memo system for auditability and future reference.
 - Follow the AgencyStack Charter: never modify live systems directly; all changes flow from the repository.
 
+---
+
+### SequentialThinking Memo Update
+
+**Key learning added:**
+> Perplexity MCP server integration requires explicit PATH handling in non-interactive shells (e.g., when launched via wsl.exe or automated scripts). The CLI should be called directly as `perplexity-mcp`, not as a uvx subcommand. Always set PERPLEXITY_API_KEY and PERPLEXITY_MODEL in the launch environment. Successful test queries return live, cited research results. Update all automation and documentation to reflect these operational details for robust, repeatable deployments.
 ---
 
 # Added by Task Master - Development Workflow Rules

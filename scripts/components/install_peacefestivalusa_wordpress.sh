@@ -69,6 +69,18 @@ else
   exit 1
 fi
 
+# --- Ensure log file is created with proper permissions ---
+LOG_FILE="/var/log/agency_stack/components/peacefestivalusa_wordpress.log"
+if [[ "$LOG_FILE" == /var/log/agency_stack* ]]; then
+  echo "" | sudo tee -a "$LOG_FILE" > /dev/null
+else
+  if [[ "$LOG_FILE" == /var/log/agency_stack* ]]; then
+  echo "" | sudo tee -a "$LOG_FILE" > /dev/null
+else
+  touch "$LOG_FILE"
+fi
+fi
+
 # --- Flexible repo context check (single block) ---
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 if [[ ! -d "$REPO_ROOT/.git" || ! -d "$REPO_ROOT/scripts" || ! -d "$REPO_ROOT/docs" ]]; then
@@ -301,7 +313,11 @@ fi
 # Ensure log directory exists
 mkdir -p "$LOG_DIR"
 LOG_FILE="${LOG_DIR}/${CLIENT_ID}_wordpress.log"
-touch "$LOG_FILE"
+if [[ "$LOG_FILE" == /var/log/agency_stack* ]]; then
+  echo "" | sudo tee -a "$LOG_FILE" > /dev/null
+else
+  touch "$LOG_FILE"
+fi
 
 # Set special networking variables for Docker-in-Docker
 if [ "$DID_MODE" = "true" ]; then

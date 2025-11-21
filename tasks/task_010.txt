@@ -1,0 +1,11 @@
+# Task ID: 10
+# Title: Audit all install and utility scripts for AgencyStack Charter compliance
+# Status: pending
+# Dependencies: None
+# Priority: high
+# Description: Systematically audit all scripts in /scripts/components/ and /scripts/utils/ for strict compliance with AgencyStack Charter v1.0.3: containerization, idempotency, no direct host modifications, all changes tracked in-repo.
+# Details:
+Document any gaps or issues found. Refactor scripts as needed to ensure all operational logic is repository-driven, idempotent, and auditable.
+
+# Test Strategy:
+

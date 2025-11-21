@@ -1,0 +1,11 @@
+# Task ID: 12
+# Title: Update WordPress and infrastructure docs for current best practices
+# Status: pending
+# Dependencies: None
+# Priority: high
+# Description: Review and update documentation for WordPress deployment and supporting infrastructure to reflect current best practices and Charter alignment.
+# Details:
+Ensure all client-specific logic is multi-tenant ready and does not break AgencyStack patterns. Documentation should be actionable and clear for future deployments.
+
+# Test Strategy:
+

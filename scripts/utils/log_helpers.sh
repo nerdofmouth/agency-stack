@@ -89,7 +89,11 @@ rotate_log() {
         
         # Rotate current log
         mv "$log_file" "${log_file}.1" 2>/dev/null || true
-        touch "$log_file" 2>/dev/null || true
+        if [[ "$log_file" == /var/log/agency_stack* ]]; then
+  echo "" | sudo tee -a "$log_file" > /dev/null
+else
+  touch "$log_file" 2>/dev/null || true
+fi
         chmod 640 "$log_file" 2>/dev/null || true
         
         log_info "Log rotation completed for: $log_file"
